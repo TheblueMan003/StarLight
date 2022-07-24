@@ -13,10 +13,10 @@ object TypeParser{
     /**
      * Try to parse a type. If succed return Some[Type] otherwise None
      */
-    def tryParse(text: TokenBufferedIterator)(implicit context: Context):Option[Type] = {
+    def tryParse()(implicit text: TokenBufferedIterator, context: Context):Option[Type] = {
         val state = text.saveState()
         try{
-            Some(parse(text))
+            Some(parse())
         }
         catch{
             case e: Exception => {
@@ -29,7 +29,7 @@ object TypeParser{
     /**
      * Parse a type and return a type value
      */
-    def parse(text: TokenBufferedIterator)(implicit context: Context): Type = {
+    def parse()(implicit text: TokenBufferedIterator, context: Context): Type = {
         /** 
          * Parse a basic Type
          */ 
@@ -47,10 +47,10 @@ object TypeParser{
          */ 
         def listType(): List[Type] = {
             val lst = ArrayBuffer[Type]()
-            lst.addOne(parse(text))
+            lst.addOne(parse())
             while(text.peekNoSpace() == DelimiterToken(",")){
                 text.takeNoSpace()
-                lst.addOne(parse(text))
+                lst.addOne(parse())
             }
             text.requierTokenNoSpace(DelimiterToken(")"))
             lst.toList
@@ -77,9 +77,9 @@ object TypeParser{
             else if (text.peekNoSpace() == OperatorToken("=>")){
                 text.takeNoSpace()
                 typ match{
-                    case TuppleType(sub) => composed(FuncType(sub, parse(text)))
-                    case VoidType => composed(FuncType(List(), parse(text)))
-                    case _ => FuncType(List(typ), parse(text))
+                    case TuppleType(sub) => composed(FuncType(sub, parse()))
+                    case VoidType => composed(FuncType(List(), parse()))
+                    case _ => FuncType(List(typ), parse())
                 }
             }
             else{

@@ -133,6 +133,29 @@ class TokenBufferedIterator(string: List[Token]){
         itIndex = state.itIndex
         start = state.start
     }
+
+        /**
+     * @return Some(operator) if next is an operator token and None otherwise
+     */
+    def getOperator(possible: List[String]): Option[String] = {
+        if (!hasNext()){
+            None
+        }
+        else{
+            peekNoSpace() match{
+                case OperatorToken(name) => { 
+                    if (possible.contains(name)){
+                        takeNoSpace()
+                        Some(name)
+                    }
+                    else{
+                        None
+                    }
+                }
+                case token => None
+            }
+        }
+    }
 }
 
 case class TBIState(start: Int, itIndex: Int)

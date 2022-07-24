@@ -1,3 +1,1 @@
-def test(){
-    int $test
-}
+int test

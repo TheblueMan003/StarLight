@@ -11,27 +11,29 @@ import objects.Modifier
 import objects.Variable
 
 object Parser{
-    def parse(text: TokenBufferedIterator)(implicit context: Context):Instruction = {
+    def parse()(implicit text: TokenBufferedIterator, context: Context):Instruction = {
         if (text.peekNoSpace() == IdentifierToken("namespace")){
             text.takeNoSpace()
             text.takeNoSpace() match{
-                case IdentifierToken(name) => parse(text)(context.root.push(name))
+                case IdentifierToken(name) => parse()(text, context.root.push(name))
                 case other => throw UnexpectedTokenException(other, "IdentifierToken")
             }
         }
-        ???
+        else{
+            parseIntruction()
+        }
     }
 
-    def parseIntruction(text: TokenBufferedIterator)(implicit context: Context):Instruction = {
-        val modifier = ModifierParser.parse(text)
-        val styp = TypeParser.tryParse(text)
+    def parseIntruction()(implicit text: TokenBufferedIterator, context: Context):Instruction = {
+        val modifier = ModifierParser.parse()
+        val styp = TypeParser.tryParse()
         styp match{
-            case Some(typ) => parseObject(text, typ, modifier)
+            case Some(typ) => parseObject(typ, modifier)
             case other => parseIdentifierInstruction(text)
         }
     }
 
-    def parseObject(text: TokenBufferedIterator, typ: Type, modifier: Modifier)(implicit context: Context):Instruction = {
+    def parseObject(typ: Type, modifier: Modifier)(implicit text: TokenBufferedIterator, context: Context):Instruction = {
         text.takeNoSpace() match{
             case DelimiterToken("{") => ???
             case DelimiterToken("(") => ???
