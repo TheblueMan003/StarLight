@@ -80,14 +80,16 @@ object Lexer{
             }
         }
         // Spaces Chars
-        else if (c.isSpaceChar || c == '\n'){
-            text.takeWhile(x => x.isSpaceChar || x == '\n')
-            val cut = text.cut()
+        else if (c == '\n' || c == '\r'){
+            text.takeWhile(x => x == '\r' && x == '\n')
+            ReturnToken
+        }
+        else if (c.isSpaceChar){
+            text.takeWhile(x => x.isSpaceChar && x != '\n')
             SpaceToken
         }
         else{
             val cut = text.cut()
-            Reporter.error(f"Unknown Token ${cut}")
             ErrorToken(cut)
         }
     }

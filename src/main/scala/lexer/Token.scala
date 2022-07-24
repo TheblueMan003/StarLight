@@ -9,6 +9,9 @@ abstract class Token extends Positionable{
 case object EOFToken extends Token{
     override def toString(): String = f"EOF"
 }
+case object ReturnToken extends Token{
+    override def toString(): String = f"\\n"
+}
 case object SpaceToken extends Token{
     override def toString(): String = f"Space"
 }

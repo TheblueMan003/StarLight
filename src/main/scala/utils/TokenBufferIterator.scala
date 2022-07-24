@@ -28,6 +28,7 @@ class TokenBufferedIterator(string: List[Token]){
         c match{
             case SpaceToken => takeNoSpace()
             case CommentToken(_) => takeNoSpace()
+            case ReturnToken => takeNoSpace()
             case _ => c
         }
     }
@@ -59,6 +60,7 @@ class TokenBufferedIterator(string: List[Token]){
             c match{
                 case SpaceToken => peekNoSpace(acc+1)
                 case CommentToken(_) => peekNoSpace(acc+1)
+                case ReturnToken => peekNoSpace(acc+1)
                 case _ => c
             }
         }

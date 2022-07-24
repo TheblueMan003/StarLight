@@ -37,15 +37,17 @@ class Context(name: String, parent: Context = null, _root: Context = null) {
     def getVariable(identifier: Identifier): Variable = {
         getElement(_.variables)(identifier)
     }
-    def addVariable(variable: Variable) = {
+    def addVariable(variable: Variable): Variable = {
         variables.addOne(variable.name, variable)
+        variable
     }
 
     def getFunction(identifier: Identifier): Function = {
         getElement(_.functions)(identifier)
     }
-    def addFunction(function: Function) = {
+    def addFunction(function: Function): Function = {
         functions.addOne(function.name, function)
+        function
     }
 
 
