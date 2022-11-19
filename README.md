@@ -1,3 +1,17 @@
+# Notation
+Here are some notion used in this ReadMe:
+
+`<value>` needed value
+
+`[value]` optional value
+
+`value*` repeated value (usually splitted by a commat)
+
+# How to use
+## program argument
+-i <list of source files>: Specifify which files to use. Order doesn't matter. If a directory is given, all the files in it will be taken.
+-o <output path>: Specifify the output of the datapack
+
 # Feature
 ## Variables
 Variables can be declared with 
@@ -23,10 +37,9 @@ If the variable is tuple, then the tuple with be unpack
 ## Function
 Functions can be declared with 
 ```
-[def] <modifier> <name>([<type> <argument name>])<block or instruction>
+[def] <modifier> <name>([<type> <argument name>]*)<block or instruction>
 ```
 or with
 ```
-[def] <modifier> <type> <variable1_name>, [variable2_name], [variable3_name] ...
+[def] <modifier> <type> <name>([<type> <argument name>]*)<block or instruction>
 ```
-run -i G:/005_SoftwareDev/StarLight/src/main/test/test.sl -o G:/005_SoftwareDev/StarLight/src/main/test/output
