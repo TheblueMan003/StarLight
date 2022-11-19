@@ -3,6 +3,7 @@ package fos
 import scala.util.parsing.input.Positional
 import objects.Identifier
 import objects.Variable
+import fos.Compilation.Selector.Selector
 
 sealed abstract class Expression extends Positional{
     def hasIntValue(): Boolean
@@ -53,6 +54,12 @@ case class RangeValue(val min: Expression, val max: Expression) extends Expressi
     override def getIntValue(): Int = ???
     override def hasIntValue(): Boolean = false
 }
+case class SelectorValue(val value: Selector) extends Expression{
+    override def toString(): String = value.toString()
+    override def getIntValue(): Int = ???
+    override def hasIntValue(): Boolean = false
+}
+
 
 
 case class BinaryOperation(val op: String, val left: Expression, val right: Expression) extends Expression{

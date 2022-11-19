@@ -86,7 +86,10 @@ class Context(name: String, parent: Context = null, _root: Context = null) {
     def getFreshVariable(typ: Type): Variable = {
         synchronized{
             varId += 1
-            addVariable(Variable(this, "_"+varId.toString(), typ, Modifier.newPrivate()))
+            val vari = Variable(this, "_"+varId.toString(), typ, Modifier.newPrivate())
+            addVariable(vari)
+            vari.generate()(this)
+            vari
         }
     }
     def getFreshBlock(content: List[String]): BlockFunction = {

@@ -4,6 +4,7 @@ import fos.{If, SmallValue, Expression, ElseIf}
 import objects.{Context, Variable}
 import fos.*
 import objects.types.IntType
+import objects.types.EntityType
 
 object Execute{
     def ifs(ifb: If)(implicit context: Context): List[String] = {
@@ -17,7 +18,6 @@ object Execute{
         val cbs = ElseIf(ifb.cond, ifb.ifBlock) :: ifb.elseBlock
         val cbs2 = cbs.map(x => (getIfCase(Utils.simplify(x.cond)), x.ifBlock)).filter(x => x._1 != IFFalse)
         val multi = cbs2.length > 1 && isMulti(cbs2)
-
 
         val length = cbs.length
         var i = 0
@@ -36,7 +36,7 @@ object Execute{
                     makeExecute(getListCase(List(IFNotValueCase(LinkedVariableValue(vari)))), exp._1)
             }
 
-            if (exp._2.head == IFTrue){
+            if (exp._2.length == 1 && exp._2.head == IFTrue && !multi){
                 content = content ::: fos.Compiler.compile(inner)
                 return content
             }
@@ -84,7 +84,7 @@ object Execute{
      * Concat List of IFCase to String
      */
     private def getListCase(expr: List[IFCase])(implicit context: Context): String = {
-        expr.map(_.get()).foldLeft("")(_ + " " + _)
+        expr.filter(_ != IFTrue).filter(_ != IFFalse).map(_.get()).foldLeft("")(_ + " " + _)
     }
 
 
@@ -96,6 +96,7 @@ object Execute{
             case IntValue(value) => if value == 0 then (List(), List(IFFalse)) else (List(), List(IFTrue))
             case FloatValue(value) => if value == 0 then (List(), List(IFFalse)) else (List(), List(IFTrue))
             case BoolValue(value) => if value then (List(), List(IFTrue)) else (List(), List(IFFalse))
+            case SelectorValue(value) => (List(), List(IFValueCase(expr)))
             case vari: VariableValue => (List(), List(IFValueCase(vari)))
             case vari: LinkedVariableValue => (List(), List(IFValueCase(vari)))
             case BinaryOperation(">" | "<" | ">=" | "<=" | "==" | "!=", VariableValue(left), right) if right.hasIntValue() => (List(), List(IFValueCase(expr)))
@@ -127,6 +128,10 @@ object Execute{
                     }
                     case "||" => {
                         ???
+                    }
+                    case _ => {
+                        val v = Utils.simplifyToVariable(expr)
+                        (v._1, List(IFValueCase(v._2)))
                     }
                 }
             }
@@ -197,11 +202,17 @@ trait IFCase{
 case class IFValueCase(val value: Expression) extends IFCase{
     def get()(implicit context: Context): String = {
         value match{
+            case SelectorValue(selector) => {
+                f"if entity ${selector.getString()}"
+            }
             case VariableValue(name) => {
-                f"unless score ${context.getVariable(name).getSelector()} matches 0"
+                IFValueCase(LinkedVariableValue(context.getVariable(name))).get()
             }
             case LinkedVariableValue(vari) => {
-                f"unless score ${vari.getSelector()} matches 0"
+                vari.getType() match{
+                    case EntityType => f"if entity @e[tag=${vari.tagName}]"
+                    case _ => f"unless score ${vari.getSelector()} matches 0"
+                }
             }
             case BinaryOperation(">" | "<" | ">=" | "<=" | "==", VariableValue(left), VariableValue(right))=> {
                 val op = value.asInstanceOf[BinaryOperation].op
@@ -273,14 +284,15 @@ def getComparatorInverse(op: String, value: Int):String={
 
 case class IFNotValueCase(val value: Expression) extends IFCase{
     def get()(implicit context: Context): String = {
-        value match{
-            case VariableValue(name) => {
-                f"if score ${context.getVariable(name).getSelector()} matches 0"
-            }
-            case LinkedVariableValue(vari) => {
-                f"if score ${vari.getSelector()} matches 0"
-            }
-            case a => throw new Exception(f"ERROR IFVALUECASE NOT HANDLED: $a")
+        val ret = IFValueCase(value).get()
+        if (ret.startsWith("if")){
+            "unless"+ret.substring(2)
+        }
+        else if (ret.startsWith("unless")){
+            "if"+ret.substring(6)
+        }
+        else{
+            ret
         }
     }
 }

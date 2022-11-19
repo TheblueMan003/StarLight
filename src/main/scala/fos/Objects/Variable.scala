@@ -3,8 +3,11 @@ package objects
 import types.*
 import fos.*
 
+private val entityTypeSubVariable = List((BoolType, "isPlayer"))
+
 class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) extends CObject(context, name, _modifier) with Typed(typ){
   var tupleVari: List[Variable] = List()
+  val tagName = fullName
 
   def generate()(implicit context: Context):Unit = {
     typ match
@@ -15,6 +18,11 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
         case TupleType(sub) => {
             val ctx = context.push(name)
             tupleVari = sub.zipWithIndex.map((t, i) => ctx.addVariable(new Variable(ctx, f"$i", t, _modifier)))
+            tupleVari.map(_.generate()(ctx))
+        }
+        case EntityType => {
+            val ctx = context.push(name)
+            tupleVari = entityTypeSubVariable.map((t, n) => ctx.addVariable(new Variable(ctx, n, t, _modifier)))
             tupleVari.map(_.generate()(ctx))
         }
         case _ => {
@@ -39,6 +47,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
                     case BoolType => assignBool(op, value)
                     case TupleType(sub) => assignTuple(op, value)                    
                     case FuncType(source, out) => assignFunc(op, value)
+                    case EntityType => assignEntity(op, value)
             }
         }
     }
@@ -220,7 +229,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
                 case "&=" => List(f"scoreboard players operation ${getSelector()} *= ${vari.getSelector()}")
                 case "|=" => List(f"scoreboard players operation ${getSelector()} += ${vari.getSelector()}")
                 case ":=" => List(f"${checkNull()} scoreboard players operation ${getSelector()} $op  ${vari.getSelector()}")
-                case _ => List(f"scoreboard players operation ${getSelector()} $op ${value} ${vari.getSelector()}")
+                case _ => List(f"scoreboard players operation ${getSelector()} $op ${vari.getSelector()}")
         case FunctionCallValue(name, args) => context.getFunction(name, args).call(this)
         case bin: BinaryOperation => assignBinaryOperator(op, bin)
         case _ => throw new Exception(f"Unknown cast to bool $value")
@@ -311,6 +320,83 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
         case TupleValue(value) => tupleVari.zip(value).flatMap((t, v) => t.assign(op, v))
         case v => tupleVari.flatMap(t => t.assign(op, v))
   }
+  def removeEntityTag()(implicit context: Context)={
+    Compiler.compile(If(LinkedVariableValue(tupleVari(0)), 
+                        CMD(f"tag @a[tag=${tagName}] remove $tagName"), 
+                        List(ElseIf(BoolValue(true), CMD(f"tag @e[tag=${tagName}] remove $tagName")))))
+  }
+  def assignEntity(op: String, expr: Expression)(implicit context: Context):List[String]={
+    op match{
+        case "=" => {
+            expr match
+                case VariableValue(name) => {
+                    val vari = context.getVariable(name)
+
+                    // Remove tag to previous entities
+                    removeEntityTag():::
+                    // copy fields
+                    tupleVari.zip(vari.tupleVari).flatMap((t, v) => t.assign(op, LinkedVariableValue(v))) :::
+                    // Add tag to new entities
+                    Compiler.compile(If(LinkedVariableValue(tupleVari(0)), 
+                                        CMD(f"tag @a[tag=${vari.tagName}] add $tagName"), 
+                                        List(ElseIf(BoolValue(true), CMD(f"tag @e[tag=${vari.tagName}] add $tagName")))))
+                }
+                case IntValue(0) => List()
+                case SelectorValue(value) => {
+                    // Remove tag to previous entities
+                    removeEntityTag():::
+                    // copy fields
+                    tupleVari.zip(List(BoolValue(value.isPlayer))).flatMap((t, v) => t.assign(op, v)) ::: 
+                    // Add tag to new entities
+                    List(f"tag ${value.getString()} add $tagName")
+                }
+                case bin: BinaryOperation => assignBinaryOperator(op, bin)
+                case _ => throw new Exception(f"No cast from ${expr} to entity")
+        }
+        case "+=" | "&=" => {
+            expr match
+                case VariableValue(name) => {
+                    val vari = context.getVariable(name)
+
+                    // copy fields
+                    tupleVari.zip(vari.tupleVari).flatMap((t, v) => t.assign(op, LinkedVariableValue(v))) :::
+                    // Add tag to new entities
+                    Compiler.compile(If(LinkedVariableValue(tupleVari(0)), 
+                                        CMD(f"tag @a[tag=${vari.tagName}] add $tagName"), 
+                                        List(ElseIf(BoolValue(true), CMD(f"tag @e[tag=${vari.tagName}] add $tagName")))))
+                }
+                case IntValue(0) => List()
+                case SelectorValue(value) => {
+                    // Remove copy fields
+                    tupleVari.zip(List(BoolValue(value.isPlayer))).flatMap((t, v) => t.assign(op, v)) ::: 
+                    // Add tag to new entities
+                    List(f"tag ${value.getString()} add $tagName")
+                }
+                case bin: BinaryOperation => assignBinaryOperator(op, bin)
+                case _ => throw new Exception(f"No cast from ${expr} to entity")
+        }
+        case "-=" | "/=" => {
+            expr match
+                case VariableValue(name) => {
+                    val vari = context.getVariable(name)
+
+                    // Add tag to new entities
+                    Compiler.compile(If(LinkedVariableValue(tupleVari(0)), 
+                                        CMD(f"tag @a[tag=${vari.tagName}] remove $tagName"), 
+                                        List(ElseIf(BoolValue(true), CMD(f"tag @e[tag=${vari.tagName}] remove $tagName")))))
+                }
+                case IntValue(0) => List()
+                case SelectorValue(value) => {
+                    // Add tag to new entities
+                    List(f"tag ${value.getString()} remove $tagName")
+                }
+                case bin: BinaryOperation => assignBinaryOperator(op, bin)
+                case _ => throw new Exception(f"No cast from ${expr} to entity")
+        }
+        case ":=" => { return List(f"${checkNull()} ${assignEntity("=", expr).head}")}
+        case _ => throw new Exception(f"Illegal operation with ${name}: $op")
+    }
+  }
 
 
 
@@ -320,6 +406,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
         case FloatValue(value) => false
         case BoolValue(value) => false
         case JsonValue(content) => false
+        case SelectorValue(value) => false
         case VariableValue(name1) => context.tryGetVariable(name1) == Some(this)
         case LinkedVariableValue(vari) => vari == this
         case BinaryOperation(op, left, right) => isPresentIn(left) || isPresentIn(right)

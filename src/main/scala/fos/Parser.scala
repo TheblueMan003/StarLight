@@ -7,13 +7,14 @@ import objects.{Modifier, Protection}
 import objects.types.VoidType
 import scala.util.parsing.combinator._
 import objects.Identifier
+import fos.Compilation.Selector.*
 
 object Parser extends StandardTokenParsers{
-  lexical.delimiters ++= List("(", ")", "\\", ".", ":", "=", "->", "{", "}", ",", "*", "[", "]", "/", "+", "-", "*", "/", "%", "&&", "||", "=>", ";",
-                              "+=", "-=", "/=", "*=", "?=", ":=", "%", "@", "@a", "@s", "@r", "@p", "~", "^", "<=", "==", ">=", "<", ">", "!=")
+  lexical.delimiters ++= List("(", ")", "\\", ".", ":", "=", "->", "{", "}", ",", "*", "[", "]", "/", "+", "-", "*", "/", "\\", "%", "&&", "||", "=>", ";",
+                              "+=", "-=", "/=", "*=", "?=", ":=", "%", "@", "@e", "@a", "@s", "@r", "@p", "~", "^", "<=", "==", ">=", "<", ">", "!=")
   lexical.reserved   ++= List("bool", "int", "float", "void", "true", "false", "if", "then", "else", "return", "switch", "for", "do", "while",
                               "var", "val", "def", "package", "struct", "lazy", "jsonfile",
-                              "public", "protected", "private", "entity")
+                              "public", "protected", "private", "entity", "scoreboard")
 
 
   def block: Parser[Instruction] = "{" ~> rep(instruction) <~ "}" ^^ (p => InstructionBlock(p))
@@ -23,7 +24,8 @@ object Parser extends StandardTokenParsers{
 
 
 
-  def jsonValueStr: Parser[String] = (((numericLit <~ ".") ~ numericLit) ^^ { p => p._1 + "." + p._2 } 
+  def floatValue: Parser[Double] = (numericLit <~ ".") ~ numericLit ^^ { p => (p._1 + "." + p._2).toDouble } 
+  def jsonValueStr: Parser[String] = (floatValue ^^ { p => p.toString() } 
                                     | numericLit | stringLit | jsonStr 
                                     | ("[" ~> repsep(jsonValueStr, ",")) <~ "]" ^^ { p => "[" + p.reduce(_ + ","+ _) + "]" }
                                     )^^ { p => p.toString }
@@ -31,7 +33,7 @@ object Parser extends StandardTokenParsers{
   def jsonStr: Parser[String] = "{" ~> rep1sep(jsonKeypairStr, ",") <~ "}" ^^ { p => "{" + p.reduce(_ + ","+ _) + "}" }
 
 
-  def jsonValue: Parser[JSONElement] = ((numericLit <~ ".") ~ numericLit) ^^ { p => JsonFloat((p._1 + "." + p._2).toDouble) } 
+  def jsonValue: Parser[JSONElement] = floatValue ^^ { p => JsonFloat(p) } 
                                     | numericLit ^^ { p => JsonInt(p.toInt) } 
                                     | stringLit ^^ { p => JsonString(p) }
                                     | json
@@ -41,9 +43,6 @@ object Parser extends StandardTokenParsers{
   def json: Parser[JSONElement] = "{" ~> rep1sep(jsonKeypair, ",") <~ "}" ^^ { p => JsonDictionary(p.toMap) }
 
 
-
-  def selectorFilter: Parser[String] = ident ~ "=" ~ (ident | jsonStr) ^^ { p => p.toString }
-  def selector: Parser[String] = ("@a" | "@s" | "@e" | "@p" | "@r") ~ opt("[" ~ rep1sep(selectorFilter, ",") ~ "]") ^^ { p => if p._2.isDefined then p._1 + p._2.toString() else p._1 }
 
   def argument: Parser[Argument] = types ~ ident ~ opt("=" ~> expr) ^^ { p => Argument(p._1._2, p._1._1, p._2) }
 
@@ -55,7 +54,7 @@ object Parser extends StandardTokenParsers{
       | (modifier <~ "struct") ~ ident ~ block ^^ (p => StructDecl(p._1._2, p._2, p._1._1)) // Struct Dec
       | varDeclaration
       | varAssignment
-      | "%" ~> rep(ident | selector | jsonStr | "~" | "^") <~ "%" ^^ { p => CMD(p.reduce(_ + " " + _)) }
+      | "%" ~> rep(ident | jsonStr | "~" | "^") <~ "%" ^^ { p => CMD(p.reduce(_ + " " + _)) }
       | ifs
       | "return" ~> expr ^^ (Return(_))
       | block
@@ -100,8 +99,20 @@ object Parser extends StandardTokenParsers{
       }
 
 
+
+
+  def sfRange: Parser[SelectorFilterValue] = (floatValue <~ "..") ~ floatValue ^^ (p => SelectorRange(p._1, p._2))
+  def sfNumber: Parser[SelectorFilterValue] = floatValue ^^ (SelectorNumber(_))
+  def sfString: Parser[SelectorFilterValue] = stringLit ^^ (SelectorString(_))
+  def sfIdentifier: Parser[SelectorFilterValue] = ident2 ^^ (SelectorIdentifier(_))
+
+  def selectorFilterValue = sfRange | sfNumber | sfString | sfIdentifier
+  def selectorFilter: Parser[(String, SelectorFilterValue)] = (ident <~ "=") ~ selectorFilterValue ^^ { p => (p._1, p._2) }
+  def selector: Parser[Selector] = ("@a" | "@s" | "@e" | "@p" | "@r") ~ opt("[" ~> rep1sep(selectorFilter, ",") <~ "]") ^^ { p => Selector.parse(p._1, p._2.getOrElse(List())) }
+
+
   def exprBottom: Parser[Expression] = 
-    (numericLit <~ ".") ~ numericLit ^^ (p => FloatValue((p._1 + "."+p._2).toDouble))
+    floatValue ^^ (p => FloatValue(p))
     | numericLit ^^ (p => IntValue(p.toInt))
     | "-" ~> exprBottom ^^ (BinaryOperation("-", IntValue(0), _))
     | "true" ^^^ BoolValue(true)
@@ -110,11 +121,12 @@ object Parser extends StandardTokenParsers{
     | ident2 ^^ (VariableValue(_))
     | "(" ~> expr <~ ")"
     | json ^^ (JsonValue(_))
+    | selector ^^ (SelectorValue(_))
 
   def comparator: Parser[String] = "<" | "<=" | ">=" | ">" | "==" | "!="
 
   def exprMod: Parser[Expression] = exprBottom ~ rep("%" ~> exprMod) ^^ {unpack("%", _)}
-  def exprDiv: Parser[Expression] = exprMod ~ rep("/" ~> exprDiv) ^^ {unpack("/", _)}
+  def exprDiv: Parser[Expression] = exprMod ~ rep(("/" | "\\") ~> exprDiv) ^^ {unpack("/", _)}
   def exprMult: Parser[Expression] = exprDiv ~ rep("*" ~> exprMult) ^^ {unpack("*", _)}
   def exprSub: Parser[Expression] = exprMult ~ rep("-" ~> exprSub) ^^ {unpack("-", _)}
   def exprAdd: Parser[Expression] = exprSub ~ rep("+" ~> exprAdd) ^^ {unpack("+", _)}
@@ -130,12 +142,15 @@ object Parser extends StandardTokenParsers{
   def unpack(p: (Expression ~ List[String ~ Expression])): Expression = {
     if p._2.isEmpty then p._1 else p._2.foldLeft(p._1)((e, p) => BinaryOperation(p._1, e, p._2))
   }
+
+
   
   def nonRecTypes: Parser[Type] = 
     "int" ^^^ IntType |
     "float" ^^^ FloatType |
     "bool" ^^^ BoolType |
     "void" ^^^ VoidType |
+    "entity" ^^^ EntityType |
     ident2 ^^ { IdentifierType(_) } |
     (("(" ~> types) ~ rep1("," ~> types)) <~ ")" ^^ (p => if p._2.length > 0 then TupleType(p._1 :: p._2) else p._1)
 
@@ -144,7 +159,7 @@ object Parser extends StandardTokenParsers{
                             ((nonRecTypes <~ "[") ~ numericLit) <~ "]" ^^ (p => ArrayType(p._1, p._2)) |
                             nonRecTypes
 
-  def modifierSub: Parser[String] = ("override" | "lazy" | "inline"| "entity")
+  def modifierSub: Parser[String] = ("override" | "lazy" | "inline"| "scoreboard")
   def modifier: Parser[Modifier] = 
     (opt("public" | "private" | "protected") ~ rep(modifierSub)) ^^ (p => {
       val mod = new Modifier()
@@ -158,7 +173,7 @@ object Parser extends StandardTokenParsers{
       if p._2.contains("override") then {mod.isOverride = true}
       if p._2.contains("lazy")     then {mod.isLazy = true}
       if p._2.contains("inline")   then {mod.isInline = true}
-      if p._2.contains("entity")   then {mod.isEntity = true}
+      if p._2.contains("scoreboard")   then {mod.isEntity = true}
       
       mod
     })

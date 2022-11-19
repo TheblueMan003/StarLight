@@ -63,6 +63,7 @@ object Utils{
             case FloatValue(value) => instr
             case BoolValue(value) => instr
             case JsonValue(content) => instr
+            case SelectorValue(content) => instr
             case VariableValue(name) => VariableValue(name.replaceAllLiterally(from, to))
             case BinaryOperation(op, left, right) => BinaryOperation(op, subst(left, from, to), subst(right, from, to))
             case TupleValue(values) => TupleValue(values.map(subst(_, from, to)))
@@ -108,6 +109,7 @@ object Utils{
             case IntValue(value) => instr
             case FloatValue(value) => instr
             case BoolValue(value) => instr
+            case SelectorValue(content) => instr
             case JsonValue(content) => JsonValue(subst(content, from, to))
             case VariableValue(name) => VariableValue(name.toString().replaceAllLiterally(from, to))
             case BinaryOperation(op, left, right) => BinaryOperation(op, subst(left, from, to), subst(right, from, to))
@@ -168,6 +170,7 @@ object Utils{
             case FloatValue(value) => instr
             case BoolValue(value) => instr
             case JsonValue(content) => instr
+            case SelectorValue(content) => instr
             case VariableValue(name) => if name.toString() == from then to else instr
             case BinaryOperation(op, left, right) => BinaryOperation(op, subst(left, from, to), subst(right, from, to))
             case TupleValue(values) => TupleValue(values.map(subst(_, from, to)))
@@ -192,6 +195,7 @@ object Utils{
             case FloatValue(value) => FloatType
             case BoolValue(value) => BoolType
             case JsonValue(content) => JsonType
+            case SelectorValue(content) => EntityType
             case VariableValue(name) => context.getVariable(name).getType()
             case BinaryOperation(op, left, right) => combineType(op, typeof(left), typeof(right), expr)
             case TupleValue(values) => TupleType(values.map(typeof(_)))
@@ -211,6 +215,8 @@ object Utils{
                     case (FloatType, FloatType) => FloatType
 
                     case (BoolType, BoolType) => BoolType
+
+                    case (EntityType, EntityType) => EntityType
             }
             case "&&" | "||" => {
                 (t1, t2) match

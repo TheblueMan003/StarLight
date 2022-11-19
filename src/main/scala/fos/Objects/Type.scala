@@ -73,7 +73,16 @@ object VoidType extends Type{
     }
     override def getName()(implicit context: Context): String = "void"
 }
-
+object EntityType extends Type{
+    override def allowAdditionSimplification(): Boolean = false
+    override def getDistance(other: Type)(implicit context: Context): Int = {
+        other match
+            case EntityType => 0
+            case AnyType => 1000
+            case _ => outOfBound
+    }
+    override def getName()(implicit context: Context): String = "entity"
+}
 
 case class TupleType(sub: List[Type]) extends Type{
     override def allowAdditionSimplification(): Boolean = false

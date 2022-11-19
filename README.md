@@ -10,6 +10,7 @@ Here are some notion used in this ReadMe:
 # How to use
 ## program argument
 -i <list of source files>: Specifify which files to use. Order doesn't matter. If a directory is given, all the files in it will be taken.
+
 -o <output path>: Specifify the output of the datapack
 
 # Feature
@@ -32,7 +33,61 @@ If the variable is tuple, then the tuple with be unpack
 * int: normal integer
 * float: fixed point value (by default keep 3 digits after dot)
 * bool: boolean value
+* entity: store multiple entities. (Use a tag)
 * (T, T*): tuple store multiple value. e.i. (float, float, float) position = 0,0,0
+
+## Flow Controls
+### If
+The language support `if` with a c like syntax:
+```
+if (a > 0){
+
+}
+else if(b == 0){
+
+}
+else{
+
+}
+```
+If a case is always true if will be remove the other following cases in the output code. If a case is always false it will be removed from the output code.
+
+### Loop
+The language also support the following loop: for, while, do while with a c like syntax:
+```
+for(int a=0;a < 10;a+=1){
+
+}
+
+while(a > 0){
+
+}
+
+do{
+
+}while(a > 0)
+```
+
+## Selectors & Entity
+The entity can be assigned a selector. This will result in only the entity selected by the selector to be inside the variable.
+```
+entity players = @a
+```
+The selector can have either the java or bedrock syntax.
+
+Sets operations can be performs on the variables of type entity.
+```
+players += @a
+players -= @p
+```
+In addition variables of type entity and selectors can be used inside if. It will return true if there is at least one entity that match the selector or is in the variable.
+```
+entity a = @p
+if (a && @e[tag=hello]){
+
+}
+```
+
 
 ## Function
 Functions can be declared with 
@@ -42,4 +97,12 @@ Functions can be declared with
 or with
 ```
 [def] <modifier> <type> <name>([<type> <argument name>]*)<block or instruction>
+```
+
+## JSON File
+Jsonfile can be added with the following construct:
+```
+jsonfile advancements.name{
+    <json content>
+}
 ```
