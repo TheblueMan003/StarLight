@@ -5,6 +5,7 @@ import objects.{Context, Variable}
 import fos.*
 import objects.types.IntType
 import objects.types.EntityType
+import javax.rmi.CORBA.Util
 
 object Execute{
     def ifs(ifb: If)(implicit context: Context): List[String] = {
@@ -56,6 +57,68 @@ object Execute{
         }
         content
     }
+    def doWhileLoop(whl: DoWhileLoop)(implicit context: Context):List[String] = {
+        val block = context.getFreshBlock(Compiler.compile(whl.block))
+        block.append(ifs(If(whl.cond, LinkedFunctionCall(block, List(), null), List())))
+        block.call(List())
+    }
+    def whileLoop(whl: WhileLoop)(implicit context: Context):List[String] = {
+        val block = context.getFreshBlock(Compiler.compile(whl.block))
+        block.append(ifs(If(whl.cond, LinkedFunctionCall(block, List(), null), List())))
+        ifs(If(whl.cond, LinkedFunctionCall(block, List(), null), List()))
+    }
+    def withInstr(ass: With)(implicit context: Context):List[String] = {
+        def apply(selector: String)={
+            val (pref2, cases) = getIfCase(ass.cond)
+            val tail = getListCase(cases)
+            Utils.simplify(ass.isat) match
+                case BoolValue(true) => pref2:::makeExecute(f" as $selector at @s"+tail, Compiler.compile(ass.block))
+                case BoolValue(false) => pref2:::makeExecute(f" as $selector"+tail, Compiler.compile(ass.block))
+                case other => {
+                    val (pref, vari) = Utils.simplifyToVariable(other)
+                    pref2:::pref ::: makeExecute(getListCase(List(IFValueCase(vari))) + f" as $selector at @s"+tail, Compiler.compile(ass.block))
+                            ::: makeExecute(getListCase(List(IFNotValueCase(vari))) + f" as $selector"+tail, Compiler.compile(ass.block))
+                }
+        }
+
+        ass.expr match
+            case VariableValue(name) => withInstr(With(LinkedVariableValue(context.getVariable(name)), ass.isat, ass.cond, ass.block))
+            case LinkedVariableValue(vari) => 
+                vari.getType() match
+                    case EntityType => apply(f"@e[tag=${vari.tagName}]")
+                    case _ => throw new Exception(f"Unexpected value in as $ass")
+            case TupleValue(values) => values.flatMap(p => withInstr(With(p, ass.isat, ass.cond, ass.block)))
+            case SelectorValue(value) => apply(value.getString())
+                
+        
+            case BinaryOperation(op, left, right) => 
+                val (prefix, vari) = Utils.simplifyToVariable(ass.expr)
+                prefix ::: withInstr(With(vari, ass.isat, ass.cond, ass.block))
+            case _ => throw new Exception(f"Unexpected value in as $ass")
+    }
+    def atInstr(ass: At)(implicit context: Context):List[String] = {
+        def apply(selector: String)={
+            makeExecute(f" @s $selector", Compiler.compile(ass.block))
+        }
+
+        Utils.simplify(ass.expr) match
+            case VariableValue(name) => atInstr(At(LinkedVariableValue(context.getVariable(name)), ass.block))
+            case LinkedVariableValue(vari) => 
+                vari.getType() match
+                    case EntityType => apply(f"@e[tag=${vari.tagName}]")
+                    case _ => throw new Exception(f"Unexpected value in as $ass")
+            case TupleValue(List(x, y, z)) if x.hasFloatValue() && y.hasFloatValue() && z.hasFloatValue() => {
+                makeExecute(f" positioned ${x.getFloatValue()} ${y.getFloatValue()} ${z.getFloatValue()}", Compiler.compile(ass.block))
+            }
+            case TupleValue(values) => values.flatMap(p => atInstr(At(p, ass.block)))
+            case SelectorValue(value) => apply(value.getString())
+                
+        
+            case BinaryOperation(op, left, right) => 
+                val (prefix, vari) = Utils.simplifyToVariable(ass.expr)
+                prefix ::: atInstr(At(vari, ass.block))
+            case _ => throw new Exception(f"Unexpected value in as $ass")
+    }
 
     /**
      * call "block" with execute with content: "prefix"
@@ -96,6 +159,7 @@ object Execute{
             case IntValue(value) => if value == 0 then (List(), List(IFFalse)) else (List(), List(IFTrue))
             case FloatValue(value) => if value == 0 then (List(), List(IFFalse)) else (List(), List(IFTrue))
             case BoolValue(value) => if value then (List(), List(IFTrue)) else (List(), List(IFFalse))
+            case DefaultValue => (List(), List(IFFalse))
             case SelectorValue(value) => (List(), List(IFValueCase(expr)))
             case vari: VariableValue => (List(), List(IFValueCase(vari)))
             case vari: LinkedVariableValue => (List(), List(IFValueCase(vari)))
@@ -158,16 +222,6 @@ object Execute{
                 vari.assign("=", swit.value) ::: makeTree(vari, swit.cases.map(x => (x.expr.getIntValue(), x.instr)))
             }
         }
-    }
-    def doWhileLoop(whl: DoWhileLoop)(implicit context: Context):List[String] = {
-        val block = context.getFreshBlock(Compiler.compile(whl.block))
-        block.append(ifs(If(whl.cond, LinkedFunctionCall(block, List(), null), List())))
-        block.call(List())
-    }
-    def whileLoop(whl: WhileLoop)(implicit context: Context):List[String] = {
-        val block = context.getFreshBlock(Compiler.compile(whl.block))
-        block.append(ifs(If(whl.cond, LinkedFunctionCall(block, List(), null), List())))
-        ifs(If(whl.cond, LinkedFunctionCall(block, List(), null), List()))
     }
 
     def makeTree(cond: Variable, values: List[(Int, Instruction)])(implicit context: Context):List[String] = {

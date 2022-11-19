@@ -36,38 +36,6 @@ If the variable is tuple, then the tuple with be unpack
 * entity: store multiple entities. (Use a tag)
 * (T, T*): tuple store multiple value. e.i. (float, float, float) position = 0,0,0
 
-## Flow Controls
-### If
-The language support `if` with a c like syntax:
-```
-if (a > 0){
-
-}
-else if(b == 0){
-
-}
-else{
-
-}
-```
-If a case is always true if will be remove the other following cases in the output code. If a case is always false it will be removed from the output code.
-
-### Loop
-The language also support the following loop: for, while, do while with a c like syntax:
-```
-for(int a=0;a < 10;a+=1){
-
-}
-
-while(a > 0){
-
-}
-
-do{
-
-}while(a > 0)
-```
-
 ## Selectors & Entity
 The entity can be assigned a selector. This will result in only the entity selected by the selector to be inside the variable.
 ```
@@ -88,6 +56,63 @@ if (a && @e[tag=hello]){
 }
 ```
 
+## Flow Controls
+### If
+The language support `if` with a c like syntax:
+```
+if (a > 0){
+
+}
+else if(b == 0){
+
+}
+else{
+
+}
+```
+If a case is always true if will be remove the other following cases in the output code. If a case is always false it will be removed from the output code.
+
+
+### Loop
+The language also support the following loop: for, while, do while with a c like syntax:
+```
+for(int a=0;a < 10;a+=1){
+
+}
+
+while(a > 0){
+
+}
+
+do{
+
+}while(a > 0)
+```
+
+### Context Manipulation
+Instructions can be executed **at** an entity with:
+```
+at(@a){
+    do_stuff()
+}
+```
+Instructions can be executed **as** an entity with:
+```
+as(@a){
+    do_stuff()
+}
+```
+For compatibility with BluePhoenix the following also work:
+```
+// as @a at @s
+with(@a, true, a == 0){
+    do_stuff()
+}
+// as @a
+with(@a, false, a == 0){
+    do_stuff()
+}
+```
 
 ## Function
 Functions can be declared with 

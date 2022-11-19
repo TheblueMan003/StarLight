@@ -27,6 +27,9 @@ object Utils{
             case WhileLoop(cond, instr) => WhileLoop(cond, substReturn(instr, to))
             case DoWhileLoop(cond, instr) => DoWhileLoop(cond, substReturn(instr, to))
 
+            case At(expr, block) => At(expr, substReturn(block, to))
+            case With(expr, isAt, cond, block) => With(expr, isAt, cond, substReturn(block, to))
+
             case Switch(cond, cases, cv) => Switch(cond, cases.map(x => SwitchCase(x.expr, substReturn(x.instr, to))), cv)
     }
 
@@ -54,6 +57,9 @@ object Utils{
             case WhileLoop(cond, instr) => WhileLoop(subst(cond, from, to), subst(instr, from, to))
             case DoWhileLoop(cond, instr) => DoWhileLoop(subst(cond, from, to), subst(instr, from, to))
 
+            case At(expr, block) => At(subst(expr, from, to), subst(block, from, to))
+            case With(expr, isAt, cond, block) => With(subst(expr, from, to), subst(isAt, from, to), subst(cond, from, to), subst(block, from, to))
+
             case Switch(cond, cases, cv) => Switch(subst(cond, from, to), cases.map(x => SwitchCase(subst(x.expr, from, to), subst(x.instr, from, to))), cv)
     }
 
@@ -64,6 +70,7 @@ object Utils{
             case BoolValue(value) => instr
             case JsonValue(content) => instr
             case SelectorValue(content) => instr
+            case DefaultValue => DefaultValue
             case VariableValue(name) => VariableValue(name.replaceAllLiterally(from, to))
             case BinaryOperation(op, left, right) => BinaryOperation(op, subst(left, from, to), subst(right, from, to))
             case TupleValue(values) => TupleValue(values.map(subst(_, from, to)))
@@ -101,6 +108,9 @@ object Utils{
             case WhileLoop(cond, instr) => WhileLoop(subst(cond, from, to), subst(instr, from, to))
             case DoWhileLoop(cond, instr) => DoWhileLoop(subst(cond, from, to), subst(instr, from, to))
 
+            case At(expr, block) => At(subst(expr, from, to), subst(block, from, to))
+            case With(expr, isAt, cond, block) => With(subst(expr, from, to), subst(isAt, from, to), subst(cond, from, to), subst(block, from, to))
+
             case Switch(cond, cases, cv) => Switch(subst(cond, from, to), cases.map(x => SwitchCase(subst(x.expr, from, to), subst(x.instr, from, to))), cv)
     }
 
@@ -110,6 +120,7 @@ object Utils{
             case FloatValue(value) => instr
             case BoolValue(value) => instr
             case SelectorValue(content) => instr
+            case DefaultValue => DefaultValue
             case JsonValue(content) => JsonValue(subst(content, from, to))
             case VariableValue(name) => VariableValue(name.toString().replaceAllLiterally(from, to))
             case BinaryOperation(op, left, right) => BinaryOperation(op, subst(left, from, to), subst(right, from, to))
@@ -160,6 +171,9 @@ object Utils{
             case DoWhileLoop(cond, instr) => DoWhileLoop(subst(cond, from, to), subst(instr, from, to))
             case JSONFile(name, json) => instr
 
+            case At(expr, block) => At(subst(expr, from, to), subst(block, from, to))
+            case With(expr, isAt, cond, block) => With(subst(expr, from, to), subst(isAt, from, to), subst(cond, from, to), subst(block, from, to))
+
             case Switch(cond, cases, cv) => Switch(subst(cond, from, to), cases.map(x => SwitchCase(subst(x.expr, from, to), subst(x.instr, from, to))), cv)
 
     }
@@ -171,6 +185,7 @@ object Utils{
             case BoolValue(value) => instr
             case JsonValue(content) => instr
             case SelectorValue(content) => instr
+            case DefaultValue => DefaultValue
             case VariableValue(name) => if name.toString() == from then to else instr
             case BinaryOperation(op, left, right) => BinaryOperation(op, subst(left, from, to), subst(right, from, to))
             case TupleValue(values) => TupleValue(values.map(subst(_, from, to)))
@@ -180,12 +195,12 @@ object Utils{
     }
 
 
-    def simplifyToVariable(expr: Expression)(implicit context: Context): (List[String], VariableValue) = {
+    def simplifyToVariable(expr: Expression)(implicit context: Context): (List[String], LinkedVariableValue) = {
         expr match
-            case VariableValue(name) => (List(), VariableValue(name))
+            case VariableValue(name) => (List(), LinkedVariableValue(context.getVariable(name)))
             case other => {
                 val vari = context.getFreshVariable(typeof(other))
-                (vari.assign("=", other), VariableValue(vari.fullName))
+                (vari.assign("=", other), LinkedVariableValue(vari))
             }
     }
 
@@ -196,6 +211,7 @@ object Utils{
             case BoolValue(value) => BoolType
             case JsonValue(content) => JsonType
             case SelectorValue(content) => EntityType
+            case DefaultValue => throw new Exception("default value has no type")
             case VariableValue(name) => context.getVariable(name).getType()
             case BinaryOperation(op, left, right) => combineType(op, typeof(left), typeof(right), expr)
             case TupleValue(values) => TupleType(values.map(typeof(_)))

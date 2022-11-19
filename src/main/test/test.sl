@@ -1,7 +1,7 @@
 package test
 
 def test(){
-    if (@e \ @a){
+    at 0,0,0 {
         int a
     }
 }

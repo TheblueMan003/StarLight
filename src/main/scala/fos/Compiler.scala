@@ -97,6 +97,8 @@ object Compiler{
             case swit: Switch => Execute.switch(swit)
             case whl: WhileLoop => Execute.whileLoop(whl)
             case whl: DoWhileLoop => Execute.doWhileLoop(whl)
+            case at: At => Execute.atInstr(at)
+            case wth: With => Execute.withInstr(wth)
             case ElseIf(cond, ifBlock) => throw new Exception("Unexpected Instruction")
         }
     }

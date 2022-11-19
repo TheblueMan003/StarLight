@@ -8,56 +8,83 @@ import fos.Compilation.Selector.Selector
 sealed abstract class Expression extends Positional{
     def hasIntValue(): Boolean
     def getIntValue(): Int
+    def hasFloatValue(): Boolean
+    def getFloatValue(): Double
 }
 
 trait SmallValue{
+}
+case object DefaultValue extends Expression with SmallValue{
+    override def toString(): String = "default"
+    override def getIntValue(): Int = ???
+    override def hasIntValue(): Boolean = false
+    override def hasFloatValue(): Boolean = false
+    override def getFloatValue(): Double = ???
 }
 case class IntValue(val value: Int) extends Expression with SmallValue{
     override def toString(): String = value.toString()
     override def getIntValue(): Int = value
     override def hasIntValue(): Boolean = true
+    override def hasFloatValue(): Boolean = true
+    override def getFloatValue(): Double = value
 }
 case class FloatValue(val value: Double) extends Expression with SmallValue{
     override def toString(): String = value.toString()
     override def getIntValue(): Int = (value * Settings.floatPrec).toInt
     override def hasIntValue(): Boolean = true
+    override def hasFloatValue(): Boolean = true
+    override def getFloatValue(): Double = value
 }
 case class BoolValue(val value: Boolean) extends Expression with SmallValue{
     override def toString(): String = value.toString()
     override def getIntValue(): Int = if value then 1 else 0
     override def hasIntValue(): Boolean = true
+    override def hasFloatValue(): Boolean = false
+    override def getFloatValue(): Double = ???
 }
 case class VariableValue(val name: Identifier) extends Expression with SmallValue{
     override def toString(): String = name.toString()
     override def getIntValue(): Int = ???
     override def hasIntValue(): Boolean = false
+    override def hasFloatValue(): Boolean = false
+    override def getFloatValue(): Double = ???
 }
 case class LinkedVariableValue(val vari: Variable) extends Expression with SmallValue{
     override def toString(): String = vari.fullName
     override def getIntValue(): Int = ???
     override def hasIntValue(): Boolean = false
+    override def hasFloatValue(): Boolean = false
+    override def getFloatValue(): Double = ???
 }
 
 case class TupleValue(val values: List[Expression]) extends Expression with SmallValue{
     override def toString(): String = "("+values.map(_.toString()).reduce(_ + ", " + _)+")"
     override def getIntValue(): Int = ???
     override def hasIntValue(): Boolean = false
+    override def hasFloatValue(): Boolean = false
+    override def getFloatValue(): Double = ???
 }
 
 case class FunctionCallValue(val name: Identifier, val args: List[Expression]) extends Expression with SmallValue{
-  override def toString() = f"${name}()"
-  override def getIntValue(): Int = ???
+    override def toString() = f"${name}()"
+    override def getIntValue(): Int = ???
     override def hasIntValue(): Boolean = false
+    override def hasFloatValue(): Boolean = false
+    override def getFloatValue(): Double = ???
 }
 case class RangeValue(val min: Expression, val max: Expression) extends Expression with SmallValue{
     override def toString(): String = f"$min .. $max"
     override def getIntValue(): Int = ???
     override def hasIntValue(): Boolean = false
+    override def hasFloatValue(): Boolean = false
+    override def getFloatValue(): Double = ???
 }
 case class SelectorValue(val value: Selector) extends Expression{
     override def toString(): String = value.toString()
     override def getIntValue(): Int = ???
     override def hasIntValue(): Boolean = false
+    override def hasFloatValue(): Boolean = false
+    override def getFloatValue(): Double = ???
 }
 
 
@@ -66,6 +93,8 @@ case class BinaryOperation(val op: String, val left: Expression, val right: Expr
     override def toString(): String = f"($left $op $right)"
     override def getIntValue(): Int = ???
     override def hasIntValue(): Boolean = false
+    override def hasFloatValue(): Boolean = false
+    override def getFloatValue(): Double = ???
 }
 
 
@@ -73,6 +102,8 @@ case class JsonValue(val content: JSONElement) extends Expression{
     override def toString(): String = f"$content"
     override def getIntValue(): Int = ???
     override def hasIntValue(): Boolean = false
+    override def hasFloatValue(): Boolean = false
+    override def getFloatValue(): Double = ???
 }
 trait JSONElement{
     def getString(): String

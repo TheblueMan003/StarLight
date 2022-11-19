@@ -13,6 +13,7 @@ object Parser extends StandardTokenParsers{
   lexical.delimiters ++= List("(", ")", "\\", ".", ":", "=", "->", "{", "}", ",", "*", "[", "]", "/", "+", "-", "*", "/", "\\", "%", "&&", "||", "=>", ";",
                               "+=", "-=", "/=", "*=", "?=", ":=", "%", "@", "@e", "@a", "@s", "@r", "@p", "~", "^", "<=", "==", ">=", "<", ">", "!=")
   lexical.reserved   ++= List("bool", "int", "float", "void", "true", "false", "if", "then", "else", "return", "switch", "for", "do", "while",
+                              "as", "at", "with",
                               "var", "val", "def", "package", "struct", "lazy", "jsonfile",
                               "public", "protected", "private", "entity", "scoreboard")
 
@@ -59,6 +60,9 @@ object Parser extends StandardTokenParsers{
       | "return" ~> expr ^^ (Return(_))
       | block
       | switch | whileLoop | doWhileLoop | forLoop | jsonFile
+      | "as" ~> expr ~ instruction ^^ (p => With(p._1, BoolValue(false), BoolValue(true), p._2))
+      | "at" ~> expr ~ instruction ^^ (p => At(p._1, p._2))
+      | withInstr
 
       
 
@@ -67,6 +71,10 @@ object Parser extends StandardTokenParsers{
   def whileLoop: Parser[Instruction] = ("while" ~> "(" ~> expr <~ ")") ~ instruction ^^ (p => WhileLoop(p._1, p._2))
   def forLoop: Parser[Instruction] = ((("for" ~> "(" ~> instruction <~ ";") ~ expr <~ ";") ~ instruction <~ ")") ~ instruction ^^ 
     (p => InstructionList(List(p._1._1._1, WhileLoop(p._1._1._2, InstructionList(List(p._2, p._1._2))))))
+  def withInstr: Parser[Instruction] = 
+    ("with" ~> "(" ~> exprNoTuple <~ ")") ~ instruction ^^ (p => With(p._1, BoolValue(false), BoolValue(true), p._2))
+      | (("with" ~> "(" ~> exprNoTuple <~ ",") ~ exprNoTuple <~ ")") ~ instruction ^^ (p => With(p._1._1, p._1._2, BoolValue(true), p._2))
+      | ((("with" ~> "(" ~> exprNoTuple <~ ",") ~ exprNoTuple <~ ",") ~ exprNoTuple <~ ")") ~ instruction ^^ (p => With(p._1._1._1, p._1._1._2, p._1._2, p._2))
   def switch: Parser[Switch] = ("switch" ~> expr <~ "{") ~ rep(switchCase) <~ "}" ^^ (p => Switch(p._1, p._2))
   def switchCase: Parser[SwitchCase] = (expr <~ "->") ~ instruction ^^ (p => SwitchCase(p._1, p._2))
   def varAssignment: Parser[Instruction] = (rep1sep(ident2, ",") ~ assignmentOp ~ expr) ^^ (p => 
@@ -80,7 +88,7 @@ object Parser extends StandardTokenParsers{
       val decl = p._1._2.map(VariableDecl(_, p._1._1._2, mod))
       val identifiers = p._1._2.map(Identifier.fromString(_))
       if (!mod.isEntity && p._2.isEmpty){
-        InstructionList(decl ::: List(VariableAssigment(identifiers, ":=", IntValue(0))))
+        InstructionList(decl ::: List(VariableAssigment(identifiers, ":=", DefaultValue)))
       }
       else if (!mod.isEntity && !p._2.isEmpty){
         InstructionList(decl ::: List(VariableAssigment(identifiers, "=", p._2.get)))
@@ -133,7 +141,8 @@ object Parser extends StandardTokenParsers{
   def exprComp: Parser[Expression] = exprAdd ~ rep(comparator ~ exprComp) ^^ {unpack(_)}
   def exprAnd: Parser[Expression] = exprComp ~ rep("&&" ~> exprAnd) ^^ {unpack("&&", _)}
   def exprOr: Parser[Expression] = exprAnd ~ rep("||" ~> exprOr) ^^ {unpack("||", _)}
-  def expr: Parser[Expression] = rep1sep(exprOr, ",") ^^ (p => if p.length == 1 then p.head else TupleValue(p))
+  def exprNoTuple = exprOr
+  def expr: Parser[Expression] = rep1sep(exprNoTuple, ",") ^^ (p => if p.length == 1 then p.head else TupleValue(p))
 
   def unpack(op: String, p: (Expression ~ List[Expression])): Expression = {
     if p._2.isEmpty then p._1 else p._2.foldLeft(p._1)(BinaryOperation(op, _, _))
