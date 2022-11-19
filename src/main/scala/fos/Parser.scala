@@ -8,13 +8,15 @@ import objects.types.VoidType
 import scala.util.parsing.combinator._
 import objects.Identifier
 import fos.Compilation.Selector.*
+import objects.EnumField
+import objects.EnumValue
 
 object Parser extends StandardTokenParsers{
   lexical.delimiters ++= List("(", ")", "\\", ".", ":", "=", "->", "{", "}", ",", "*", "[", "]", "/", "+", "-", "*", "/", "\\", "%", "&&", "||", "=>", ";",
                               "+=", "-=", "/=", "*=", "?=", ":=", "%", "@", "@e", "@a", "@s", "@r", "@p", "~", "^", "<=", "==", ">=", "<", ">", "!=")
   lexical.reserved   ++= List("bool", "int", "float", "void", "true", "false", "if", "then", "else", "return", "switch", "for", "do", "while",
-                              "as", "at", "with",
-                              "var", "val", "def", "package", "struct", "lazy", "jsonfile",
+                              "as", "at", "with", 
+                              "var", "val", "def", "package", "struct", "enum", "lazy", "jsonfile",
                               "public", "protected", "private", "entity", "scoreboard")
 
 
@@ -63,6 +65,7 @@ object Parser extends StandardTokenParsers{
       | "as" ~> expr ~ instruction ^^ (p => With(p._1, BoolValue(false), BoolValue(true), p._2))
       | "at" ~> expr ~ instruction ^^ (p => At(p._1, p._2))
       | withInstr
+      | enumInstr
 
       
 
@@ -77,6 +80,13 @@ object Parser extends StandardTokenParsers{
       | ((("with" ~> "(" ~> exprNoTuple <~ ",") ~ exprNoTuple <~ ",") ~ exprNoTuple <~ ")") ~ instruction ^^ (p => With(p._1._1._1, p._1._1._2, p._1._2, p._2))
   def switch: Parser[Switch] = ("switch" ~> expr <~ "{") ~ rep(switchCase) <~ "}" ^^ (p => Switch(p._1, p._2))
   def switchCase: Parser[SwitchCase] = (expr <~ "->") ~ instruction ^^ (p => SwitchCase(p._1, p._2))
+
+
+  def enumInstr: Parser[EnumDecl] = (modifier ~ ("enum" ~> ident) ~ opt("("~>repsep(enumField,",")<~")") <~ "{") ~ repsep(enumValue, ",") <~ "}" ^^ 
+                                    (p => EnumDecl(p._1._1._2, p._1._2.getOrElse(List()), p._2, p._1._1._1))
+  def enumField: Parser[EnumField] = types ~ ident ^^ { p => EnumField(p._2, p._1) }
+  def enumValue: Parser[EnumValue] = ident ~ opt("("~>repsep(expr,",")<~")") ^^ (p => EnumValue(p._1, p._2.getOrElse(List())))
+
   def varAssignment: Parser[Instruction] = (rep1sep(ident2, ",") ~ assignmentOp ~ expr) ^^ (p => 
     {
       val identifiers = p._1._1.map(Identifier.fromString(_))

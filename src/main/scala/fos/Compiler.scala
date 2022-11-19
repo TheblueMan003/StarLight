@@ -1,6 +1,6 @@
 package fos
 
-import objects.{Context, ConcreteFunction, LazyFunction, Modifier, Struct, Variable}
+import objects.{Context, ConcreteFunction, LazyFunction, Modifier, Struct, Variable, Enum, EnumField}
 import objects.Identifier
 import objects.types.{VoidType, TupleType}
 import fos.Compilation.Execute
@@ -25,12 +25,12 @@ object Compiler{
             case FunctionDecl(name, block, typ, args, modifier) =>{
                 val fname = context.getFunctionWorkingName(name)
                 if (!modifier.isLazy){
-                    val func = new ConcreteFunction(context, fname, args, typ, modifier, block, firstPass)
+                    val func = new ConcreteFunction(context, fname, args, context.getType(typ), modifier, block, firstPass)
                     context.addFunction(name, func)
                     func.generateArgument()(context)
                 }
                 else{
-                    val func = new LazyFunction(context, name, args, typ, modifier, block)
+                    val func = new LazyFunction(context, name, args, context.getType(typ), modifier, block)
                     context.addFunction(name, func)
                     func.generateArgument()(context)
                 }
@@ -40,8 +40,13 @@ object Compiler{
                 context.addStruct(new Struct(context, name, modifier, block))
                 List()
             }
+            case EnumDecl(name, fields, values, modifier) => {
+                val enm = context.addEnum(new Enum(context, name, modifier, fields.map(x => EnumField(x.name, context.getType(x.typ)))))
+                enm.addValues(values)
+                List()
+            }
             case VariableDecl(name, typ, modifier) => {
-                val vari = new Variable(context, name, typ, modifier)
+                val vari = new Variable(context, name, context.getType(typ), modifier)
                 context.addVariable(vari)
                 vari.generate()
                 List()

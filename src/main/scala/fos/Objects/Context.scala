@@ -16,6 +16,7 @@ class Context(name: String, parent: Context = null, _root: Context = null) {
     private val variables = mutable.Map[String, Variable]()
     private val functions = mutable.Map[String, List[Function]]()
     private val structs = mutable.Map[String, Struct]()
+    private val enums = mutable.Map[String, Enum]()
     private val jsonfiles = mutable.Map[String, JSONFile]()
     
     
@@ -260,6 +261,40 @@ class Context(name: String, parent: Context = null, _root: Context = null) {
     def addStruct(struct: Struct): Struct = synchronized{
         structs.addOne(struct.name, struct)
         struct
+    }
+
+
+
+    def getEnum(identifier: Identifier): Enum = {
+        tryGetElement(_.enums)(identifier) match{
+            case Some(value) => value
+            case None => throw new Exception(f"Unknown enum: $identifier in context: $path")
+        }
+    }
+    def tryGetEnum(identifier: Identifier): Option[Enum] = {
+        tryGetElement(_.enums)(identifier)
+    }
+    def addEnum(enm: Enum): Enum = synchronized{
+        enums.addOne(enm.name, enm)
+        enm
+    }
+
+    def getType(typ: Type): Type = {
+        typ match
+            case IdentifierType(identifier) => {
+                val struct = tryGetStruct(identifier)
+                if (struct.isDefined){
+                    return StructType(struct.get)
+                }
+
+                val enm = tryGetEnum(identifier)
+                if (enm.isDefined){
+                    return EnumType(enm.get)
+                }
+
+                throw new Exception(f"Unknown type: $identifier in context: $path")
+            }
+            case _ => typ
     }
 
 

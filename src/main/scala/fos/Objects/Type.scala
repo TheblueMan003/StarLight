@@ -2,6 +2,7 @@ package objects.types
 
 import scala.util.parsing.input.Positional
 import objects.Context
+import objects.Struct
 
 trait Typed(typ: Type){
     def getType(): Type ={
@@ -123,6 +124,26 @@ case class IdentifierType(name: String) extends Type{
             case _ => outOfBound
     }
     override def getName()(implicit context: Context): String = name
+}
+case class StructType(struct: Struct) extends Type{
+    override def allowAdditionSimplification(): Boolean = false
+    override def getDistance(other: Type)(implicit context: Context): Int = {
+        other match
+            case StructType(sub2) => ???
+            case AnyType => 1000
+            case _ => outOfBound
+    }
+    override def getName()(implicit context: Context): String = struct.fullName
+}
+case class EnumType(enm: objects.Enum) extends Type{
+    override def allowAdditionSimplification(): Boolean = false
+    override def getDistance(other: Type)(implicit context: Context): Int = {
+        other match
+            case EnumType(sub2) if sub2 == enm => 0
+            case AnyType => 1000
+            case _ => outOfBound
+    }
+    override def getName()(implicit context: Context): String = enm.fullName
 }
 case class RangeType(sub: Type) extends Type{
     override def allowAdditionSimplification(): Boolean = false

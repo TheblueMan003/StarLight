@@ -4,6 +4,8 @@ import scala.util.parsing.input.Positional
 import objects.types.Type
 import objects.Modifier
 import objects.{Identifier, Variable, Function}
+import objects.EnumField
+import objects.EnumValue
 
 
 case class Argument(val name: String, val typ: Type, val defValue: Option[Expression])
@@ -17,6 +19,9 @@ case class Package(val name: String, val block: Instruction) extends Instruction
 
 case class StructDecl(val name: String, val block: Instruction, val modifier: Modifier) extends Instruction {
   override def toString() = f"struct ${name} ${block}"
+}
+case class EnumDecl(val name: String, val fields: List[EnumField], val values: List[EnumValue], val modifier: Modifier) extends Instruction {
+  override def toString() = f"enum ${name}(${fields}]{$values}"
 }
 
 case class FunctionDecl(val name: String, val block: Instruction, val typ: Type, val args: List[Argument], val modifier: Modifier) extends Instruction {

@@ -13,8 +13,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 
 	def generate()(implicit context: Context):Unit = {
 		typ match
-			case IdentifierType(typeName) => {
-				val struct = context.getStruct(typeName)
+			case StructType(struct) => {
 				fos.Compiler.compile(struct.block)(context.push(name))
 			}
 			case TupleType(sub) => {
@@ -52,6 +51,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 								case TupleType(sub) => assignTuple(op, value)										
 								case FuncType(source, out) => assignFunc(op, value)
 								case EntityType => assignEntity(op, value)
+								case EnumType(enm) => assignEnum(op, value)
 						}
 					}
 				}
@@ -161,6 +161,25 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 			}
 			case _ => List(f"scoreboard players operation ${getSelector()} ${op} ${vari.getSelector()}")
 		}
+	}
+
+
+	/**
+	 * Assign a value to the enum variable
+	 */
+	def assignEnum(op: String, value: Expression)(implicit context: Context): List[String] = {
+		value match
+			case VariableValue(name) => {
+				val a = getType().asInstanceOf[EnumType].enm.values.indexWhere(_.name == name.toString())
+				if (a >= 0){
+					if (op != "=") throw new Exception(f"Illegal operation: $op on enum")
+					assignInt(op, IntValue(a))
+				}
+				else{
+					assignInt(op, LinkedVariableValue(context.getVariable(name)))
+				}
+			}
+			case _ => assignInt(op, value)
 	}
 
 
