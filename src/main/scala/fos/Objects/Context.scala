@@ -26,8 +26,9 @@ class Context(name: String, parent: Context = null, _root: Context = null) {
     private lazy val muxCtx = root.push(Settings.multiplexFolder)
 
     private var funcToCompile = List[ConcreteFunction]()
-    private var constants = List[Int]()
+    private var constants = mutable.Set[Int]()
     private var muxIDs = mutable.Set[Int]()
+    private var scoreboardIDs = mutable.Set[Int]()
     private val mux = mutable.Map[(List[Type], Type), MultiplexFunction]()
 
     private var varId = -1
@@ -118,9 +119,14 @@ class Context(name: String, parent: Context = null, _root: Context = null) {
 
     def requestConstant(value: Int): Unit = {
         val r = root
-        var ret: ConcreteFunction = null
         r.synchronized{
-            constants = value :: constants
+            constants.add(value)
+        }
+    }
+    def getAllConstant(): List[Int] = {
+        val r = root
+        r.synchronized{
+            constants.toList
         }
     }
 
@@ -162,6 +168,20 @@ class Context(name: String, parent: Context = null, _root: Context = null) {
     def addVariable(variable: Variable): Variable = {
         variables.addOne(variable.name, variable)
         variable
+    }
+    def getScoreboardID(variable: Variable): Int = {
+        val r = root
+        r.synchronized{
+            var hash = scala.util.hashing.MurmurHash3.stringHash(variable.fullName)
+            while (r.scoreboardIDs.contains(hash)){
+                hash += 1
+            }
+            r.scoreboardIDs.add(hash)
+            hash
+        }
+    }
+    def getAllVariable():List[Variable] = {
+        variables.values.toList ::: child.map(_._2.getAllVariable()).foldLeft(List[Variable]())(_.toList ::: _.toList)
     }
 
 
@@ -240,6 +260,7 @@ class Context(name: String, parent: Context = null, _root: Context = null) {
             while (r.muxIDs.contains(hash)){
                 hash += 1
             }
+            r.muxIDs.add(hash)
             hash
         }
     }

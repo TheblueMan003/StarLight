@@ -3,13 +3,14 @@ package objects
 import types.*
 import fos.*
 import fos.Compilation.Execute
-import javax.swing.text.html.parser.Entity
 
 private val entityTypeSubVariable = List((BoolType, "isPlayer"))
 
 class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) extends CObject(context, name, _modifier) with Typed(typ){
 	var tupleVari: List[Variable] = List()
 	val tagName = fullName
+	val scoreboard = if modifiers.isEntity then "s"+context.getScoreboardID(this) else ""
+	var lazyValue: Expression = DefaultValue
 
 	def generate()(implicit context: Context):Unit = {
 		typ match
@@ -27,31 +28,46 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 				tupleVari.map(_.generate()(ctx))
 			}
 			case _ => {
-				List()
 			}
 	}
 	def assign(op: String, value: Expression)(implicit context: Context): List[String] = {
-		op match{
-			case ":=" => defaultAssign(value)
-			case _ => {
-				value match{
-					case VariableValue(nm) if op == "=" && context.tryGetVariable(nm) == Some(this) =>{
-						List()
-					}
-					case _ => {
-						if (isPresentIn(value) && value.isInstanceOf[BinaryOperation]){
-							val tmp = context.getFreshVariable(getType())
-							tmp.assign("=", value) ::: assign(op, LinkedVariableValue(tmp))
+		if (modifiers.isLazy){
+			op match{
+				case "=" => lazyValue = Utils.simplify(value)
+				case "+=" => lazyValue = Utils.simplify(BinaryOperation("+", LinkedVariableValue(this), value))
+				case "-=" => lazyValue = Utils.simplify(BinaryOperation("-", LinkedVariableValue(this), value))
+				case "/=" => lazyValue = Utils.simplify(BinaryOperation("/", LinkedVariableValue(this), value))
+				case "*=" => lazyValue = Utils.simplify(BinaryOperation("*", LinkedVariableValue(this), value))
+				case "%=" => lazyValue = Utils.simplify(BinaryOperation("%", LinkedVariableValue(this), value))
+				case "&=" => lazyValue = Utils.simplify(BinaryOperation("&", LinkedVariableValue(this), value))
+				case "|=" => lazyValue = Utils.simplify(BinaryOperation("|", LinkedVariableValue(this), value))
+				case "^=" => lazyValue = Utils.simplify(BinaryOperation("^", LinkedVariableValue(this), value))
+			}
+			List()
+		}
+		else{
+			op match{
+				case ":=" => defaultAssign(value)
+				case _ => {
+					value match{
+						case VariableValue(nm) if op == "=" && context.tryGetVariable(nm) == Some(this) =>{
+							List()
 						}
-						else{
-							typ match
-								case IntType => assignInt(op, value)
-								case FloatType => assignFloat(op, value)
-								case BoolType => assignBool(op, value)
-								case TupleType(sub) => assignTuple(op, value)										
-								case FuncType(source, out) => assignFunc(op, value)
-								case EntityType => assignEntity(op, value)
-								case EnumType(enm) => assignEnum(op, value)
+						case _ => {
+							if (isPresentIn(value) && value.isInstanceOf[BinaryOperation]){
+								val tmp = context.getFreshVariable(getType())
+								tmp.assign("=", value) ::: assign(op, LinkedVariableValue(tmp))
+							}
+							else{
+								typ match
+									case IntType => assignInt(op, value)
+									case FloatType => assignFloat(op, value)
+									case BoolType => assignBool(op, value)
+									case TupleType(sub) => assignTuple(op, value)										
+									case FuncType(source, out) => assignFunc(op, value)
+									case EntityType => assignEntity(op, value)
+									case EnumType(enm) => assignEnum(op, value)
+							}
 						}
 					}
 				}
@@ -418,6 +434,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 			case BoolValue(value) => false
 			case JsonValue(content) => false
 			case SelectorValue(value) => false
+			case StringValue(value) => false
 			case DefaultValue => false
 			case VariableValue(name1) => context.tryGetVariable(name1) == Some(this)
 			case LinkedVariableValue(vari) => vari == this
@@ -429,7 +446,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 
 	def getSelector(): String = {
 		if (modifiers.isEntity){
-			f"@s ${fullName}"
+			f"@s ${scoreboard}"
 		}
 		else{
 			f"${fullName} ${Settings.variableScoreboard}"

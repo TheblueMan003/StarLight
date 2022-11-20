@@ -161,8 +161,23 @@ object Execute{
             case BoolValue(value) => if value then (List(), List(IFTrue)) else (List(), List(IFFalse))
             case DefaultValue => (List(), List(IFFalse))
             case SelectorValue(value) => (List(), List(IFValueCase(expr)))
-            case vari: VariableValue => (List(), List(IFValueCase(vari)))
-            case vari: LinkedVariableValue => (List(), List(IFValueCase(vari)))
+            case VariableValue(iden) => {
+                val vari = context.getVariable(iden)
+                if (vari.modifiers.isLazy){
+                    getIfCase(vari.lazyValue)
+                }
+                else{
+                    (List(), List(IFValueCase(LinkedVariableValue(vari))))
+                }
+            }
+            case LinkedVariableValue(vari) => {
+                if (vari.modifiers.isLazy){
+                    getIfCase(vari.lazyValue)
+                }
+                else{
+                    (List(), List(IFValueCase(expr)))
+                }
+            }
             case BinaryOperation(">" | "<" | ">=" | "<=" | "==" | "!=", VariableValue(left), right) if right.hasIntValue() => (List(), List(IFValueCase(expr)))
             case BinaryOperation(">" | "<" | ">=" | "<=" | "==" | "!=", left, VariableValue(right)) if left.hasIntValue() => (List(), List(IFValueCase(expr)))
 

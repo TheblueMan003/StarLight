@@ -3,14 +3,18 @@ package fos
 import objects.Identifier
 import objects.Context
 import objects.types.*
-import objects.Variable
+import objects.{Variable, EnumValue, EnumField}
 
 object Utils{
+    def stringify(string: String): String = {
+        f"\"${string.replaceAllLiterally("\\\\", "\\\\")}\""
+    }
     def substReturn(instr: Instruction, to: Variable): Instruction = {
         instr match
             case Package(name, block) => Package(name, substReturn(block, to))
             case StructDecl(name, block, modifier) => StructDecl(name, substReturn(block, to), modifier)
             case FunctionDecl(name, block, typ, args, modifier) => FunctionDecl(name, substReturn(block, to), typ, args, modifier)
+            case EnumDecl(name, fields, values, modifier) => instr
             case VariableDecl(name, _type, modifier) => instr
             case JSONFile(name, json) => instr
             
@@ -40,6 +44,7 @@ object Utils{
             case StructDecl(name, block, modifier) => StructDecl(name, subst(block, from, to), modifier)
             case FunctionDecl(name, block, typ, args, modifier) => FunctionDecl(name, subst(block, from, to), typ, args, modifier)
             case VariableDecl(name, _type, modifier) => instr
+            case EnumDecl(name, fields, values, modifier) => EnumDecl(name, fields, values.map(v => EnumValue(v.name, v.fields.map(subst(_, from, to)))), modifier)
             case JSONFile(name, json) => instr
             
             case InstructionList(list) => InstructionList(list.map(subst(_, from, to)))
@@ -69,6 +74,7 @@ object Utils{
             case FloatValue(value) => instr
             case BoolValue(value) => instr
             case JsonValue(content) => instr
+            case StringValue(value) => instr
             case SelectorValue(content) => instr
             case DefaultValue => DefaultValue
             case VariableValue(name) => VariableValue(name.replaceAllLiterally(from, to))
@@ -92,6 +98,7 @@ object Utils{
                     FunctionDecl(name.replaceAllLiterally(from, to), subst(block, from, to), typ, args, modifier)
                 }
             }
+            case EnumDecl(name, fields, values, modifier) => EnumDecl(name.replaceAllLiterally(from, to), fields, values.map(v => EnumValue(v.name.replaceAllLiterally(from, to), v.fields.map(subst(_, from, to)))), modifier)
             case VariableDecl(name, _type, modifier) => VariableDecl(name.replaceAllLiterally(from, to), _type, modifier)
             case JSONFile(name, json) => JSONFile(name.replaceAllLiterally(from, to), subst(json, from, to))
 
@@ -120,6 +127,7 @@ object Utils{
             case FloatValue(value) => instr
             case BoolValue(value) => instr
             case SelectorValue(content) => instr
+            case StringValue(value) => StringValue(value.replaceAllLiterally(from, to))
             case DefaultValue => DefaultValue
             case JsonValue(content) => JsonValue(subst(content, from, to))
             case VariableValue(name) => VariableValue(name.toString().replaceAllLiterally(from, to))
@@ -155,6 +163,7 @@ object Utils{
                     FunctionDecl(name, subst(block, from, to), typ, args, modifier)
                 }
             }
+            case EnumDecl(name, fields, values, modifier) => EnumDecl(name, fields, values.map(v => EnumValue(v.name, v.fields.map(subst(_, from, to)))), modifier)
             case VariableDecl(name, _type, modifier) => VariableDecl(name, _type, modifier)
 
             case InstructionList(list) => InstructionList(list.map(subst(_, from, to)))
@@ -183,6 +192,7 @@ object Utils{
             case IntValue(value) => instr
             case FloatValue(value) => instr
             case BoolValue(value) => instr
+            case StringValue(value) => instr
             case JsonValue(content) => instr
             case SelectorValue(content) => instr
             case DefaultValue => DefaultValue
@@ -209,6 +219,7 @@ object Utils{
             case IntValue(value) => IntType
             case FloatValue(value) => FloatType
             case BoolValue(value) => BoolType
+            case StringValue(value) => StringType
             case JsonValue(content) => JsonType
             case SelectorValue(content) => EntityType
             case DefaultValue => throw new Exception("default value has no type")
@@ -233,6 +244,7 @@ object Utils{
                     case (BoolType, BoolType) => BoolType
 
                     case (EntityType, EntityType) => EntityType
+                    case (StringType, StringType) => StringType
             }
             case "&&" | "||" => {
                 (t1, t2) match
@@ -254,6 +266,7 @@ object Utils{
                     case (IntValue(a), FloatValue(b)) => BoolValue(compare(op, a, b))
                     case (FloatValue(a), IntValue(b)) => BoolValue(compare(op, a, b))
                     case (BoolValue(a), BoolValue(b)) => BoolValue(compare(op, a, b))
+                    case (StringValue(a), StringValue(b)) => BoolValue(compare(op, a, b))
                     case _ => BinaryOperation(op, nl, nr)
             }
             case BinaryOperation("+", a: Expression, b: Expression) if a == b && typeof(a).allowAdditionSimplification() => BinaryOperation("*", a, IntValue(2))
@@ -266,9 +279,61 @@ object Utils{
                     case (IntValue(a), FloatValue(b)) => FloatValue(combine(op, a, b))
                     case (FloatValue(a), IntValue(b)) => FloatValue(combine(op, a, b))
                     case (BoolValue(a), BoolValue(b)) => BoolValue(combine(op, a, b))
+                    case (StringValue(a), StringValue(b)) => StringValue(combine(op, a, b))
                     case _ => BinaryOperation(op, nl, nr)
             }
+            case LinkedVariableValue(vari) => {
+                if vari.modifiers.isLazy then vari.lazyValue else expr
+            }
+            case VariableValue(iden) => {
+                val vari = context.getVariable(iden)
+                if vari.modifiers.isLazy then vari.lazyValue else expr
+            }
             case other => other
+    }
+
+    def compileJson(elm: JSONElement)(implicit context: Context): JSONElement = {
+        elm match
+            case JsonArray(content) => JsonArray(content.map(compileJson(_)))
+            case JsonDictionary(map) => JsonDictionary(map.map((k,v) => (k, compileJson(v))))
+            case JsonIdentifier(value) => {
+                val vari = context.tryGetVariable(value)
+                vari match
+                    case Some(value) => {
+                        if (value.modifiers.isLazy){
+                            value.lazyValue match
+                                case IntValue(value) => JsonInt(value)
+                                case FloatValue(value) => JsonFloat(value)
+                                case BoolValue(value) => JsonBoolean(value)
+                                case StringValue(value) => JsonString(value)
+                                case JsonValue(content) => compileJson(content)
+                                case other => throw new Exception(f"Cannot put not $other in json") 
+                                
+                            
+                        }
+                        else{
+                            throw new Exception(f"Cannot put not lazy variable ${value.fullName} in json")
+                        }
+                    }
+                    case None => {
+                        throw new Exception(f"No value for $value")
+                    }
+            }
+            case JsonFloat(value) => elm
+            case JsonBoolean(value) => elm
+            case JsonInt(value) => elm
+            case JsonString(value) => elm
+        
+    }
+
+    def compare(op: String, a: String, b: String): Boolean = {
+        op match
+            case "<"  => a < b
+            case "<=" => a <= b
+            case "==" => a == b
+            case "!=" => a != b
+            case ">=" => a >= b
+            case ">"  => a > b
     }
 
     def compare(op: String, a: Double, b: Double): Boolean = {
@@ -289,6 +354,11 @@ object Utils{
             case "!=" => a != b
             case ">=" => a >= b
             case ">"  => a > b
+    }
+
+    def combine(op: String, a: String, b: String): String = {
+        op match
+            case "+" => a + b
     }
 
     def combine(op: String, a: Boolean, b: Boolean): Boolean = {

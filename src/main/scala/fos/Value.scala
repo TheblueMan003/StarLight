@@ -4,6 +4,7 @@ import scala.util.parsing.input.Positional
 import objects.Identifier
 import objects.Variable
 import fos.Compilation.Selector.Selector
+import objects.Context
 
 sealed abstract class Expression extends Positional{
     def hasIntValue(): Boolean
@@ -39,6 +40,13 @@ case class BoolValue(val value: Boolean) extends Expression with SmallValue{
     override def toString(): String = value.toString()
     override def getIntValue(): Int = if value then 1 else 0
     override def hasIntValue(): Boolean = true
+    override def hasFloatValue(): Boolean = false
+    override def getFloatValue(): Double = ???
+}
+case class StringValue(val value: String) extends Expression with SmallValue{
+    override def toString(): String = value
+    override def getIntValue(): Int = ???
+    override def hasIntValue(): Boolean = false
     override def hasFloatValue(): Boolean = false
     override def getFloatValue(): Double = ???
 }
@@ -106,20 +114,20 @@ case class JsonValue(val content: JSONElement) extends Expression{
     override def getFloatValue(): Double = ???
 }
 trait JSONElement{
-    def getString(): String
+    def getString()(implicit context: Context): String
     def getNbt(): String
 }
 
 case class JsonDictionary(val map: Map[String, JSONElement]) extends JSONElement{
-    def getString(): String = {
-        map.map((k, v) => f"{$k:${v.getString()}}").reduceOption(_ +", "+ _).getOrElse("")
+    def getString()(implicit context: Context): String = {
+        map.map((k, v) => f"{${Utils.stringify(k)}:${v.getString()}}").reduceOption(_ +", "+ _).getOrElse("")
     }
     def getNbt(): String = {
-        map.map((k, v) => f"{$k:${v.getNbt()}}").reduceOption(_ +", "+ _).getOrElse("")
+        map.map((k, v) => f"{${Utils.stringify(k)}:${v.getNbt()}}").reduceOption(_ +", "+ _).getOrElse("")
     }
 }
 case class JsonArray(val content: List[JSONElement]) extends JSONElement{
-    def getString(): String = {
+    def getString()(implicit context: Context): String = {
         content.map(v=> f"[${v.getString()}]").reduceOption(_ +", "+ _).getOrElse("")
     }
     def getNbt(): String = {
@@ -127,15 +135,31 @@ case class JsonArray(val content: List[JSONElement]) extends JSONElement{
     }
 }
 case class JsonString(val value: String) extends JSONElement{
-    def getString(): String = {
-        "\""+value.replaceAll("\\\\","\\\\")+"\""
+    def getString()(implicit context: Context): String = {
+        Utils.stringify(value)
     }
     def getNbt(): String = {
-        "\""+value.replaceAll("\\\\","\\\\")+"\""
+        Utils.stringify(value)
+    }
+}
+case class JsonIdentifier(val value: String) extends JSONElement{
+    def getString()(implicit context: Context): String = {
+        Utils.stringify(value)
+    }
+    def getNbt(): String = {
+        Utils.stringify(value)
+    }
+}
+case class JsonCall(val value: String, val args: List[Expression]) extends JSONElement{
+    def getString()(implicit context: Context): String = {
+        Utils.stringify(value)
+    }
+    def getNbt(): String = {
+        Utils.stringify(value)
     }
 }
 case class JsonInt(val value: Int) extends JSONElement{
-    def getString(): String = {
+    def getString()(implicit context: Context): String = {
         value.toString()
     }
     def getNbt(): String = {
@@ -143,7 +167,7 @@ case class JsonInt(val value: Int) extends JSONElement{
     }
 }
 case class JsonFloat(val value: Double) extends JSONElement{
-    def getString(): String = {
+    def getString()(implicit context: Context): String = {
         value.toString()
     }
     def getNbt(): String = {
@@ -151,7 +175,7 @@ case class JsonFloat(val value: Double) extends JSONElement{
     }
 }
 case class JsonBoolean(val value: Boolean) extends JSONElement{
-    def getString(): String = {
+    def getString()(implicit context: Context): String = {
         value.toString()
     }
     def getNbt(): String = {

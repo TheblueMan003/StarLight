@@ -3,7 +3,7 @@ package fos
 import scala.util.parsing.input.Positional
 import objects.types.Type
 import objects.Modifier
-import objects.{Identifier, Variable, Function}
+import objects.{Identifier, Variable, Function, Context}
 import objects.EnumField
 import objects.EnumValue
 
@@ -84,5 +84,5 @@ case class With(val expr: Expression, val isat: Expression, val cond: Expression
 }
 
 case class JSONFile(val name: String, val json: JSONElement) extends Instruction {
-  override def toString() = f"jsonfile $name${json.getString()}"
+  override def toString() = f"jsonfile $name"
 }

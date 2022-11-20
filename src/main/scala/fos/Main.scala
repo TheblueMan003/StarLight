@@ -5,10 +5,36 @@ import java.io._
 
 object Main{
   def main(args: Array[String]): Unit = {
+    if (args(0) == "new"){
+      newProject(args)
+    }
+    if (args(0) == "build"){
+      println("building project")
+      build(args)
+    }
+    if (args(0) == "compile"){
+      println("compiling project")
+      compile(args)
+    }
+  }
+  def newProject(args: Array[String]): Unit = {
+    val p = getArg(args, "-p")
+    val directory = if p == "default" then "." else p
+    safeWriteFile(directory+"/build.slconf", List(f"compile -i ./src -o ./output -name ${getArg(args, "-name")}"))
+    safeWriteFile(directory+"/src/main.sl", List("package main", "","def ticking main(){","","}"))
+  }
+  def build(args: Array[String]): Unit = {
+    getFile(args(1)).split("\n").foreach(line => main(line.split(" ")))
+  }
+  def compile(args: Array[String]): Unit = {
+    if (hasArg(args, "-bedrock")){
+      Settings.target = MCBedrock
+    }
+    Settings.outputName = getArg(args, "-name")
     var files = getFiles(sourceFromArg(args, "-i"))
     var tokenized = files.map((f, c) => Parser.parse(f, c))
     if (tokenized.contains(None)) return;
-    val context = ContextBuilder.build(getArg(args, "-n"), InstructionList(tokenized.map(_.get)))
+    val context = ContextBuilder.build(getArg(args, "-name"), InstructionList(tokenized.map(_.get)))
     var output = Compiler.compile(context)
     exportOutput(getArg(args, "-o"), output)
   }
@@ -19,6 +45,11 @@ object Main{
   def exportOutput(dir: String, output: List[(String, List[String])]):Unit={
     output.foreach((path, content) =>{
       val filename = dir + path
+      safeWriteFile(filename, content)
+    })
+  }
+
+  def safeWriteFile(filename: String, content: List[String]):Unit = {
       val file = new File(filename)
       val directory = new File(file.getParent())
 
@@ -34,7 +65,11 @@ object Main{
         bw.write("\n")}
       )
       bw.close()
-    })
+  }
+
+  // Return CMD arg
+  def hasArg(args: Array[String], param: String): Boolean ={
+    args.contains(param)
   }
 
   // Return CMD arg

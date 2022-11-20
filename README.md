@@ -8,10 +8,23 @@ Here are some notion used in this ReadMe:
 `value*` repeated value (usually splitted by a commat)
 
 # How to use
-## program argument
+java -jar <new|build|compile>
+## compile arguments
 -i <list of source files>: Specifify which files to use. Order doesn't matter. If a directory is given, all the files in it will be taken.
 
 -o <output path>: Specifify the output of the datapack
+
+-n <top level name>: Namespace name for the datapack
+
+-bedrock: If present export as a Behavor pack
+
+## new arguments
+-p <path>: path where to place the project
+
+-n <top level name>: Namespace name for the datapack
+
+## build arguments
+java -jar build <path_to/build.slconf>
 
 # Feature
 ## Variables
@@ -124,6 +137,18 @@ or with
 [def] <modifier> <type> <name>([<type> <argument name>]*)<block or instruction>
 ```
 
+Functions can be called with:
+```
+function_name(arg1, arg2)
+```
+
+Function can also return value:
+```
+bool test(){
+    return true
+}
+```
+
 ## JSON File
 Jsonfile can be added with the following construct:
 ```
@@ -131,3 +156,32 @@ jsonfile advancements.name{
     <json content>
 }
 ```
+
+## Metaprogramming
+### Lazy Variable
+Lazy variable are not exported into the output code. Instead all operation on them are interpreted directly and when they are used, they are replaced by the value interpreted.
+```
+lazy int a = 0
+a += 10*5
+int b = a
+```
+Will be the same as
+```
+int b = 50
+```
+
+This allow to do static string & json manipulation.
+
+### Lazy Functions
+Lazy functions are also not exported into the output code. Instead when they are called, there content is replace at the call site.
+```
+lazy def test(int a){
+    int b = a
+}
+test(0)
+```
+Will be the same as
+```
+int b = 0
+```
+Every call for function that are not mark as inline is done in a sub context meaning that variable inside it won't be usable after the call.

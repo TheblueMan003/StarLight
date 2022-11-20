@@ -136,12 +136,16 @@ class BlockFunction(context: Context, name: String, var body: List[String]) exte
 class LazyFunction(context: Context, name: String, arguments: List[Argument], typ: Type, _modifier: Modifier, val body: Instruction) extends Function(context, name, arguments, typ, _modifier){
     def call(args: List[Expression], ret: Variable = null)(implicit ctx: Context): List[String] = {
         var block = body
+        val sub = ctx.push("dummy")
         argMap(args).foreach((a, v) => {
+            sub.addVariable(Variable(sub, a.name, a.getType(), a.modifiers)).assign("=", v)
             block = Utils.substReturn(Utils.subst(block, a.name, v), ret)
         })
-        fos.Compiler.compile(block)
+        fos.Compiler.compile(block)(if modifiers.isInline then ctx else sub)
     }
     override def generateArgument()(implicit ctx: Context):Unit = {
+        super.generateArgument()
+        argumentsVariables.foreach(_.modifiers.isLazy = true)
     }
 
     def exists(): Boolean = false

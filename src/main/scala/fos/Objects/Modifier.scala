@@ -17,6 +17,8 @@ class Modifier(){
     var isInline = false
     var isEntity = false
     var isConst = false
+    var isTicking = false
+    var isLoading = false
     var tags = ArrayBuffer[String]()
 }
 

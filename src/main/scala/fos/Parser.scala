@@ -13,11 +13,12 @@ import objects.EnumValue
 
 object Parser extends StandardTokenParsers{
   lexical.delimiters ++= List("(", ")", "\\", ".", ":", "=", "->", "{", "}", ",", "*", "[", "]", "/", "+", "-", "*", "/", "\\", "%", "&&", "||", "=>", ";",
-                              "+=", "-=", "/=", "*=", "?=", ":=", "%", "@", "@e", "@a", "@s", "@r", "@p", "~", "^", "<=", "==", ">=", "<", ">", "!=")
-  lexical.reserved   ++= List("bool", "int", "float", "void", "true", "false", "if", "then", "else", "return", "switch", "for", "do", "while",
+                              "+=", "-=", "/=", "*=", "?=", ":=", "%", "@", "@e", "@a", "@s", "@r", "@p", "~", "^", "<=", "==", ">=", "<", ">", "!=", "%%%")
+  lexical.reserved   ++= List("bool", "int", "float", "void", "string", "true", "false", "if", "then", "else", "return", "switch", "for", "do", "while",
                               "as", "at", "with", 
                               "var", "val", "def", "package", "struct", "enum", "lazy", "jsonfile",
-                              "public", "protected", "private", "entity", "scoreboard")
+                              "public", "protected", "private", "entity", "scoreboard",
+                              "ticking", "loading")
 
 
   def block: Parser[Instruction] = "{" ~> rep(instruction) <~ "}" ^^ (p => InstructionBlock(p))
@@ -29,16 +30,17 @@ object Parser extends StandardTokenParsers{
 
   def floatValue: Parser[Double] = (numericLit <~ ".") ~ numericLit ^^ { p => (p._1 + "." + p._2).toDouble } 
   def jsonValueStr: Parser[String] = (floatValue ^^ { p => p.toString() } 
-                                    | numericLit | stringLit | jsonStr 
+                                    | numericLit | stringLit ^^ (Utils.stringify(_)) | jsonStr 
                                     | ("[" ~> repsep(jsonValueStr, ",")) <~ "]" ^^ { p => "[" + p.reduce(_ + ","+ _) + "]" }
                                     )^^ { p => p.toString }
-  def jsonKeypairStr: Parser[String] = ((stringLit | ident) <~ ":") ~ jsonValueStr ^^ { p => p._1 + ":" + p._2 }
+  def jsonKeypairStr: Parser[String] = ((stringLit ^^ (Utils.stringify(_)) | ident) <~ ":") ~ jsonValueStr ^^ { p => p._1 + ":" + p._2 }
   def jsonStr: Parser[String] = "{" ~> rep1sep(jsonKeypairStr, ",") <~ "}" ^^ { p => "{" + p.reduce(_ + ","+ _) + "}" }
 
 
   def jsonValue: Parser[JSONElement] = floatValue ^^ { p => JsonFloat(p) } 
                                     | numericLit ^^ { p => JsonInt(p.toInt) } 
                                     | stringLit ^^ { p => JsonString(p) }
+                                    | ident2 ^^ { p => JsonIdentifier(p) }
                                     | json
                                     | ("[" ~> repsep(jsonValue, ",")) <~ "]" ^^ { p => JsonArray(p)}
                                     
@@ -52,12 +54,12 @@ object Parser extends StandardTokenParsers{
   def instruction: Parser[Instruction] = 
       ((((("def" ~> modifier) ~ ident) <~ "(") ~ repsep(argument, ",")) <~ ")") ~ instruction ^^ (p => FunctionDecl(p._1._1._2, p._2, VoidType, p._1._2, p._1._1._1))
       | ((((((opt("def") ~> modifier) ~ types) ~ ident) <~ "(") ~ repsep(argument, ",")) <~ ")") ~ instruction ^^ (p => FunctionDecl(p._1._1._2, p._2, p._1._1._1._2, p._1._2, p._1._1._1._1))
-      | ((ident2 <~ "(") ~ repsep(expr, ",")) <~ ")" ^^ (p => FunctionCall(p._1, p._2)) // Function Call
+      | ((ident2 <~ "(") ~ repsep(exprNoTuple, ",")) <~ ")" ^^ (p => FunctionCall(p._1, p._2)) // Function Call
       | "package" ~> ident2 ~ program ^^ (p => Package(p._1, p._2)) // Package
       | (modifier <~ "struct") ~ ident ~ block ^^ (p => StructDecl(p._1._2, p._2, p._1._1)) // Struct Dec
       | varDeclaration
       | varAssignment
-      | "%" ~> rep(ident | jsonStr | "~" | "^") <~ "%" ^^ { p => CMD(p.reduce(_ + " " + _)) }
+      | "%%%" ~> rep(ident2 | jsonStr | selectorStr | "~" | "^") <~ "%%%" ^^ { p => CMD(p.reduce(_ + " " + _)) }
       | ifs
       | "return" ~> expr ^^ (Return(_))
       | block
@@ -85,7 +87,7 @@ object Parser extends StandardTokenParsers{
   def enumInstr: Parser[EnumDecl] = (modifier ~ ("enum" ~> ident) ~ opt("("~>repsep(enumField,",")<~")") <~ "{") ~ repsep(enumValue, ",") <~ "}" ^^ 
                                     (p => EnumDecl(p._1._1._2, p._1._2.getOrElse(List()), p._2, p._1._1._1))
   def enumField: Parser[EnumField] = types ~ ident ^^ { p => EnumField(p._2, p._1) }
-  def enumValue: Parser[EnumValue] = ident ~ opt("("~>repsep(expr,",")<~")") ^^ (p => EnumValue(p._1, p._2.getOrElse(List())))
+  def enumValue: Parser[EnumValue] = ident ~ opt("("~>repsep(exprNoTuple,",")<~")") ^^ (p => EnumValue(p._1, p._2.getOrElse(List())))
 
   def varAssignment: Parser[Instruction] = (rep1sep(ident2, ",") ~ assignmentOp ~ expr) ^^ (p => 
     {
@@ -127,7 +129,7 @@ object Parser extends StandardTokenParsers{
   def selectorFilterValue = sfRange | sfNumber | sfString | sfIdentifier
   def selectorFilter: Parser[(String, SelectorFilterValue)] = (ident <~ "=") ~ selectorFilterValue ^^ { p => (p._1, p._2) }
   def selector: Parser[Selector] = ("@a" | "@s" | "@e" | "@p" | "@r") ~ opt("[" ~> rep1sep(selectorFilter, ",") <~ "]") ^^ { p => Selector.parse(p._1, p._2.getOrElse(List())) }
-
+  def selectorStr : Parser[String] = (selector ^^ (_.toString()))
 
   def exprBottom: Parser[Expression] = 
     floatValue ^^ (p => FloatValue(p))
@@ -135,6 +137,7 @@ object Parser extends StandardTokenParsers{
     | "-" ~> exprBottom ^^ (BinaryOperation("-", IntValue(0), _))
     | "true" ^^^ BoolValue(true)
     | "false" ^^^ BoolValue(false)
+    | stringLit ^^ (StringValue(_))
     | ((ident2 <~ "(") ~ repsep(expr, ",")) <~ ")" ^^ (p => FunctionCallValue(p._1, p._2))
     | ident2 ^^ (VariableValue(_))
     | "(" ~> expr <~ ")"
@@ -169,6 +172,7 @@ object Parser extends StandardTokenParsers{
     "float" ^^^ FloatType |
     "bool" ^^^ BoolType |
     "void" ^^^ VoidType |
+    "string" ^^^ StringType |
     "entity" ^^^ EntityType |
     ident2 ^^ { IdentifierType(_) } |
     (("(" ~> types) ~ rep1("," ~> types)) <~ ")" ^^ (p => if p._2.length > 0 then TupleType(p._1 :: p._2) else p._1)
@@ -178,7 +182,7 @@ object Parser extends StandardTokenParsers{
                             ((nonRecTypes <~ "[") ~ numericLit) <~ "]" ^^ (p => ArrayType(p._1, p._2)) |
                             nonRecTypes
 
-  def modifierSub: Parser[String] = ("override" | "lazy" | "inline"| "scoreboard")
+  def modifierSub: Parser[String] = ("override" | "lazy" | "inline"| "scoreboard" | "ticking" | "loading")
   def modifier: Parser[Modifier] = 
     (opt("public" | "private" | "protected") ~ rep(modifierSub)) ^^ (p => {
       val mod = new Modifier()
@@ -193,6 +197,8 @@ object Parser extends StandardTokenParsers{
       if p._2.contains("lazy")     then {mod.isLazy = true}
       if p._2.contains("inline")   then {mod.isInline = true}
       if p._2.contains("scoreboard")   then {mod.isEntity = true}
+      if p._2.contains("ticking")   then {mod.isTicking = true}
+      if p._2.contains("loading")   then {mod.isLoading = true}
       
       mod
     })
@@ -206,7 +212,7 @@ object Parser extends StandardTokenParsers{
   }
 
   def parse(file: String, args: String): Option[Instruction] = {
-    val tokens = new lexical.Scanner(args)
+    val tokens = new lexical.Scanner(Preparser.parse(args))
     phrase(program)(tokens) match {
       case Success(trees, _) =>
         Some(trees)

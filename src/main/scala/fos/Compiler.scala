@@ -18,7 +18,8 @@ object Compiler{
 
 
         context.getAllFunction().filter(_.exists()).map(fct => (fct.getName(), fct.getContent())) ::: 
-            context.getAllJsonFiles().filter(_.exists()).map(fct => (fct.getName(), fct.getContent()))
+            context.getAllJsonFiles().filter(_.exists()).map(fct => (fct.getName(), fct.getContent())):::
+            Settings.target.getExtraFiles(context)
     }
     def compile(instruction: Instruction, firstPass: Boolean = false)(implicit context: Context):List[String]={        
         instruction match{
@@ -52,7 +53,7 @@ object Compiler{
                 List()
             }
             case fos.JSONFile(name, json) => {
-                context.addJsonFile(new objects.JSONFile(context, name, Modifier.newPrivate(), json))
+                context.addJsonFile(new objects.JSONFile(context, name, Modifier.newPrivate(), Utils.compileJson(json)))
                 List()
             }
 
@@ -84,7 +85,9 @@ object Compiler{
             case CMD(value) => List(value)
             case Package(name, block) => {
                 val sub = context.push(name)
-                sub.getNamedBlock("__init__", compile(block, firstPass)(sub)).call(List())
+                val init = sub.getNamedBlock("__init__", compile(block, firstPass)(sub))
+                init.modifiers.isLoading = true
+                List()
             }
             case InstructionList(block) => {
                 block.flatMap(inst => compile(inst, firstPass))

@@ -51,6 +51,7 @@ case class BedrockSelector(val prefix: String, val filters: Map[String, Selector
             case "@a" => true
             case _ => false
         }
+    override def toString(): String = getString()(Context.getNew("default"))
 }
 case class JavaSelector(val prefix: String, val filters: Map[String, SelectorFilterValue]) extends Selector{
     override def getString()(implicit context: Context): String = {
@@ -75,6 +76,7 @@ case class JavaSelector(val prefix: String, val filters: Map[String, SelectorFil
             case "@r" => true
             case _ => false
         }
+    override def toString(): String = getString()(Context.getNew("default"))
 }
 
 
