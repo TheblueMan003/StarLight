@@ -20,6 +20,20 @@ class Modifier(){
     var isTicking = false
     var isLoading = false
     var tags = ArrayBuffer[String]()
+
+    def combine(other: Modifier): Modifier = {
+        val ret = Modifier()
+        ret.protection = protection
+        ret.isOverride = isOverride | other.isOverride
+        ret.isLazy = isLazy | other.isLazy
+        ret.isInline = isInline | other.isInline
+        ret.isEntity = isEntity | other.isEntity
+        ret.isConst = isConst | other.isConst
+        ret.isTicking = isTicking | other.isTicking
+        ret.isLoading = isLoading | other.isLoading
+        ret.tags = tags ++ other.tags
+        ret
+    }
 }
 
 trait Protection

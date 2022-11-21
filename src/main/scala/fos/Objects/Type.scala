@@ -129,7 +129,7 @@ case class StructType(struct: Struct) extends Type{
     override def allowAdditionSimplification(): Boolean = false
     override def getDistance(other: Type)(implicit context: Context): Int = {
         other match
-            case StructType(sub2) => ???
+            case StructType(sub2) if sub2 == struct => 0
             case AnyType => 1000
             case _ => outOfBound
     }

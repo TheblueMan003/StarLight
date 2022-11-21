@@ -1,17 +1,46 @@
 package test
 
-lazy void fct(json test){
-    jsonfile test{
-        "test" : test
+struct test{
+    int bruh
+    int sup(){
+        bruh += 1
+        return bruh
     }
 }
+struct timer{
+    int h, m, s, t
 
-def ticking main(){
-    with(@a[c=1]){
-        int a
+    def update(){
+        t += 1
     }
-    lazy json a = {"test":"lol"}
-    a += {"bruh":"lol"}
-    fct({"value":a})
+    def lazy __set__(int time){
+        h = time
+        m = time
+        s = time
+        t = time
+    }
+    def lazy __set__(timer other){
+        h = other.h
+        m = other.m
+        s = other.s
+        t = other.t
+    }
+    def lazy __set__(test other){
+        update()
+        h = other.sup()
+    }
+    def lazy __add__(timer other){
+        h += other.h
+        m += other.m
+        s += other.s
+        t += other.t
+    }
+}
+timer a
+timer b
+test c
+def ticking main(){
+    a = c
+    a.update()
 }
 

@@ -27,7 +27,7 @@ object Utils{
             case FunctionCall(name, args) => instr
             case LinkedFunctionCall(name, args, vari) => instr
             case VariableAssigment(name, op, expr) => instr
-            case Return(value) => VariableAssigment(List(to.fullName), "=", value)
+            case Return(value) => VariableAssigment(List(Left(to.fullName)), "=", value)
             case WhileLoop(cond, instr) => WhileLoop(cond, substReturn(instr, to))
             case DoWhileLoop(cond, instr) => DoWhileLoop(cond, substReturn(instr, to))
 
@@ -56,7 +56,7 @@ object Utils{
             case FunctionCall(name, args) => FunctionCall(name.replaceAllLiterally(from, to), args.map(subst(_, from, to)))
             case LinkedFunctionCall(name, args, vari) => LinkedFunctionCall(name, args.map(subst(_, from, to)), vari)
             case VariableAssigment(name, op, expr) => {
-                VariableAssigment(name.map(_.replaceAllLiterally(from, to)), op, subst(expr, from, to))
+                VariableAssigment(name.map(subst(_, from, to)), op, subst(expr, from, to))
             }
             case Return(value) => Return(subst(value, from, to))
             case WhileLoop(cond, instr) => WhileLoop(subst(cond, from, to), subst(instr, from, to))
@@ -66,6 +66,11 @@ object Utils{
             case With(expr, isAt, cond, block) => With(subst(expr, from, to), subst(isAt, from, to), subst(cond, from, to), subst(block, from, to))
 
             case Switch(cond, cases, cv) => Switch(subst(cond, from, to), cases.map(x => SwitchCase(subst(x.expr, from, to), subst(x.instr, from, to))), cv)
+    }
+    def subst(vari: Either[Identifier, Variable], from: Identifier, to: Identifier): Either[Identifier, Variable] = {
+        vari match
+            case Left(value) => Left(value.replaceAllLiterally(from, to))
+            case Right(value) => Right(value)
     }
 
     def subst(instr: Expression, from: Identifier, to: Identifier): Expression = {
@@ -110,7 +115,7 @@ object Utils{
             case CMD(value) => CMD(value.replaceAllLiterally(from, to))
             case FunctionCall(name, args) => FunctionCall(name.toString().replaceAllLiterally(from, to), args.map(subst(_, from, to)))
             case LinkedFunctionCall(name, args, vari) => LinkedFunctionCall(name, args.map(subst(_, from, to)), vari)
-            case VariableAssigment(name, op, expr) => VariableAssigment(name.map(_.toString().replaceAllLiterally(from, to)), op, subst(expr, from, to))
+            case VariableAssigment(name, op, expr) => VariableAssigment(name.map(subst(_, from, to)), op, subst(expr, from, to))
             case Return(value) => Return(subst(value, from, to))
             case WhileLoop(cond, instr) => WhileLoop(subst(cond, from, to), subst(instr, from, to))
             case DoWhileLoop(cond, instr) => DoWhileLoop(subst(cond, from, to), subst(instr, from, to))
@@ -119,6 +124,11 @@ object Utils{
             case With(expr, isAt, cond, block) => With(subst(expr, from, to), subst(isAt, from, to), subst(cond, from, to), subst(block, from, to))
 
             case Switch(cond, cases, cv) => Switch(subst(cond, from, to), cases.map(x => SwitchCase(subst(x.expr, from, to), subst(x.instr, from, to))), cv)
+    }
+    def subst(vari: Either[Identifier, Variable], from: String, to: String): Either[Identifier, Variable] = {
+        vari match
+            case Left(value) => Left(value.toString().replaceAllLiterally(from, to))
+            case Right(value) => Right(value)
     }
 
     def subst(instr: Expression, from: String, to: String): Expression = {
@@ -146,8 +156,7 @@ object Utils{
             case JsonBoolean(value) => JsonBoolean(value)
             case JsonInt(value) => JsonInt(value)
             case JsonFloat(value) => JsonFloat(value)
-        }
-            
+        } 
     }
 
 
@@ -184,7 +193,107 @@ object Utils{
             case With(expr, isAt, cond, block) => With(subst(expr, from, to), subst(isAt, from, to), subst(cond, from, to), subst(block, from, to))
 
             case Switch(cond, cases, cv) => Switch(subst(cond, from, to), cases.map(x => SwitchCase(subst(x.expr, from, to), subst(x.instr, from, to))), cv)
+    }
 
+    def rmFunctions(instr: Instruction): Instruction = {
+        instr match
+            case Package(name, block) => Package(name, rmFunctions(block))
+            case StructDecl(name, block, modifier) => StructDecl(name, rmFunctions(block), modifier)
+            case FunctionDecl(name, block, typ, args, modifier) => InstructionList(List())
+            case EnumDecl(name, fields, values, modifier) => EnumDecl(name, fields, values, modifier)
+            case VariableDecl(name, _type, modifier) => VariableDecl(name, _type, modifier)
+
+            case InstructionList(list) => InstructionList(list.map(rmFunctions(_)))
+            case InstructionBlock(list) => InstructionBlock(list.map(rmFunctions(_)))
+
+            case ElseIf(cond, ifBlock) => ElseIf(cond, rmFunctions(ifBlock))
+            case If(cond, ifBlock, elseBlock) => If(cond, rmFunctions(ifBlock), elseBlock.map(rmFunctions(_).asInstanceOf[ElseIf]))
+            case CMD(value) => instr
+            case FunctionCall(name, args) => instr
+            case LinkedFunctionCall(name, args, vari) => instr
+            case VariableAssigment(name, op, expr) => instr
+            case Return(value) => instr
+            case WhileLoop(cond, instr) => WhileLoop(cond, rmFunctions(instr))
+            case DoWhileLoop(cond, instr) => DoWhileLoop(cond, rmFunctions(instr))
+            case JSONFile(name, json) => instr
+
+            case At(expr, block) => At(expr, rmFunctions(block))
+            case With(expr, isAt, cond, block) => With(expr, isAt, cond, rmFunctions(block))
+
+            case Switch(cond, cases, cv) => Switch(cond, cases.map(x => SwitchCase(x.expr, rmFunctions(x.instr))), cv)
+    }
+
+    def fix(instr: Instruction)(implicit context: Context): Instruction = {
+        instr match
+            case Package(name, block) => Package(name, fix(block))
+            case StructDecl(name, block, modifier) => StructDecl(name, fix(block), modifier)
+            case FunctionDecl(name, block, typ, args, modifier) => FunctionDecl(name, fix(block), typ, args, modifier)
+            case EnumDecl(name, fields, values, modifier) => EnumDecl(name, fields, values.map(v => EnumValue(v.name, v.fields.map(fix(_)))), modifier)
+            case VariableDecl(name, _type, modifier) => VariableDecl(name, _type, modifier)
+
+            case InstructionList(list) => InstructionList(list.map(fix(_)))
+            case InstructionBlock(list) => InstructionBlock(list.map(fix(_)))
+
+            case ElseIf(cond, ifBlock) => ElseIf(fix(cond), fix(ifBlock))
+            case If(cond, ifBlock, elseBlock) => If(fix(cond), fix(ifBlock), elseBlock.map(fix(_).asInstanceOf[ElseIf]))
+            case CMD(value) => instr
+            case FunctionCall(name, args) => {
+                val argF = args.map(fix(_))
+                try{
+                    val fct = context.getFunction(name, argF)
+                    LinkedFunctionCall(fct._1, fct._2)
+                }
+                catch{
+                    case _ => FunctionCall(name, argF)
+                }
+            }
+            case LinkedFunctionCall(name, args, vari) => LinkedFunctionCall(name, args.map(fix(_)), vari)
+            case VariableAssigment(name, op, expr) => VariableAssigment(name.map(x => 
+                x match
+                    case Left(iden) => {
+                        context.tryGetVariable(iden) match
+                            case None => x
+                            case Some(value) => Right(value)
+                    }
+                    case Right(vari) => Right(vari)
+                ), op, fix(expr))
+            case Return(value) => Return(fix(value))
+            case WhileLoop(cond, instr) => WhileLoop(fix(cond), fix(instr))
+            case DoWhileLoop(cond, instr) => DoWhileLoop(fix(cond), fix(instr))
+            case JSONFile(name, json) => instr
+
+            case At(expr, block) => At(fix(expr), fix(block))
+            case With(expr, isAt, cond, block) => With(fix(expr), fix(isAt), fix(cond), fix(block))
+
+            case Switch(cond, cases, cv) => Switch(fix(cond), cases.map(x => SwitchCase(fix(x.expr), fix(x.instr))), cv)
+    }
+    def fix(instr: Expression)(implicit context: Context): Expression = {
+        instr match
+            case IntValue(value) => instr
+            case FloatValue(value) => instr
+            case BoolValue(value) => instr
+            case SelectorValue(content) => instr
+            case StringValue(value) => StringValue(value)
+            case DefaultValue => DefaultValue
+            case JsonValue(content) => JsonValue(fix(content))
+            case VariableValue(name) => context.tryGetVariable(name) match
+                case Some(vari) => LinkedVariableValue(vari)
+                case None => VariableValue(name)
+            case BinaryOperation(op, left, right) => BinaryOperation(op, fix(left), fix(right))
+            case TupleValue(values) => TupleValue(values.map(fix(_)))
+            case FunctionCallValue(name, args) => FunctionCallValue(name, args.map(fix(_)))
+            case RangeValue(min, max) => RangeValue(fix(min), fix(max))
+            case lk: LinkedVariableValue => lk
+    }
+    def fix(json: JSONElement)(implicit context: Context): JSONElement = {
+        json match{
+            case JsonArray(content) => JsonArray(content.map(fix(_)))
+            case JsonDictionary(map) => JsonDictionary(map.map((k,v) => (k, fix(v))))
+            case JsonString(value) => JsonString(value)
+            case JsonBoolean(value) => JsonBoolean(value)
+            case JsonInt(value) => JsonInt(value)
+            case JsonFloat(value) => JsonFloat(value)
+        } 
     }
 
     def subst(instr: Expression, from: String, to: Expression): Expression = {

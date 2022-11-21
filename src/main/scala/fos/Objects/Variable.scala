@@ -5,17 +5,37 @@ import fos.*
 import fos.Compilation.Execute
 
 private val entityTypeSubVariable = List((BoolType, "isPlayer"))
-
+object Variable {
+	extension (value: Either[Identifier, Variable]) {
+		def get()(implicit context: Context):Variable = {
+			value match{
+				case Left(value) => context.getVariable(value)
+				case Right(value) => value
+			}
+		}
+	}
+}
 class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) extends CObject(context, name, _modifier) with Typed(typ){
 	var tupleVari: List[Variable] = List()
 	val tagName = fullName
 	val scoreboard = if modifiers.isEntity then "s"+context.getScoreboardID(this) else ""
 	var lazyValue: Expression = DefaultValue
 
-	def generate()(implicit context: Context):Unit = {
+	def generate(isStructFunctionArgument: Boolean = false)(implicit context: Context):Unit = {
+		val parent = context.getCurrentVariable()
+		if (parent != null){
+			parent.tupleVari = parent.tupleVari ::: List(this)
+		}
+
 		typ match
 			case StructType(struct) => {
-				fos.Compiler.compile(struct.block)(context.push(name))
+				if (isStructFunctionArgument && context.getCurrentVariable().getType() == getType()){
+					fos.Compiler.compile(Utils.rmFunctions(struct.block))(context.push(name, this))
+				}
+				else{
+					fos.Compiler.compile(struct.block)(context.push(name, this))
+				}
+				tupleVari.foreach(vari => vari.modifiers = vari.modifiers.combine(modifiers))
 			}
 			case TupleType(sub) => {
 				val ctx = context.push(name)
@@ -32,16 +52,36 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 	}
 	def assign(op: String, value: Expression)(implicit context: Context): List[String] = {
 		if (modifiers.isLazy){
-			op match{
-				case "=" => lazyValue = Utils.simplify(value)
-				case "+=" => lazyValue = Utils.simplify(BinaryOperation("+", LinkedVariableValue(this), value))
-				case "-=" => lazyValue = Utils.simplify(BinaryOperation("-", LinkedVariableValue(this), value))
-				case "/=" => lazyValue = Utils.simplify(BinaryOperation("/", LinkedVariableValue(this), value))
-				case "*=" => lazyValue = Utils.simplify(BinaryOperation("*", LinkedVariableValue(this), value))
-				case "%=" => lazyValue = Utils.simplify(BinaryOperation("%", LinkedVariableValue(this), value))
-				case "&=" => lazyValue = Utils.simplify(BinaryOperation("&", LinkedVariableValue(this), value))
-				case "|=" => lazyValue = Utils.simplify(BinaryOperation("|", LinkedVariableValue(this), value))
-				case "^=" => lazyValue = Utils.simplify(BinaryOperation("^", LinkedVariableValue(this), value))
+			getType() match{
+				case StructType(struct) => {
+					value match
+						case VariableValue(name) => {
+							val vari = context.getVariable(name)
+							if (vari.getType() == StructType(struct)){
+								tupleVari.zip(vari.tupleVari).map((a,v) => a.assign(op, LinkedVariableValue(v)))
+							}
+							else{
+								throw new Exception(f"Lazy assignment of $vari not supported for struct")
+							}
+						}
+						case LinkedVariableValue(vari) if vari.getType() == StructType(struct) => {
+							tupleVari.zip(vari.tupleVari).map((a,v) => a.assign(op, LinkedVariableValue(v)))
+						}
+						case a => throw new Exception(f"Lazy assignment of $a not supported for struct")
+				}
+				case other => {
+					op match{
+						case "=" => lazyValue = Utils.simplify(value)
+						case "+=" => lazyValue = Utils.simplify(BinaryOperation("+", LinkedVariableValue(this), value))
+						case "-=" => lazyValue = Utils.simplify(BinaryOperation("-", LinkedVariableValue(this), value))
+						case "/=" => lazyValue = Utils.simplify(BinaryOperation("/", LinkedVariableValue(this), value))
+						case "*=" => lazyValue = Utils.simplify(BinaryOperation("*", LinkedVariableValue(this), value))
+						case "%=" => lazyValue = Utils.simplify(BinaryOperation("%", LinkedVariableValue(this), value))
+						case "&=" => lazyValue = Utils.simplify(BinaryOperation("&", LinkedVariableValue(this), value))
+						case "|=" => lazyValue = Utils.simplify(BinaryOperation("|", LinkedVariableValue(this), value))
+						case "^=" => lazyValue = Utils.simplify(BinaryOperation("^", LinkedVariableValue(this), value))
+					}
+				}
 			}
 			List()
 		}
@@ -66,6 +106,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 									case TupleType(sub) => assignTuple(op, value)	
 									case JsonType => assignJson(op, value)									
 									case FuncType(source, out) => assignFunc(op, value)
+									case StructType(struct) => assignStruct(op, value)
 									case EntityType => assignEntity(op, value)
 									case EnumType(enm) => assignEnum(op, value)
 							}
@@ -478,6 +519,38 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 				case bin: BinaryOperation => assignBinaryOperator(op, bin)
 				case _ => throw new Exception(f"Unknown cast to json $value")
 		}
+	}
+
+	/**
+	 * Assign a value to the struct variable
+	 */
+	def assignStruct(op: String, value: Expression)(implicit context: Context): List[String] = {
+		if value == DefaultValue then return List()
+		op match
+			case "=" => {
+				value match
+					case LinkedVariableValue(vari) if vari.getType() == getType() => {
+						tupleVari.zip(vari.tupleVari).flatMap((a,v) => a.assign(op, LinkedVariableValue(v)))
+					}
+					case VariableValue(name) => {
+						val vari = context.getVariable(name)
+						if (vari.getType() == getType()){
+							tupleVari.zip(vari.tupleVari).flatMap((a,v) => a.assign(op, LinkedVariableValue(v)))
+						}
+						else{
+							context.getFunction(this.name + ".__set__", List(value), false).call()
+						}
+					}
+					case _ => context.getFunction(name + ".__set__", List(value), false).call()
+			}
+			case "+=" => context.getFunction(name + ".__add__",  List(value), false).call()
+			case "-=" => context.getFunction(name + ".__sub__",  List(value), false).call()
+			case "*=" => context.getFunction(name + ".__mult__", List(value), false).call()
+			case "/=" => context.getFunction(name + ".__div__",  List(value), false).call()
+			case "%=" => context.getFunction(name + ".__mod__",  List(value), false).call()
+			case "&=" => context.getFunction(name + ".__and__",  List(value), false).call()
+			case "|=" => context.getFunction(name + ".__or__",   List(value), false).call()
+		
 	}
 
 

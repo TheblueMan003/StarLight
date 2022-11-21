@@ -42,10 +42,10 @@ abstract class Function(context: Context, name: String, val arguments: List[Argu
         argumentsVariables = arguments.map(a => {
             val mod = new Modifier()
             mod.protection = Protection.Private
-            val vari = new Variable(ctx2, a.name, a.typ, mod)
+            val vari = new Variable(ctx2, a.name, ctx.getType(a.typ), mod)
 
             ctx2.addVariable(vari)
-            vari.generate()(ctx2)
+            vari.generate(ctx.getCurrentVariable() != null)(ctx2)
             vari
     })
     }
@@ -138,7 +138,9 @@ class LazyFunction(context: Context, name: String, arguments: List[Argument], ty
         var block = body
         val sub = ctx.push(ctx.getLazyCallId())
         argMap(args).foreach((a, v) => {
-            sub.addVariable(Variable(sub, a.name, a.getType(), a.modifiers)).assign("=", v)
+            val vari = Variable(sub, a.name, a.getType(), a.modifiers)
+            vari.generate()(sub)
+            sub.addVariable(vari).assign("=", v)
             block = Utils.substReturn(Utils.subst(block, a.name, v), ret)
         })
         fos.Compiler.compile(block)(if modifiers.isInline then ctx else sub)

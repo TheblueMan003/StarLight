@@ -31,7 +31,7 @@ case class FunctionDecl(val name: String, val block: Instruction, val typ: Type,
 case class VariableDecl(val name: String, val _type: Type, val modifier: Modifier) extends Instruction {
   override def toString() = f"${_type} ${name}"
 }
-case class VariableAssigment(val name: List[Identifier], val op: String, val expr: Expression) extends Instruction {
+case class VariableAssigment(val name: List[Either[Identifier, Variable]], val op: String, val expr: Expression) extends Instruction {
   override def toString() = f"${name} ${op} ${expr}"
 }
 

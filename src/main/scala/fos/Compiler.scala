@@ -31,7 +31,7 @@ object Compiler{
                     func.generateArgument()(context)
                 }
                 else{
-                    val func = new LazyFunction(context, name, args, context.getType(typ), modifier, block)
+                    val func = new LazyFunction(context, name, args, context.getType(typ), modifier, Utils.fix(block))
                     context.addFunction(name, func)
                     func.generateArgument()(context)
                 }
@@ -60,11 +60,11 @@ object Compiler{
 
             case VariableAssigment(names, op, expr) => {
                 if (names.length == 1){
-                    context.getVariable(names.head).assign(op, Utils.simplify(expr))
+                    names.head.get().assign(op, Utils.simplify(expr))
                 }
                 else{
                     val simplied = Utils.simplify(expr)
-                    val varis = names.map(context.getVariable(_))
+                    val varis = names.map(_.get())
                     simplied match
                         case TupleValue(lst) => varis.zip(lst).flatMap(p => p._1.assign(op, p._2))
                         case VariableValue(name) => {

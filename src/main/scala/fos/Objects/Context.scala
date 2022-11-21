@@ -34,6 +34,7 @@ class Context(name: String, parent: Context = null, _root: Context = null) {
     private var varId = -1
 
     private var function: Function = null
+    private var variable: Variable = null
 
     def getPath(): String ={
         return path
@@ -151,12 +152,30 @@ class Context(name: String, parent: Context = null, _root: Context = null) {
         ret.function = fct
         ret
     }
+    /**
+     * Return a new context for a sub block
+     */
+    def push(name: String, fct: Variable): Context = {
+        val ret = if (child.contains(name)){
+          child(name)
+        }
+        else{
+            val n = new Context(name, this, root)
+            child.addOne(name, n)
+            n
+        }
+        ret.variable = fct
+        ret
+    }
 
 
 
 
     def getCurrentFunction(): Function = {
-        if function == null then parent.getCurrentFunction() else function
+        if function == null && parent != null then parent.getCurrentFunction() else function
+    }
+    def getCurrentVariable(): Variable = {
+        if variable == null && parent != null then parent.getCurrentVariable() else variable
     }
 
 

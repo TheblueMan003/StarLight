@@ -92,7 +92,7 @@ object Parser extends StandardTokenParsers{
   def varAssignment: Parser[Instruction] = (rep1sep(ident2, ",") ~ assignmentOp ~ expr) ^^ (p => 
     {
       val identifiers = p._1._1.map(Identifier.fromString(_))
-      VariableAssigment(identifiers, p._1._2, p._2)
+      VariableAssigment(identifiers.map(Left(_)), p._1._2, p._2)
     })
 
   def varDeclaration: Parser[Instruction] = (modifier ~ types ~ rep1sep(ident, ",") ~ opt("=" ~> expr)) ^^ (p => {
@@ -100,10 +100,10 @@ object Parser extends StandardTokenParsers{
       val decl = p._1._2.map(VariableDecl(_, p._1._1._2, mod))
       val identifiers = p._1._2.map(Identifier.fromString(_))
       if (!mod.isEntity && p._2.isEmpty){
-        InstructionList(decl ::: List(VariableAssigment(identifiers, ":=", DefaultValue)))
+        InstructionList(decl ::: List(VariableAssigment(identifiers.map(Left(_)), ":=", DefaultValue)))
       }
       else if (!mod.isEntity && !p._2.isEmpty){
-        InstructionList(decl ::: List(VariableAssigment(identifiers, "=", p._2.get)))
+        InstructionList(decl ::: List(VariableAssigment(identifiers.map(Left(_)), "=", p._2.get)))
       }
       else{
         InstructionList(decl)
