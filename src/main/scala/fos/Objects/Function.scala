@@ -136,7 +136,7 @@ class BlockFunction(context: Context, name: String, var body: List[String]) exte
 class LazyFunction(context: Context, name: String, arguments: List[Argument], typ: Type, _modifier: Modifier, val body: Instruction) extends Function(context, name, arguments, typ, _modifier){
     def call(args: List[Expression], ret: Variable = null)(implicit ctx: Context): List[String] = {
         var block = body
-        val sub = ctx.push("dummy")
+        val sub = ctx.push(ctx.getLazyCallId())
         argMap(args).foreach((a, v) => {
             sub.addVariable(Variable(sub, a.name, a.getType(), a.modifiers)).assign("=", v)
             block = Utils.substReturn(Utils.subst(block, a.name, v), ret)

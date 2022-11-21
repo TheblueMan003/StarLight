@@ -14,7 +14,7 @@ import objects.EnumValue
 object Parser extends StandardTokenParsers{
   lexical.delimiters ++= List("(", ")", "\\", ".", ":", "=", "->", "{", "}", ",", "*", "[", "]", "/", "+", "-", "*", "/", "\\", "%", "&&", "||", "=>", ";",
                               "+=", "-=", "/=", "*=", "?=", ":=", "%", "@", "@e", "@a", "@s", "@r", "@p", "~", "^", "<=", "==", ">=", "<", ">", "!=", "%%%")
-  lexical.reserved   ++= List("bool", "int", "float", "void", "string", "true", "false", "if", "then", "else", "return", "switch", "for", "do", "while",
+  lexical.reserved   ++= List("bool", "int", "float", "void", "string", "json", "true", "false", "if", "then", "else", "return", "switch", "for", "do", "while",
                               "as", "at", "with", 
                               "var", "val", "def", "package", "struct", "enum", "lazy", "jsonfile",
                               "public", "protected", "private", "entity", "scoreboard",
@@ -123,10 +123,11 @@ object Parser extends StandardTokenParsers{
 
   def sfRange: Parser[SelectorFilterValue] = (floatValue <~ "..") ~ floatValue ^^ (p => SelectorRange(p._1, p._2))
   def sfNumber: Parser[SelectorFilterValue] = floatValue ^^ (SelectorNumber(_))
+  def sfNumber2: Parser[SelectorFilterValue] = numericLit ^^ (p => SelectorNumber(p.toInt))
   def sfString: Parser[SelectorFilterValue] = stringLit ^^ (SelectorString(_))
   def sfIdentifier: Parser[SelectorFilterValue] = ident2 ^^ (SelectorIdentifier(_))
 
-  def selectorFilterValue = sfRange | sfNumber | sfString | sfIdentifier
+  def selectorFilterValue = sfRange | sfNumber | sfString | sfIdentifier | sfNumber2
   def selectorFilter: Parser[(String, SelectorFilterValue)] = (ident <~ "=") ~ selectorFilterValue ^^ { p => (p._1, p._2) }
   def selector: Parser[Selector] = ("@a" | "@s" | "@e" | "@p" | "@r") ~ opt("[" ~> rep1sep(selectorFilter, ",") <~ "]") ^^ { p => Selector.parse(p._1, p._2.getOrElse(List())) }
   def selectorStr : Parser[String] = (selector ^^ (_.toString()))
@@ -173,6 +174,7 @@ object Parser extends StandardTokenParsers{
     "bool" ^^^ BoolType |
     "void" ^^^ VoidType |
     "string" ^^^ StringType |
+    "json" ^^^ JsonType |
     "entity" ^^^ EntityType |
     ident2 ^^ { IdentifierType(_) } |
     (("(" ~> types) ~ rep1("," ~> types)) <~ ")" ^^ (p => if p._2.length > 0 then TupleType(p._1 :: p._2) else p._1)

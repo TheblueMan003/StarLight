@@ -7,7 +7,11 @@ lazy void fct(json test){
 }
 
 def ticking main(){
-    lazy string a = "test"
-    a += a
+    with(@a[c=1]){
+        int a
+    }
+    lazy json a = {"test":"lol"}
+    a += {"bruh":"lol"}
     fct({"value":a})
 }
+

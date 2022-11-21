@@ -280,6 +280,7 @@ object Utils{
                     case (FloatValue(a), IntValue(b)) => FloatValue(combine(op, a, b))
                     case (BoolValue(a), BoolValue(b)) => BoolValue(combine(op, a, b))
                     case (StringValue(a), StringValue(b)) => StringValue(combine(op, a, b))
+                    case (JsonValue(a), JsonValue(b)) => JsonValue(combine(op, a, b))
                     case _ => BinaryOperation(op, nl, nr)
             }
             case LinkedVariableValue(vari) => {
@@ -290,6 +291,21 @@ object Utils{
                 if vari.modifiers.isLazy then vari.lazyValue else expr
             }
             case other => other
+    }
+
+    def combineJson(elm1: JSONElement, elm2: JSONElement): JSONElement = {
+        elm1 match
+            case JsonArray(content1) => {
+                elm2 match
+                    case JsonArray(content2) => JsonArray(content1 ::: content2)
+                    case _ => throw new Exception(f"Json Element doesn't match ${elm1} vs ${elm2}")
+            }
+            case JsonDictionary(content1) => {
+                elm2 match
+                    case JsonDictionary(content2) => JsonDictionary((content1.toList ++ content2.toList).groupBy(_._1).map((k, value) => (k, if value.length == 1 then value.head._2 else combineJson(value(0)._2, value(1)._2))).toMap)
+                    case _ => throw new Exception(f"Json Element doesn't match ${elm1} vs ${elm2}")
+            }
+            case other => elm1
     }
 
     def compileJson(elm: JSONElement)(implicit context: Context): JSONElement = {
@@ -308,8 +324,6 @@ object Utils{
                                 case StringValue(value) => JsonString(value)
                                 case JsonValue(content) => compileJson(content)
                                 case other => throw new Exception(f"Cannot put not $other in json") 
-                                
-                            
                         }
                         else{
                             throw new Exception(f"Cannot put not lazy variable ${value.fullName} in json")
@@ -354,6 +368,11 @@ object Utils{
             case "!=" => a != b
             case ">=" => a >= b
             case ">"  => a > b
+    }
+
+    def combine(op: String, a: JSONElement, b: JSONElement): JSONElement = {
+        op match
+            case "+" => combineJson(a, b)
     }
 
     def combine(op: String, a: String, b: String): String = {

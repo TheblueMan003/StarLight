@@ -218,6 +218,7 @@ object Execute{
                 val v = Utils.simplifyToVariable(expr)
                 (v._1, List(IFValueCase(v._2)))
             }
+            case StringValue(string) => throw new Exception("Can't use if with string")
             case JsonValue(json) => throw new Exception("Can't use if with json")
             case RangeValue(min, max) => throw new Exception("Can't use if with range")
             case TupleValue(values) => throw new Exception("Can't use if with tuple")

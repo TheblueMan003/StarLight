@@ -85,6 +85,12 @@ class Context(name: String, parent: Context = null, _root: Context = null) {
             getPath()+"."+ varId
         }
     }
+    def getLazyCallId(): String = {
+        synchronized{
+            varId += 1
+            varId.toString()
+        }
+    }
     def getFreshVariable(typ: Type): Variable = {
         synchronized{
             varId += 1

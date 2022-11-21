@@ -63,7 +63,8 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 									case IntType => assignInt(op, value)
 									case FloatType => assignFloat(op, value)
 									case BoolType => assignBool(op, value)
-									case TupleType(sub) => assignTuple(op, value)										
+									case TupleType(sub) => assignTuple(op, value)	
+									case JsonType => assignJson(op, value)									
 									case FuncType(source, out) => assignFunc(op, value)
 									case EntityType => assignEntity(op, value)
 									case EnumType(enm) => assignEnum(op, value)
@@ -422,6 +423,60 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					case _ => throw new Exception(f"No cast from ${expr} to entity")
 			}
 			case _ => throw new Exception(f"Illegal operation with ${name}: $op")
+		}
+	}
+
+	/**
+	 * Assign a value to the float variable
+	 */
+	def assignJson(op: String, value: Expression)(implicit context: Context): List[String] = {
+		if (Settings.target == MCBedrock){
+			throw new Exception("Dynamic Json Variable Not Supported in Bedrock")
+		}
+		if (modifiers.isEntity){
+			throw new Exception("Not Supported")
+		}
+		else{
+			value match
+				case JsonValue(value) => 
+					op match{
+						case "=" => List(f"data modify storage ${fullName} json set value ${value.getNbt()}")
+						case "+=" => List(f"data modify storage ${fullName} json append value ${value.getNbt()}")
+						case "&=" => List(f"data modify storage ${fullName} json merge value ${value.getNbt()}")
+					}
+				case DefaultValue => List(f"scoreboard players set 0")
+				case VariableValue(name) => assignBool(op, LinkedVariableValue(context.getVariable(name)))
+				case LinkedVariableValue(vari) => 
+					vari.getType() match{
+						case JsonType => {
+							op match{
+								case "=" => List(f"data modify storage ${fullName} json set from storage ${vari.fullName} json")
+								case "+=" => List(f"data modify storage ${fullName} json append from storage ${vari.fullName} json")
+								case "&=" => List(f"data modify storage ${fullName} json merge from storage ${vari.fullName} json")
+							}
+						}
+						case IntType => {
+							op match{
+								case "=" => List(f"execute store result storage ${fullName} json int 1 run scoreboard players get ${vari.getSelector()}")
+								case "+=" => List(f"execute store result storage ${fullName} tmp int 1 run scoreboard players get ${vari.getSelector()}", 
+												f"data modify storage ${fullName} json append from storage ${fullName} tmp")
+								case "&=" => List(f"execute store result storage ${fullName} tmp int 1 run scoreboard players get ${vari.getSelector()}", 
+												f"data modify storage ${fullName} json merge from storage ${fullName} tmp")
+							}
+						}
+						case FloatType => {
+							op match{
+								case "=" => List(f"execute store result storage ${fullName} json float ${1/Settings.floatPrec} run scoreboard players get ${vari.getSelector()}")
+								case "+=" => List(f"execute store result storage ${fullName} tmp float ${1/Settings.floatPrec} run scoreboard players get ${vari.getSelector()}", 
+												f"data modify storage ${fullName} json append from storage ${fullName} tmp")
+								case "&=" => List(f"execute store result storage ${fullName} tmp float ${1/Settings.floatPrec} run scoreboard players get ${vari.getSelector()}", 
+												f"data modify storage ${fullName} json merge from storage ${fullName} tmp")
+							}
+						}
+					}
+				case FunctionCallValue(name, args) => context.getFunction(name, args).call(this)
+				case bin: BinaryOperation => assignBinaryOperator(op, bin)
+				case _ => throw new Exception(f"Unknown cast to json $value")
 		}
 	}
 
