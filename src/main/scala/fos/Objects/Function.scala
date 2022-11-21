@@ -48,6 +48,7 @@ abstract class Function(context: Context, name: String, val arguments: List[Argu
             vari.generate(ctx.getCurrentVariable() != null)(ctx2)
             vari
     })
+
     }
     def argMap(args: List[Expression]) = {
         argumentsVariables
@@ -80,7 +81,7 @@ class ConcreteFunction(context: Context, name: String, arguments: List[Argument]
             context.addFunctionToCompile(this)
         }
         val r = argMap(args2).flatMap(p => p._1.assign("=", p._2)) :::
-            List("function " + fullName.replaceAllLiterally(".","/"))
+            List("function " + Settings.target.getFunctionName(fullName))
 
         if (ret != null){
             r ::: ret.assign("=", LinkedVariableValue(returnVariable))
@@ -112,13 +113,16 @@ class ConcreteFunction(context: Context, name: String, arguments: List[Argument]
     def markAsCompile(): Unit = {
         wasCompiled = true
     }
+    def markAsUsed():Unit = {
+        _needCompiling = true
+    }
 
     def getMuxID(): Int = {
         muxID
     }
 }
 
-class BlockFunction(context: Context, name: String, var body: List[String]) extends Function(context, name, List(), VoidType, Modifier.newPrivate()){
+class BlockFunction(context: Context, name: String, arguments: List[Argument], var body: List[String]) extends Function(context, name, arguments, VoidType, Modifier.newPrivate()){
     def call(args2: List[Expression], ret: Variable = null)(implicit ctx: Context): List[String] = {
         argMap(args2).flatMap(p => p._1.assign("=", p._2)) :::
             List("function " + fullName.replaceAllLiterally(".","/"))

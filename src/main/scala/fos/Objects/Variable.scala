@@ -193,7 +193,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 			case FloatValue(value) => assignInt(op, IntValue(value.toInt))
 			case VariableValue(name) => assignInt(op, LinkedVariableValue(context.getVariable(name)))
 			case LinkedVariableValue(vari) => assignIntLinkedVariable(op, vari)
-			case FunctionCallValue(name, args) => context.getFunction(name, args).call(this)
+			case FunctionCallValue(name, args) => context.getFunction(name, args, getType()).call(this)
 			case bin: BinaryOperation => assignBinaryOperator(op, bin)
 			case _ => throw new Exception(f"Unknown cast to int $value")
 	}
@@ -289,7 +289,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 			case BoolValue(value) => assignFloat(op, IntValue(if value then 1 else 0))
 			case VariableValue(name) => assignFloat(op, LinkedVariableValue(context.getVariable(name)))
 			case LinkedVariableValue(vari) => assignFloatLinkedVariable(op, vari)
-			case FunctionCallValue(name, args) => context.getFunction(name, args).call(this)
+			case FunctionCallValue(name, args) => context.getFunction(name, args, getType()).call(this)
 			case bin: BinaryOperation => assignBinaryOperator(op, bin)
 			case _ => throw new Exception(f"Unknown cast to float $value")
 	}
@@ -312,7 +312,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					case "&=" => List(f"scoreboard players operation ${getSelector()} *= ${vari.getSelector()}")
 					case "|=" => List(f"scoreboard players operation ${getSelector()} += ${vari.getSelector()}")
 					case _ => List(f"scoreboard players operation ${getSelector()} $op ${vari.getSelector()}")
-			case FunctionCallValue(name, args) => context.getFunction(name, args).call(this)
+			case FunctionCallValue(name, args) => context.getFunction(name, args, getType()).call(this)
 			case bin: BinaryOperation => assignBinaryOperator(op, bin)
 			case _ => throw new Exception(f"Unknown cast to bool $value")
 	}
@@ -381,10 +381,18 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					case Some(value) => List(f"scoreboard players operation ${getSelector()} = ${value.getSelector()}")
 					case None =>{
 						val typ = getType().asInstanceOf[FuncType]
-						val fct = context.getFunction(name, typ.sources, true).asInstanceOf[ConcreteFunction]
+						val fct = context.getFunction(name, typ.sources, typ.output, true).asInstanceOf[ConcreteFunction]
+						fct.markAsUsed()
 						context.addFunctionToMux(typ.sources, typ.output, fct)
 						List(f"scoreboard players set ${getSelector()} ${fct.getMuxID()}")
 				}
+			}
+			case LambdaValue(args, instr) => {
+				val typ = getType().asInstanceOf[FuncType]
+				val fct = context.getFreshLambda(args, typ.sources, typ.output, instr).asInstanceOf[ConcreteFunction]
+				fct.markAsUsed()
+				context.addFunctionToMux(typ.sources, typ.output, fct)
+				List(f"scoreboard players set ${getSelector()} ${fct.getMuxID()}")
 			}
 			case DefaultValue => List(f"scoreboard players set ${getSelector()} 0")
 			case TupleValue(value) => tupleVari.zip(value).flatMap((t, v) => t.assign(op, v))
@@ -515,7 +523,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 							}
 						}
 					}
-				case FunctionCallValue(name, args) => context.getFunction(name, args).call(this)
+				case FunctionCallValue(name, args) => context.getFunction(name, args, getType()).call(this)
 				case bin: BinaryOperation => assignBinaryOperator(op, bin)
 				case _ => throw new Exception(f"Unknown cast to json $value")
 		}
@@ -538,18 +546,18 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 							tupleVari.zip(vari.tupleVari).flatMap((a,v) => a.assign(op, LinkedVariableValue(v)))
 						}
 						else{
-							context.getFunction(this.name + ".__set__", List(value), false).call()
+							context.getFunction(this.name + ".__set__", List(value), getType(), false).call()
 						}
 					}
-					case _ => context.getFunction(name + ".__set__", List(value), false).call()
+					case _ => context.getFunction(name + ".__set__", List(value), getType(), false).call()
 			}
-			case "+=" => context.getFunction(name + ".__add__",  List(value), false).call()
-			case "-=" => context.getFunction(name + ".__sub__",  List(value), false).call()
-			case "*=" => context.getFunction(name + ".__mult__", List(value), false).call()
-			case "/=" => context.getFunction(name + ".__div__",  List(value), false).call()
-			case "%=" => context.getFunction(name + ".__mod__",  List(value), false).call()
-			case "&=" => context.getFunction(name + ".__and__",  List(value), false).call()
-			case "|=" => context.getFunction(name + ".__or__",   List(value), false).call()
+			case "+=" => context.getFunction(name + ".__add__",  List(value), getType(), false).call()
+			case "-=" => context.getFunction(name + ".__sub__",  List(value), getType(), false).call()
+			case "*=" => context.getFunction(name + ".__mult__", List(value), getType(), false).call()
+			case "/=" => context.getFunction(name + ".__div__",  List(value), getType(), false).call()
+			case "%=" => context.getFunction(name + ".__mod__",  List(value), getType(), false).call()
+			case "&=" => context.getFunction(name + ".__and__",  List(value), getType(), false).call()
+			case "|=" => context.getFunction(name + ".__or__",   List(value), getType(), false).call()
 		
 	}
 
@@ -564,6 +572,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 			case SelectorValue(value) => false
 			case StringValue(value) => false
 			case DefaultValue => false
+			case LambdaValue(args, instr) => false
 			case VariableValue(name1) => context.tryGetVariable(name1) == Some(this)
 			case LinkedVariableValue(vari) => vari == this
 			case BinaryOperation(op, left, right) => isPresentIn(left) || isPresentIn(right)

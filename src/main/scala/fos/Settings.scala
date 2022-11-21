@@ -19,12 +19,16 @@ object Settings{
 
 trait Target{
     def getFunctionPath(path: String): String
+    def getFunctionName(path: String): String
     def getJsonPath(path: String): String
     def getExtraFiles(context: Context): List[(String, List[String])]
 }
 case object MCJava extends Target{
     def getFunctionPath(path: String): String = {
         "/data/" + path.replaceAllLiterally(".","/").replaceFirst("/", "/functions/")+ ".mcfunction"
+    }
+    def getFunctionName(path: String): String = {
+        path.replaceAllLiterally(".","/").replaceFirst("/", ":")
     }
     def getJsonPath(path: String): String = {
         "/data/" + path.replaceAllLiterally(".","/")+ ".json"
@@ -60,6 +64,9 @@ case object MCJava extends Target{
 case object MCBedrock extends Target{
     def getFunctionPath(path: String): String = {
         "/functions/" + path.replaceAllLiterally(".","/") + ".mcfunction"
+    }
+    def getFunctionName(path: String): String = {
+        path.replaceAllLiterally(".","/")
     }
     def getJsonPath(path: String): String = {
         "/" + path.replaceAllLiterally(".","/") + ".json"

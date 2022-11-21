@@ -46,6 +46,14 @@ object Compiler{
                 enm.addValues(values)
                 List()
             }
+            case ForGenerate(key, provider, instr) => {
+                val cases: IterableOnce[String] = provider match
+                    case RangeValue(IntValue(min), IntValue(max)) => Range(min, max+1).map(_.toString())
+                    case TupleValue(lst) => lst.map(_.toString())
+                    case _ => throw new Exception(f"Unknown generator: $provider")
+                
+                cases.map(x => Utils.subst(instr, key.toString(), x)).flatMap(Compiler.compile(_)).toList
+            }
             case VariableDecl(name, typ, modifier) => {
                 val vari = new Variable(context, name, context.getType(typ), modifier)
                 context.addVariable(vari)
@@ -96,7 +104,7 @@ object Compiler{
                 block.flatMap(inst => compile(inst, firstPass))
             }
             case FunctionCall(name, args) => {
-                context.getFunction(name, args).call()
+                context.getFunction(name, args, VoidType).call()
             }
             case LinkedFunctionCall(name, args, ret) => {
                 name.call(args, ret)

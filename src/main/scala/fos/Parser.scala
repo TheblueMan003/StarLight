@@ -12,12 +12,12 @@ import objects.EnumField
 import objects.EnumValue
 
 object Parser extends StandardTokenParsers{
-  lexical.delimiters ++= List("(", ")", "\\", ".", ":", "=", "->", "{", "}", ",", "*", "[", "]", "/", "+", "-", "*", "/", "\\", "%", "&&", "||", "=>", ";",
+  lexical.delimiters ++= List("(", ")", "\\", ".", "..", ":", "=", "->", "{", "}", ",", "*", "[", "]", "/", "+", "-", "*", "/", "\\", "%", "&&", "||", "=>", ";",
                               "+=", "-=", "/=", "*=", "?=", ":=", "%", "@", "@e", "@a", "@s", "@r", "@p", "~", "^", "<=", "==", ">=", "<", ">", "!=", "%%%")
   lexical.reserved   ++= List("bool", "int", "float", "void", "string", "json", "true", "false", "if", "then", "else", "return", "switch", "for", "do", "while",
-                              "as", "at", "with", 
+                              "as", "at", "with", "to",
                               "var", "val", "def", "package", "struct", "enum", "lazy", "jsonfile",
-                              "public", "protected", "private", "entity", "scoreboard",
+                              "public", "protected", "private", "entity", "scoreboard", "forgenerate",
                               "ticking", "loading")
 
 
@@ -68,9 +68,10 @@ object Parser extends StandardTokenParsers{
       | "at" ~> expr ~ instruction ^^ (p => At(p._1, p._2))
       | withInstr
       | enumInstr
+      | forgenerate
 
       
-
+  def forgenerate: Parser[Instruction] = (("forgenerate" ~> "(" ~> ident2 <~ ",") ~ exprNoTuple <~ ")") ~ instruction ^^ (p => ForGenerate(p._1._1, p._1._2, p._2))
   def jsonFile: Parser[Instruction] = "jsonfile" ~> ident2 ~ json ^^ (p => JSONFile(p._1, p._2))
   def doWhileLoop: Parser[Instruction] = ("do" ~> instruction <~ "while") ~ ("(" ~> expr <~ ")") ^^ (p => DoWhileLoop(p._2, p._1))
   def whileLoop: Parser[Instruction] = ("while" ~> "(" ~> expr <~ ")") ~ instruction ^^ (p => WhileLoop(p._1, p._2))
@@ -120,6 +121,9 @@ object Parser extends StandardTokenParsers{
 
 
 
+  def lambda1: Parser[Expression] = (ident2 <~ "=>") ~ instruction ^^ (p => LambdaValue(List(p._1), p._2))
+  def lambda2: Parser[Expression] = ("(" ~> repsep(ident2, ",") <~ ")" <~ "=>") ~ instruction ^^ (p => LambdaValue(p._1, p._2))
+  def lambda = lambda1 | lambda2
 
   def sfRange: Parser[SelectorFilterValue] = (floatValue <~ "..") ~ floatValue ^^ (p => SelectorRange(p._1, p._2))
   def sfNumber: Parser[SelectorFilterValue] = floatValue ^^ (SelectorNumber(_))
@@ -133,12 +137,14 @@ object Parser extends StandardTokenParsers{
   def selectorStr : Parser[String] = (selector ^^ (_.toString()))
 
   def exprBottom: Parser[Expression] = 
-    floatValue ^^ (p => FloatValue(p))
+    (numericLit <~ "..") ~ numericLit ^^ (p => RangeValue(IntValue(p._1.toInt), IntValue(p._2.toInt)))
+    | floatValue ^^ (p => FloatValue(p))
     | numericLit ^^ (p => IntValue(p.toInt))
     | "-" ~> exprBottom ^^ (BinaryOperation("-", IntValue(0), _))
     | "true" ^^^ BoolValue(true)
     | "false" ^^^ BoolValue(false)
     | stringLit ^^ (StringValue(_))
+    | lambda
     | ((ident2 <~ "(") ~ repsep(expr, ",")) <~ ")" ^^ (p => FunctionCallValue(p._1, p._2))
     | ident2 ^^ (VariableValue(_))
     | "(" ~> expr <~ ")"

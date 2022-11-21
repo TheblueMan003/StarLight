@@ -28,6 +28,10 @@ case class FunctionDecl(val name: String, val block: Instruction, val typ: Type,
   override def toString() = f"def ${name} ${block}"
 }
 
+case class ForGenerate(val key: Identifier, val provider: Expression, val instr: Instruction) extends Instruction {
+  override def toString() = f"forgenerate($key, $provider)$instr"
+}
+
 case class VariableDecl(val name: String, val _type: Type, val modifier: Modifier) extends Instruction {
   override def toString() = f"${_type} ${name}"
 }

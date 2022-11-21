@@ -105,6 +105,16 @@ case class ArrayType(inner: Type, size: String) extends Type{
     }
     override def getName()(implicit context: Context): String = f"$inner[$size]"
 }
+case class  LambdaType(val nb: Int) extends Type{
+    override def allowAdditionSimplification(): Boolean = false
+    override def getDistance(other: Type)(implicit context: Context): Int = {
+        other match
+            case FuncType(sources2, output2) if sources2.length == nb => 0
+            case AnyType => 1000
+            case _ => outOfBound
+    }
+    override def getName()(implicit context: Context): String = f"lambda"
+}
 case class FuncType(sources: List[Type], output: Type) extends Type{
     override def allowAdditionSimplification(): Boolean = false
     override def getDistance(other: Type)(implicit context: Context): Int = {

@@ -2,8 +2,11 @@ package objects
 
 import scala.collection.mutable
 import objects.types.*
-import fos.{Settings, Utils, LinkedVariableValue}
+import fos.{Settings, Utils, LinkedVariableValue, Argument}
 import fos.Expression
+import fos.Instruction
+import fos.LambdaValue
+import fos.VariableValue
 
 object Context{
     def getNew(name: String):Context = {
@@ -101,11 +104,22 @@ class Context(name: String, parent: Context = null, _root: Context = null) {
             vari
         }
     }
+    def getFreshLambda(argument: List[String], types: List[Type], output: Type, instr: Instruction, isLazy: Boolean = false): Function = synchronized{
+        val args = argument.zip(types).map((v, t) => Argument(v, t, None))
+        val name = "lambda_"+getLazyCallId()
+        val ctx = push(name)
+        val mod = Modifier.newPrivate()
+        mod.isLazy = isLazy
+        val fct = if isLazy then LazyFunction(this, name, args, output, mod, instr) else ConcreteFunction(this, name, args, output, mod, instr, true)
+        fct.generateArgument()(this)
+        addFunction(name, fct)
+        fct
+    }
     def getFreshBlock(content: List[String]): BlockFunction = {
         val r = fctCtx
         r.synchronized{
             r.varId += 1
-            val fct = BlockFunction(r, "_"+r.varId.toString(), content)
+            val fct = BlockFunction(r, "_"+r.varId.toString(), List(), content)
             r.addFunction("_"+r.varId.toString(), fct)
             fct
         }
@@ -113,7 +127,7 @@ class Context(name: String, parent: Context = null, _root: Context = null) {
     def getNamedBlock(name: String, content: List[String]): Function = {
         val name2 = getFunctionWorkingName(name)
         synchronized{
-            addFunction(name, BlockFunction(this, name2, content))
+            addFunction(name, BlockFunction(this, name2, List(), content))
         }
     }
     def getFreshFunctionIdentifier(): Identifier = {
@@ -212,16 +226,24 @@ class Context(name: String, parent: Context = null, _root: Context = null) {
 
 
 
-    def getFunction(identifier: Identifier, args: List[Expression], concrete: Boolean = false): (Function, List[Expression]) = {
+    def getFunction(identifier: Identifier, args: List[Expression], output: Type, concrete: Boolean = false): (Function, List[Expression]) = {
         val vari = tryGetVariable(identifier)
         vari match
             case Some(vari) if vari.getType().isInstanceOf[FuncType] => {
-                val typ = vari.getType().asInstanceOf[FuncType]
-                (getFunctionMux(typ.sources, typ.output)(this), LinkedVariableValue(vari)::args)
+                if (vari.modifiers.isLazy){
+                    vari.lazyValue match
+                        case LambdaValue(args2, instr) => (getFreshLambda(args2, args.map(Utils.typeof(_)(this)), output, instr, true), args)
+                        case VariableValue(name) => getFunction(name, args, output, concrete)
+                        case other => throw new Exception(f"Illegal call of ${other} with $args")
+                }
+                else{
+                    val typ = vari.getType().asInstanceOf[FuncType]
+                    (getFunctionMux(typ.sources, typ.output)(this), LinkedVariableValue(vari)::args)
+                }
             }
-            case _ => (getFunction(identifier, args.map(Utils.typeof(_)(this)), concrete), args)
+            case _ => (getFunction(identifier, args.map(Utils.typeof(_)(this)), output, concrete), args)
     }
-    def getFunction(identifier: Identifier, args: List[Type], concrete: Boolean): Function = {
+    def getFunction(identifier: Identifier, args: List[Type], output: Type, concrete: Boolean): Function = {
         val fcts = getElementList(_.functions)(identifier)
         if (fcts.length == 0) throw new Exception(f"Unknown function: $identifier in context: $path")
         if (fcts.length == 1) return fcts.head

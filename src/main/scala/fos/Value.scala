@@ -73,6 +73,14 @@ case class TupleValue(val values: List[Expression]) extends Expression with Smal
     override def getFloatValue(): Double = ???
 }
 
+case class LambdaValue(val args: List[String], val instr: Instruction) extends Expression with SmallValue{
+    override def toString() = f"($args)=>$instr"
+    override def getIntValue(): Int = ???
+    override def hasIntValue(): Boolean = false
+    override def hasFloatValue(): Boolean = false
+    override def getFloatValue(): Double = ???
+}
+
 case class FunctionCallValue(val name: Identifier, val args: List[Expression]) extends Expression with SmallValue{
     override def toString() = f"${name}()"
     override def getIntValue(): Int = ???

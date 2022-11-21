@@ -14,6 +14,7 @@ object Utils{
             case Package(name, block) => Package(name, substReturn(block, to))
             case StructDecl(name, block, modifier) => StructDecl(name, substReturn(block, to), modifier)
             case FunctionDecl(name, block, typ, args, modifier) => FunctionDecl(name, substReturn(block, to), typ, args, modifier)
+            case ForGenerate(key, provider, instr) => ForGenerate(key, provider, substReturn(instr, to))
             case EnumDecl(name, fields, values, modifier) => instr
             case VariableDecl(name, _type, modifier) => instr
             case JSONFile(name, json) => instr
@@ -44,6 +45,7 @@ object Utils{
             case StructDecl(name, block, modifier) => StructDecl(name, subst(block, from, to), modifier)
             case FunctionDecl(name, block, typ, args, modifier) => FunctionDecl(name, subst(block, from, to), typ, args, modifier)
             case VariableDecl(name, _type, modifier) => instr
+            case ForGenerate(key, provider, instr) => ForGenerate(key, subst(provider, from, to), subst(instr, from, to))
             case EnumDecl(name, fields, values, modifier) => EnumDecl(name, fields, values.map(v => EnumValue(v.name, v.fields.map(subst(_, from, to)))), modifier)
             case JSONFile(name, json) => instr
             
@@ -87,6 +89,7 @@ object Utils{
             case TupleValue(values) => TupleValue(values.map(subst(_, from, to)))
             case FunctionCallValue(name, args) => FunctionCallValue(name.replaceAllLiterally(from, to), args.map(subst(_, from, to)))
             case RangeValue(min, max) => RangeValue(subst(min, from, to), subst(max, from, to))
+            case LambdaValue(args, instr) => LambdaValue(args, subst(instr, from, to))
             case lk: LinkedVariableValue => lk
     }
 
@@ -103,6 +106,7 @@ object Utils{
                     FunctionDecl(name.replaceAllLiterally(from, to), subst(block, from, to), typ, args, modifier)
                 }
             }
+            case ForGenerate(key, provider, instr) => ForGenerate(key, subst(provider, from, to), subst(instr, from, to))
             case EnumDecl(name, fields, values, modifier) => EnumDecl(name.replaceAllLiterally(from, to), fields, values.map(v => EnumValue(v.name.replaceAllLiterally(from, to), v.fields.map(subst(_, from, to)))), modifier)
             case VariableDecl(name, _type, modifier) => VariableDecl(name.replaceAllLiterally(from, to), _type, modifier)
             case JSONFile(name, json) => JSONFile(name.replaceAllLiterally(from, to), subst(json, from, to))
@@ -145,6 +149,7 @@ object Utils{
             case TupleValue(values) => TupleValue(values.map(subst(_, from, to)))
             case FunctionCallValue(name, args) => FunctionCallValue(name.replaceAllLiterally(from, to), args.map(subst(_, from, to)))
             case RangeValue(min, max) => RangeValue(subst(min, from, to), subst(max, from, to))
+            case LambdaValue(args, instr) => LambdaValue(args.map(_.replaceAllLiterally(from, to)), subst(instr, from, to))
             case lk: LinkedVariableValue => lk
     }
 
@@ -172,6 +177,7 @@ object Utils{
                     FunctionDecl(name, subst(block, from, to), typ, args, modifier)
                 }
             }
+            case ForGenerate(key, provider, instr) => ForGenerate(key, subst(provider, from, to), subst(instr, from, to))
             case EnumDecl(name, fields, values, modifier) => EnumDecl(name, fields, values.map(v => EnumValue(v.name, v.fields.map(subst(_, from, to)))), modifier)
             case VariableDecl(name, _type, modifier) => VariableDecl(name, _type, modifier)
 
@@ -202,6 +208,7 @@ object Utils{
             case FunctionDecl(name, block, typ, args, modifier) => InstructionList(List())
             case EnumDecl(name, fields, values, modifier) => EnumDecl(name, fields, values, modifier)
             case VariableDecl(name, _type, modifier) => VariableDecl(name, _type, modifier)
+            case ForGenerate(key, provider, instr) => ForGenerate(key, provider, rmFunctions(instr))
 
             case InstructionList(list) => InstructionList(list.map(rmFunctions(_)))
             case InstructionBlock(list) => InstructionBlock(list.map(rmFunctions(_)))
@@ -230,6 +237,7 @@ object Utils{
             case FunctionDecl(name, block, typ, args, modifier) => FunctionDecl(name, fix(block), typ, args, modifier)
             case EnumDecl(name, fields, values, modifier) => EnumDecl(name, fields, values.map(v => EnumValue(v.name, v.fields.map(fix(_)))), modifier)
             case VariableDecl(name, _type, modifier) => VariableDecl(name, _type, modifier)
+            case ForGenerate(key, provider, instr) => ForGenerate(key, fix(provider), fix(instr))
 
             case InstructionList(list) => InstructionList(list.map(fix(_)))
             case InstructionBlock(list) => InstructionBlock(list.map(fix(_)))
@@ -240,7 +248,7 @@ object Utils{
             case FunctionCall(name, args) => {
                 val argF = args.map(fix(_))
                 try{
-                    val fct = context.getFunction(name, argF)
+                    val fct = context.getFunction(name, argF, VoidType)
                     LinkedFunctionCall(fct._1, fct._2)
                 }
                 catch{
@@ -283,6 +291,7 @@ object Utils{
             case TupleValue(values) => TupleValue(values.map(fix(_)))
             case FunctionCallValue(name, args) => FunctionCallValue(name, args.map(fix(_)))
             case RangeValue(min, max) => RangeValue(fix(min), fix(max))
+            case LambdaValue(args, instr) => LambdaValue(args, fix(instr))
             case lk: LinkedVariableValue => lk
     }
     def fix(json: JSONElement)(implicit context: Context): JSONElement = {
@@ -310,6 +319,7 @@ object Utils{
             case TupleValue(values) => TupleValue(values.map(subst(_, from, to)))
             case FunctionCallValue(name, args) => FunctionCallValue(name, args.map(subst(_, from, to)))
             case RangeValue(min, max) => RangeValue(subst(min, from, to), subst(max, from, to))
+            case LambdaValue(args, instr) => LambdaValue(args, subst(instr, from, to))
             case lk: LinkedVariableValue => lk
     }
 
@@ -331,11 +341,12 @@ object Utils{
             case StringValue(value) => StringType
             case JsonValue(content) => JsonType
             case SelectorValue(content) => EntityType
+            case LambdaValue(args, instr) => LambdaType(args.length)
             case DefaultValue => throw new Exception("default value has no type")
             case VariableValue(name) => context.getVariable(name).getType()
             case BinaryOperation(op, left, right) => combineType(op, typeof(left), typeof(right), expr)
             case TupleValue(values) => TupleType(values.map(typeof(_)))
-            case FunctionCallValue(name, args) => context.getFunction(name, args)._1.getType()
+            case FunctionCallValue(name, args) => context.getFunction(name, args, AnyType)._1.getType()
             case RangeValue(min, max) => RangeType(typeof(min))
             case LinkedVariableValue(vari) => vari.getType()
     }
