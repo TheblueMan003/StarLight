@@ -1,13 +1,11 @@
 package test
 
-lazy void test(void=>void fct){
-    fct()
+def lazy test(void=>void a){
+    a()
 }
 
-
-def ticking main(){
-    test(()=>{
-        /say hi
-    })
+def main(){
+    test(){
+        /say bruh
+    }
 }
-

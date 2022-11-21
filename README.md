@@ -137,6 +137,12 @@ or with
 [def] <modifier> <type> <name>([<type> <argument name>]*)<block or instruction>
 ```
 
+Arugment can also have default value:
+```
+def hello(int a = 0){
+}
+```
+
 Functions can be called with:
 ```
 function_name(arg1, arg2)
@@ -148,6 +154,35 @@ bool test(){
     return true
 }
 ```
+
+
+Function can be put inside variable:
+```
+int plus(int a){
+    return a + 1
+}
+int=>int fct = plus
+int b = fct(5)
+```
+
+Lambda can be created with the syntax:
+```
+(int, int)=>int fct = (a,b)=> return a + b
+```
+
+```
+def fct(void=>void arg){
+    /say befor
+    arg()
+    /say after
+}
+fct(){
+    /say hi
+}
+```
+With the latter syntax the lambda is always the rightmost argument of the function; not including optional argument.
+
+
 
 ## JSON File
 Jsonfile can be added with the following construct:

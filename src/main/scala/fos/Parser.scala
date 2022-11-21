@@ -54,6 +54,7 @@ object Parser extends StandardTokenParsers{
   def instruction: Parser[Instruction] = 
       ((((("def" ~> modifier) ~ ident) <~ "(") ~ repsep(argument, ",")) <~ ")") ~ instruction ^^ (p => FunctionDecl(p._1._1._2, p._2, VoidType, p._1._2, p._1._1._1))
       | ((((((opt("def") ~> modifier) ~ types) ~ ident) <~ "(") ~ repsep(argument, ",")) <~ ")") ~ instruction ^^ (p => FunctionDecl(p._1._1._2, p._2, p._1._1._1._2, p._1._2, p._1._1._1._1))
+      | (((ident2 <~ "(") ~ repsep(exprNoTuple, ",")) <~ ")") ~ block ^^ (p => FunctionCall(p._1._1, p._1._2 ::: List(LambdaValue(List(), p._2))))
       | ((ident2 <~ "(") ~ repsep(exprNoTuple, ",")) <~ ")" ^^ (p => FunctionCall(p._1, p._2)) // Function Call
       | "package" ~> ident2 ~ program ^^ (p => Package(p._1, p._2)) // Package
       | (modifier <~ "struct") ~ ident ~ block ^^ (p => StructDecl(p._1._2, p._2, p._1._1)) // Struct Dec
@@ -145,7 +146,8 @@ object Parser extends StandardTokenParsers{
     | "false" ^^^ BoolValue(false)
     | stringLit ^^ (StringValue(_))
     | lambda
-    | ((ident2 <~ "(") ~ repsep(expr, ",")) <~ ")" ^^ (p => FunctionCallValue(p._1, p._2))
+    | (((ident2 <~ "(") ~ repsep(exprNoTuple, ",")) <~ ")") ~ block ^^ (p => FunctionCallValue(p._1._1, p._1._2 ::: List(LambdaValue(List(), p._2))))
+    | ((ident2 <~ "(") ~ repsep(exprNoTuple, ",")) <~ ")" ^^ (p => FunctionCallValue(p._1, p._2))
     | ident2 ^^ (VariableValue(_))
     | "(" ~> expr <~ ")"
     | json ^^ (JsonValue(_))
