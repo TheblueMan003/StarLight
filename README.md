@@ -47,6 +47,10 @@ If the variable is tuple, then the tuple with be unpack
 * float: fixed point value (by default keep 3 digits after dot)
 * bool: boolean value
 * entity: store multiple entities. (Use a tag)
+* json: store a json value. `+=` operator acts as append and `&=` operator acts as merge. This type is dynamicly support only for java datapack. For bedrock, the lazy key word must be used.
+* string: TODO
+* T[]: TODO
+* (T*)=>T: any store dynamicly any non lazy functions when the variable is not lazy or any functions otherwise. The variable can be call with the usual call notation.
 * (T, T*): tuple store multiple value. e.i. (float, float, float) position = 0,0,0
 
 ## Selectors & Entity
@@ -130,7 +134,7 @@ with(@a, false, a == 0){
 ## Function
 Functions can be declared with 
 ```
-[def] <modifier> <name>([<type> <argument name>]*)<block or instruction>
+def <modifier> <name>([<type> <argument name>]*)<block or instruction>
 ```
 or with
 ```
@@ -191,6 +195,33 @@ jsonfile advancements.name{
     <json content>
 }
 ```
+
+
+## Struct
+Struct allow you to create new type. Note that every time copy a struct to another a copy of the inner states is perform.
+```
+struct typ{
+    int a
+    int b
+    
+    def fct(){
+        a += b
+    }
+}
+typ foo
+foo.fct()
+int bar = typ.foo
+```
+
+To overload the operator of the type, the following function can be used:
+* `=`: `__set__`
+* `+=`: `__add__`
+* `-=`: `__sub__`
+* `*=`: `__mult__`
+* `/=`: `__div__`
+* `%=`: `__mod__`
+* `&=`: `__and__`
+* `|=`: `__or__`
 
 ## Metaprogramming
 ### Lazy Variable
