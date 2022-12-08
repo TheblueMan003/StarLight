@@ -19,7 +19,9 @@ class Modifier(){
     var isConst = false
     var isTicking = false
     var isLoading = false
+    var isHelper = false
     var tags = ArrayBuffer[String]()
+    var attributes = Map[String,String]()
 
     def combine(other: Modifier): Modifier = {
         val ret = Modifier()
@@ -31,7 +33,9 @@ class Modifier(){
         ret.isConst = isConst | other.isConst
         ret.isTicking = isTicking | other.isTicking
         ret.isLoading = isLoading | other.isLoading
+        ret.isHelper = isHelper | other.isHelper
         ret.tags = tags ++ other.tags
+        ret.attributes = attributes
         ret
     }
 }

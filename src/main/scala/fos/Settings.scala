@@ -11,24 +11,36 @@ object Settings{
 
     var functionFolder = "zzz_sl_block"
     var multiplexFolder = "zzz_sl_mux"
+    var tagsFolder = "zzz_sl_tags"
     var outputName = "default"
     var floatPrec = 1000
     var treeSize = 20
     var target:Target = MCJava
+    var debug = false
+
+    val metaVariable = List(
+        ("Compiler.isJava", () => target == MCJava),
+        ("Compiler.isBedrock", () => target == MCBedrock),
+        ("Compiler.isDebug", () => debug)
+    )
 }
 
 trait Target{
     def getFunctionPath(path: String): String
+    def getPredicatePath(path: String): String
     def getFunctionName(path: String): String
     def getJsonPath(path: String): String
     def getExtraFiles(context: Context): List[(String, List[String])]
 }
 case object MCJava extends Target{
     def getFunctionPath(path: String): String = {
-        "/data/" + path.replaceAllLiterally(".","/").replaceFirst("/", "/functions/")+ ".mcfunction"
+        "/data/" + path.replaceAll("([A-Z])","\\$$1").toLowerCase().replaceAllLiterally(".","/").replaceFirst("/", "/functions/")+ ".mcfunction"
+    }
+    def getPredicatePath(path: String): String = {
+        "/data/" + path.replaceAll("([A-Z])","\\$$1").toLowerCase().replaceAllLiterally(".","/").replaceFirst("/", "/predicates/")+ ".mcfunction"
     }
     def getFunctionName(path: String): String = {
-        path.replaceAllLiterally(".","/").replaceFirst("/", ":")
+        path.replaceAll("([A-Z])","\\$$1").toLowerCase().replaceAllLiterally(".","/").replaceFirst("/", ":")
     }
     def getJsonPath(path: String): String = {
         "/data/" + path.replaceAllLiterally(".","/")+ ".json"
@@ -63,10 +75,13 @@ case object MCJava extends Target{
 }
 case object MCBedrock extends Target{
     def getFunctionPath(path: String): String = {
-        "/functions/" + path.replaceAllLiterally(".","/") + ".mcfunction"
+        "/functions/" + path.replaceAll("([A-Z])","\\$$1").toLowerCase().replaceAllLiterally(".","/") + ".mcfunction"
+    }
+    def getPredicatePath(path: String): String = {
+        throw new Exception("Predicate not supported on bedrock!")
     }
     def getFunctionName(path: String): String = {
-        path.replaceAllLiterally(".","/")
+        path.replaceAll("([A-Z])","\\$$1").toLowerCase().replaceAllLiterally(".","/")
     }
     def getJsonPath(path: String): String = {
         "/" + path.replaceAllLiterally(".","/") + ".json"

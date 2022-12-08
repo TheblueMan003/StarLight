@@ -6,6 +6,8 @@ import fos.*
 import objects.types.IntType
 import objects.types.EntityType
 import javax.rmi.CORBA.Util
+import objects.Identifier
+import objects.types.BoolType
 
 object Execute{
     def ifs(ifb: If)(implicit context: Context): List[String] = {
@@ -34,7 +36,7 @@ object Execute{
             }
             else if (multi){
                 content = content ::: 
-                    makeExecute(getListCase(List(IFNotValueCase(LinkedVariableValue(vari)))), exp._1)
+                    makeExecute(getListCase(List(IFNotValueCase(IFValueCase(LinkedVariableValue(vari))))), exp._1)
             }
 
             if (exp._2.length == 1 && exp._2.head == IFTrue && !multi){
@@ -49,7 +51,7 @@ object Execute{
                     content = content ::: makeExecute(getListCase(exp._2), block)
                 }
                 else{
-                    content = content ::: makeExecute(getListCase(IFNotValueCase(LinkedVariableValue(vari)) :: exp._2), block)
+                    content = content ::: makeExecute(getListCase(IFNotValueCase(IFValueCase(LinkedVariableValue(vari))) :: exp._2), block)
                 }
             }
 
@@ -77,7 +79,7 @@ object Execute{
                 case other => {
                     val (pref, vari) = Utils.simplifyToVariable(other)
                     pref2:::pref ::: makeExecute(getListCase(List(IFValueCase(vari))) + f" as $selector at @s"+tail, Compiler.compile(ass.block))
-                            ::: makeExecute(getListCase(List(IFNotValueCase(vari))) + f" as $selector"+tail, Compiler.compile(ass.block))
+                            ::: makeExecute(getListCase(List(IFNotValueCase(IFValueCase(vari)))) + f" as $selector"+tail, Compiler.compile(ass.block))
                 }
         }
 
@@ -124,8 +126,18 @@ object Execute{
      * call "block" with execute with content: "prefix"
      */
     def makeExecute(prefix: String, block: List[String])(implicit context: Context): List[String] = {
-        if (prefix == ""){
-            List()
+        if (prefix == "" || prefix == " "){
+            if (block.length == 1){
+                List(block.head)
+            }
+            else if (block.length > 1){
+                val fct = context.getFreshBlock(block)
+                val call = fct.call(List()).head
+                List(call)
+            }
+            else{
+                List()
+            }
         }
         else if (block.length == 1){
             List("execute"+prefix+" run "+ block.head)
@@ -160,6 +172,7 @@ object Execute{
             case FloatValue(value) => if value == 0 then (List(), List(IFFalse)) else (List(), List(IFTrue))
             case BoolValue(value) => if value then (List(), List(IFTrue)) else (List(), List(IFFalse))
             case DefaultValue => (List(), List(IFFalse))
+            case NullValue => (List(), List(IFFalse))
             case SelectorValue(value) => (List(), List(IFValueCase(expr)))
             case VariableValue(iden) => {
                 val vari = context.getVariable(iden)
@@ -206,7 +219,24 @@ object Execute{
                         }
                     }
                     case "||" => {
-                        ???
+                        val left = getIfCase(lft)
+                        val right = getIfCase(rght)
+                        if (left._2.head == IFFalse && right._2.head == IFFalse) then {
+                            (List(), List(IFFalse))
+                        }
+                        else if (right._2.head == IFTrue){
+                            right
+                        }
+                        else if (left._2.head == IFTrue){
+                            left
+                        }
+                        else{
+                            val vari = context.getFreshVariable(BoolType)
+                            val exec1 = makeExecute(getListCase(left._2), vari.assign("=", BoolValue(true)))
+                            val exec2 = makeExecute(getListCase(List(IFNotValueCase(IFValueCase(LinkedVariableValue(vari))))), right._1 :::
+                                                    makeExecute(getListCase(right._2), vari.assign("|=", BoolValue(true))))
+                            (vari.assign("=", BoolValue(true)) ::: left._1 ::: exec1 ::: exec2, List(IFValueCase(LinkedVariableValue(vari))))
+                        }
                     }
                     case _ => {
                         val v = Utils.simplifyToVariable(expr)
@@ -214,10 +244,48 @@ object Execute{
                     }
                 }
             }
+            case UnaryOperation("!", left) => {
+                val v = getIfCase(left)
+                if v._2.length == 1 then 
+                    (v._1, List(IFNotValueCase(v._2.head)))
+                else
+                    val v = Utils.simplifyToVariable(left)
+                    (v._1, List(IFNotValueCase(IFValueCase(v._2))))
+            }
+            case UnaryOperation(op, left) => {
+                val v = Utils.simplifyToVariable(expr)
+                (v._1, List(IFValueCase(v._2)))
+            }
+            case FunctionCallValue(name, args) if name.toString() == "Compiler.isBedrock" => {
+                if Settings.target == MCBedrock then (List(), List(IFFalse)) else (List(), List(IFTrue))
+            }
+            case FunctionCallValue(name, args) if name.toString() == "Compiler.isJava" => {
+                if Settings.target == MCJava then (List(), List(IFFalse)) else (List(), List(IFTrue))
+            }
+            case FunctionCallValue(name, args) if name.toString() == "block" && args.length > 0=> {
+                if (args.length > 1){
+                    (List(), List(IFBlock(args.map(_.getString()).reduce(_ +" "+ _))))
+                }
+                else{
+                    (List(), List(IFBlock("~ ~ ~ "+args.head.getString())))
+                }
+            }
+            case FunctionCallValue(VariableValue(name), args) => {
+                val predicate = context.tryGetPredicate(name, args.map(Utils.typeof(_)))
+                predicate match
+                    case None => {
+                        val v = Utils.simplifyToVariable(expr)
+                        (v._1, List(IFValueCase(v._2)))
+                    }
+                    case Some(value) => {
+                        (List(), List(IFPredicate(value.call(args))))
+                    }
+            }
             case FunctionCallValue(name, args) => {
                 val v = Utils.simplifyToVariable(expr)
                 (v._1, List(IFValueCase(v._2)))
             }
+            case LambdaValue(args, instr) => (List(), List(IFTrue))
             case StringValue(string) => throw new Exception("Can't use if with string")
             case JsonValue(json) => throw new Exception("Can't use if with json")
             case RangeValue(min, max) => throw new Exception("Can't use if with range")
@@ -243,7 +311,7 @@ object Execute{
     def makeTree(cond: Variable, values: List[(Int, Instruction)])(implicit context: Context):List[String] = {
         if (values.length <= Settings.treeSize){
             values.flatMap((v, i) =>
-                makeExecute(IFValueCase(BinaryOperation("==", LinkedVariableValue(cond), IntValue(v))).get(), Compiler.compile(i))
+                makeExecute(getListCase(List(IFValueCase(BinaryOperation("==", LinkedVariableValue(cond), IntValue(v))))), Compiler.compile(i))
             )
         }
         else{
@@ -253,10 +321,10 @@ object Execute{
                     val block = context.getFreshBlock(makeTree(cond, x.map(p => p._1).sortBy(_._1)))
                     val min = x.map(p => p._1).head._1
                     val max = x.map(p => p._1).last._1
-                    makeExecute(IFValueCase(BinaryOperation("in", LinkedVariableValue(cond), RangeValue(IntValue(min), IntValue(max)))).get(), block.call(List()))
+                    makeExecute(getListCase(List(IFValueCase(BinaryOperation("in", LinkedVariableValue(cond), RangeValue(IntValue(min), IntValue(max)))))), block.call(List()))
                 }
                 else{
-                    makeExecute(IFValueCase(BinaryOperation("==", LinkedVariableValue(cond), IntValue(x.head._1._1))).get(), Compiler.compile(x.head._1._2))
+                    makeExecute(getListCase(List(IFValueCase(BinaryOperation("==", LinkedVariableValue(cond), IntValue(x.head._1._1))))), Compiler.compile(x.head._1._2))
                 }
             }
             ).toList
@@ -284,6 +352,16 @@ case class IFValueCase(val value: Expression) extends IFCase{
                     case _ => f"unless score ${vari.getSelector()} matches 0"
                 }
             }
+
+            case BinaryOperation(">" | "<" | ">=" | "<=" | "==", LinkedVariableValue(left), LinkedVariableValue(right))=> {
+                val op = value.asInstanceOf[BinaryOperation].op
+                val mcop = if op == "==" then "=" else op
+                f"if score ${left.getSelector()} $mcop ${right.getSelector()}"
+            }
+            case BinaryOperation("!=", LinkedVariableValue(left), LinkedVariableValue(right))=> {
+                f"if score ${left.getSelector()} = ${left.getSelector()}"
+            }
+
             case BinaryOperation(">" | "<" | ">=" | "<=" | "==", VariableValue(left), VariableValue(right))=> {
                 val op = value.asInstanceOf[BinaryOperation].op
                 val mcop = if op == "==" then "=" else op
@@ -301,6 +379,14 @@ case class IFValueCase(val value: Expression) extends IFCase{
             case BinaryOperation(">" | "<" | ">=" | "<=" | "==", right, VariableValue(left)) if right.hasIntValue()=> {
                 val op = value.asInstanceOf[BinaryOperation].op
                 f"if score ${context.getVariable(left).getSelector()} matches ${getComparatorInverse(op, right.getIntValue())}"
+            }
+            case BinaryOperation(">" | "<" | ">=" | "<=" | "==", LinkedVariableValue(left), right) if right.hasIntValue()=> {
+                val op = value.asInstanceOf[BinaryOperation].op
+                f"if score ${left.getSelector()} matches ${getComparator(op, right.getIntValue())}"
+            }
+            case BinaryOperation(">" | "<" | ">=" | "<=" | "==", right, LinkedVariableValue(left)) if right.hasIntValue()=> {
+                val op = value.asInstanceOf[BinaryOperation].op
+                f"if score ${left.getSelector()} matches ${getComparatorInverse(op, right.getIntValue())}"
             }
 
 
@@ -320,7 +406,7 @@ case class IFValueCase(val value: Expression) extends IFCase{
 
             case BinaryOperation("in", LinkedVariableValue(left), RangeValue(min, max)) if min.hasIntValue() && max.hasIntValue()=> {
                 val op = value.asInstanceOf[BinaryOperation].op
-                f"unless score ${left.getSelector()} matches ${min.getIntValue()}..${max.getIntValue()}"
+                f"if score ${left.getSelector()} matches ${min.getIntValue()}..${max.getIntValue()}"
             }
             
 
@@ -352,9 +438,9 @@ def getComparatorInverse(op: String, value: Int):String={
 
 
 
-case class IFNotValueCase(val value: Expression) extends IFCase{
+case class IFNotValueCase(val value: IFCase) extends IFCase{
     def get()(implicit context: Context): String = {
-        val ret = IFValueCase(value).get()
+        val ret = value.get()
         if (ret.startsWith("if")){
             "unless"+ret.substring(2)
         }
@@ -364,6 +450,16 @@ case class IFNotValueCase(val value: Expression) extends IFCase{
         else{
             ret
         }
+    }
+}
+case class IFPredicate(val value: String) extends IFCase{
+    def get()(implicit context: Context): String = {
+        f"if predicate $value"
+    }
+}
+case class IFBlock(val value: String) extends IFCase{
+    def get()(implicit context: Context): String = {
+        f"if block $value"
     }
 }
 case object IFTrue extends IFCase{

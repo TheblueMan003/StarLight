@@ -43,11 +43,38 @@ Variables can be assigned
 If the variable is tuple, then the tuple with be unpack
 
 ## Default Types
-* int: normal integer
-* float: fixed point value (by default keep 3 digits after dot)
-* bool: boolean value
-* entity: store multiple entities. (Use a tag)
-* (T, T*): tuple store multiple value. e.i. (float, float, float) position = 0,0,0
+### int
+Store Normal integer
+
+Supported operation:
+* `=`, `+`, `-`, `*`, `/`, `%`
+
+
+### float
+Store Fixed point value with 32 bits (by default keep 3 digits after dot)
+
+Supported operation:
+* `=`, `+`, `-`, `*`, `/`, `%`
+
+### bool
+Store boolean value
+
+Supported operation:
+* `=`, `+`, `-`, `*`, `/`, `%`, `&`, `|`, `&&`, `||`
+
+### entity
+Store one or multiple entities
+
+Supported operation:
+* `=`: The variable to have the entity
+* `&`: Intersection of entities set
+* `|`: Union of entities set
+* `-`: Difference of entities set
+
+### (T, T*)
+Tuple, Store multiple value. e.i. (float, float, float) position = 0,0,0
+
+All operators are supported as long as either the operation can be done on every single value or the right hand side is also a tuple with the same size and the operation can be perform with each corresponding entry.
 
 ## Selectors & Entity
 The entity can be assigned a selector. This will result in only the entity selected by the selector to be inside the variable.
@@ -76,8 +103,11 @@ The language support `if` with a c like syntax:
 if (a > 0){
 
 }
-else if(b == 0){
-
+else if(b == 0 && a < 0){
+    // b==0 and a < 0
+}
+else if (b == 1 || a < 0){
+    // b ==1 or a < 0
 }
 else{
 
@@ -192,6 +222,102 @@ jsonfile advancements.name{
 }
 ```
 
+## Predicate (JAVA Only)
+Predicate can be defined like function but with a json body.
+```
+predicate example(int count, string itemID){
+  "condition": "minecraft:entity_properties",
+  "entity": "this",
+  "predicate": {
+    "equipment": {
+      "mainhand": {
+        "items": [
+          itemID
+        ],
+        "count": count
+      }
+    }
+  }
+}
+```
+They can only be call inside conditional statements like if, while, etc
+
+## Typedef
+Complexe type can be assign to a name with the following syntax:
+```
+typedef int=>int fct
+fct foo = (a)=>{ return a + 1 }
+```
+
+## Structs
+Data structure can be define with the following syntax:
+```
+struct vector3{
+    int x
+    int y
+    int z
+
+    def __add__(vector other){
+        x += other.x
+        y += other.y
+        z += other.z
+    }
+}
+```
+They can then be used as any other type:
+```
+vector3 a
+vector3 b
+a.x = 0
+a += b
+```
+Here is the list of possible operator overloading:
+* `__set__`: `=`
+* `__add__`: `+=`
+* `__sub__`: `-=`
+* `__mult__`: `*=`
+* `__div__`: `/=`
+* `__mod__`: `%=`
+* `__and__`: `&=`
+* `__or__`: `|=`
+* `__init__`: Constructor
+
+Structs can also be extended. They will recieve all the methode & variable from the parent struct.
+```
+struct vector4 extends vector3{
+    int a
+}
+```
+
+## Classes
+Classes can be define with the following syntax:
+```
+class cow{
+    int health
+}
+```
+
+## Templates
+Templates are ways of having static class with inherritance.
+```
+template example{
+    def test(){
+
+    }
+}
+template example2 extends example{
+
+}
+```
+
+```
+example2 foo{
+    def bar(){
+        test()
+    }
+}
+```
+
 ## Metaprogramming
 ### Lazy Variable
 Lazy variable are not exported into the output code. Instead all operation on them are interpreted directly and when they are used, they are replaced by the value interpreted.
@@ -220,3 +346,22 @@ Will be the same as
 int b = 0
 ```
 Every call for function that are not mark as inline is done in a sub context meaning that variable inside it won't be usable after the call.
+
+### "Lazy IF"
+When a if statement is compiled, the expression inside it is simplified. If the result value is always true then the condition will disapear from the output code and all the else statement with it. 
+```
+if (true){
+    //do stuff
+}
+else{
+    // crash
+}
+```
+will become
+```
+//do stuff
+```
+This can be used to compile according to some compilation settings. Here is a list of meta variable that can be tested:
+* `Compiler.isJava`: Tell if the target is MC Java
+* `Compiler.isBedrock`: Tell if the target is MC Bedrock
+* `Compiler.isDebug`: Used to add extra info in the datapack that can be used to debug

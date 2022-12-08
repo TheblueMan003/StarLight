@@ -6,10 +6,12 @@ import objects.Identifier
 import fos.Settings
 import fos.MCBedrock
 import fos.MCJava
+import fos.JsonValue
+import fos.JSONElement
 
 object Selector{
     private val bedrockElement = List("x", "y", "z", "dx", "dy", "dz", "r", "rm", "scores", "tag", "name", "type", "familly", "rx", "rxm", "ry", "rym", "l", "lm", "m", "c")
-    private val javaElement = List("x", "y", "z", "dx", "dy", "dz", "distance", "scores", "tag", "team", "name", "type", "predicate", "x_rotation‌", "y_rotation‌", "level", "gamemode", "advancements‌", "limit", "sort")
+    private val javaElement = List("x", "y", "z", "dx", "dy", "dz", "distance", "scores", "tag", "team", "name", "type", "predicate", "x_rotation‌", "y_rotation‌", "level", "gamemode", "advancements‌", "limit", "sort", "nbt")
 
     def parse(prefix: String, filters: List[(String, SelectorFilterValue)]): Selector = {
         if (filters.forall((k,v) => javaElement.contains(k))){
@@ -203,4 +205,8 @@ case class SelectorString(val value: String) extends SelectorFilterValue{
 }
 case class SelectorIdentifier(val value: String) extends SelectorFilterValue{
     override def toString(): String = value
+}
+
+case class SelectorNbt(val value: JSONElement) extends SelectorFilterValue{
+    override def toString(): String = value.getNbt()
 }

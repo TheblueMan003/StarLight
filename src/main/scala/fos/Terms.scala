@@ -17,19 +17,34 @@ case class Package(val name: String, val block: Instruction) extends Instruction
   override def toString() = f"package ${name} {${block}}"
 }
 
-case class StructDecl(val name: String, val block: Instruction, val modifier: Modifier) extends Instruction {
+case class StructDecl(val name: String, val block: Instruction, val modifier: Modifier, val parent: Option[String]) extends Instruction {
+  override def toString() = f"struct ${name} ${block}"
+}
+case class ClassDecl(val name: String, val block: Instruction, val modifier: Modifier, val parent: Option[String]) extends Instruction {
   override def toString() = f"struct ${name} ${block}"
 }
 case class EnumDecl(val name: String, val fields: List[EnumField], val values: List[EnumValue], val modifier: Modifier) extends Instruction {
   override def toString() = f"enum ${name}(${fields}]{$values}"
 }
+case class PredicateDecl(val name: String, val args: List[Argument], val block: JSONElement, val modifier: Modifier) extends Instruction {
+  override def toString() = f"predicate ${name} (${args}) $block"
+}
 
 case class FunctionDecl(val name: String, val block: Instruction, val typ: Type, val args: List[Argument], val modifier: Modifier) extends Instruction {
   override def toString() = f"def ${name} ${block}"
 }
+case class TemplateDecl(val name: String, val block: Instruction, val modifier: Modifier, val parent: Option[String]) extends Instruction {
+  override def toString() = f"template ${name} ${block}"
+}
+case class TypeDef(val name: String, val typ: Type) extends Instruction {
+  override def toString() = f"typedef ${typ} ${name}"
+}
 
-case class ForGenerate(val key: Identifier, val provider: Expression, val instr: Instruction) extends Instruction {
+case class ForGenerate(val key: String, val provider: Expression, val instr: Instruction) extends Instruction {
   override def toString() = f"forgenerate($key, $provider)$instr"
+}
+case class ForEach(val key: Identifier, val provider: Expression, val instr: Instruction) extends Instruction {
+  override def toString() = f"foreach($key, $provider)$instr"
 }
 
 case class VariableDecl(val name: String, val _type: Type, val modifier: Modifier) extends Instruction {
@@ -38,6 +53,9 @@ case class VariableDecl(val name: String, val _type: Type, val modifier: Modifie
 case class VariableAssigment(val name: List[Either[Identifier, Variable]], val op: String, val expr: Expression) extends Instruction {
   override def toString() = f"${name} ${op} ${expr}"
 }
+case class ArrayAssigment(val name: Either[Identifier, Variable], val index: Expression, val op: String, val expr: Expression) extends Instruction {
+  override def toString() = f"${name}[$index] ${op} ${expr}"
+}
 
 case class CMD(val value: String) extends Instruction{
   override def toString() = f"/$value"
@@ -45,6 +63,9 @@ case class CMD(val value: String) extends Instruction{
 
 case class FunctionCall(val name: Identifier, val args: List[Expression]) extends Instruction {
   override def toString() = f"${name}()"
+}
+case class TemplateUse(val template: Identifier, val name: String, val block: Instruction) extends Instruction {
+  override def toString() = f"template ${name}()"
 }
 case class LinkedFunctionCall(val fct: Function, val args: List[Expression], val ret: Variable = null) extends Instruction {
   override def toString() = f"${fct.fullName}()"
@@ -60,6 +81,10 @@ case class If(val cond: Expression, val ifBlock: Instruction, val elseBlock: Lis
 
 case class Return(val value: Expression) extends Instruction {
   override def toString() = f"return($value)"
+}
+
+case class Import(val value: String) extends Instruction {
+  override def toString() = f"import $value"
 }
 
 case class Switch(val value: Expression, val cases: List[SwitchCase], val copyVariable: Boolean = true) extends Instruction {

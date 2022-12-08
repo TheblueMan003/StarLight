@@ -2,7 +2,8 @@ package objects.types
 
 import scala.util.parsing.input.Positional
 import objects.Context
-import objects.Struct
+import objects.{Struct, Class}
+import fos.Expression
 
 trait Typed(typ: Type){
     def getType(): Type ={
@@ -33,6 +34,15 @@ object IntType extends Type{
             case _ => outOfBound
     }
     override def getName()(implicit context: Context): String = "int"
+}
+object MCObjectType extends Type{
+    override def allowAdditionSimplification(): Boolean = false
+    override def getDistance(other: Type)(implicit context: Context): Int = {
+        other match
+            case MCObjectType => 0
+            case _ => outOfBound
+    }
+    override def getName()(implicit context: Context): String = "mcobject"
 }
 object FloatType extends Type{
     override def allowAdditionSimplification(): Boolean = true
@@ -95,7 +105,7 @@ case class TupleType(sub: List[Type]) extends Type{
     }
     override def getName()(implicit context: Context): String = f"(${sub.map(_.getName()).reduce(_ + ", " + _)})"
 }
-case class ArrayType(inner: Type, size: String) extends Type{
+case class ArrayType(inner: Type, size: Expression) extends Type{
     override def allowAdditionSimplification(): Boolean = false
     override def getDistance(other: Type)(implicit context: Context): Int = {
         other match
@@ -105,7 +115,7 @@ case class ArrayType(inner: Type, size: String) extends Type{
     }
     override def getName()(implicit context: Context): String = f"$inner[$size]"
 }
-case class  LambdaType(val nb: Int) extends Type{
+case class LambdaType(val nb: Int) extends Type{
     override def allowAdditionSimplification(): Boolean = false
     override def getDistance(other: Type)(implicit context: Context): Int = {
         other match
@@ -144,6 +154,16 @@ case class StructType(struct: Struct) extends Type{
             case _ => outOfBound
     }
     override def getName()(implicit context: Context): String = struct.fullName
+}
+case class ClassType(clazz: Class) extends Type{
+    override def allowAdditionSimplification(): Boolean = false
+    override def getDistance(other: Type)(implicit context: Context): Int = {
+        other match
+            case ClassType(sub2) if sub2 == clazz => 0
+            case AnyType => 1000
+            case _ => outOfBound
+    }
+    override def getName()(implicit context: Context): String = clazz.fullName
 }
 case class EnumType(enm: objects.Enum) extends Type{
     override def allowAdditionSimplification(): Boolean = false

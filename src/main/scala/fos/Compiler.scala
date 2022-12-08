@@ -1,9 +1,10 @@
 package fos
 
-import objects.{Context, ConcreteFunction, LazyFunction, Modifier, Struct, Variable, Enum, EnumField}
+import objects.{Context, ConcreteFunction, LazyFunction, Modifier, Struct, Class, Template, Variable, Enum, EnumField, Predicate}
 import objects.Identifier
 import objects.types.{VoidType, TupleType}
 import fos.Compilation.Execute
+import javax.rmi.CORBA.ClassDesc
 
 object Compiler{
     def compile(context: Context):List[(String, List[String])] = {
@@ -15,10 +16,12 @@ object Compiler{
         }
 
         context.getMuxes().foreach(x => x.compile())
+        context.getTags().foreach(x => x.compile())
 
 
         context.getAllFunction().filter(_.exists()).map(fct => (fct.getName(), fct.getContent())) ::: 
             context.getAllJsonFiles().filter(_.exists()).map(fct => (fct.getName(), fct.getContent())):::
+            context.getAllPredicates().flatMap(_.getFiles()):::
             Settings.target.getExtraFiles(context)
     }
     def compile(instruction: Instruction, firstPass: Boolean = false)(implicit context: Context):List[String]={        
@@ -37,8 +40,37 @@ object Compiler{
                 }
                 List()
             }
-            case StructDecl(name, block, modifier) => {
-                context.addStruct(new Struct(context, name, modifier, block))
+            case StructDecl(name, block, modifier, parent) => {
+                val parentStruct = parent match
+                    case None => null
+                    case Some(p) => context.getStruct(p)
+                
+                context.addStruct(new Struct(context, name, modifier, block, parentStruct))
+                List()
+            }
+            case ClassDecl(name, block, modifier, parent) => {
+                val parentClass = parent match
+                    case None => null
+                    case Some(p) => context.getClass(p)
+                
+                context.addClass(new Class(context, name, modifier, block, parentClass)).generate()
+                List()
+            }
+            case TemplateDecl(name, block, modifier, parent) => {
+                val parentTemplate = parent match
+                    case None => null
+                    case Some(p) => context.getTemplate(p)
+                
+                context.addTemplate(new Template(context, name, modifier, block, parentTemplate))
+                List()
+            }
+            case PredicateDecl(name, args, block, modifier) => {
+                val pred = context.addPredicate(new Predicate(context, name, args, modifier, block))
+                pred.generateArgument()(context)
+                List()
+            }
+            case TypeDef(name, typ) => {
+                context.addTypeDef(name, typ)
                 List()
             }
             case EnumDecl(name, fields, values, modifier) => {
@@ -47,12 +79,14 @@ object Compiler{
                 List()
             }
             case ForGenerate(key, provider, instr) => {
-                val cases: IterableOnce[String] = provider match
-                    case RangeValue(IntValue(min), IntValue(max)) => Range(min, max+1).map(_.toString())
-                    case TupleValue(lst) => lst.map(_.toString())
-                    case _ => throw new Exception(f"Unknown generator: $provider")
+                val cases = Utils.getForgenerateCases(key, provider)
                 
-                cases.map(x => Utils.subst(instr, key.toString(), x)).flatMap(Compiler.compile(_)).toList
+                cases.map(lst => lst.sortBy(0 - _._1.length()).foldLeft(instr)((instr, elm) => Utils.subst(instr, elm._1, elm._2))).flatMap(Compiler.compile(_)).toList
+            }
+            case ForEach(key, provider, instr) => {
+                val cases = Utils.getForeachCases(provider)
+                
+                cases.map(elm => Utils.subst(instr, key.toString(), elm)).flatMap(Compiler.compile(_)).toList
             }
             case VariableDecl(name, typ, modifier) => {
                 val vari = new Variable(context, name, context.getType(typ), modifier)
@@ -63,6 +97,16 @@ object Compiler{
             case fos.JSONFile(name, json) => {
                 context.addJsonFile(new objects.JSONFile(context, name, Modifier.newPrivate(), Utils.compileJson(json)))
                 List()
+            }
+            case Import(value) => {
+                compile(Utils.getLib(value).get)(context.root)
+            }
+            case TemplateUse(iden, name, block) => {
+                val template = context.getTemplate(iden)
+                val sub = context.push(name)
+                
+                compile(Utils.fix(template.block)(template.context), true)(sub)
+                compile(block, true)(sub)
             }
 
 
@@ -93,8 +137,11 @@ object Compiler{
             case CMD(value) => List(value)
             case Package(name, block) => {
                 val sub = context.push(name)
-                val init = sub.getNamedBlock("__init__", compile(block, firstPass)(sub))
-                init.modifiers.isLoading = true
+                val content = compile(block, firstPass)(sub)
+                if (content.length > 0){
+                    val init = sub.getNamedBlock("__init__", content)
+                    init.modifiers.isLoading = true
+                }
                 List()
             }
             case InstructionList(block) => {
@@ -108,6 +155,9 @@ object Compiler{
             }
             case LinkedFunctionCall(name, args, ret) => {
                 name.call(args, ret)
+            }
+            case If(BinaryOperation("||", left, right), ifBlock, elseBlock) => {
+                compile(If(left, ifBlock, ElseIf(right, ifBlock) :: elseBlock))
             }
             case ifb: If => Execute.ifs(ifb)
             case swit: Switch => Execute.switch(swit)

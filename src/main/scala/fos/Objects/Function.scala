@@ -4,6 +4,7 @@ import types.*
 import fos.*
 import fos.Utils
 import scala.collection.mutable
+import fos.Compilation.Selector.*
 
 object Function {
   extension (str: (Function, List[Expression])) {
@@ -23,14 +24,15 @@ abstract class Function(context: Context, name: String, val arguments: List[Argu
         args match{
             case head::tail => {
                 head.defValue match
-                    case None => getMinArgCount(tail, true)
-                    case Some(value) => {
+                    case None => 
                         if (stopped){
                             throw new Exception(f"${head.name} must have a default value in ${fullName}")
                         }
                         else{
-                            getMinArgCount(tail, true) + 1
+                            getMinArgCount(tail, false) + 1
                         }
+                    case Some(value) => {
+                        getMinArgCount(tail, true)
                     }
             }
             case Nil => 0
@@ -43,15 +45,14 @@ abstract class Function(context: Context, name: String, val arguments: List[Argu
             val mod = new Modifier()
             mod.protection = Protection.Private
             val vari = new Variable(ctx2, a.name, ctx.getType(a.typ), mod)
-
+            vari.isFunctionArgument = true
             ctx2.addVariable(vari)
             vari.generate(ctx.getCurrentVariable() != null)(ctx2)
             vari
-    })
-
+        })
     }
     def argMap(args: List[Expression]) = {
-        argumentsVariables
+        argumentsVariables.filter(_.getType() != VoidType)
                  .zip(arguments.map(_.defValue))
                  .zipAll(args, null, null)
                  .map(p => (p._1._1, if p._2 == null then p._1._2.get else p._2))
@@ -62,7 +63,7 @@ abstract class Function(context: Context, name: String, val arguments: List[Argu
 }
 
 class ConcreteFunction(context: Context, name: String, arguments: List[Argument], typ: Type, _modifier: Modifier, val body: Instruction, topLevel: Boolean) extends Function(context, name, arguments, typ, _modifier){
-    private var _needCompiling = topLevel
+    private var _needCompiling = false
     private var wasCompiled = false
     protected var content = List[String]()
     val returnVariable = {
@@ -76,10 +77,7 @@ class ConcreteFunction(context: Context, name: String, arguments: List[Argument]
     }
     
     def call(args2: List[Expression], ret: Variable = null)(implicit ctx: Context): List[String] = {
-        _needCompiling = true
-        if (needCompiling()) {
-            context.addFunctionToCompile(this)
-        }
+        markAsUsed()
         val r = argMap(args2).flatMap(p => p._1.assign("=", p._2)) :::
             List("function " + Settings.target.getFunctionName(fullName))
 
@@ -115,6 +113,9 @@ class ConcreteFunction(context: Context, name: String, arguments: List[Argument]
     }
     def markAsUsed():Unit = {
         _needCompiling = true
+        if (needCompiling()) {
+            context.addFunctionToCompile(this)
+        }
     }
 
     def getMuxID(): Int = {
@@ -141,12 +142,15 @@ class LazyFunction(context: Context, name: String, arguments: List[Argument], ty
     def call(args: List[Expression], ret: Variable = null)(implicit ctx: Context): List[String] = {
         var block = body
         val sub = ctx.push(ctx.getLazyCallId())
+        
         argMap(args).foreach((a, v) => {
             val vari = Variable(sub, a.name, a.getType(), a.modifiers)
             vari.generate()(sub)
             sub.addVariable(vari).assign("=", v)
-            block = Utils.substReturn(Utils.subst(block, a.name, v), ret)
+            block = if a.name.startsWith("$") then Utils.subst(block, a.name, v.getString()) else Utils.subst(block, a.name, v)
         })
+        block = Utils.substReturn(block, ret)
+
         fos.Compiler.compile(block)(if modifiers.isInline then ctx else sub)
     }
     override def generateArgument()(implicit ctx: Context):Unit = {
@@ -160,7 +164,7 @@ class LazyFunction(context: Context, name: String, arguments: List[Argument], ty
 }
 
 class MultiplexFunction(context: Context, name: String, arguments: List[Argument], typ: Type) extends ConcreteFunction(context, name, arguments, typ, objects.Modifier.newPrivate(), fos.InstructionList(List()), false){
-    private val functions = mutable.Set[ConcreteFunction]()
+    private val functions = mutable.ListBuffer[ConcreteFunction]()
     override def needCompiling():Boolean = {
         false
     }
@@ -179,11 +183,64 @@ class MultiplexFunction(context: Context, name: String, arguments: List[Argument
     override def compile(): Unit = {
         val cases = 
             if typ == VoidType then
-                functions.map(x => SwitchCase(IntValue(x.getMuxID()), LinkedFunctionCall(x, argumentsVariables.tail.map(LinkedVariableValue(_))))).toList
+                functions.zipWithIndex.map((x, i) => SwitchCase(IntValue(x.getMuxID()), LinkedFunctionCall(x, argumentsVariables.tail.map(LinkedVariableValue(_))))).toList
             else
-                functions.map(x => SwitchCase(IntValue(x.getMuxID()), LinkedFunctionCall(x, argumentsVariables.tail.map(LinkedVariableValue(_)), returnVariable))).toList
+                functions.zipWithIndex.map((x, i) => SwitchCase(IntValue(x.getMuxID()), LinkedFunctionCall(x, argumentsVariables.tail.map(LinkedVariableValue(_)), returnVariable))).toList
         
         val switch = Switch(LinkedVariableValue(argumentsVariables.head), cases, false)
         content = fos.Compiler.compile(switch)(context.push(name, this))
+    }
+}
+
+class TagFunction(context: Context, name: String, arguments: List[Argument]) extends ConcreteFunction(context, name, arguments, VoidType, objects.Modifier.newPrivate(), fos.InstructionList(List()), false){
+    private val functions = mutable.Set[ConcreteFunction]()
+    override def needCompiling():Boolean = {
+        false
+    }
+    override def markAsCompile(): Unit = {
+    }
+
+    def addFunction(fct: ConcreteFunction) = {
+        if (!functions.contains(fct)){
+            functions.addOne(fct)
+        }
+    }
+
+    def getFunctionsName(): List[String] = {
+        functions.map(fct => Settings.target.getFunctionName(fct.fullName)).toList
+    }
+
+    override def exists()= true
+
+    override def compile(): Unit = {
+        content = fos.Compiler.compile(InstructionList(functions.map(LinkedFunctionCall(_, argumentsVariables.map(LinkedVariableValue(_)))).toList))(context.push(name, this))
+    }
+}
+
+class ClassFunction(variable: Variable, function: Function) extends Function(function.context, function.name, function.arguments, function.getType(), function.modifiers){
+    override def exists()= false
+
+    override def getContent(): List[String] = List()
+    override def getName(): String = function.name
+
+    def call(args2: List[Expression], ret: Variable = null)(implicit ctx: Context): List[String] = {
+        val selector = SelectorValue(JavaSelector("@e", Map(("tag", SelectorIdentifier("__class__")))))
+
+        def callNoEntity(ret: Variable = null) = {
+            Compiler.compile(With(
+                selector, 
+                BoolValue(true), 
+                BinaryOperation("==", LinkedVariableValue(variable), LinkedVariableValue(variable)),
+                LinkedFunctionCall(function, args2, ret)
+                ))
+        }
+
+        if (ret == null || !ret.modifiers.isEntity){
+            callNoEntity(ret)
+        }
+        else{
+            val vari = ctx.getFreshVariable(function.getType())
+            callNoEntity(vari) ::: ret.assign("=", LinkedVariableValue(vari))
+        }
     }
 }

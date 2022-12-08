@@ -4,23 +4,37 @@ import objects.Identifier
 import objects.Context
 import objects.types.*
 import objects.{Variable, EnumValue, EnumField}
+import scala.io.Source
 
 object Utils{
+    def getLib(path: String): Option[Instruction] = {
+        val cpath = path.replace(".","/")
+        val ipath = path.replace("/",".").replace("\\",".")
+        Parser.parse(path, Preparser.parse(Source.fromResource("libraries/"+cpath+".sl").getLines.reduce((x,y) => x + "\n" +y)))
+    }
     def stringify(string: String): String = {
         f"\"${string.replaceAllLiterally("\\\\", "\\\\")}\""
     }
     def substReturn(instr: Instruction, to: Variable): Instruction = {
         instr match
             case Package(name, block) => Package(name, substReturn(block, to))
-            case StructDecl(name, block, modifier) => StructDecl(name, substReturn(block, to), modifier)
+            case StructDecl(name, block, modifier, parent) => StructDecl(name, substReturn(block, to), modifier, parent)
+            case ClassDecl(name, block, modifier, parent) => ClassDecl(name, substReturn(block, to), modifier, parent)
             case FunctionDecl(name, block, typ, args, modifier) => FunctionDecl(name, substReturn(block, to), typ, args, modifier)
+            case PredicateDecl(name, args, block, modifier) => instr
             case ForGenerate(key, provider, instr) => ForGenerate(key, provider, substReturn(instr, to))
+            case ForEach(key, provider, instr) => ForEach(key, provider, substReturn(instr, to))
             case EnumDecl(name, fields, values, modifier) => instr
             case VariableDecl(name, _type, modifier) => instr
             case JSONFile(name, json) => instr
+            case Import(value) => instr
             
             case InstructionList(list) => InstructionList(list.map(substReturn(_, to)))
             case InstructionBlock(list) => InstructionBlock(list.map(substReturn(_, to)))
+
+            case TemplateDecl(name, block, modifier, parent) => TemplateDecl(name, substReturn(block, to), modifier, parent)
+            case TemplateUse(iden, name, instr) => TemplateUse(iden, name, substReturn(instr, to))
+            case TypeDef(name, typ) => instr
 
             case ElseIf(cond, ifBlock) => ElseIf(cond, substReturn(ifBlock, to))
             case If(cond, ifBlock, elseBlock) => If(cond, substReturn(ifBlock, to), elseBlock.map(substReturn(_,  to).asInstanceOf[ElseIf]))
@@ -42,15 +56,23 @@ object Utils{
     def subst(instr: Instruction, from: Identifier, to: Identifier): Instruction = {
         instr match
             case Package(name, block) => Package(name, subst(block, from, to))
-            case StructDecl(name, block, modifier) => StructDecl(name, subst(block, from, to), modifier)
+            case StructDecl(name, block, modifier, parent) => StructDecl(name, subst(block, from, to), modifier, parent)
+            case ClassDecl(name, block, modifier, parent) => ClassDecl(name, subst(block, from, to), modifier, parent)
             case FunctionDecl(name, block, typ, args, modifier) => FunctionDecl(name, subst(block, from, to), typ, args, modifier)
+            case PredicateDecl(name, args, block, modifier) => PredicateDecl(name, args, block, modifier)
             case VariableDecl(name, _type, modifier) => instr
             case ForGenerate(key, provider, instr) => ForGenerate(key, subst(provider, from, to), subst(instr, from, to))
+            case ForEach(key, provider, instr) => ForEach(key, subst(provider, from, to), subst(instr, from, to))
             case EnumDecl(name, fields, values, modifier) => EnumDecl(name, fields, values.map(v => EnumValue(v.name, v.fields.map(subst(_, from, to)))), modifier)
             case JSONFile(name, json) => instr
+            case Import(value) => instr
             
             case InstructionList(list) => InstructionList(list.map(subst(_, from, to)))
             case InstructionBlock(list) => InstructionBlock(list.map(subst(_, from, to)))
+
+            case TemplateDecl(name, block, modifier, parent) => TemplateDecl(name, subst(block, from, to), modifier, parent)
+            case TemplateUse(iden, name, instr) => TemplateUse(iden, name, subst(instr, from, to))
+            case TypeDef(name, typ) => TypeDef(name, typ)
 
             case ElseIf(cond, ifBlock) => ElseIf(subst(cond, from, to), subst(ifBlock, from, to))
             case If(cond, ifBlock, elseBlock) => If(subst(cond, from, to), subst(ifBlock, from, to), elseBlock.map(subst(_, from, to).asInstanceOf[ElseIf]))
@@ -83,11 +105,15 @@ object Utils{
             case JsonValue(content) => instr
             case StringValue(value) => instr
             case SelectorValue(content) => instr
+            case NamespacedName(value) => instr
             case DefaultValue => DefaultValue
+            case NullValue => NullValue
+            case ArrayGetValue(name, index) => ArrayGetValue(subst(name, from, to), subst(index, from, to))
             case VariableValue(name) => VariableValue(name.replaceAllLiterally(from, to))
             case BinaryOperation(op, left, right) => BinaryOperation(op, subst(left, from, to), subst(right, from, to))
+            case UnaryOperation(op, left) => UnaryOperation(op, subst(left, from, to))
             case TupleValue(values) => TupleValue(values.map(subst(_, from, to)))
-            case FunctionCallValue(name, args) => FunctionCallValue(name.replaceAllLiterally(from, to), args.map(subst(_, from, to)))
+            case FunctionCallValue(name, args) => FunctionCallValue(subst(name, from, to), args.map(subst(_, from, to)))
             case RangeValue(min, max) => RangeValue(subst(min, from, to), subst(max, from, to))
             case LambdaValue(args, instr) => LambdaValue(args, subst(instr, from, to))
             case lk: LinkedVariableValue => lk
@@ -97,7 +123,8 @@ object Utils{
     def subst(instr: Instruction, from: String, to: String): Instruction = {
         instr match
             case Package(name, block) => Package(name.replaceAllLiterally(from, to), subst(block, from, to))
-            case StructDecl(name, block, modifier) => StructDecl(name.replaceAllLiterally(from, to), subst(block, from, to), modifier)
+            case StructDecl(name, block, modifier, parent) => StructDecl(name.replaceAllLiterally(from, to), subst(block, from, to), modifier, parent)
+            case ClassDecl(name, block, modifier, parent) => ClassDecl(name.replaceAllLiterally(from, to), subst(block, from, to), modifier, parent)
             case FunctionDecl(name, block, typ, args, modifier) => {
                 if (args.exists(x => x.name == from)){
                     instr
@@ -106,13 +133,27 @@ object Utils{
                     FunctionDecl(name.replaceAllLiterally(from, to), subst(block, from, to), typ, args, modifier)
                 }
             }
+            case PredicateDecl(name, args, block, modifier) => {
+                if (args.exists(x => x.name == from)){
+                    instr
+                }
+                else{
+                    PredicateDecl(name.replaceAllLiterally(from, to), args, subst(block, from, to), modifier)
+                }
+            }
+            case Import(value) => instr
             case ForGenerate(key, provider, instr) => ForGenerate(key, subst(provider, from, to), subst(instr, from, to))
+            case ForEach(key, provider, instr) => ForEach(key, subst(provider, from, to), subst(instr, from, to))
             case EnumDecl(name, fields, values, modifier) => EnumDecl(name.replaceAllLiterally(from, to), fields, values.map(v => EnumValue(v.name.replaceAllLiterally(from, to), v.fields.map(subst(_, from, to)))), modifier)
             case VariableDecl(name, _type, modifier) => VariableDecl(name.replaceAllLiterally(from, to), _type, modifier)
             case JSONFile(name, json) => JSONFile(name.replaceAllLiterally(from, to), subst(json, from, to))
 
             case InstructionList(list) => InstructionList(list.map(subst(_, from, to)))
             case InstructionBlock(list) => InstructionBlock(list.map(subst(_, from, to)))
+
+            case TemplateDecl(name, block, modifier, parent) => TemplateDecl(name.replaceAllLiterally(from, to), subst(block, from, to), modifier, parent)
+            case TemplateUse(iden, name, instr) => TemplateUse(iden, name.replaceAllLiterally(from, to), subst(instr, from, to))
+            case TypeDef(name, typ) => TypeDef(name.replaceAllLiterally(from, to), typ)
 
             case ElseIf(cond, ifBlock) => ElseIf(subst(cond, from, to), subst(ifBlock, from, to))
             case If(cond, ifBlock, elseBlock) => If(subst(cond, from, to), subst(ifBlock, from, to), elseBlock.map(subst(_, from, to).asInstanceOf[ElseIf]))
@@ -141,13 +182,17 @@ object Utils{
             case FloatValue(value) => instr
             case BoolValue(value) => instr
             case SelectorValue(content) => instr
+            case NamespacedName(value) => NamespacedName(value.replaceAllLiterally(from, to))
             case StringValue(value) => StringValue(value.replaceAllLiterally(from, to))
             case DefaultValue => DefaultValue
+            case NullValue => NullValue
+            case ArrayGetValue(name, index) => ArrayGetValue(subst(name, from, to), subst(index, from, to))
             case JsonValue(content) => JsonValue(subst(content, from, to))
             case VariableValue(name) => VariableValue(name.toString().replaceAllLiterally(from, to))
             case BinaryOperation(op, left, right) => BinaryOperation(op, subst(left, from, to), subst(right, from, to))
+            case UnaryOperation(op, left) => UnaryOperation(op, subst(left, from, to))
             case TupleValue(values) => TupleValue(values.map(subst(_, from, to)))
-            case FunctionCallValue(name, args) => FunctionCallValue(name.replaceAllLiterally(from, to), args.map(subst(_, from, to)))
+            case FunctionCallValue(name, args) => FunctionCallValue(subst(name, from, to), args.map(subst(_, from, to)))
             case RangeValue(min, max) => RangeValue(subst(min, from, to), subst(max, from, to))
             case LambdaValue(args, instr) => LambdaValue(args.map(_.replaceAllLiterally(from, to)), subst(instr, from, to))
             case lk: LinkedVariableValue => lk
@@ -168,7 +213,8 @@ object Utils{
     def subst(instr: Instruction, from: String, to: Expression): Instruction = {
         instr match
             case Package(name, block) => Package(name, subst(block, from, to))
-            case StructDecl(name, block, modifier) => StructDecl(name, subst(block, from, to), modifier)
+            case StructDecl(name, block, modifier, parent) => StructDecl(name, subst(block, from, to), modifier, parent)
+            case ClassDecl(name, block, modifier, parent) => ClassDecl(name, subst(block, from, to), modifier, parent)
             case FunctionDecl(name, block, typ, args, modifier) => {
                 if (args.exists(x => x.name == from)){
                     instr
@@ -177,12 +223,20 @@ object Utils{
                     FunctionDecl(name, subst(block, from, to), typ, args, modifier)
                 }
             }
+            case PredicateDecl(name, args, block, modifier) => instr
+            case Import(value) => instr
             case ForGenerate(key, provider, instr) => ForGenerate(key, subst(provider, from, to), subst(instr, from, to))
+            case ForEach(key, provider, instr) => ForEach(key, subst(provider, from, to), subst(instr, from, to))
             case EnumDecl(name, fields, values, modifier) => EnumDecl(name, fields, values.map(v => EnumValue(v.name, v.fields.map(subst(_, from, to)))), modifier)
             case VariableDecl(name, _type, modifier) => VariableDecl(name, _type, modifier)
 
             case InstructionList(list) => InstructionList(list.map(subst(_, from, to)))
             case InstructionBlock(list) => InstructionBlock(list.map(subst(_, from, to)))
+
+            case TypeDef(name, typ) => TypeDef(name, typ)
+
+            case TemplateDecl(name, block, modifier, parent) => TemplateDecl(name, subst(block, from, to), modifier, parent)
+            case TemplateUse(iden, name, instr) => TemplateUse(iden, name, subst(instr, from, to))
 
             case ElseIf(cond, ifBlock) => ElseIf(subst(cond, from, to), subst(ifBlock, from, to))
             case If(cond, ifBlock, elseBlock) => If(subst(cond, from, to), subst(ifBlock, from, to), elseBlock.map(subst(_, from, to).asInstanceOf[ElseIf]))
@@ -204,14 +258,22 @@ object Utils{
     def rmFunctions(instr: Instruction): Instruction = {
         instr match
             case Package(name, block) => Package(name, rmFunctions(block))
-            case StructDecl(name, block, modifier) => StructDecl(name, rmFunctions(block), modifier)
+            case StructDecl(name, block, modifier, parent) => StructDecl(name, rmFunctions(block), modifier, parent)
+            case ClassDecl(name, block, modifier, parent) => ClassDecl(name, rmFunctions(block), modifier, parent)
             case FunctionDecl(name, block, typ, args, modifier) => InstructionList(List())
+            case PredicateDecl(name, args, block, modifier) => instr
             case EnumDecl(name, fields, values, modifier) => EnumDecl(name, fields, values, modifier)
             case VariableDecl(name, _type, modifier) => VariableDecl(name, _type, modifier)
             case ForGenerate(key, provider, instr) => ForGenerate(key, provider, rmFunctions(instr))
+            case ForEach(key, provider, instr) => ForEach(key, provider, rmFunctions(instr))
+            case Import(value) => instr
 
             case InstructionList(list) => InstructionList(list.map(rmFunctions(_)))
             case InstructionBlock(list) => InstructionBlock(list.map(rmFunctions(_)))
+            case TypeDef(name, typ) => instr
+
+            case TemplateDecl(name, block, modifier, parent) => TemplateDecl(name, rmFunctions(block), modifier, parent)
+            case TemplateUse(iden, name, instr) => TemplateUse(iden, name, rmFunctions(instr))
 
             case ElseIf(cond, ifBlock) => ElseIf(cond, rmFunctions(ifBlock))
             case If(cond, ifBlock, elseBlock) => If(cond, rmFunctions(ifBlock), elseBlock.map(rmFunctions(_).asInstanceOf[ElseIf]))
@@ -233,14 +295,22 @@ object Utils{
     def fix(instr: Instruction)(implicit context: Context): Instruction = {
         instr match
             case Package(name, block) => Package(name, fix(block))
-            case StructDecl(name, block, modifier) => StructDecl(name, fix(block), modifier)
+            case StructDecl(name, block, modifier, parent) => StructDecl(name, fix(block), modifier, parent)
+            case ClassDecl(name, block, modifier, parent) => ClassDecl(name, fix(block), modifier, parent)
             case FunctionDecl(name, block, typ, args, modifier) => FunctionDecl(name, fix(block), typ, args, modifier)
+            case PredicateDecl(name, args, block, modifier) => PredicateDecl(name, args, fix(block), modifier)
             case EnumDecl(name, fields, values, modifier) => EnumDecl(name, fields, values.map(v => EnumValue(v.name, v.fields.map(fix(_)))), modifier)
-            case VariableDecl(name, _type, modifier) => VariableDecl(name, _type, modifier)
+            case VariableDecl(name, _type, modifier) => VariableDecl(name, fix(_type), modifier)
             case ForGenerate(key, provider, instr) => ForGenerate(key, fix(provider), fix(instr))
+            case ForEach(key, provider, instr) => ForEach(key, fix(provider), fix(instr))
+            case Import(value) => instr
 
             case InstructionList(list) => InstructionList(list.map(fix(_)))
             case InstructionBlock(list) => InstructionBlock(list.map(fix(_)))
+
+            case TemplateDecl(name, block, modifier, parent) => TemplateDecl(name, fix(block), modifier, parent)
+            case TemplateUse(iden, name, instr) => TemplateUse(iden, name, fix(instr))
+            case TypeDef(name, typ) => TypeDef(name, fix(typ))
 
             case ElseIf(cond, ifBlock) => ElseIf(fix(cond), fix(ifBlock))
             case If(cond, ifBlock, elseBlock) => If(fix(cond), fix(ifBlock), elseBlock.map(fix(_).asInstanceOf[ElseIf]))
@@ -275,21 +345,36 @@ object Utils{
 
             case Switch(cond, cases, cv) => Switch(fix(cond), cases.map(x => SwitchCase(fix(x.expr), fix(x.instr))), cv)
     }
+    def fix(typ: Type)(implicit context: Context): Type = {
+        typ match
+            case TupleType(sub) => TupleType(sub.map(fix(_)))
+            case ArrayType(inner, size) => ArrayType(fix(inner), size)
+            case RangeType(sub) => RangeType(fix(sub))
+            case IdentifierType(name) => {
+                context.getType(typ)
+            }
+            case other => other
+        
+    }
     def fix(instr: Expression)(implicit context: Context): Expression = {
         instr match
             case IntValue(value) => instr
             case FloatValue(value) => instr
             case BoolValue(value) => instr
             case SelectorValue(content) => instr
+            case NamespacedName(value) => instr
             case StringValue(value) => StringValue(value)
             case DefaultValue => DefaultValue
+            case NullValue => NullValue
             case JsonValue(content) => JsonValue(fix(content))
+            case ArrayGetValue(name, index) => ArrayGetValue(fix(name), fix(index))
             case VariableValue(name) => context.tryGetVariable(name) match
                 case Some(vari) => LinkedVariableValue(vari)
                 case None => VariableValue(name)
             case BinaryOperation(op, left, right) => BinaryOperation(op, fix(left), fix(right))
+            case UnaryOperation(op, left) => UnaryOperation(op, fix(left))
             case TupleValue(values) => TupleValue(values.map(fix(_)))
-            case FunctionCallValue(name, args) => FunctionCallValue(name, args.map(fix(_)))
+            case FunctionCallValue(name, args) => FunctionCallValue(fix(name), args.map(fix(_)))
             case RangeValue(min, max) => RangeValue(fix(min), fix(max))
             case LambdaValue(args, instr) => LambdaValue(args, fix(instr))
             case lk: LinkedVariableValue => lk
@@ -313,9 +398,13 @@ object Utils{
             case StringValue(value) => instr
             case JsonValue(content) => instr
             case SelectorValue(content) => instr
+            case NamespacedName(value) => instr
+            case ArrayGetValue(name, index) => ArrayGetValue(subst(name, from, to), subst(index, from, to))
             case DefaultValue => DefaultValue
+            case NullValue => NullValue
             case VariableValue(name) => if name.toString() == from then to else instr
             case BinaryOperation(op, left, right) => BinaryOperation(op, subst(left, from, to), subst(right, from, to))
+            case UnaryOperation(op, left) => UnaryOperation(op, subst(left, from, to))
             case TupleValue(values) => TupleValue(values.map(subst(_, from, to)))
             case FunctionCallValue(name, args) => FunctionCallValue(name, args.map(subst(_, from, to)))
             case RangeValue(min, max) => RangeValue(subst(min, from, to), subst(max, from, to))
@@ -327,6 +416,7 @@ object Utils{
     def simplifyToVariable(expr: Expression)(implicit context: Context): (List[String], LinkedVariableValue) = {
         expr match
             case VariableValue(name) => (List(), LinkedVariableValue(context.getVariable(name)))
+            case LinkedVariableValue(name) => (List(), LinkedVariableValue(name))
             case other => {
                 val vari = context.getFreshVariable(typeof(other))
                 (vari.assign("=", other), LinkedVariableValue(vari))
@@ -342,11 +432,33 @@ object Utils{
             case JsonValue(content) => JsonType
             case SelectorValue(content) => EntityType
             case LambdaValue(args, instr) => LambdaType(args.length)
+            case NamespacedName(value) => MCObjectType
+            case ArrayGetValue(name, index) => {
+                typeof(name) match
+                    case ArrayType(inner, size) => inner
+                    case other => throw new Exception(f"Illegal access of $other")
+            }
             case DefaultValue => throw new Exception("default value has no type")
-            case VariableValue(name) => context.getVariable(name).getType()
+            case NullValue => throw new Exception("null value has no type")
+            case VariableValue(name) => {
+                val vari = context.tryGetVariable(name)
+                vari match
+                    case None => {
+                        val fct = context.getFunction(name)
+                        FuncType(fct.arguments.map(_.typ), fct.getType())
+                    }
+                    case Some(value) => value.getType()
+            }
             case BinaryOperation(op, left, right) => combineType(op, typeof(left), typeof(right), expr)
+            case UnaryOperation(op, left) => BoolType
             case TupleValue(values) => TupleType(values.map(typeof(_)))
-            case FunctionCallValue(name, args) => context.getFunction(name, args, AnyType)._1.getType()
+            case FunctionCallValue(name, args) => {
+                name match
+                    case VariableValue(name) => context.getFunction(name, args, AnyType)._1.getType()
+                    case other => typeof(name) match
+                        case FuncType(sources, output) => output
+                        case other => throw new Exception(f"Cannot call $other")
+            }
             case RangeValue(min, max) => RangeType(typeof(min))
             case LinkedVariableValue(vari) => vari.getType()
     }
@@ -368,7 +480,7 @@ object Utils{
             }
             case "&&" | "||" => {
                 (t1, t2) match
-                    case (BoolType, BoolType) => BoolType
+                    case (BoolType | IntType | FloatType, BoolType | IntType | FloatType) => BoolType
                     case (a, b) => throw new Exception(f"Unexpect type in ${expr} found $a and $b, exptected: bool and bool") 
             }
         }
@@ -403,12 +515,20 @@ object Utils{
                     case (JsonValue(a), JsonValue(b)) => JsonValue(combine(op, a, b))
                     case _ => BinaryOperation(op, nl, nr)
             }
+            case VariableValue(iden) if iden.toString() == "Compiler.isJava" => {
+                BoolValue(Settings.target == MCJava)
+            }
+            case VariableValue(iden) if iden.toString() == "Compiler.isBedrock" => {
+                BoolValue(Settings.target == MCBedrock)
+            }
             case LinkedVariableValue(vari) => {
                 if vari.modifiers.isLazy then vari.lazyValue else expr
             }
             case VariableValue(iden) => {
-                val vari = context.getVariable(iden)
-                if vari.modifiers.isLazy then vari.lazyValue else expr
+                val vari = context.tryGetVariable(iden)
+                vari match
+                    case None => expr
+                    case Some(vari) => if vari.modifiers.isLazy then vari.lazyValue else expr
             }
             case other => other
     }
@@ -432,6 +552,22 @@ object Utils{
         elm match
             case JsonArray(content) => JsonArray(content.map(compileJson(_)))
             case JsonDictionary(map) => JsonDictionary(map.map((k,v) => (k, compileJson(v))))
+            case JsonCall(value, args) => {
+                Settings.target match
+                    case MCJava => {
+                        val fct = context.getFunction(value, args, VoidType).call()
+                        if (fct.length == 1){
+                            JsonString(fct.last.replaceAll("function ", ""))
+                        }
+                        else{
+                            val block = context.getFreshBlock(fct)
+                            JsonString(MCJava.getFunctionName(block.fullName))
+                        }
+                    }
+                    case MCBedrock => {
+                        JsonArray(context.getFunction(value, args, VoidType).call().map(JsonString(_)))
+                    }
+            }
             case JsonIdentifier(value) => {
                 val vari = context.tryGetVariable(value)
                 vari match
@@ -530,6 +666,24 @@ object Utils{
             case "%" => a % b
             case "&&" => if a != 0 && b != 0 then 1 else 0
             case "||" => if a != 0 || b != 0 then 1 else 0
-        
+    }
+
+    def getForgenerateCases(key: String, provider: Expression)(implicit context: Context): IterableOnce[List[(String, String)]] = {
+        provider match
+            case RangeValue(IntValue(min), IntValue(max)) => Range(min, max+1).map(elm => List((key, elm.toString())))
+            case TupleValue(lst) => lst.map(elm => List((key, elm.toString())))
+            case VariableValue(iden) if iden.toString().startsWith("@") => {
+                context.getFunctionTags(iden).getFunctionsName().map(name => List((key, name)))
+            }
+            case _ => throw new Exception(f"Unknown generator: $provider")
+    }
+    def getForeachCases(provider: Expression)(implicit context: Context): IterableOnce[Expression] = {
+        provider match
+            case RangeValue(IntValue(min), IntValue(max)) => Range(min, max+1).map(elm => IntValue(elm))
+            case TupleValue(lst) => lst.map(elm => elm)
+            case VariableValue(iden) if iden.toString().startsWith("@") => {
+                context.getFunctionTags(iden).getFunctionsName().map(name => VariableValue(name))
+            }
+            case _ => throw new Exception(f"Unknown generator: $provider")
     }
 }

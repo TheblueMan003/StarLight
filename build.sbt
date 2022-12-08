@@ -2,7 +2,7 @@ scalaVersion := "3.2.0"
 
 name              := "StarLight"
 
-version           := "0.1.1-SNAPSHOT"
+version           := "0.1.2-SNAPSHOT"
 
 organization      := "com.github.theblueman003"
 

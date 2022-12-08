@@ -7,6 +7,9 @@ case class Identifier(values: List[String]) {
     def child(name: String): Identifier={
         Identifier(values:::List(name))
     }
+    def getTagFunctionName()={
+        toString().replaceAll("[\\.]", "_").replaceAll("@", "")
+    }
     def parent(): Identifier = {
         Identifier(values.dropRight(1))
     }
@@ -67,6 +70,9 @@ case class Identifier(values: List[String]) {
             
         }
         rec(values, other.values)
+    }
+    def replaceAllLiterally(other: String, to: String): Identifier ={
+        Identifier.fromString(toString().replaceAll(other, to))
     }
     def replaceAllLiterally(other: Identifier, to: Identifier): Identifier ={
         if (isPrefixBy(other)){
