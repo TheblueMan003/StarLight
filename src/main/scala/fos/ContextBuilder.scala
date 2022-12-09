@@ -2,6 +2,7 @@ package fos
 
 import objects.{Context, ConcreteFunction, LazyFunction, Struct, Class, Template, Enum, Modifier, Variable}
 import objects.types.VoidType
+import fos.Compilation.DefaultFunction
 
 object ContextBuilder{
     def build(name: String, inst: Instruction):Context = {
@@ -13,7 +14,9 @@ object ContextBuilder{
 
         Compiler.compile(inst, true)(context)
         Compiler.compile(extra, true)(context)
-        
+
+        DefaultFunction.get()(context)
+
         context
     }
 
