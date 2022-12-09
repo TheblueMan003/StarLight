@@ -43,7 +43,6 @@ Variables can be assigned
 If the variable is tuple, then the tuple with be unpack
 
 ## Default Types
-<<<<<<< HEAD
 ### int
 Store Normal integer
 
@@ -76,17 +75,6 @@ Supported operation:
 Tuple, Store multiple value. e.i. (float, float, float) position = 0,0,0
 
 All operators are supported as long as either the operation can be done on every single value or the right hand side is also a tuple with the same size and the operation can be perform with each corresponding entry.
-=======
-* int: normal integer
-* float: fixed point value (by default keep 3 digits after dot)
-* bool: boolean value
-* entity: store multiple entities. (Use a tag)
-* json: store a json value. `+=` operator acts as append and `&=` operator acts as merge. This type is dynamicly support only for java datapack. For bedrock, the lazy key word must be used.
-* string: TODO
-* T[]: TODO
-* (T*)=>T: any store dynamicly any non lazy functions when the variable is not lazy or any functions otherwise. The variable can be call with the usual call notation.
-* (T, T*): tuple store multiple value. e.i. (float, float, float) position = 0,0,0
->>>>>>> 50bfc7ccaff724c909364f9a9e291d232b1d77e5
 
 ## Selectors & Entity
 The entity can be assigned a selector. This will result in only the entity selected by the selector to be inside the variable.
@@ -234,7 +222,6 @@ jsonfile advancements.name{
 }
 ```
 
-<<<<<<< HEAD
 ## Predicate (JAVA Only)
 Predicate can be defined like function but with a json body.
 ```
@@ -246,7 +233,6 @@ predicate example(int count, string itemID){
       "mainhand": {
         "items": [
           itemID
-        ],
         "count": count
       }
     }
@@ -330,7 +316,6 @@ example2 foo{
     }
 }
 ```
-=======
 
 ## Struct
 Struct allow you to create new type. Note that every time copy a struct to another a copy of the inner states is perform.
@@ -342,34 +327,6 @@ struct typ{
     def fct(){
         a += b
     }
-}
-typ foo
-foo.fct()
-int bar = typ.foo
-```
-
-To overload the operator of the type, the following function can be used:
-* `=`: `__set__`
-* `+=`: `__add__`
-* `-=`: `__sub__`
-* `*=`: `__mult__`
-* `/=`: `__div__`
-* `%=`: `__mod__`
-* `&=`: `__and__`
-* `|=`: `__or__`
->>>>>>> 50bfc7ccaff724c909364f9a9e291d232b1d77e5
-
-## Metaprogramming
-### Lazy Variable
-Lazy variable are not exported into the output code. Instead all operation on them are interpreted directly and when they are used, they are replaced by the value interpreted.
-```
-lazy int a = 0
-a += 10*5
-int b = a
-```
-Will be the same as
-```
-int b = 50
 ```
 
 This allow to do static string & json manipulation.
@@ -387,7 +344,6 @@ Will be the same as
 int b = 0
 ```
 Every call for function that are not mark as inline is done in a sub context meaning that variable inside it won't be usable after the call.
-<<<<<<< HEAD
 
 ### "Lazy IF"
 When a if statement is compiled, the expression inside it is simplified. If the result value is always true then the condition will disapear from the output code and all the else statement with it. 
@@ -407,5 +363,3 @@ This can be used to compile according to some compilation settings. Here is a li
 * `Compiler.isJava`: Tell if the target is MC Java
 * `Compiler.isBedrock`: Tell if the target is MC Bedrock
 * `Compiler.isDebug`: Used to add extra info in the datapack that can be used to debug
-=======
->>>>>>> 50bfc7ccaff724c909364f9a9e291d232b1d77e5
