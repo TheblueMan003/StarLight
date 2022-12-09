@@ -1,45 +1,52 @@
-package process
+package utils.process
 
-import cmd.schedule
+if (Compiler.isJava){
+    import cmd.schedule as schedule
+}
+import standard
 
 int t_running, t_total
 
 def @test.after show(){
-    //print(("===[ Running Processes ]===",green))
+    standard.print(("===[ Running Processes ]===","green"))
     int running = 0
     int off = 0
     int unknown = 0
     int total = 0
     
-    forgenerate($i,@process.count){
+    forgenerate($i, @process.count){
         t_running = 0
         t_total = 0
         $i()
         if (t_running == 1){
-            //print((" [ON] $i",green))
+            standard.print((" [ON] $i","green"))
             running++
         }
         else if (t_running == 0){
-            //print((" [OFF] $i",red))
+            standard.print((" [OFF] $i","red"))
             off++
         }
         else{
-            //print((" [??] $i",yellow))
+            standard.print((" [??] $i","yellow"))
             unknown++
         }
         total++
     }
-    //print(("Stats: ",white),(f"{running}/{total} Running",green),(" - "), (f"{off}/{total} Off",red),(" - "),(f"{unknown}/{total} Unknown",yellow))
+    standard.print(("Stats: ","white"),(running,"green"),("/"),(total,"green"),(" Running","green"),(" - "),
+                    (off,"red"),("/"),(total,"red"),(" Off","red"),(" - "),
+                    (unknown,"yellow"),("/"),(total,"yellow"),(" Unknown","yellow"),(" - "))
 }
 
 
-template process{
+template Process{
     int enabled
     int crashCount
     void=>void callback
     
     def loading reload(){
-        run()
+        if (Compiler.isJava){
+            run()
+        }
     }
     def crash(){
         //exception.exception("Stack Overlow detect in Process. Try to increase the maxCommandChainLength")
@@ -48,24 +55,43 @@ template process{
             //exception.exception("Max Number of Stack Overflow reach. Process Killed.")
             enabled = 0
         }
-        run()
+        if (Compiler.isJava){
+            run()
+        }
     }
     def start(){
         enabled:=false
         if (!enabled){
             enabled = true
             onStart()
-            run()
+            if (Compiler.isJava){
+                run()
+            }
         }
     }
-    def @process.main run(){
-        asyncwhile(enabled){
-            schedule.add(crash)
-            if (enabled){
-                main()
+    if (Compiler.isJava){
+        def @process.main run(){
+            schedule.asyncwhile(enabled){
+                schedule.add(crash)
+                if (enabled){
+                    main()
+                }
+                schedule.remove(crash)
+                crashCount = 0
             }
-            schedule.remove(crash)
-            crashCount = 0
+        }
+    }
+    if (Compiler.isBedrock){
+        bool crashDetect
+        def ticking mainLoop(){
+            if (enabled){
+                if (crashDetect){
+                    crash()
+                }
+                crashDetect = true
+                main()
+                crashDetect = false
+            }
         }
     }
     def stop(){

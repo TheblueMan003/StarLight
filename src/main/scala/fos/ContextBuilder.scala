@@ -6,8 +6,14 @@ import objects.types.VoidType
 object ContextBuilder{
     def build(name: String, inst: Instruction):Context = {
         val context = Context.getNew(name)
+        val extra = Utils.getLib("__init__").get
+
         buildRec(inst)(context)
+        buildRec(extra)(context)
+
         Compiler.compile(inst, true)(context)
+        Compiler.compile(extra, true)(context)
+        
         context
     }
 
@@ -65,8 +71,17 @@ object ContextBuilder{
                 
                 cases.map(elm => Utils.subst(instr, key.toString(), elm)).flatMap(Compiler.compile(_)).toList
             }
-            case Import(value) => {
-                buildRec(Utils.getLib(value).get)(context.root)
+            case Import(value, alias) => {
+                val ret = if (context.importFile(value)){
+                    buildRec(Utils.getLib(value).get)(context.root)
+                }
+                else{
+                    List()
+                }
+                if (alias != null){
+                    context.push(alias, context.getContext(value))
+                }
+                ret
             }
             case _ => {
             }

@@ -3,6 +3,8 @@ package objects
 import types.*
 import fos.*
 import fos.Compilation.Execute
+import fos.Compilation.Print
+import fos.Compilation.Selector.{Selector, JavaSelector, SelectorIdentifier}
 
 private val entityTypeSubVariable = List((BoolType, "isPlayer"))
 object Variable {
@@ -25,22 +27,30 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 	def generate(isStructFunctionArgument: Boolean = false)(implicit context: Context):Unit = {
 		val parent = context.getCurrentVariable()
 		if (parent != null){
+			isFunctionArgument = parent.isFunctionArgument
 			parent.tupleVari = parent.tupleVari ::: List(this)
 		}
 
+		typ.generateCompilerFunction(this)(context.push(name))
+
 		typ match
 			case StructType(struct) => {
+				val ctx = context.push(name, this)
+				ctx.inherit(struct.context)
+				val block = Utils.subst(struct.getBlock(), "$this", fullName)
 				if (isStructFunctionArgument && context.getCurrentVariable().getType() == getType()){
-					fos.Compiler.compile(Utils.rmFunctions(struct.getBlock()))(context.push(name, this))
+					fos.Compiler.compile(Utils.rmFunctions(block))(ctx)
 				}
 				else{
-					fos.Compiler.compile(struct.getBlock())(context.push(name, this))
+					fos.Compiler.compile(block)(ctx)
 				}
 				tupleVari.foreach(vari => vari.modifiers = vari.modifiers.combine(modifiers))
 			}
 			case ClassType(clazz) => {
 				val ctx = context.push(name, this)
-				clazz.getAllFunctions().map(fct => {
+				clazz.getAllFunctions()
+				.filter(!_.modifiers.isStatic)
+				.map(fct => {
 					val deco = ClassFunction(this, fct)
 					ctx.addFunction(fct.name, deco)
 				})
@@ -87,7 +97,48 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 						}
 						case a => throw new Exception(f"Lazy assignment of $a not supported for struct")
 				}
+				case RawJsonType => {
+					Utils.typeof(value) match
+						case TupleType(sub) => {
+							Utils.simplify(value) match
+								case TupleValue(lst) =>
+									val value2 = Print.toRawJson(lst)
+									op match{
+										case "=" => lazyValue = value2._2
+										case "+=" => lazyValue = Utils.simplify(BinaryOperation("+", lazyValue, value2._2))
+										case other => throw new Exception(f"Unsupported operation: $fullName $op $value")
+									}
+									return value2._1
+								case other => throw new Exception(f"Unsupported operation: $fullName $op $value")
+						}
+						case RawJsonType => {
+							op match{
+								case "=" => lazyValue = value
+								case "+=" => lazyValue = Utils.simplify(BinaryOperation("+", lazyValue, value))
+								case other => throw new Exception(f"Unsupported operation: $fullName $op $value")
+							}
+						}
+						case other => {
+							val value2 = Print.toRawJson(List(value))
+							op match{
+								case "=" => lazyValue = value2._2
+								case "+=" => lazyValue = Utils.simplify(BinaryOperation("+", lazyValue, value2._2))
+								case other => throw new Exception(f"Unsupported operation: $fullName $op $value")
+							}
+							return value2._1
+						}
+				}
 				case other => {
+					value match{
+						case FunctionCallValue(VariableValue(name), args) => 
+							val res = context.getFunction(name, args, getType(), false)
+							if (res._1.canBeCallAtCompileTime){
+								return res.call(this)
+							}
+						case _ => {
+						}
+					}
+
 					op match{
 						case "=" => lazyValue = Utils.simplify(value)
 						case "+=" => lazyValue = Utils.simplify(BinaryOperation("+", LinkedVariableValue(this), value))
@@ -98,6 +149,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 						case "&=" => lazyValue = Utils.simplify(BinaryOperation("&", LinkedVariableValue(this), value))
 						case "|=" => lazyValue = Utils.simplify(BinaryOperation("|", LinkedVariableValue(this), value))
 						case "^=" => lazyValue = Utils.simplify(BinaryOperation("^", LinkedVariableValue(this), value))
+						case other => throw new Exception(f"Unsupported operation: $fullName $op $value")
 					}
 				}
 			}
@@ -599,6 +651,21 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 							context.getFunction(this.name + ".__set__", List(value), getType(), false).call()
 						}
 					}
+					case ConstructorCall(name2, args) => {
+						context.getType(IdentifierType(name2.toString())) match
+							case ClassType(clazz) => context.getFunction(this.name + ".__set__", List(value), getType(), false).call()
+							case typ@StructType(struct) => {
+								if (typ == getType()){
+									context.getFunction(name + ".__init__", args, getType(), false).call()
+								}
+								else{
+									val vari = context.getFreshVariable(typ)
+									vari.assign("=", value)
+									assign("=", LinkedVariableValue(vari))
+								}
+							}
+							case other => throw new Exception(f"Cannot constructor call $other")
+					}
 					case _ => context.getFunction(name + ".__set__", List(value), getType(), false).call()
 			}
 			case "+=" => context.getFunction(name + ".__add__",  List(value), getType(), false).call()
@@ -631,6 +698,21 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 							context.getFunction(this.name + ".__set__", List(value), getType(), false).call()
 						}
 					}
+					case ConstructorCall(name2, args) => {
+						context.getType(IdentifierType(name2.toString())) match
+							case StructType(struct) => throw new Exception("Cannot call struct constructor for class")
+							case typ@ClassType(clazz) => {
+								if (typ == getType()){
+									context.getFunction(name + ".__init__", args, getType(), false).call()
+								}
+								else{
+									val vari = context.getFreshVariable(typ)
+									vari.assign("=", value)
+									assign("=", LinkedVariableValue(vari))
+								}
+							}
+							case other => throw new Exception(f"Cannot constructor call $other")
+					}
 					case _ => context.getFunction(name + ".__set__", List(value), getType(), false).call()
 			}
 			case _ => assignStruct(op, value)
@@ -652,10 +734,12 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 			case LambdaValue(args, instr) => false
 			case VariableValue(name1) => context.tryGetVariable(name1) == Some(this)
 			case LinkedVariableValue(vari) => vari == this
+			case RawJsonValue(value) => false
 			case BinaryOperation(op, left, right) => isPresentIn(left) || isPresentIn(right)
 			case UnaryOperation(op, left) => isPresentIn(left)
 			case TupleValue(values) => values.exists(isPresentIn(_))
-			case FunctionCallValue(name, args) => args.exists(isPresentIn(_))|| isPresentIn(name)
+			case FunctionCallValue(name, args) => args.exists(isPresentIn(_)) || isPresentIn(name)
+			case ConstructorCall(name, args) => args.exists(isPresentIn(_))
 			case RangeValue(min, max) => isPresentIn(min) || isPresentIn(max)
 		}
 
@@ -666,5 +750,27 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 		else{
 			f"${fullName} ${Settings.variableScoreboard}"
 		}
+	}
+
+	def getSelectorName(): String = {
+		if (modifiers.isEntity){
+			f"@s"
+		}
+		else{
+			f"${fullName}"
+		}
+	}
+
+	def getSelectorObjective(): String = {
+		if (modifiers.isEntity){
+			f"${scoreboard}"
+		}
+		else{
+			f"${Settings.variableScoreboard}"
+		}
+	} 
+
+	def getEntityVariableSelector(): Selector = {
+		JavaSelector("@e", Map(("tag", SelectorIdentifier(tagName))))
 	}
 }

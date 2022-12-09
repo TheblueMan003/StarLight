@@ -1,6 +1,6 @@
-package entity
+package mc.entity
 
-import standard.int
+import standard.int as int
 
 if (Compiler.isBedrock()){
 	jsonfile entities.marker{
@@ -260,4 +260,23 @@ def lazy angerAngaist(entity $e1, entity $e2){
     with($e1){
         angerAngaist($e)
     }
+}
+
+def lazy gamemode(mcobject $gamemode, entity $e = @s){
+	/gamemode $gamemode $e
+}
+
+def lazy gamemode(int gamemode, entity $e = @s){
+	if (gamemode == 0){
+		/gamemode survival $e
+	}
+	else if (gamemode == 1){
+		/gamemode creative $e
+	}
+	else if (gamemode == 2){
+		/gamemode adventure $e
+	}
+	else if (gamemode == 3){
+		/gamemode spectator $e
+	}
 }

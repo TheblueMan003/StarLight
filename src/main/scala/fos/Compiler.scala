@@ -28,6 +28,9 @@ object Compiler{
         instruction match{
             case FunctionDecl(name, block, typ, args, modifier) =>{
                 val fname = context.getFunctionWorkingName(name)
+                if (Settings.target == MCBedrock && modifier.isLoading){
+                    modifier.tags.addOne("__loading__")
+                }
                 if (!modifier.isLazy){
                     val func = new ConcreteFunction(context, fname, args, context.getType(typ), modifier, block, firstPass)
                     context.addFunction(name, func)
@@ -98,15 +101,24 @@ object Compiler{
                 context.addJsonFile(new objects.JSONFile(context, name, Modifier.newPrivate(), Utils.compileJson(json)))
                 List()
             }
-            case Import(value) => {
-                compile(Utils.getLib(value).get)(context.root)
+            case Import(value, alias) => {
+                val ret = if (context.importFile(value)){
+                    compile(Utils.getLib(value).get)(context.root)
+                }
+                else{
+                    List()
+                }
+                if (alias != null){
+                    context.push(alias, context.getContext(value))
+                }
+                ret
             }
             case TemplateUse(iden, name, block) => {
                 val template = context.getTemplate(iden)
                 val sub = context.push(name)
-                
-                compile(Utils.fix(template.block)(template.context), true)(sub)
-                compile(block, true)(sub)
+
+                sub.inherit(template.context)
+                compile(Utils.fix(template.block)(template.context), true)(sub) ::: compile(block, true)(sub)
             }
 
 
@@ -134,13 +146,17 @@ object Compiler{
                     case cf: ConcreteFunction => cf.returnVariable.assign("=", value)
                     case _ => throw new Exception(f"Unexpected return at ${instruction.pos}")
             }
-            case CMD(value) => List(value)
+            case CMD(value) => List(value.replaceAllLiterally("\\\"","\""))
             case Package(name, block) => {
-                val sub = context.push(name)
+                val sub = context.root.push(name)
                 val content = compile(block, firstPass)(sub)
                 if (content.length > 0){
                     val init = sub.getNamedBlock("__init__", content)
                     init.modifiers.isLoading = true
+                    if (Settings.target == MCBedrock && init.modifiers.isLoading){
+                        init.modifiers.tags.addOne("__loading__")
+                        sub.addFunctionToTags(init)
+                    }
                 }
                 List()
             }

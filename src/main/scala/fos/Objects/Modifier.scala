@@ -8,6 +8,11 @@ object Modifier{
         mod.protection = Protection.Private
         mod
     }
+    def newPublic()= {
+        val mod = new Modifier()
+        mod.protection = Protection.Public
+        mod
+    }
 }
 
 class Modifier(){
@@ -19,6 +24,7 @@ class Modifier(){
     var isConst = false
     var isTicking = false
     var isLoading = false
+    var isStatic = false
     var isHelper = false
     var tags = ArrayBuffer[String]()
     var attributes = Map[String,String]()
@@ -34,6 +40,7 @@ class Modifier(){
         ret.isTicking = isTicking | other.isTicking
         ret.isLoading = isLoading | other.isLoading
         ret.isHelper = isHelper | other.isHelper
+        ret.isStatic = isStatic | other.isStatic
         ret.tags = tags ++ other.tags
         ret.attributes = attributes
         ret

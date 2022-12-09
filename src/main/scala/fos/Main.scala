@@ -5,16 +5,21 @@ import java.io._
 
 object Main{
   def main(args: Array[String]): Unit = {
-    if (args(0) == "new"){
-      newProject(args)
+    if (args.length == 0){
+      build(Array("build","build.slconf"))
     }
-    if (args(0) == "build"){
-      println("building project")
-      build(args)
-    }
-    if (args(0) == "compile"){
-      println("compiling project")
-      compile(args)
+    else{
+      if (args(0) == "new"){
+        newProject(args)
+      }
+      if (args(0) == "build"){
+        println("building project")
+        build(args)
+      }
+      if (args(0) == "compile"){
+        println("compiling project")
+        compile(args)
+      }
     }
   }
   def newProject(args: Array[String]): Unit = {

@@ -17,6 +17,7 @@ object Settings{
     var treeSize = 20
     var target:Target = MCJava
     var debug = false
+    var allFunction = false
 
     val metaVariable = List(
         ("Compiler.isJava", () => target == MCJava),
@@ -34,13 +35,13 @@ trait Target{
 }
 case object MCJava extends Target{
     def getFunctionPath(path: String): String = {
-        "/data/" + path.replaceAll("([A-Z])","\\$$1").toLowerCase().replaceAllLiterally(".","/").replaceFirst("/", "/functions/")+ ".mcfunction"
+        "/data/" + path.replaceAll("([A-Z])","-$1").toLowerCase().replaceAllLiterally(".","/").replaceFirst("/", "/functions/")+ ".mcfunction"
     }
     def getPredicatePath(path: String): String = {
-        "/data/" + path.replaceAll("([A-Z])","\\$$1").toLowerCase().replaceAllLiterally(".","/").replaceFirst("/", "/predicates/")+ ".mcfunction"
+        "/data/" + path.replaceAll("([A-Z])","-$1").toLowerCase().replaceAllLiterally(".","/").replaceFirst("/", "/predicates/")+ ".mcfunction"
     }
     def getFunctionName(path: String): String = {
-        path.replaceAll("([A-Z])","\\$$1").toLowerCase().replaceAllLiterally(".","/").replaceFirst("/", ":")
+        path.replaceAll("([A-Z])","-$1").toLowerCase().replaceAllLiterally(".","/").replaceFirst("/", ":")
     }
     def getJsonPath(path: String): String = {
         "/data/" + path.replaceAllLiterally(".","/")+ ".json"
@@ -48,14 +49,14 @@ case object MCJava extends Target{
     def getExtraFiles(context: Context): List[(String, List[String])] = {
         val ticks = context.getAllFunction()
                         .filter(_.modifiers.isTicking)
-                        .map(_.fullName.replaceAllLiterally(".","/").replaceFirst("/", ":"))
+                        .map(f => getFunctionName(f.fullName))
                         .map(Utils.stringify(_))
                         .reduceOption(_ +","+_)
                         .getOrElse("")
 
         val loads = context.getAllFunction()
                         .filter(_.modifiers.isLoading)
-                        .map(_.fullName.replaceAllLiterally(".","/").replaceFirst("/", ":"))
+                        .map(f => getFunctionName(f.fullName))
                         .appended(f"${context.root.getPath()}:__init__")
                         .map(Utils.stringify(_))
                         .reduceOption(_ +","+_)
@@ -75,13 +76,13 @@ case object MCJava extends Target{
 }
 case object MCBedrock extends Target{
     def getFunctionPath(path: String): String = {
-        "/functions/" + path.replaceAll("([A-Z])","\\$$1").toLowerCase().replaceAllLiterally(".","/") + ".mcfunction"
+        "/functions/" + path.replaceAll("([A-Z])","-$1").toLowerCase().replaceAllLiterally(".","/") + ".mcfunction"
     }
     def getPredicatePath(path: String): String = {
         throw new Exception("Predicate not supported on bedrock!")
     }
     def getFunctionName(path: String): String = {
-        path.replaceAll("([A-Z])","\\$$1").toLowerCase().replaceAllLiterally(".","/")
+        path.replaceAll("([A-Z])","-$1").toLowerCase().replaceAllLiterally(".","/")
     }
     def getJsonPath(path: String): String = {
         "/" + path.replaceAllLiterally(".","/") + ".json"
@@ -89,7 +90,7 @@ case object MCBedrock extends Target{
     def getExtraFiles(context: Context): List[(String, List[String])] = {
         val ticks = context.getAllFunction()
                         .filter(_.modifiers.isTicking)
-                        .map(_.fullName.replaceAllLiterally(".","/"))
+                        .map(f => getFunctionName(f.fullName))
                         .map(Utils.stringify(_))
                         .reduceOption(_ +","+_)
                         .getOrElse("")
@@ -109,13 +110,13 @@ case object MCBedrock extends Target{
     def getManifestContent(): String = {
         f"""
 {
-    "format_version": 1,
+    "format_version": 2,
     "header": {
         "description": "Made with Project Star Light",
         "name": "${Settings.outputName}",
         "uuid": "${getUUID(Settings.outputName)}",
         "version": [0, 0, 1],
-        "min_engine_version": [1, 2, 6]
+        "min_engine_version": [1, 19, 50]
     },
     "modules": [
         {

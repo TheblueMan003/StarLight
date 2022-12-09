@@ -5,20 +5,48 @@ import fos.*
 import fos.Utils
 import scala.collection.mutable
 import fos.Compilation.Selector.*
+import fos.Compilation.Print
 
 object Function {
   extension (str: (Function, List[Expression])) {
-    def call()(implicit context: Context) = {
-      str._1.call(str._2)
-    }
-    def call(ret: Variable)(implicit context: Context) = {
-      str._1.call(str._2, ret)
+    def call(ret: Variable = null)(implicit context: Context) = {
+        if (str._1.hasRawJsonArg()){
+            val prefix = str._2.take(str._1.arguments.length - 1)
+            val sufix = str._2.drop(str._1.arguments.length - 1)
+            val (prep, json) = Print.toRawJson(sufix)
+            prep ::: str._1.call(prefix ::: List(json), ret)
+        }
+        else{
+            str._1.call(str._2, ret)
+        }
     }
   }
 }
 abstract class Function(context: Context, name: String, val arguments: List[Argument], typ: Type, _modifier: Modifier) extends CObject(context, name, _modifier) with Typed(typ){
     val minArgCount = getMinArgCount(arguments)
+    val maxArgCount = getMaxArgCount(arguments)
     var argumentsVariables: List[Variable] = List()
+
+    private def getMaxArgCount(args: List[Argument]): Int = {
+        if args.length == 0 then 0 else
+        args.last.typ match
+            case ParamsType => Integer.MAX_VALUE
+            case RawJsonType => Integer.MAX_VALUE
+            case _ => args.length
+    }
+
+    def prototype() = {
+        fullName + "(" +arguments.map(_.typ.toString()).foldRight("")(_ +","+_) +")"
+    }
+
+    def hasRawJsonArg(): Boolean = {
+        if arguments.length == 0 then false else
+        arguments.last.typ match
+            case RawJsonType => true
+            case _ => false
+    }
+
+    def canBeCallAtCompileTime = false
 
     private def getMinArgCount(args: List[Argument], stopped: Boolean = false): Int = {
         args match{
@@ -52,10 +80,12 @@ abstract class Function(context: Context, name: String, val arguments: List[Argu
         })
     }
     def argMap(args: List[Expression]) = {
+        if args.length > argumentsVariables.length then throw new Exception(f"Too much argument for $fullName: $args")
+        if args.length < minArgCount then throw new Exception(f"Too few argument for $fullName got: $args expected: $arguments")
         argumentsVariables.filter(_.getType() != VoidType)
-                 .zip(arguments.map(_.defValue))
-                 .zipAll(args, null, null)
-                 .map(p => (p._1._1, if p._2 == null then p._1._2.get else p._2))
+                .zip(arguments.map(_.defValue))
+                .zipAll(args, null, null)
+                .map(p => (p._1._1, if p._2 == null then p._1._2.get else p._2))
     }
     def exists(): Boolean
     def getName(): String
@@ -63,12 +93,15 @@ abstract class Function(context: Context, name: String, val arguments: List[Argu
 }
 
 class ConcreteFunction(context: Context, name: String, arguments: List[Argument], typ: Type, _modifier: Modifier, val body: Instruction, topLevel: Boolean) extends Function(context, name, arguments, typ, _modifier){
-    private var _needCompiling = false
+    private var _needCompiling = topLevel || Settings.allFunction
     private var wasCompiled = false
+    
     protected var content = List[String]()
     val returnVariable = {
         val ctx = context.push(name)
-        ctx.addVariable(new Variable(ctx, "_ret", typ, Modifier.newPrivate()))
+        val vari = new Variable(ctx, "_ret", typ, Modifier.newPrivate())
+        vari.isFunctionArgument = true
+        ctx.addVariable(vari)
     }
     private lazy val muxID = context.getFunctionMuxID(this)
 
@@ -101,7 +134,7 @@ class ConcreteFunction(context: Context, name: String, arguments: List[Argument]
         content = content ::: cnt
     }
 
-    def exists(): Boolean = wasCompiled
+    def exists(): Boolean = wasCompiled || Settings.allFunction
     def getContent(): List[String] = content
     def getName(): String = Settings.target.getFunctionPath(fullName)
 
@@ -142,6 +175,7 @@ class LazyFunction(context: Context, name: String, arguments: List[Argument], ty
     def call(args: List[Expression], ret: Variable = null)(implicit ctx: Context): List[String] = {
         var block = body
         val sub = ctx.push(ctx.getLazyCallId())
+        sub.inherit(context)
         
         argMap(args).foreach((a, v) => {
             val vari = Variable(sub, a.name, a.getType(), a.modifiers)
@@ -193,14 +227,14 @@ class MultiplexFunction(context: Context, name: String, arguments: List[Argument
 }
 
 class TagFunction(context: Context, name: String, arguments: List[Argument]) extends ConcreteFunction(context, name, arguments, VoidType, objects.Modifier.newPrivate(), fos.InstructionList(List()), false){
-    private val functions = mutable.Set[ConcreteFunction]()
+    private val functions = mutable.Set[Function]()
     override def needCompiling():Boolean = {
         false
     }
     override def markAsCompile(): Unit = {
     }
 
-    def addFunction(fct: ConcreteFunction) = {
+    def addFunction(fct: Function) = {
         if (!functions.contains(fct)){
             functions.addOne(fct)
         }
@@ -209,6 +243,11 @@ class TagFunction(context: Context, name: String, arguments: List[Argument]) ext
     def getFunctionsName(): List[String] = {
         functions.map(fct => Settings.target.getFunctionName(fct.fullName)).toList
     }
+
+    def getCompilerFunctionsName(): List[String] = {
+        functions.map(fct => fct.fullName).toList
+    }
+
 
     override def exists()= true
 
@@ -243,4 +282,24 @@ class ClassFunction(variable: Variable, function: Function) extends Function(fun
             callNoEntity(vari) ::: ret.assign("=", LinkedVariableValue(vari))
         }
     }
+}
+
+
+class CompilerFunction(context: Context, name: String, arguments: List[Argument], typ: Type, _modifier: Modifier, val body: List[Expression]=>(List[String],Expression)) extends Function(context, name, arguments, typ, _modifier){
+    override def exists()= false
+
+    override def getContent(): List[String] = List()
+    override def getName(): String = name
+
+    def call(args2: List[Expression], ret: Variable = null)(implicit ctx: Context): List[String] = {
+        val call = body(argMap(args2).map((v,e) => Utils.simplify(e)))
+        if (ret != null){
+            call._1 ::: ret.assign("=", call._2)
+        }
+        else{
+            call._1
+        }
+    }
+
+    override def canBeCallAtCompileTime: Boolean = true
 }

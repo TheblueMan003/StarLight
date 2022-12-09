@@ -5,6 +5,7 @@ import objects.Context
 import objects.types.*
 import objects.{Variable, EnumValue, EnumField}
 import scala.io.Source
+import scala.runtime.stdLibPatches.language.experimental.namedTypeArguments
 
 object Utils{
     def getLib(path: String): Option[Instruction] = {
@@ -12,8 +13,11 @@ object Utils{
         val ipath = path.replace("/",".").replace("\\",".")
         Parser.parse(path, Preparser.parse(Source.fromResource("libraries/"+cpath+".sl").getLines.reduce((x,y) => x + "\n" +y)))
     }
+    def getConfig(path: String): List[String] = {
+        Source.fromResource("configs/"+path).getLines.toList
+    }
     def stringify(string: String): String = {
-        f"\"${string.replaceAllLiterally("\\\\", "\\\\")}\""
+        f"\"${string.replaceAllLiterally("\\\\", "\\\\").replaceAllLiterally("\"", "\\\"")}\""
     }
     def substReturn(instr: Instruction, to: Variable): Instruction = {
         instr match
@@ -27,7 +31,7 @@ object Utils{
             case EnumDecl(name, fields, values, modifier) => instr
             case VariableDecl(name, _type, modifier) => instr
             case JSONFile(name, json) => instr
-            case Import(value) => instr
+            case Import(value, alias) => instr
             
             case InstructionList(list) => InstructionList(list.map(substReturn(_, to)))
             case InstructionBlock(list) => InstructionBlock(list.map(substReturn(_, to)))
@@ -65,7 +69,7 @@ object Utils{
             case ForEach(key, provider, instr) => ForEach(key, subst(provider, from, to), subst(instr, from, to))
             case EnumDecl(name, fields, values, modifier) => EnumDecl(name, fields, values.map(v => EnumValue(v.name, v.fields.map(subst(_, from, to)))), modifier)
             case JSONFile(name, json) => instr
-            case Import(value) => instr
+            case Import(value, alias) => instr
             
             case InstructionList(list) => InstructionList(list.map(subst(_, from, to)))
             case InstructionBlock(list) => InstructionBlock(list.map(subst(_, from, to)))
@@ -104,6 +108,7 @@ object Utils{
             case BoolValue(value) => instr
             case JsonValue(content) => instr
             case StringValue(value) => instr
+            case RawJsonValue(value) => instr
             case SelectorValue(content) => instr
             case NamespacedName(value) => instr
             case DefaultValue => DefaultValue
@@ -114,6 +119,7 @@ object Utils{
             case UnaryOperation(op, left) => UnaryOperation(op, subst(left, from, to))
             case TupleValue(values) => TupleValue(values.map(subst(_, from, to)))
             case FunctionCallValue(name, args) => FunctionCallValue(subst(name, from, to), args.map(subst(_, from, to)))
+            case ConstructorCall(name, args) => ConstructorCall(name, args.map(subst(_, from, to)))
             case RangeValue(min, max) => RangeValue(subst(min, from, to), subst(max, from, to))
             case LambdaValue(args, instr) => LambdaValue(args, subst(instr, from, to))
             case lk: LinkedVariableValue => lk
@@ -141,7 +147,7 @@ object Utils{
                     PredicateDecl(name.replaceAllLiterally(from, to), args, subst(block, from, to), modifier)
                 }
             }
-            case Import(value) => instr
+            case Import(value, alias) => instr
             case ForGenerate(key, provider, instr) => ForGenerate(key, subst(provider, from, to), subst(instr, from, to))
             case ForEach(key, provider, instr) => ForEach(key, subst(provider, from, to), subst(instr, from, to))
             case EnumDecl(name, fields, values, modifier) => EnumDecl(name.replaceAllLiterally(from, to), fields, values.map(v => EnumValue(v.name.replaceAllLiterally(from, to), v.fields.map(subst(_, from, to)))), modifier)
@@ -184,6 +190,7 @@ object Utils{
             case SelectorValue(content) => instr
             case NamespacedName(value) => NamespacedName(value.replaceAllLiterally(from, to))
             case StringValue(value) => StringValue(value.replaceAllLiterally(from, to))
+            case RawJsonValue(value) => instr
             case DefaultValue => DefaultValue
             case NullValue => NullValue
             case ArrayGetValue(name, index) => ArrayGetValue(subst(name, from, to), subst(index, from, to))
@@ -193,6 +200,7 @@ object Utils{
             case UnaryOperation(op, left) => UnaryOperation(op, subst(left, from, to))
             case TupleValue(values) => TupleValue(values.map(subst(_, from, to)))
             case FunctionCallValue(name, args) => FunctionCallValue(subst(name, from, to), args.map(subst(_, from, to)))
+            case ConstructorCall(name, args) => ConstructorCall(name, args.map(subst(_, from, to)))
             case RangeValue(min, max) => RangeValue(subst(min, from, to), subst(max, from, to))
             case LambdaValue(args, instr) => LambdaValue(args.map(_.replaceAllLiterally(from, to)), subst(instr, from, to))
             case lk: LinkedVariableValue => lk
@@ -224,7 +232,7 @@ object Utils{
                 }
             }
             case PredicateDecl(name, args, block, modifier) => instr
-            case Import(value) => instr
+            case Import(value, alias) => instr
             case ForGenerate(key, provider, instr) => ForGenerate(key, subst(provider, from, to), subst(instr, from, to))
             case ForEach(key, provider, instr) => ForEach(key, subst(provider, from, to), subst(instr, from, to))
             case EnumDecl(name, fields, values, modifier) => EnumDecl(name, fields, values.map(v => EnumValue(v.name, v.fields.map(subst(_, from, to)))), modifier)
@@ -266,7 +274,7 @@ object Utils{
             case VariableDecl(name, _type, modifier) => VariableDecl(name, _type, modifier)
             case ForGenerate(key, provider, instr) => ForGenerate(key, provider, rmFunctions(instr))
             case ForEach(key, provider, instr) => ForEach(key, provider, rmFunctions(instr))
-            case Import(value) => instr
+            case Import(value, alias) => instr
 
             case InstructionList(list) => InstructionList(list.map(rmFunctions(_)))
             case InstructionBlock(list) => InstructionBlock(list.map(rmFunctions(_)))
@@ -303,7 +311,7 @@ object Utils{
             case VariableDecl(name, _type, modifier) => VariableDecl(name, fix(_type), modifier)
             case ForGenerate(key, provider, instr) => ForGenerate(key, fix(provider), fix(instr))
             case ForEach(key, provider, instr) => ForEach(key, fix(provider), fix(instr))
-            case Import(value) => instr
+            case Import(value, alias) => instr
 
             case InstructionList(list) => InstructionList(list.map(fix(_)))
             case InstructionBlock(list) => InstructionBlock(list.map(fix(_)))
@@ -363,7 +371,8 @@ object Utils{
             case BoolValue(value) => instr
             case SelectorValue(content) => instr
             case NamespacedName(value) => instr
-            case StringValue(value) => StringValue(value)
+            case StringValue(value) => instr
+            case RawJsonValue(value) => instr
             case DefaultValue => DefaultValue
             case NullValue => NullValue
             case JsonValue(content) => JsonValue(fix(content))
@@ -375,6 +384,11 @@ object Utils{
             case UnaryOperation(op, left) => UnaryOperation(op, fix(left))
             case TupleValue(values) => TupleValue(values.map(fix(_)))
             case FunctionCallValue(name, args) => FunctionCallValue(fix(name), args.map(fix(_)))
+            case ConstructorCall(name, args) => 
+                context.getType(IdentifierType(name.toString())) match
+                    case StructType(struct) => ConstructorCall(struct.fullName, args.map(fix(_)))
+                    case ClassType(clazz) => ConstructorCall(clazz.fullName, args.map(fix(_)))
+                    case other => throw new Exception(f"Cannot constructor call $other")
             case RangeValue(min, max) => RangeValue(fix(min), fix(max))
             case LambdaValue(args, instr) => LambdaValue(args, fix(instr))
             case lk: LinkedVariableValue => lk
@@ -396,6 +410,7 @@ object Utils{
             case FloatValue(value) => instr
             case BoolValue(value) => instr
             case StringValue(value) => instr
+            case RawJsonValue(value) => instr
             case JsonValue(content) => instr
             case SelectorValue(content) => instr
             case NamespacedName(value) => instr
@@ -407,6 +422,7 @@ object Utils{
             case UnaryOperation(op, left) => UnaryOperation(op, subst(left, from, to))
             case TupleValue(values) => TupleValue(values.map(subst(_, from, to)))
             case FunctionCallValue(name, args) => FunctionCallValue(name, args.map(subst(_, from, to)))
+            case ConstructorCall(name, args) => ConstructorCall(name, args.map(subst(_, from, to)))
             case RangeValue(min, max) => RangeValue(subst(min, from, to), subst(max, from, to))
             case LambdaValue(args, instr) => LambdaValue(args, subst(instr, from, to))
             case lk: LinkedVariableValue => lk
@@ -429,6 +445,7 @@ object Utils{
             case FloatValue(value) => FloatType
             case BoolValue(value) => BoolType
             case StringValue(value) => StringType
+            case RawJsonValue(value) => RawJsonType
             case JsonValue(content) => JsonType
             case SelectorValue(content) => EntityType
             case LambdaValue(args, instr) => LambdaType(args.length)
@@ -459,6 +476,9 @@ object Utils{
                         case FuncType(sources, output) => output
                         case other => throw new Exception(f"Cannot call $other")
             }
+            case ConstructorCall(name, args) => {
+                context.getType(IdentifierType(name.toString()))
+            }
             case RangeValue(min, max) => RangeType(typeof(min))
             case LinkedVariableValue(vari) => vari.getType()
     }
@@ -477,6 +497,7 @@ object Utils{
 
                     case (EntityType, EntityType) => EntityType
                     case (StringType, StringType) => StringType
+                    case (RawJsonType, RawJsonType) => RawJsonType
             }
             case "&&" | "||" => {
                 (t1, t2) match
@@ -502,6 +523,7 @@ object Utils{
                     case _ => BinaryOperation(op, nl, nr)
             }
             case BinaryOperation("+", a: Expression, b: Expression) if a == b && typeof(a).allowAdditionSimplification() => BinaryOperation("*", a, IntValue(2))
+            case BinaryOperation("+", RawJsonValue(a), RawJsonValue(b)) => RawJsonValue(a ::: b)
             case BinaryOperation(op, left, right) => {
                 val nl = simplify(left)
                 val nr = simplify(right)
@@ -673,7 +695,7 @@ object Utils{
             case RangeValue(IntValue(min), IntValue(max)) => Range(min, max+1).map(elm => List((key, elm.toString())))
             case TupleValue(lst) => lst.map(elm => List((key, elm.toString())))
             case VariableValue(iden) if iden.toString().startsWith("@") => {
-                context.getFunctionTags(iden).getFunctionsName().map(name => List((key, name)))
+                context.getFunctionTags(iden).getCompilerFunctionsName().map(name => List((key, name)))
             }
             case _ => throw new Exception(f"Unknown generator: $provider")
     }
@@ -682,7 +704,7 @@ object Utils{
             case RangeValue(IntValue(min), IntValue(max)) => Range(min, max+1).map(elm => IntValue(elm))
             case TupleValue(lst) => lst.map(elm => elm)
             case VariableValue(iden) if iden.toString().startsWith("@") => {
-                context.getFunctionTags(iden).getFunctionsName().map(name => VariableValue(name))
+                context.getFunctionTags(iden).getCompilerFunctionsName().map(name => VariableValue(name))
             }
             case _ => throw new Exception(f"Unknown generator: $provider")
     }

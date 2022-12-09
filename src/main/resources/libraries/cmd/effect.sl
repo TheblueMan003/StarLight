@@ -1,4 +1,4 @@
-package effect
+package cmd.effect
 
 forgenerate($name, (absorption, unluck, bad_omen, blindness, conduit_power, dolphins_grace, 
                 fire_resistance, glowing, haste, health_boost, hero_of_the_village,
@@ -6,6 +6,10 @@ forgenerate($name, (absorption, unluck, bad_omen, blindness, conduit_power, dolp
                 luck, mining_fatigue, nausea, night_vision, poison, regeneration, resistance,
                 saturation, slow_falling, slowness, speed, strength, water_breathing, weakness,
                 wither, darkness)){
+    """
+    Give effect `$name` to `ent` for `duration` and `power`.
+    Show particles if `particle`
+    """
     def lazy $name(entity $ent, int $duration = 999999, int $power = 0, bool $particle = true){
         if (Compiler.isJava()){
             /effect give $ent $name $power $duration $particle
@@ -14,6 +18,11 @@ forgenerate($name, (absorption, unluck, bad_omen, blindness, conduit_power, dolp
             /effect $ent $name $power $duration $particle
         }
     }
+
+    """
+    Give effect `$name` to self for `duration` and `power`.
+    Show particles if `particle`
+    """
     def lazy $name(int $duration = 999999, int $power = 0, bool $particle = true){
         if (Compiler.isJava()){
             /effect give @s $name $power $duration $particle
@@ -22,6 +31,10 @@ forgenerate($name, (absorption, unluck, bad_omen, blindness, conduit_power, dolp
             /effect @s $name $power $duration $particle
         }
     }
+
+    """
+    Clear effect `$name` for `ent`
+    """
     def lazy clear$name(entity $ent = @s){
         if (Compiler.isJava()){
             /effect clear $ent $name

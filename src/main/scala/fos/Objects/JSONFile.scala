@@ -9,5 +9,5 @@ class JSONFile(context: Context, _name: String, _modifier: Modifier, _json: JSON
 
     def exists(): Boolean = true
     def getContent(): List[String] = List(json.getString()(Context.getNew("")))
-    def getName(): String = Settings.target.getJsonPath(context.root.getPath()+"."+name)
+    def getName(): String = Settings.target.getJsonPath(name)
 }

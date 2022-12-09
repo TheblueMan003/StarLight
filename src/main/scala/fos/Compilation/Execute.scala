@@ -262,12 +262,21 @@ object Execute{
             case FunctionCallValue(name, args) if name.toString() == "Compiler.isJava" => {
                 if Settings.target == MCJava then (List(), List(IFFalse)) else (List(), List(IFTrue))
             }
-            case FunctionCallValue(name, args) if name.toString() == "block" && args.length > 0=> {
+            case FunctionCallValue(name, args) if name.toString() == "Compiler.isVariable" => {
+                val check = args.forall(arg =>
+                    arg match
+                        case VariableValue(name) => true
+                        case LinkedVariableValue(vari) => true
+                        case other => false
+                    )
+                if check then (List(), List(IFTrue)) else (List(), List(IFFalse))
+            }
+            case FunctionCallValue(name, args) if name.toString() == "block" && args.length > 0 => {
                 if (args.length > 1){
                     (List(), List(IFBlock(args.map(_.getString()).reduce(_ +" "+ _))))
                 }
                 else{
-                    (List(), List(IFBlock("~ ~ ~ "+args.head.getString())))
+                    (List(), List(IFBlock("~ ~ ~ "+args.head.toString())))
                 }
             }
             case FunctionCallValue(VariableValue(name), args) => {
@@ -392,11 +401,11 @@ case class IFValueCase(val value: Expression) extends IFCase{
 
             case BinaryOperation("!=", VariableValue(left), right) if right.hasIntValue()=> {
                 val op = value.asInstanceOf[BinaryOperation].op
-                f"unless score ${context.getVariable(left).getSelector()} matches ${getComparator(op, right.getIntValue())}"
+                f"unless score ${context.getVariable(left).getSelector()} matches ${right.getIntValue()}"
             }
             case BinaryOperation("!=", right, VariableValue(left)) if right.hasIntValue()=> {
                 val op = value.asInstanceOf[BinaryOperation].op
-                f"unless score ${context.getVariable(left).getSelector()} matches ${getComparator(op, right.getIntValue())}"
+                f"unless score ${context.getVariable(left).getSelector()} matches ${right.getIntValue()}"
             }
 
             case BinaryOperation("==", LinkedVariableValue(left), right) if right.hasIntValue()=> {

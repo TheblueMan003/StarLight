@@ -83,8 +83,8 @@ case class Return(val value: Expression) extends Instruction {
   override def toString() = f"return($value)"
 }
 
-case class Import(val value: String) extends Instruction {
-  override def toString() = f"import $value"
+case class Import(val value: String, val alias: String) extends Instruction {
+  override def toString() = f"import $value as $alias"
 }
 
 case class Switch(val value: Expression, val cases: List[SwitchCase], val copyVariable: Boolean = true) extends Instruction {

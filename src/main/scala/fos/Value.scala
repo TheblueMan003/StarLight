@@ -6,6 +6,7 @@ import objects.Variable
 import fos.Compilation.Selector.Selector
 import objects.Context
 import objects.types.*
+import fos.Compilation.Printable
 
 sealed abstract class Expression extends Positional{
     def hasIntValue(): Boolean
@@ -67,6 +68,19 @@ case class StringValue(val value: String) extends Expression with SmallValue{
     override def hasFloatValue(): Boolean = false
     override def getFloatValue(): Double = ???
     override def getString()(implicit context: Context): String = Utils.stringify(value)
+}
+case class RawJsonValue(val value: List[Printable]) extends Expression with SmallValue{
+    override def toString(): String = value.toString()
+    override def getIntValue(): Int = ???
+    override def hasIntValue(): Boolean = false
+    override def hasFloatValue(): Boolean = false
+    override def getFloatValue(): Double = ???
+    override def getString()(implicit context: Context): String = {
+        val json1 = value.map(_.getString()).reduce(_ + "," + _)
+        Settings.target match
+            case MCBedrock => f"{\"rawtext\" : [$json1]}"
+            case MCJava => f"[$json1]"
+    }
 }
 case class NamespacedName(val value: String) extends Expression with SmallValue{
     override def toString(): String = value
@@ -154,6 +168,16 @@ case class FunctionCallValue(val name: Expression, val args: List[Expression]) e
     override def getFloatValue(): Double = ???
     override def getString()(implicit context: Context): String = throw new Exception(f"Function call cannot be transformed to string")
 }
+
+case class ConstructorCall(val name: Identifier, val args: List[Expression]) extends Expression{
+    override def toString() = f"${name}()"
+    override def getIntValue(): Int = ???
+    override def hasIntValue(): Boolean = false
+    override def hasFloatValue(): Boolean = false
+    override def getFloatValue(): Double = ???
+    override def getString()(implicit context: Context): String = throw new Exception(f"Constructor Function call cannot be transformed to string")
+}
+
 case class RangeValue(val min: Expression, val max: Expression) extends Expression with SmallValue{
     override def toString(): String = f"$min .. $max"
     override def getIntValue(): Int = ???

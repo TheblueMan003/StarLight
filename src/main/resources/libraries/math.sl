@@ -1,13 +1,4 @@
 package math
- /**
-     * ifs.
-     *
-     * @author	Unknown
-     * @since	v0.0.1
-     * @version	v1.0.0	Wednesday, November 30th, 2022.
-     * @param	mixed	if	
-     * @return	void
-     */
 
 """
 Return the absolute value of x

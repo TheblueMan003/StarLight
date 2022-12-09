@@ -6,6 +6,7 @@ import fos.{Instruction, InstructionList, Compiler}
 class Class(context: Context, name: String, _modifier: Modifier, val block: Instruction, val parent: Class) extends CObject(context, name, _modifier) with Typed(IdentifierType(context.getPath()+"."+name)){
     def generate()={
         val ctx = context.push(name)
+        ctx.push("this", ctx)
         if (parent != null){
             ctx.inherit(parent.context.push(parent.name))
         }

@@ -18,9 +18,9 @@ object Parser extends StandardTokenParsers{
                               "!", "!=")
   lexical.reserved   ++= List("true", "false", "if", "then", "else", "return", "switch", "for", "do", "while",
                               "as", "at", "with", "to", "import", "doc", "template", "null", "typedef", "helper", "foreach", "in",
-                              "var", "val", "def", "package", "struct", "enum", "class", "lazy", "jsonfile", "mcobject",
+                              "var", "val", "def", "package", "struct", "enum", "class", "lazy", "jsonfile",
                               "public", "protected", "private", "scoreboard", "forgenerate",
-                              "ticking", "loading", "predicate", "extends")
+                              "ticking", "loading", "predicate", "extends", "new", "static")
 
 
   def block: Parser[Instruction] = "{" ~> rep(instruction) <~ "}" ^^ (p => InstructionBlock(p))
@@ -38,31 +38,31 @@ object Parser extends StandardTokenParsers{
 
   def floatValue: Parser[Double] = (numericLit <~ ".") ~ numericLit ^^ { p => (p._1 + "." + p._2).toDouble } 
   def jsonValueStr: Parser[String] = (floatValue ^^ { p => p.toString() } 
-                                    | numericLit | stringLit ^^ (Utils.stringify(_)) | jsonStr 
+                                    | numericLit | stringLit2 ^^ (Utils.stringify(_)) | jsonStr 
                                     | ("[" ~> repsep(jsonValueStr, ",")) <~ "]" ^^ { p => "[" + p.reduce(_ + ","+ _) + "]" }
                                     )^^ { p => p.toString }
-  def jsonKeypairStr: Parser[String] = ((stringLit ^^ (Utils.stringify(_)) | identLazy) <~ ":") ~ jsonValueStr ^^ { p => p._1 + ":" + p._2 }
+  def jsonKeypairStr: Parser[String] = ((stringLit2 ^^ (Utils.stringify(_)) | identLazy) <~ ":") ~ jsonValueStr ^^ { p => p._1 + ":" + p._2 }
   def jsonStr: Parser[String] = "{" ~> rep1sep(jsonKeypairStr, ",") <~ "}" ^^ { p => "{" + p.reduce(_ + ","+ _) + "}" }
 
 
   def jsonValue: Parser[JSONElement] = floatValue ^^ { p => JsonFloat(p) } 
                                     | numericLit ^^ { p => JsonInt(p.toInt) } 
-                                    | stringLit ^^ { p => JsonString(p) }
+                                    | stringLit2 ^^ { p => JsonString(p) }
                                     | identLazy2 ^^ { p => JsonIdentifier(p) }
                                     | "true" ^^^ (JsonBoolean(true))
                                     | "false" ^^^ (JsonBoolean(false))
                                     | json
                                     | ("[" ~> repsep(jsonValue, ",")) <~ "]" ^^ { p => JsonArray(p)}
                                     
-  def jsonKeypair: Parser[(String, JSONElement)] = ((stringLit | identLazy) <~ ":") ~ jsonValue ^^ { p => (p._1, p._2) }
+  def jsonKeypair: Parser[(String, JSONElement)] = ((stringLit2 | identLazy) <~ ":") ~ jsonValue ^^ { p => (p._1, p._2) }
   def json: Parser[JSONElement] = "{" ~> repsep(jsonKeypair, ",") <~ "}" ^^ { p => JsonDictionary(p.toMap) }
 
 
 
-  def argument: Parser[Argument] = types ~ identLazy ~ opt("=" ~> expr) ^^ { p => Argument(p._1._2, p._1._1, p._2) }
+  def argument: Parser[Argument] = types ~ identLazy ~ opt("=" ~> exprNoTuple) ^^ { p => Argument(p._1._2, p._1._1, p._2) }
   def arguments: Parser[List[Argument]] = "(" ~> repsep(argument, ",") <~ ")"
 
-  def functionDoc: Parser[String] = ("doc" ~ "(") ~> stringLit <~ ")"
+  def functionDoc: Parser[String] = ("doc" ~ "(") ~> stringLit2 <~ ")"
   def instruction: Parser[Instruction] = 
       ((((opt(functionDoc) ~> "def" ~> modifier) ~ identLazy)) ~ arguments) ~ instruction ^^ (p => FunctionDecl(p._1._1._2, p._2, VoidType, p._1._2, p._1._1._1))
       | ((((opt(functionDoc) ~> opt("def") ~> modifier) ~ types) ~ identLazy) ~ arguments) ~ instruction ^^ (p => FunctionDecl(p._1._1._2, p._2, p._1._1._1._2, p._1._2, p._1._1._1._1))
@@ -73,9 +73,10 @@ object Parser extends StandardTokenParsers{
       | classDecl
       | identLazy2 <~ ("+" ~ "+") ^^ (p => VariableAssigment(List(Left(p)), "+=", IntValue(1)))
       | identLazy2 <~ ("-" ~ "-") ^^ (p => VariableAssigment(List(Left(p)), "-=", IntValue(1)))
+      | templateUse
       | varDeclaration
       | varAssignment
-      | "%%%" ~> rep((expr) ^^ (_.toString) | identLazyCMD | jsonStr | "entity" | selectorStr | "~" | "^") <~ "%%%" ^^ { p => CMD(p.reduce(_ + " " + _)) }
+      | "%%%" ~> stringLit2 <~ "%%%" ^^ { p => CMD(p) }
       | ifs
       | "return" ~> expr ^^ (Return(_))
       | block
@@ -87,10 +88,11 @@ object Parser extends StandardTokenParsers{
       | forgenerate
       | importInst
       | templateDesc
-      | templateUse
       | typedef
       | foreach
       | predicate
+
+  def anyKeyword: Parser[String] = lexical.reserved.map(f => f ^^ (p => p)).reduce(_ | _)
 
   def predicate:Parser[Instruction] = (modifier <~ "predicate") ~ identLazy ~ arguments ~ json ^^ {case mod ~ name ~ args ~ json => PredicateDecl(name, args, json, mod)}
   def arrayAssign:Parser[Instruction] = (identLazy2 <~ "[") ~ (expr <~ "]") ~ assignmentOp ~ expr ^^ { case a ~ i ~ o ~ e => ArrayAssigment(Left(a), i, o, e) }
@@ -99,9 +101,9 @@ object Parser extends StandardTokenParsers{
   def classDecl: Parser[Instruction] = (modifier <~ "class") ~ identLazy ~ opt("extends" ~> ident2) ~ block ^^ { case mod ~ iden ~ par ~ block => ClassDecl(iden, block, mod, par) }
   def structDecl: Parser[Instruction] = (modifier <~ "struct") ~ identLazy ~ opt("extends" ~> ident2) ~ block ^^ { case mod ~ iden ~ par ~ block => StructDecl(iden, block, mod, par) }
   def typedef: Parser[Instruction] = "typedef" ~> types ~ identLazy ^^ { case _1 ~ _2 => TypeDef(_2, _1) }
-  def templateUse: Parser[Instruction] = ident2 ~ ident ~ instruction ^^ {case iden ~ name ~ instr => TemplateUse(iden, name, instr)}
+  def templateUse: Parser[Instruction] = ident2 ~ ident ~ block ^^ {case iden ~ name ~ instr => TemplateUse(iden, name, instr)}
   def templateDesc: Parser[Instruction] = (modifier <~ "template") ~ identLazy ~ opt("extends" ~> ident2) ~ instruction ^^ {case mod ~ name ~ parent ~ instr => TemplateDecl(name, instr, mod, parent)}
-  def importInst: Parser[Instruction] = "import"~>ident2 ^^ (Import(_))
+  def importInst: Parser[Instruction] = "import"~>ident2 ~ opt("as" ~> ident2) ^^ {case file ~ alias => Import(file, alias.getOrElse(null))}
   def forgenerate: Parser[Instruction] = (("forgenerate" ~> "(" ~> identLazy <~ ",") ~ exprNoTuple <~ ")") ~ instruction ^^ (p => ForGenerate(p._1._1, p._1._2, p._2))
   def jsonFile: Parser[Instruction] = "jsonfile" ~> identLazy2 ~ json ^^ (p => JSONFile(p._1, p._2))
   def doWhileLoop: Parser[Instruction] = ("do" ~> instruction <~ "while") ~ ("(" ~> expr <~ ")") ^^ (p => DoWhileLoop(p._2, p._1))
@@ -159,7 +161,7 @@ object Parser extends StandardTokenParsers{
   def sfRange: Parser[SelectorFilterValue] = (floatValue <~ "..") ~ floatValue ^^ (p => SelectorRange(p._1, p._2))
   def sfNumber: Parser[SelectorFilterValue] = floatValue ^^ (SelectorNumber(_))
   def sfNumber2: Parser[SelectorFilterValue] = numericLit ^^ (p => SelectorNumber(p.toInt))
-  def sfString: Parser[SelectorFilterValue] = stringLit ^^ (SelectorString(_))
+  def sfString: Parser[SelectorFilterValue] = stringLit2 ^^ (SelectorString(_))
   def sfIdentifier: Parser[SelectorFilterValue] = identLazy2 ^^ (SelectorIdentifier(_))
   def sfNamespacedName: Parser[SelectorFilterValue] = namespacedName ^^ (p => SelectorIdentifier(p.toString()))
   def sfNBT: Parser[SelectorFilterValue] = json ^^ (SelectorNbt(_))
@@ -169,6 +171,7 @@ object Parser extends StandardTokenParsers{
   def selector: Parser[Selector] = ("@a" | "@s" | "@e" | "@p" | "@r") ~ opt("[" ~> rep1sep(selectorFilter, ",") <~ "]") ^^ { p => Selector.parse(p._1, p._2.getOrElse(List())) }
   def selectorStr : Parser[String] = (selector ^^ (_.toString()))
 
+  def stringLit2: Parser[String] = stringLit ^^ {p => p.replaceAllLiterally("◘", "\\\"")}
   def namespacedName = ident ~ ":" ~ ident2 ^^ { case a ~ b ~ c => NamespacedName(a+b+c) }
   def exprBottom: Parser[Expression] = 
     (numericLit <~ "..") ~ numericLit ^^ (p => RangeValue(IntValue(p._1.toInt), IntValue(p._2.toInt)))
@@ -181,8 +184,10 @@ object Parser extends StandardTokenParsers{
     | "false" ^^^ BoolValue(false)
     | "null" ^^^ NullValue
     | namespacedName
-    | stringLit ^^ (StringValue(_))
+    | stringLit2 ^^ (StringValue(_))
     | lambda
+    | "new" ~> identLazy2 ~ ("(" ~> repsep(exprNoTuple, ",") <~ ")") ~ block ^^ { case f ~ a ~ b => ConstructorCall(f, a ::: List(LambdaValue(List(), b))) }
+    | "new" ~> identLazy2 ~ ("(" ~> repsep(exprNoTuple, ",") <~ ")") ^^ { case f ~ a => ConstructorCall(f, a) }
     | identLazy2 ~ ("(" ~> repsep(exprNoTuple, ",") <~ ")") ~ block ^^ { case f ~ a ~ b => FunctionCallValue(VariableValue(f), a ::: List(LambdaValue(List(), b))) }
     | identLazy2 ~ rep1("(" ~> repsep(exprNoTuple, ",") <~ ")") ^^ (p => p._2.foldLeft[Expression](VariableValue(p._1))((b, a) => FunctionCallValue(b, a)))
     | identLazy2 ^^ (VariableValue(_))
@@ -224,6 +229,8 @@ object Parser extends StandardTokenParsers{
         case "json" => JsonType
         case "entity" => EntityType
         case "mcobject" => MCObjectType
+        case "params" => ParamsType
+        case "rawjson" => RawJsonType
         case other => IdentifierType(other)
     }
   }
@@ -237,9 +244,9 @@ object Parser extends StandardTokenParsers{
                             ((nonRecTypes <~ "[") ~ expr) <~ "]" ^^ (p => ArrayType(p._1, p._2)) |
                             nonRecTypes
 
-  def modifierSub: Parser[String] = ("override" | "lazy" | "inline"| "scoreboard" | "ticking" | "loading" | "helper")
+  def modifierSub: Parser[String] = ("override" | "lazy" | "inline"| "scoreboard" | "ticking" | "loading" | "helper" | "static")
   def modifier: Parser[Modifier] = 
-    (opt(stringLit ~ stringLit ~ stringLit)~opt("public" | "private" | "protected") ~ rep(modifierSub) ~ rep(identTag)) ^^ 
+    (opt(stringLit2 ~ stringLit2 ~ stringLit2)~opt("public" | "private" | "protected") ~ rep(modifierSub) ~ rep(identTag)) ^^ 
     { case doc ~ protection ~ subs ~ tags => {
       val mod = new Modifier()
       mod.tags.addAll(tags)
@@ -257,6 +264,7 @@ object Parser extends StandardTokenParsers{
       if subs.contains("ticking")   then {mod.isTicking = true}
       if subs.contains("loading")   then {mod.isLoading = true}
       if subs.contains("helper")   then {mod.isHelper = true}
+      if subs.contains("static")   then {mod.isStatic = true}
       
       mod
     }
