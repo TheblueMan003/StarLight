@@ -76,6 +76,14 @@ Tuple, Store multiple value. e.i. (float, float, float) position = 0,0,0
 
 All operators are supported as long as either the operation can be done on every single value or the right hand side is also a tuple with the same size and the operation can be perform with each corresponding entry.
 
+### T => T
+Store non lazy function (e.i. void=>void)
+
+Supported operation:
+* `=`: The variable to have the variable of function
+* `()`: Call the contained function
+
+
 ## Selectors & Entity
 The entity can be assigned a selector. This will result in only the entity selected by the selector to be inside the variable.
 ```
@@ -212,7 +220,11 @@ fct(){
 ```
 With the latter syntax the lambda is always the rightmost argument of the function; not including optional argument.
 
-
+### Lambda
+Lambda can be created with the following syntax:
+```
+int=>int fct = (a)=> {return a}
+```
 
 ## JSON File
 Jsonfile can be added with the following construct:
@@ -308,7 +320,7 @@ template example2 extends example{
 
 }
 ```
-
+Template can be "Apply" with the following syntax:
 ```
 example2 foo{
     def bar(){
