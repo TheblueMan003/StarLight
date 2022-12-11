@@ -7,6 +7,7 @@ import sl.Compilation.Selector.Selector
 import objects.Context
 import objects.types.*
 import sl.Compilation.Printable
+import objects.Function
 
 sealed abstract class Expression extends Positional{
     def hasIntValue(): Boolean
@@ -109,8 +110,13 @@ case class VariableValue(val name: Identifier, val selector: Selector = Selector
         val vari = context.tryGetVariable(name)
         vari match
             case None => {
-                val fct = context.getFunction(name)
-                Settings.target.getFunctionName(fct.fullName)
+                try{
+                    val fct = context.getFunction(name)
+                    Settings.target.getFunctionName(fct.fullName)
+                }
+                catch{
+                    case _ => name.toString()
+                }
             }
             case Some(vari) => {
                 if (vari.modifiers.isLazy){
@@ -122,14 +128,14 @@ case class VariableValue(val name: Identifier, val selector: Selector = Selector
             }
     }
 }
-case class ArrayGetValue(val name: Expression, val index: Expression) extends Expression with SmallValue{
-    override def toString(): String = name.toString()
+case class ArrayGetValue(val name: Expression, val index: List[Expression]) extends Expression with SmallValue{
+    override def toString(): String = name.toString() + "[" + index.map(_.toString()).reduce(_ +", "+_) + "]"
     override def getIntValue(): Int = ???
     override def hasIntValue(): Boolean = false
     override def hasFloatValue(): Boolean = false
     override def getFloatValue(): Double = ???
     override def getString()(implicit context: Context): String ={
-        name.getString() + "[" + index.getString() + "]"
+        name.getString() + "[" + index.map(_.getString()).reduce(_ +", "+_) + "]"
     }
 }
 case class LinkedVariableValue(val vari: Variable, val selector: Selector = Selector.self) extends Expression with SmallValue{
@@ -145,6 +151,16 @@ case class LinkedVariableValue(val vari: Variable, val selector: Selector = Sele
         else{
             throw new Exception(f"Variable ${vari.name} cannot be transformed to string")
         }
+    }
+}
+case class LinkedFunctionValue(val fct: Function) extends Expression with SmallValue{
+    override def toString(): String = fct.fullName
+    override def getIntValue(): Int = ???
+    override def hasIntValue(): Boolean = false
+    override def hasFloatValue(): Boolean = false
+    override def getFloatValue(): Double = ???
+    override def getString()(implicit context: Context): String = {
+        fct.fullName
     }
 }
 
@@ -169,7 +185,7 @@ case class LambdaValue(val args: List[String], val instr: Instruction) extends E
     }
 }
 
-case class FunctionCallValue(val name: Expression, val args: List[Expression]) extends Expression with SmallValue{
+case class FunctionCallValue(val name: Expression, val args: List[Expression], val selector: Selector = Selector.self) extends Expression with SmallValue{
     override def toString() = f"${name}()"
     override def getIntValue(): Int = ???
     override def hasIntValue(): Boolean = false

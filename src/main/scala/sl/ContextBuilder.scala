@@ -74,15 +74,20 @@ object ContextBuilder{
                 
                 cases.map(elm => Utils.subst(instr, key.toString(), elm)).flatMap(Compiler.compile(_)).toList
             }
-            case Import(value, alias) => {
-                val ret = if (context.importFile(value)){
-                    buildRec(Utils.getLib(value).get)(context.root)
+            case Import(lib, value, alias) => {
+                val ret = if (context.importFile(lib)){
+                    buildRec(Utils.getLib(lib).get)(context.root)
                 }
                 else{
                     List()
                 }
-                if (alias != null){
-                    context.push(alias, context.getContext(value))
+                if (value != null){
+                    try{
+                        context.addObjectFrom(value, if alias == null then value else alias, context.root.push(lib))
+                    }catch{case _ =>{}}
+                }
+                else if (alias != null){
+                    context.push(alias, context.getContext(lib))
                 }
                 ret
             }

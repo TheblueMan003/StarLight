@@ -4,7 +4,6 @@ import objects.{Context, ConcreteFunction, LazyFunction, Modifier, Struct, Class
 import objects.Identifier
 import objects.types.{VoidType, TupleType}
 import sl.Compilation.Execute
-import javax.rmi.CORBA.ClassDesc
 
 object Compiler{
     def compile(context: Context):List[(String, List[String])] = {
@@ -111,15 +110,18 @@ object Compiler{
                 context.addJsonFile(new objects.JSONFile(context, name, Modifier.newPrivate(), Utils.compileJson(json)))
                 List()
             }
-            case Import(value, alias) => {
-                val ret = if (context.importFile(value)){
-                    compile(Utils.getLib(value).get)(context.root)
+            case Import(lib, value, alias) => {
+                val ret = if (context.importFile(lib)){
+                    compile(Utils.getLib(lib).get, firstPass)(context.root)
                 }
                 else{
                     List()
                 }
-                if (alias != null){
-                    context.push(alias, context.getContext(value))
+                if (value != null){
+                    context.addObjectFrom(value, if alias == null then value else alias, context.root.push(lib))
+                }
+                else if (alias != null){
+                    context.push(alias, context.getContext(lib))
                 }
                 ret
             }
@@ -152,6 +154,14 @@ object Compiler{
                         case _ => varis.flatMap(l => l._1.assign(op, simplied)(context, l._2))
                 }
             }
+            case ArrayAssigment(name, index, op, value) => {
+                if (op == "="){
+                    compile(FunctionCall(name.path()+"."+"set", index ::: List(value)))
+                }
+                else{
+                    compile(FunctionCall(name.path()+"."+"set", index:::List(BinaryOperation("+", FunctionCallValue(VariableValue(name.path()+"."+"get"), index), value))))
+                }
+            }
             case Return(value) => {
                 context.getCurrentFunction() match
                     case cf: ConcreteFunction => cf.returnVariable.assign("=", value)
@@ -181,7 +191,7 @@ object Compiler{
                 context.getFunction(name, args, VoidType).call()
             }
             case LinkedFunctionCall(name, args, ret) => {
-                name.call(args, ret)
+                (name, args).call(ret)
             }
             case If(BinaryOperation("||", left, right), ifBlock, elseBlock) => {
                 compile(If(left, ifBlock, ElseIf(right, ifBlock) :: elseBlock), firstPass)

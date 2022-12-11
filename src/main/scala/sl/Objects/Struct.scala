@@ -12,4 +12,17 @@ class Struct(context: Context, name: String, _modifier: Modifier, val block: Ins
             block
         }
     }
+    def hasParent(struct: Struct):Boolean = {
+        if (parent != null){
+            if (parent == struct){
+                true
+            }
+            else{
+                parent.hasParent(struct)
+            }
+        }
+        else{
+            false
+        }
+    }
 }

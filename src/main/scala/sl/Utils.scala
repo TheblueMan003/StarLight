@@ -32,7 +32,7 @@ object Utils{
             case EnumDecl(name, fields, values, modifier) => instr
             case VariableDecl(name, _type, modifier) => instr
             case JSONFile(name, json) => instr
-            case Import(value, alias) => instr
+            case Import(lib, value, alias) => instr
             
             case InstructionList(list) => InstructionList(list.map(substReturn(_, to)))
             case InstructionBlock(list) => InstructionBlock(list.map(substReturn(_, to)))
@@ -45,6 +45,7 @@ object Utils{
             case If(cond, ifBlock, elseBlock) => If(cond, substReturn(ifBlock, to), elseBlock.map(substReturn(_,  to).asInstanceOf[ElseIf]))
             case CMD(value) => instr
             case FunctionCall(name, args) => instr
+            case ArrayAssigment(name, index, op, value) => instr
             case LinkedFunctionCall(name, args, vari) => instr
             case VariableAssigment(name, op, expr) => instr
             case Return(value) => VariableAssigment(List((Left(to.fullName), Selector.self)), "=", value)
@@ -70,7 +71,7 @@ object Utils{
             case ForEach(key, provider, instr) => ForEach(key, subst(provider, from, to), subst(instr, from, to))
             case EnumDecl(name, fields, values, modifier) => EnumDecl(name, fields, values.map(v => EnumValue(v.name, v.fields.map(subst(_, from, to)))), modifier)
             case JSONFile(name, json) => instr
-            case Import(value, alias) => instr
+            case Import(lib, value, alias) => instr
             
             case InstructionList(list) => InstructionList(list.map(subst(_, from, to)))
             case InstructionBlock(list) => InstructionBlock(list.map(subst(_, from, to)))
@@ -84,6 +85,9 @@ object Utils{
             case CMD(value) => CMD(value)
             case FunctionCall(name, args) => FunctionCall(name.replaceAllLiterally(from, to), args.map(subst(_, from, to)))
             case LinkedFunctionCall(name, args, vari) => LinkedFunctionCall(name, args.map(subst(_, from, to)), vari)
+            case ArrayAssigment(name, index, op, value) => {
+                ArrayAssigment(subst(name, from, to), index.map(subst(_, from, to)), op, subst(value, from, to))
+            }
             case VariableAssigment(name, op, expr) => {
                 VariableAssigment(name.map((l,s) => (subst(l, from, to), s)), op, subst(expr, from, to))
             }
@@ -113,14 +117,15 @@ object Utils{
             case SelectorValue(content) => instr
             case NamespacedName(value) => instr
             case EnumIntValue(value) => instr
+            case LinkedFunctionValue(fct) => instr
             case DefaultValue => DefaultValue
             case NullValue => NullValue
-            case ArrayGetValue(name, index) => ArrayGetValue(subst(name, from, to), subst(index, from, to))
+            case ArrayGetValue(name, index) => ArrayGetValue(subst(name, from, to), index.map(subst(_, from, to)))
             case VariableValue(name, sel) => VariableValue(name.replaceAllLiterally(from, to), sel)
             case BinaryOperation(op, left, right) => BinaryOperation(op, subst(left, from, to), subst(right, from, to))
             case UnaryOperation(op, left) => UnaryOperation(op, subst(left, from, to))
             case TupleValue(values) => TupleValue(values.map(subst(_, from, to)))
-            case FunctionCallValue(name, args) => FunctionCallValue(subst(name, from, to), args.map(subst(_, from, to)))
+            case FunctionCallValue(name, args, selector) => FunctionCallValue(subst(name, from, to), args.map(subst(_, from, to)), selector)
             case ConstructorCall(name, args) => ConstructorCall(name, args.map(subst(_, from, to)))
             case RangeValue(min, max) => RangeValue(subst(min, from, to), subst(max, from, to))
             case LambdaValue(args, instr) => LambdaValue(args, subst(instr, from, to))
@@ -149,7 +154,7 @@ object Utils{
                     PredicateDecl(name.replaceAllLiterally(from, to), args, subst(block, from, to), modifier)
                 }
             }
-            case Import(value, alias) => instr
+            case Import(lib, value, alias) => instr
             case ForGenerate(key, provider, instr) => ForGenerate(key, subst(provider, from, to), subst(instr, from, to))
             case ForEach(key, provider, instr) => ForEach(key, subst(provider, from, to), subst(instr, from, to))
             case EnumDecl(name, fields, values, modifier) => EnumDecl(name.replaceAllLiterally(from, to), fields, values.map(v => EnumValue(v.name.replaceAllLiterally(from, to), v.fields.map(subst(_, from, to)))), modifier)
@@ -169,6 +174,9 @@ object Utils{
             case FunctionCall(name, args) => FunctionCall(name.toString().replaceAllLiterally(from, to), args.map(subst(_, from, to)))
             case LinkedFunctionCall(name, args, vari) => LinkedFunctionCall(name, args.map(subst(_, from, to)), vari)
             case VariableAssigment(name, op, expr) => VariableAssigment(name.map((l,s) => (subst(l, from, to), s)), op, subst(expr, from, to))
+            case ArrayAssigment(name, index, op, value) => {
+                ArrayAssigment(subst(name, from, to), index.map(subst(_, from, to)), op, subst(value, from, to))
+            }
             case Return(value) => Return(subst(value, from, to))
             case WhileLoop(cond, instr) => WhileLoop(subst(cond, from, to), subst(instr, from, to))
             case DoWhileLoop(cond, instr) => DoWhileLoop(subst(cond, from, to), subst(instr, from, to))
@@ -194,15 +202,16 @@ object Utils{
             case StringValue(value) => StringValue(value.replaceAllLiterally(from, to))
             case RawJsonValue(value) => instr
             case EnumIntValue(value) => instr
+            case LinkedFunctionValue(fct) => instr
             case DefaultValue => DefaultValue
             case NullValue => NullValue
-            case ArrayGetValue(name, index) => ArrayGetValue(subst(name, from, to), subst(index, from, to))
+            case ArrayGetValue(name, index) => ArrayGetValue(subst(name, from, to), index.map(subst(_, from, to)))
             case JsonValue(content) => JsonValue(subst(content, from, to))
             case VariableValue(name, sel) => VariableValue(name.toString().replaceAllLiterally(from, to), sel)
             case BinaryOperation(op, left, right) => BinaryOperation(op, subst(left, from, to), subst(right, from, to))
             case UnaryOperation(op, left) => UnaryOperation(op, subst(left, from, to))
             case TupleValue(values) => TupleValue(values.map(subst(_, from, to)))
-            case FunctionCallValue(name, args) => FunctionCallValue(subst(name, from, to), args.map(subst(_, from, to)))
+            case FunctionCallValue(name, args, selector) => FunctionCallValue(subst(name, from, to), args.map(subst(_, from, to)), selector)
             case ConstructorCall(name, args) => ConstructorCall(name, args.map(subst(_, from, to)))
             case RangeValue(min, max) => RangeValue(subst(min, from, to), subst(max, from, to))
             case LambdaValue(args, instr) => LambdaValue(args.map(_.replaceAllLiterally(from, to)), subst(instr, from, to))
@@ -235,7 +244,7 @@ object Utils{
                 }
             }
             case PredicateDecl(name, args, block, modifier) => instr
-            case Import(value, alias) => instr
+            case Import(lib, value, alias) => instr
             case ForGenerate(key, provider, instr) => ForGenerate(key, subst(provider, from, to), subst(instr, from, to))
             case ForEach(key, provider, instr) => ForEach(key, subst(provider, from, to), subst(instr, from, to))
             case EnumDecl(name, fields, values, modifier) => EnumDecl(name, fields, values.map(v => EnumValue(v.name, v.fields.map(subst(_, from, to)))), modifier)
@@ -255,6 +264,9 @@ object Utils{
             case FunctionCall(name, args) => FunctionCall(name, args.map(subst(_, from, to)))
             case LinkedFunctionCall(name, args, vari) => LinkedFunctionCall(name, args.map(subst(_, from, to)), vari)
             case VariableAssigment(name, op, expr) => VariableAssigment(name, op, subst(expr, from, to))
+            case ArrayAssigment(name, index, op, value) => {
+                ArrayAssigment(name, index.map(subst(_, from, to)), op, subst(value, from, to))
+            }
             case Return(value) => Return(subst(value, from, to))
             case WhileLoop(cond, instr) => WhileLoop(subst(cond, from, to), subst(instr, from, to))
             case DoWhileLoop(cond, instr) => DoWhileLoop(subst(cond, from, to), subst(instr, from, to))
@@ -277,7 +289,7 @@ object Utils{
             case VariableDecl(name, _type, modifier) => VariableDecl(name, _type, modifier)
             case ForGenerate(key, provider, instr) => ForGenerate(key, provider, rmFunctions(instr))
             case ForEach(key, provider, instr) => ForEach(key, provider, rmFunctions(instr))
-            case Import(value, alias) => instr
+            case Import(lib, value, alias) => instr
 
             case InstructionList(list) => InstructionList(list.map(rmFunctions(_)))
             case InstructionBlock(list) => InstructionBlock(list.map(rmFunctions(_)))
@@ -292,6 +304,7 @@ object Utils{
             case FunctionCall(name, args) => instr
             case LinkedFunctionCall(name, args, vari) => instr
             case VariableAssigment(name, op, expr) => instr
+            case ArrayAssigment(name, index, op, value) => instr
             case Return(value) => instr
             case WhileLoop(cond, instr) => WhileLoop(cond, rmFunctions(instr))
             case DoWhileLoop(cond, instr) => DoWhileLoop(cond, rmFunctions(instr))
@@ -301,6 +314,16 @@ object Utils{
             case With(expr, isAt, cond, block) => With(expr, isAt, cond, rmFunctions(block))
 
             case Switch(cond, cases, cv) => Switch(cond, cases.map(x => SwitchCase(x.expr, rmFunctions(x.instr))), cv)
+    }
+
+    def fix(name: Either[Identifier, Variable])(implicit context: Context) = {
+        name match
+            case Left(iden) => {
+                context.tryGetVariable(iden) match
+                    case None => name
+                    case Some(value) => Right(value)
+            }
+            case Right(vari) => Right(vari)
     }
 
     def fix(instr: Instruction)(implicit context: Context): Instruction = {
@@ -314,7 +337,7 @@ object Utils{
             case VariableDecl(name, _type, modifier) => VariableDecl(name, fix(_type), modifier)
             case ForGenerate(key, provider, instr) => ForGenerate(key, fix(provider), fix(instr))
             case ForEach(key, provider, instr) => ForEach(key, fix(provider), fix(instr))
-            case Import(value, alias) => instr
+            case Import(lib, value, alias) => instr
 
             case InstructionList(list) => InstructionList(list.map(fix(_)))
             case InstructionBlock(list) => InstructionBlock(list.map(fix(_)))
@@ -337,15 +360,8 @@ object Utils{
                 }
             }
             case LinkedFunctionCall(name, args, vari) => LinkedFunctionCall(name, args.map(fix(_)), vari)
-            case VariableAssigment(name, op, expr) => VariableAssigment(name.map(x => 
-                x match
-                    case (Left(iden), sel) => {
-                        context.tryGetVariable(iden) match
-                            case None => x
-                            case Some(value) => (Right(value), sel)
-                    }
-                    case (Right(vari), sel) => (Right(vari), sel)
-                ), op, fix(expr))
+            case VariableAssigment(name, op, expr) => VariableAssigment(name.map{case (v, s) => (fix(v),s)}, op, fix(expr))
+            case ArrayAssigment(name, index, op, expr) => ArrayAssigment(fix(name), index.map(fix(_)), op, fix(expr))
             case Return(value) => Return(fix(value))
             case WhileLoop(cond, instr) => WhileLoop(fix(cond), fix(instr))
             case DoWhileLoop(cond, instr) => DoWhileLoop(fix(cond), fix(instr))
@@ -377,17 +393,18 @@ object Utils{
             case StringValue(value) => instr
             case RawJsonValue(value) => instr
             case EnumIntValue(value) => instr
+            case LinkedFunctionValue(fct) => instr
             case DefaultValue => DefaultValue
             case NullValue => NullValue
             case JsonValue(content) => JsonValue(fix(content))
-            case ArrayGetValue(name, index) => ArrayGetValue(fix(name), fix(index))
+            case ArrayGetValue(name, index) => ArrayGetValue(fix(name), index.map(fix(_)))
             case VariableValue(name, sel) => context.tryGetVariable(name) match
                 case Some(vari) => LinkedVariableValue(vari, sel)
                 case None => VariableValue(name, sel)
             case BinaryOperation(op, left, right) => BinaryOperation(op, fix(left), fix(right))
             case UnaryOperation(op, left) => UnaryOperation(op, fix(left))
             case TupleValue(values) => TupleValue(values.map(fix(_)))
-            case FunctionCallValue(name, args) => FunctionCallValue(fix(name), args.map(fix(_)))
+            case FunctionCallValue(name, args, sel) => FunctionCallValue(fix(name), args.map(fix(_)), sel)
             case ConstructorCall(name, args) => 
                 context.getType(IdentifierType(name.toString())) match
                     case StructType(struct) => ConstructorCall(struct.fullName, args.map(fix(_)))
@@ -419,14 +436,15 @@ object Utils{
             case SelectorValue(content) => instr
             case NamespacedName(value) => instr
             case EnumIntValue(value) => instr
-            case ArrayGetValue(name, index) => ArrayGetValue(subst(name, from, to), subst(index, from, to))
+            case LinkedFunctionValue(fct) => instr
+            case ArrayGetValue(name, index) => ArrayGetValue(subst(name, from, to), index.map(subst(_, from, to)))
             case DefaultValue => DefaultValue
             case NullValue => NullValue
             case VariableValue(name, sel) => if name.toString() == from then to else instr
             case BinaryOperation(op, left, right) => BinaryOperation(op, subst(left, from, to), subst(right, from, to))
             case UnaryOperation(op, left) => UnaryOperation(op, subst(left, from, to))
             case TupleValue(values) => TupleValue(values.map(subst(_, from, to)))
-            case FunctionCallValue(name, args) => FunctionCallValue(name, args.map(subst(_, from, to)))
+            case FunctionCallValue(name, args, selector) => FunctionCallValue(name, args.map(subst(_, from, to)), selector)
             case ConstructorCall(name, args) => ConstructorCall(name, args.map(subst(_, from, to)))
             case RangeValue(min, max) => RangeValue(subst(min, from, to), subst(max, from, to))
             case LambdaValue(args, instr) => LambdaValue(args, subst(instr, from, to))
@@ -436,7 +454,7 @@ object Utils{
 
     def simplifyToVariable(expr: Expression)(implicit context: Context): (List[String], LinkedVariableValue) = {
         expr match
-            case VariableValue(name, sel) => (List(), LinkedVariableValue(context.getVariable(name), sel))
+            case VariableValue(name, sel) => simplifyToVariable(context.resolveVariable(expr))
             case LinkedVariableValue(name, sel) => (List(), LinkedVariableValue(name, sel))
             case other => {
                 val vari = context.getFreshVariable(typeof(other))
@@ -461,21 +479,27 @@ object Utils{
                     case ArrayType(inner, size) => inner
                     case other => throw new Exception(f"Illegal access of $other")
             }
+            case LinkedFunctionValue(fct) => FuncType(fct.arguments.map(_.typ), fct.getType())
             case DefaultValue => throw new Exception("default value has no type")
             case NullValue => throw new Exception("null value has no type")
             case VariableValue(name, sel) => {
                 val vari = context.tryGetVariable(name)
                 vari match
                     case None => {
-                        val fct = context.getFunction(name)
-                        FuncType(fct.arguments.map(_.typ), fct.getType())
+                        val property = context.tryGetProperty(name)
+                        property match
+                            case None => {
+                                val fct = context.getFunction(name)
+                                FuncType(fct.arguments.map(_.typ), fct.getType())
+                            }
+                            case Some(v) => v.getter.getType()
                     }
                     case Some(value) => value.getType()
             }
             case BinaryOperation(op, left, right) => combineType(op, typeof(left), typeof(right), expr)
             case UnaryOperation(op, left) => BoolType
             case TupleValue(values) => TupleType(values.map(typeof(_)))
-            case FunctionCallValue(name, args) => {
+            case FunctionCallValue(name, args, selector) => {
                 name match
                     case VariableValue(name, sel) => context.getFunction(name, args, AnyType)._1.getType()
                     case other => typeof(name) match

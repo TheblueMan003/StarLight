@@ -9,15 +9,15 @@ import sl.Compilation.Print
 
 object Function {
   extension (str: (Function, List[Expression])) {
-    def call(ret: Variable = null)(implicit context: Context) = {
+    def call(ret: Variable = null, op: String = null)(implicit context: Context) = {
         if (str._1.hasRawJsonArg()){
             val prefix = str._2.take(str._1.arguments.length - 1)
             val sufix = str._2.drop(str._1.arguments.length - 1)
             val (prep, json) = Print.toRawJson(sufix)
-            prep ::: str._1.call(prefix ::: List(json), ret)
+            prep ::: str._1.call(prefix ::: List(json), ret, op)
         }
         else{
-            str._1.call(str._2, ret)
+            str._1.call(str._2, ret, op)
         }
     }
   }
@@ -66,7 +66,7 @@ abstract class Function(context: Context, name: String, val arguments: List[Argu
             case Nil => 0
         }
     }
-    def call(args: List[Expression], ret: Variable = null)(implicit ctx: Context): List[String]
+    def call(args: List[Expression], ret: Variable = null, op: String = "=")(implicit ctx: Context): List[String]
     def generateArgument()(implicit ctx: Context):Unit = {
         val ctx2 = ctx.push(name)
         argumentsVariables = arguments.map(a => {
@@ -109,13 +109,13 @@ class ConcreteFunction(context: Context, name: String, arguments: List[Argument]
         context.addFunctionToCompile(this)
     }
     
-    def call(args2: List[Expression], ret: Variable = null)(implicit ctx: Context): List[String] = {
+    def call(args2: List[Expression], ret: Variable = null, op: String = "=")(implicit ctx: Context): List[String] = {
         markAsUsed()
         val r = argMap(args2).flatMap(p => p._1.assign("=", p._2)) :::
             List("function " + Settings.target.getFunctionName(fullName))
 
         if (ret != null){
-            r ::: ret.assign("=", LinkedVariableValue(returnVariable))
+            r ::: ret.assign(op, LinkedVariableValue(returnVariable))
         }
         else{
             r
@@ -157,7 +157,7 @@ class ConcreteFunction(context: Context, name: String, arguments: List[Argument]
 }
 
 class BlockFunction(context: Context, name: String, arguments: List[Argument], var body: List[String]) extends Function(context, name, arguments, VoidType, Modifier.newPrivate()){
-    def call(args2: List[Expression], ret: Variable = null)(implicit ctx: Context): List[String] = {
+    def call(args2: List[Expression], ret: Variable = null, op: String = "=")(implicit ctx: Context): List[String] = {
         argMap(args2).flatMap(p => p._1.assign("=", p._2)) :::
             List("function " + fullName.replaceAllLiterally(".","/"))
     }
@@ -172,7 +172,7 @@ class BlockFunction(context: Context, name: String, arguments: List[Argument], v
 }
 
 class LazyFunction(context: Context, name: String, arguments: List[Argument], typ: Type, _modifier: Modifier, val body: Instruction) extends Function(context, name, arguments, typ, _modifier){
-    def call(args: List[Expression], ret: Variable = null)(implicit ctx: Context): List[String] = {
+    def call(args: List[Expression], ret: Variable = null, op: String = "=")(implicit ctx: Context): List[String] = {
         var block = body
         val sub = ctx.push(ctx.getLazyCallId())
         sub.inherit(context)
@@ -183,9 +183,16 @@ class LazyFunction(context: Context, name: String, arguments: List[Argument], ty
             sub.addVariable(vari).assign("=", v)
             block = if a.name.startsWith("$") then Utils.subst(block, a.name, v.getString()) else Utils.subst(block, a.name, v)
         })
-        block = Utils.substReturn(block, ret)
 
-        sl.Compiler.compile(block)(if modifiers.isInline then ctx else sub)
+        if (op == "="){
+            block = Utils.substReturn(block, ret)
+            sl.Compiler.compile(block)(if modifiers.isInline then ctx else sub)
+        }
+        else{
+            val vari = ctx.getFreshVariable(getType())
+            block = Utils.substReturn(block, vari)
+            sl.Compiler.compile(block)(if modifiers.isInline then ctx else sub) ::: (if ret == null then List() else ret.assign(op, LinkedVariableValue(vari)))
+        }
     }
     override def generateArgument()(implicit ctx: Context):Unit = {
         super.generateArgument()
@@ -262,7 +269,7 @@ class ClassFunction(variable: Variable, function: Function) extends Function(fun
     override def getContent(): List[String] = List()
     override def getName(): String = function.name
 
-    def call(args2: List[Expression], ret: Variable = null)(implicit ctx: Context): List[String] = {
+    def call(args2: List[Expression], ret: Variable = null, op: String = "=")(implicit ctx: Context): List[String] = {
         val selector = SelectorValue(JavaSelector("@e", Map(("tag", SelectorIdentifier("__class__")))))
 
         def callNoEntity(ret: Variable = null) = {
@@ -279,7 +286,7 @@ class ClassFunction(variable: Variable, function: Function) extends Function(fun
         }
         else{
             val vari = ctx.getFreshVariable(function.getType())
-            callNoEntity(vari) ::: ret.assign("=", LinkedVariableValue(vari))
+            callNoEntity(vari) ::: ret.assign(op, LinkedVariableValue(vari))
         }
     }
 }
@@ -292,10 +299,10 @@ class CompilerFunction(context: Context, name: String, arguments: List[Argument]
     override def getContent(): List[String] = List()
     override def getName(): String = name
 
-    def call(args2: List[Expression], ret: Variable = null)(implicit ctx: Context): List[String] = {
+    def call(args2: List[Expression], ret: Variable = null, op: String = "=")(implicit ctx: Context): List[String] = {
         val call = body(argMap(args2).map((v,e) => Utils.simplify(e)), ctx)
         if (ret != null){
-            call._1 ::: ret.assign("=", call._2)
+            call._1 ::: ret.assign(op, call._2)
         }
         else{
             call._1

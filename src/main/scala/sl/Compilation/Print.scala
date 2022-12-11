@@ -30,6 +30,7 @@ object Print{
             case EnumIntValue(value) => (List(), List(PrintString(f"$value", col, mod)))
             case FloatValue(value) => (List(), List(PrintString(f"$value", col, mod)))
             case BoolValue(value) => (List(), List(PrintString(f"$value", col, mod)))
+            case LinkedFunctionValue(fct)=> (List(), List(PrintString(f"${fct.fullName}", col, mod)))
             case StringValue(value) => 
                 val reg = "[a-zA-Z0-9\\.]+".r
                 reg.findFirstMatchIn(value) match
@@ -60,7 +61,7 @@ object Print{
             }
             case LambdaValue(args, instr) => throw new Exception("Cannot transform lambda to rawjson")
             case RawJsonValue(value) => (List(), value)
-            case FunctionCallValue(name, args) => {
+            case FunctionCallValue(name, args, sel) => {
                 val (p1, vari) = Utils.simplifyToVariable(expr)
                 val (p2, print) = toRawJson(vari)
                 (p1:::p2, print)

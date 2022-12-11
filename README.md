@@ -239,6 +239,32 @@ Lambda can be created with the following syntax:
 int=>int fct = (a)=> {return a}
 ```
 
+## Import
+Library can be imported with the following syntax:
+```
+import math
+
+int a = math.abs(5)
+```
+Package can also be given alias uppon importation:
+```
+import math as mt
+
+int a = mt.abs(5)
+```
+Object can be be directly imported from a library:
+```
+from math.vector3 import Vector3
+
+Vector3 vec
+```
+Imported object can also be given alias uppon importation:
+```
+from math.vector3 import Vector3 as v3
+
+v3 vec
+```
+
 ## JSON File
 Jsonfile can be added with the following construct:
 ```

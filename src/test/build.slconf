@@ -1,1 +1,0 @@
-compile -i ./src -o ./output -name test

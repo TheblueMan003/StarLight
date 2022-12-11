@@ -69,10 +69,23 @@ case object MCJava extends Target{
                             context.getAllConstant().map(v => f"scoreboard players set $v ${Settings.constScoreboard} $v"):::
                             context.getAllVariable().filter(_.modifiers.isEntity).map(v => f"scoreboard objectives add ${v.scoreboard} dummy")
 
-        List((f"data/${context.root.getPath()}/functions/__init__.mcfunction", dfScore),
+        
+
+        List(("pack.mcmeta", List(getPackMeta())),
+            (f"data/${context.root.getPath()}/functions/__init__.mcfunction", dfScore),
             ("data/minecraft/tags/functions/tick.json", List("{", f"\t\"values\":[$ticks]", "}")),
             ("data/minecraft/tags/functions/load.json", List("{", f"\t\"values\":[$loads]", "}")))
     }
+
+    def getPackMeta()=
+        """
+        {
+            "pack": {
+                "pack_format": 10,
+                "description": "Made with Project Star Light"
+            }
+        }
+        """
 }
 case object MCBedrock extends Target{
     def getFunctionPath(path: String): String = {

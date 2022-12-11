@@ -214,3 +214,7 @@ case class SelectorIdentifier(val value: String) extends SelectorFilterValue{
 case class SelectorNbt(val value: JSONElement) extends SelectorFilterValue{
     override def toString(): String = value.getNbt()
 }
+
+case class SelectorInvert(val value: SelectorFilterValue) extends SelectorFilterValue{
+    override def toString(): String = f"!${value.toString()}"
+}

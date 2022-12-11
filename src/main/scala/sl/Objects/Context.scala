@@ -2,11 +2,12 @@ package objects
 
 import scala.collection.mutable
 import objects.types.*
-import sl.{Settings, Utils, LinkedVariableValue, Argument}
+import sl.{Settings, Utils, LinkedVariableValue, FunctionCallValue, LinkedFunctionValue, Argument}
 import sl.Expression
 import sl.Instruction
 import sl.LambdaValue
 import sl.VariableValue
+import sl.Compilation.Selector.Selector
 
 object Context{
     def getNew(name: String):Context = {
@@ -17,6 +18,7 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
     private lazy val path: String = if (parent == null){name}else{parent.path+"."+name}
     
     private val variables = mutable.Map[String, Variable]()
+    private val properties = mutable.Map[String, Property]()
     private val functions = mutable.Map[String, List[Function]]()
     private val structs = mutable.Map[String, Struct]()
     private val classes = mutable.Map[String, Class]()
@@ -25,6 +27,7 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
     private val typedefs = mutable.Map[String, Type]()
     private val jsonfiles = mutable.Map[String, JSONFile]()
     private val predicates = mutable.Map[String, List[Predicate]]()
+    private val names = mutable.Set[String]()
 
     private val functionTags = mutable.Map[Identifier, TagFunction]()
     
@@ -265,6 +268,12 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
     }
 
 
+    def addName(name: String) = {
+        if (names.contains(name)) throw new Exception(f"$name already defined in ${getPath()}")
+        names.add(name)
+    }
+
+
 
 
     def getVariable(identifier: Identifier): Variable = {
@@ -277,6 +286,7 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
         tryGetElement(_.variables)(identifier)
     }
     def addVariable(variable: Variable): Variable = {
+        addName(variable.name)
         variables.addOne(variable.name, variable)
         variable
     }
@@ -297,6 +307,29 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
         (if inheritted != null && !set.contains(inheritted) then inheritted.getAllVariable(set) else List()) :::
         variables.values.toList ::: child.filter(_._2.parent == this).map(_._2.getAllVariable(set)).foldLeft(List[Variable]())(_.toList ::: _.toList)
     }
+
+
+    def getProperty(identifier: Identifier): Property = {
+        tryGetElement(_.properties)(identifier) match{
+            case Some(value) => value
+            case None => throw new Exception(f"Unknown property: $identifier in context: $path")
+        }
+    }
+    def tryGetProperty(identifier: Identifier): Option[Property] = {
+        tryGetElement(_.properties)(identifier)
+    }
+    def addProperty(property: Property): Property = {
+        addName(property.name)
+        properties.addOne(property.name, property)
+        property
+    }
+
+    def resolveVariable(vari: Expression) = {
+		val VariableValue(name, sel) = vari
+		tryGetProperty(name) match
+			case Some(Property(_, getter, setter)) => FunctionCallValue(LinkedFunctionValue(getter), List(), sel)
+			case _ => LinkedVariableValue(getVariable(name), sel)
+	}
 
 
 
@@ -409,10 +442,10 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
         else{
             val fct = functions.get(name).get
             var c = 0
-            while(fct.exists(_.name == name+f"__overloading__$c")){
+            while(fct.exists(_.name == name+f"-$c")){
                 c+=1
             }
-            return name+f"__overloading__$c"
+            return name+f"-$c"
         }
     }
     def getFunctionMuxID(function: Function): Int = {
@@ -445,6 +478,7 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
         tryGetElement(_.structs)(identifier)
     }
     def addStruct(struct: Struct): Struct = synchronized{
+        addName(struct.name)
         structs.addOne(struct.name, struct)
         struct
     }
@@ -460,6 +494,7 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
         tryGetElement(_.classes)(identifier)
     }
     def addClass(clazz: Class): Class = synchronized{
+        addName(clazz.name)
         classes.addOne(clazz.name, clazz)
         clazz
     }
@@ -538,6 +573,11 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
 
     def getType(typ: Type): Type = {
         typ match
+            case ArrayType(sub, nb) => {
+                ArrayType(getType(sub), Utils.simplify(nb)(this))
+            }
+            case FuncType(from, to) => FuncType(from.map(getType(_)), getType(to))
+            case TupleType(from) => TupleType(from.map(getType(_)))
             case IdentifierType(identifier) => {
                 val typdef = tryGetTypeDef(identifier)
                 if (typdef.isDefined){
@@ -586,6 +626,39 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
     }
     def getAllJsonFiles():List[JSONFile] = {
         jsonfiles.values.toList ::: child.filter(_._2 != this).map(_._2.getAllJsonFiles()).foldLeft(List[JSONFile]())(_.toList ::: _.toList)
+    }
+
+
+
+    def addObjectFrom(name: String, alias: String, other: Context) = {
+        if (other.classes.contains(name)){
+            classes.addOne(alias, other.classes(name))
+            child.addOne(alias, other.push(name))
+        }
+        else if (other.templates.contains(name)){
+            templates.addOne(alias, other.templates(name))
+            child.addOne(alias, other.push(name))
+        }
+        else if (other.structs.contains(name)){
+            structs.addOne(alias, other.structs(name))
+            child.addOne(alias, other.push(name))
+        }
+        else if (other.enums.contains(name)){
+            enums.addOne(alias, other.enums(name))
+            child.addOne(alias, other.push(name))
+        }
+        else if (other.predicates.contains(name)){
+            predicates.addOne(alias, other.predicates(name))
+        }
+        else if (other.functions.contains(name)){
+            functions.addOne(alias, other.functions(name))
+        }
+        else if (other.variables.contains(name)){
+            variables.addOne(alias, other.variables(name))
+        }
+        else{
+            throw new Exception(f"$name Not Found in ${other.getPath()}")
+        }
     }
 
 

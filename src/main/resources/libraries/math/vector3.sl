@@ -1,4 +1,4 @@
-package math.Vector3
+package math.vector3
 
 import math
 
@@ -7,7 +7,7 @@ struct Vector3{
     float y
     float z
     
-    def lazy __init__(float x, float y,float z){
+    def lazy __init__(float x, float y, float z){
         this.x = x
         this.y = y
         this.z = z

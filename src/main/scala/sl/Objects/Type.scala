@@ -17,6 +17,7 @@ private val outOfBound = 100000
 abstract class Type extends Positional {
     def allowAdditionSimplification(): Boolean
     def getDistance(other: Type)(implicit context: Context): Int
+    def isSubtypeOf(other: Type)(implicit context: Context): Boolean
     def getName()(implicit context: Context): String
 
     def generateCompilerFunction(variable: Variable)(implicit context: Context) = {
@@ -39,6 +40,11 @@ abstract class Type extends Positional {
 object AnyType extends Type{
     override def allowAdditionSimplification(): Boolean = false
     override def getDistance(other: Type)(implicit context: Context): Int = outOfBound
+    override def isSubtypeOf(other: Type)(implicit context: Context): Boolean = {
+        other match
+            case AnyType => true
+            case _ => false
+    }
     override def getName()(implicit context: Context): String = "any"
 }
 object IntType extends Type{
@@ -51,6 +57,14 @@ object IntType extends Type{
             case MCObjectType => 10
             case _ => outOfBound
     }
+    override def isSubtypeOf(other: Type)(implicit context: Context): Boolean = {
+        other match
+            case IntType => true
+            case FloatType => true
+            case AnyType => true
+            case MCObjectType => true
+            case _ => false
+    }
     override def getName()(implicit context: Context): String = "int"
 }
 object MCObjectType extends Type{
@@ -59,6 +73,11 @@ object MCObjectType extends Type{
         other match
             case MCObjectType => 0
             case _ => outOfBound
+    }
+    override def isSubtypeOf(other: Type)(implicit context: Context): Boolean = {
+        other match
+            case MCObjectType => true
+            case _ => false
     }
     override def getName()(implicit context: Context): String = "mcobject"
 }
@@ -71,6 +90,13 @@ object FloatType extends Type{
             case MCObjectType => 10
             case _ => outOfBound
     }
+    override def isSubtypeOf(other: Type)(implicit context: Context): Boolean = {
+        other match
+            case FloatType => true
+            case AnyType => true
+            case MCObjectType => true
+            case _ => false
+    }
     override def getName()(implicit context: Context): String = "float"
 }
 object StringType extends Type{
@@ -81,6 +107,13 @@ object StringType extends Type{
             case AnyType => 1
             case MCObjectType => 10
             case _ => outOfBound
+    }
+    override def isSubtypeOf(other: Type)(implicit context: Context): Boolean = {
+        other match
+            case StringType => true
+            case AnyType => true
+            case MCObjectType => true
+            case _ => false
     }
     override def getName()(implicit context: Context): String = "string"
     override def generateCompilerFunction(variable: Variable)(implicit context: Context): Unit = {
@@ -171,13 +204,25 @@ object BoolType extends Type{
             case AnyType => 1000
             case _ => outOfBound
     }
-    override def getName()(implicit context: Context): String = "bool"
+    override def isSubtypeOf(other: Type)(implicit context: Context): Boolean = {
+        other match
+            case BoolType => true
+            case AnyType => true
+            case MCObjectType => true
+            case _ => false
+    }
+    override def getName()(implicit context: Context): String = "Boolean"
 }
 object VoidType extends Type{
     override def allowAdditionSimplification(): Boolean = false
     override def getDistance(other: Type)(implicit context: Context): Int = {
         other match
             case _ => outOfBound
+    }
+    override def isSubtypeOf(other: Type)(implicit context: Context): Boolean = {
+        other match
+            case VoidType => true
+            case _ => false
     }
     override def getName()(implicit context: Context): String = "void"
 }
@@ -187,6 +232,11 @@ object ParamsType extends Type{
         other match
             case _ => outOfBound
     }
+    override def isSubtypeOf(other: Type)(implicit context: Context): Boolean = {
+        other match
+            case ParamsType => true
+            case _ => false
+    }
     override def getName()(implicit context: Context): String = "params"
 }
 object RawJsonType extends Type{
@@ -195,6 +245,11 @@ object RawJsonType extends Type{
         other match
             case RawJsonType => 0
             case _ => outOfBound
+    }
+    override def isSubtypeOf(other: Type)(implicit context: Context): Boolean = {
+        other match
+            case RawJsonType => true
+            case _ => false
     }
     override def getName()(implicit context: Context): String = "rawjson"
 }
@@ -206,6 +261,11 @@ object EntityType extends Type{
             case MCObjectType => 10
             case AnyType => 1000
             case _ => outOfBound
+    }
+    override def isSubtypeOf(other: Type)(implicit context: Context): Boolean = {
+        other match
+            case EntityType => true
+            case _ => false
     }
     override def getName()(implicit context: Context): String = "entity"
 }
@@ -219,6 +279,13 @@ case class TupleType(sub: List[Type]) extends Type{
             case AnyType => 1000
             case _ => outOfBound
     }
+    override def isSubtypeOf(other: Type)(implicit context: Context): Boolean = {
+        other match
+            case TupleType(sub2) => sub.size == sub2.size && sub.zip(sub2).forall((a,b) => a.isSubtypeOf(b))
+            case AnyType => true
+            case MCObjectType => true
+            case _ => false
+    }
     override def getName()(implicit context: Context): String = f"(${sub.map(_.getName()).reduce(_ + ", " + _)})"
 }
 case class ArrayType(inner: Type, size: Expression) extends Type{
@@ -229,6 +296,13 @@ case class ArrayType(inner: Type, size: Expression) extends Type{
             case MCObjectType => 10
             case AnyType => 1000
             case _ => outOfBound
+    }
+    override def isSubtypeOf(other: Type)(implicit context: Context): Boolean = {
+        other match
+            case ArrayType(sub, size2) => size == size2 && inner.isSubtypeOf(sub)
+            case AnyType => true
+            case MCObjectType => true
+            case _ => false
     }
     override def getName()(implicit context: Context): String = f"$inner[$size]"
 }
@@ -241,6 +315,13 @@ case class LambdaType(val nb: Int) extends Type{
             case AnyType => 1000
             case _ => outOfBound
     }
+    override def isSubtypeOf(other: Type)(implicit context: Context): Boolean = {
+        other match
+            case LambdaType(nb2) => nb2 == nb
+            case AnyType => true
+            case MCObjectType => true
+            case _ => false
+    }
     override def getName()(implicit context: Context): String = f"lambda"
 }
 case class FuncType(sources: List[Type], output: Type) extends Type{
@@ -252,6 +333,13 @@ case class FuncType(sources: List[Type], output: Type) extends Type{
             case AnyType => 1000
             case _ => outOfBound
     }
+    override def isSubtypeOf(other: Type)(implicit context: Context): Boolean = {
+        other match
+            case FuncType(s,o) => sources.size == s.size && s.zip(sources).forall((a,b)=>a.isSubtypeOf(b)) && output.isSubtypeOf(o)
+            case AnyType => true
+            case MCObjectType => true
+            case _ => false
+    }
     override def getName()(implicit context: Context): String = f"(${sources.map(_.getName()).reduce(_ + ", " + _)}) => $output"
 }
 case class IdentifierType(name: String) extends Type{
@@ -262,6 +350,12 @@ case class IdentifierType(name: String) extends Type{
             case MCObjectType => 10
             case AnyType => 1000
             case _ => outOfBound
+    }
+    override def isSubtypeOf(other: Type)(implicit context: Context): Boolean = {
+        other match
+            case AnyType => true
+            case MCObjectType => true
+            case _ => false
     }
     override def getName()(implicit context: Context): String = name
 }
@@ -275,6 +369,13 @@ case class StructType(struct: Struct) extends Type{
             case AnyType => 2000
             case _ => outOfBound
     }
+    override def isSubtypeOf(other: Type)(implicit context: Context): Boolean = {
+        other match
+            case StructType(str) => struct.hasParent(str)
+            case AnyType => true
+            case MCObjectType => true
+            case _ => false
+    }
     override def getName()(implicit context: Context): String = struct.fullName
 }
 case class ClassType(clazz: Class) extends Type{
@@ -287,6 +388,13 @@ case class ClassType(clazz: Class) extends Type{
             case AnyType => 10000
             case _ => outOfBound
     }
+    override def isSubtypeOf(other: Type)(implicit context: Context): Boolean = {
+        other match
+            case ClassType(clz) => clazz.hasParent(clz)
+            case AnyType => true
+            case MCObjectType => true
+            case _ => false
+    }
     override def getName()(implicit context: Context): String = clazz.fullName
 }
 case class EnumType(enm: objects.Enum) extends Type{
@@ -298,6 +406,13 @@ case class EnumType(enm: objects.Enum) extends Type{
             case AnyType => 10000
             case _ => outOfBound
     }
+    override def isSubtypeOf(other: Type)(implicit context: Context): Boolean = {
+        other match
+            case EnumType(other) => enm == other
+            case AnyType => true
+            case MCObjectType => true
+            case _ => false
+    }
     override def getName()(implicit context: Context): String = enm.fullName
 }
 case class RangeType(sub: Type) extends Type{
@@ -308,6 +423,13 @@ case class RangeType(sub: Type) extends Type{
             case MCObjectType => 1000
             case AnyType => 10000
             case _ => outOfBound
+    }
+    override def isSubtypeOf(other: Type)(implicit context: Context): Boolean = {
+        other match
+            case RangeType(other) => sub.isSubtypeOf(other)
+            case AnyType => true
+            case MCObjectType => true
+            case _ => false
     }
     override def getName()(implicit context: Context): String = f"$sub..$sub"
 }
@@ -321,6 +443,13 @@ case object JsonType extends Type{
             case MCObjectType => 1000
             case AnyType => 10000
             case _ => outOfBound
+    }
+    override def isSubtypeOf(other: Type)(implicit context: Context): Boolean = {
+        other match
+            case JsonType => true
+            case AnyType => true
+            case MCObjectType => true
+            case _ => false
     }
     override def getName()(implicit context: Context): String = "json"
 }

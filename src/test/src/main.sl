@@ -1,10 +1,5 @@
 package main
 
+import math
 
-class test{
-    def __init__(){
-
-    }
-}
-
-test lol = new test()
+int a = math.abs(5)

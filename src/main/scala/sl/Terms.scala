@@ -54,7 +54,7 @@ case class VariableDecl(val name: String, val _type: Type, val modifier: Modifie
 case class VariableAssigment(val name: List[(Either[Identifier, Variable], Selector)], val op: String, val expr: Expression) extends Instruction {
   override def toString() = f"${name} ${op} ${expr}"
 }
-case class ArrayAssigment(val name: Either[Identifier, Variable], val index: Expression, val op: String, val expr: Expression) extends Instruction {
+case class ArrayAssigment(val name: Either[Identifier, Variable], val index: List[Expression], val op: String, val expr: Expression) extends Instruction {
   override def toString() = f"${name}[$index] ${op} ${expr}"
 }
 
@@ -84,8 +84,8 @@ case class Return(val value: Expression) extends Instruction {
   override def toString() = f"return($value)"
 }
 
-case class Import(val value: String, val alias: String) extends Instruction {
-  override def toString() = f"import $value as $alias"
+case class Import(val lib: String, val value: String, val alias: String) extends Instruction {
+  override def toString() = f"from $lib import $value as $alias"
 }
 
 case class Switch(val value: Expression, val cases: List[SwitchCase], val copyVariable: Boolean = true) extends Instruction {

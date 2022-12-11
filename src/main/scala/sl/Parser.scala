@@ -17,9 +17,9 @@ object Parser extends StandardTokenParsers{
                               "+=", "-=", "/=", "*=", "?=", ":=", "%", "@", "@e", "@a", "@s", "@r", "@p", "~", "^", "<=", "==", ">=", "<", ">", "!=", "%%%", "$",
                               "!", "!=")
   lexical.reserved   ++= List("true", "false", "if", "then", "else", "return", "switch", "for", "do", "while",
-                              "as", "at", "with", "to", "import", "doc", "template", "null", "typedef", "helper", "foreach", "in",
+                              "as", "at", "with", "to", "import", "doc", "template", "null", "typedef", "foreach", "in",
                               "var", "val", "def", "package", "struct", "enum", "class", "lazy", "jsonfile",
-                              "public", "protected", "private", "scoreboard", "forgenerate",
+                              "public", "protected", "private", "scoreboard", "forgenerate", "from",
                               "ticking", "loading", "predicate", "extends", "new", "static")
 
 
@@ -76,6 +76,7 @@ object Parser extends StandardTokenParsers{
       | templateUse
       | varDeclaration
       | varAssignment
+      | arrayAssign
       | "%%%" ~> stringLit2 <~ "%%%" ^^ { p => CMD(p) }
       | ifs
       | "return" ~> expr ^^ (Return(_))
@@ -87,6 +88,7 @@ object Parser extends StandardTokenParsers{
       | enumInstr
       | forgenerate
       | importInst
+      | fromImportInst
       | templateDesc
       | typedef
       | foreach
@@ -95,7 +97,7 @@ object Parser extends StandardTokenParsers{
   def anyKeyword: Parser[String] = lexical.reserved.map(f => f ^^ (p => p)).reduce(_ | _)
 
   def predicate:Parser[Instruction] = (modifier <~ "predicate") ~ identLazy ~ arguments ~ json ^^ {case mod ~ name ~ args ~ json => PredicateDecl(name, args, json, mod)}
-  def arrayAssign:Parser[Instruction] = (identLazy2 <~ "[") ~ (expr <~ "]") ~ assignmentOp ~ expr ^^ { case a ~ i ~ o ~ e => ArrayAssigment(Left(a), i, o, e) }
+  def arrayAssign:Parser[Instruction] = (identLazy2 <~ "[") ~ (rep1sep(expr, ",") <~ "]") ~ assignmentOp ~ expr ^^ { case a ~ i ~ o ~ e => ArrayAssigment(Left(a), i, o, e) }
   def foreach: Parser[Instruction] = ("foreach" ~> ident <~ "in") ~ expr ~ program ^^ { case v ~ e ~ i => ForEach(v, e, i) }
   def packageInstr: Parser[Instruction] = "package" ~> identLazy2 ~ program ^^ (p => Package(p._1, p._2))
   def classDecl: Parser[Instruction] = (modifier <~ "class") ~ identLazy ~ opt("extends" ~> ident2) ~ block ^^ { case mod ~ iden ~ par ~ block => ClassDecl(iden, block, mod, par) }
@@ -103,7 +105,8 @@ object Parser extends StandardTokenParsers{
   def typedef: Parser[Instruction] = "typedef" ~> types ~ identLazy ^^ { case _1 ~ _2 => TypeDef(_2, _1) }
   def templateUse: Parser[Instruction] = ident2 ~ ident ~ block ^^ {case iden ~ name ~ instr => TemplateUse(iden, name, instr)}
   def templateDesc: Parser[Instruction] = (modifier <~ "template") ~ identLazy ~ opt("extends" ~> ident2) ~ instruction ^^ {case mod ~ name ~ parent ~ instr => TemplateDecl(name, instr, mod, parent)}
-  def importInst: Parser[Instruction] = "import"~>ident2 ~ opt("as" ~> ident2) ^^ {case file ~ alias => Import(file, alias.getOrElse(null))}
+  def importInst: Parser[Instruction] = "import"~>ident2 ~ opt("as" ~> ident2) ^^ {case file ~ alias => Import(file, null, alias.getOrElse(null))}
+  def fromImportInst: Parser[Instruction] = "from"~>ident2 ~ ("import" ~> ident2) ~ opt("as" ~> ident2) ^^ {case file ~ res ~ alias => Import(file, res, alias.getOrElse(null))}
   def forgenerate: Parser[Instruction] = (("forgenerate" ~> "(" ~> identLazy <~ ",") ~ exprNoTuple <~ ")") ~ instruction ^^ (p => ForGenerate(p._1._1, p._1._2, p._2))
   def jsonFile: Parser[Instruction] = "jsonfile" ~> identLazy2 ~ json ^^ (p => JSONFile(p._1, p._2))
   def doWhileLoop: Parser[Instruction] = ("do" ~> instruction <~ "while") ~ ("(" ~> expr <~ ")") ^^ (p => DoWhileLoop(p._2, p._1))
@@ -136,7 +139,7 @@ object Parser extends StandardTokenParsers{
       if (!mod.isEntity && p._2.isEmpty){
         InstructionList(decl ::: List(VariableAssigment(identifiers.map(l => (Left(l), Selector.self)), ":=", DefaultValue)))
       }
-      else if (!mod.isEntity && !p._2.isEmpty){
+      else if (!p._2.isEmpty){
         InstructionList(decl ::: List(VariableAssigment(identifiers.map(l => (Left(l), Selector.self)), "=", p._2.get)))
       }
       else{
@@ -165,8 +168,11 @@ object Parser extends StandardTokenParsers{
   def sfIdentifier: Parser[SelectorFilterValue] = identLazy2 ^^ (SelectorIdentifier(_))
   def sfNamespacedName: Parser[SelectorFilterValue] = namespacedName ^^ (p => SelectorIdentifier(p.toString()))
   def sfNBT: Parser[SelectorFilterValue] = json ^^ (SelectorNbt(_))
+  def selectorFilterInnerValue = sfRange | sfNumber | sfString | sfNamespacedName | sfIdentifier | sfNumber2 | sfNBT
 
-  def selectorFilterValue = sfRange | sfNumber | sfString | sfNamespacedName | sfIdentifier | sfNumber2 | sfNBT
+  def selectorFilterValue: Parser[SelectorFilterValue] = "!" ~> selectorFilterInnerValue ^^ (SelectorInvert(_)) |
+                                              selectorFilterInnerValue
+
   def selectorFilter: Parser[(String, SelectorFilterValue)] = (identLazy <~ "=") ~ selectorFilterValue ^^ { p => (p._1, p._2) }
   def selector: Parser[Selector] = ("@a" | "@s" | "@e" | "@p" | "@r") ~ opt("[" ~> rep1sep(selectorFilter, ",") <~ "]") ^^ { p => Selector.parse(p._1, p._2.getOrElse(List())) }
   def selectorStr : Parser[String] = (selector ^^ (_.toString()))
@@ -199,7 +205,7 @@ object Parser extends StandardTokenParsers{
 
   def comparator: Parser[String] = "<" | "<=" | ">=" | ">" | "==" | "!="
 
-  def exprArray: Parser[Expression] = exprBottom ~ rep("[" ~> expr <~ "]") ^^ {case e ~ g => g.foldLeft(e)((e, i) => ArrayGetValue(e, i))}
+  def exprArray: Parser[Expression] = exprBottom ~ rep("[" ~> rep1sep(expr, ",") <~ "]") ^^ {case e ~ g => g.foldLeft(e)((e, i) => ArrayGetValue(e, i))}
   def exprMod: Parser[Expression] = exprArray ~ rep("%" ~> exprMod) ^^ {unpack("%", _)}
   def exprDiv: Parser[Expression] = exprMod ~ rep(("/" | "\\") ~> exprDiv) ^^ {unpack("/", _)}
   def exprMult: Parser[Expression] = exprDiv ~ rep("*" ~> exprMult) ^^ {unpack("*", _)}

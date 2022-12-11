@@ -1,4 +1,4 @@
-package math.Vector2
+package math.vector2
 
 import math
 
