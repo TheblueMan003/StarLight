@@ -71,8 +71,8 @@ object Parser extends StandardTokenParsers{
       | packageInstr
       | structDecl
       | classDecl
-      | identLazy2 <~ ("+" ~ "+") ^^ (p => VariableAssigment(List(Left(p)), "+=", IntValue(1)))
-      | identLazy2 <~ ("-" ~ "-") ^^ (p => VariableAssigment(List(Left(p)), "-=", IntValue(1)))
+      | identLazy2 <~ ("+" ~ "+") ^^ (p => VariableAssigment(List((Left(p), Selector.self)), "+=", IntValue(1)))
+      | identLazy2 <~ ("-" ~ "-") ^^ (p => VariableAssigment(List((Left(p), Selector.self)), "-=", IntValue(1)))
       | templateUse
       | varDeclaration
       | varAssignment
@@ -123,10 +123,10 @@ object Parser extends StandardTokenParsers{
   def enumField: Parser[EnumField] = types ~ identLazy ^^ { p => EnumField(p._2, p._1) }
   def enumValue: Parser[EnumValue] = identLazy ~ opt("("~>repsep(exprNoTuple,",")<~")") ^^ (p => EnumValue(p._1, p._2.getOrElse(List())))
 
-  def varAssignment: Parser[Instruction] = (rep1sep(identLazy2, ",") ~ assignmentOp ~ expr) ^^ (p => 
+  def varAssignment: Parser[Instruction] = (rep1sep(opt(selector <~ ".") ~ identLazy2, ",") ~ assignmentOp ~ expr) ^^ (p => 
     {
-      val identifiers = p._1._1.map(Identifier.fromString(_))
-      VariableAssigment(identifiers.map(Left(_)), p._1._2, p._2)
+      val identifiers = p._1._1.map(p => (Identifier.fromString(p._2), p._1.getOrElse(Selector.self)))
+      VariableAssigment(identifiers.map((i,s) => (Left(i), s)), p._1._2, p._2)
     })
 
   def varDeclaration: Parser[Instruction] = (modifier ~ types ~ rep1sep(identLazy, ",") ~ opt("=" ~> expr)) ^^ (p => {
@@ -134,10 +134,10 @@ object Parser extends StandardTokenParsers{
       val decl = p._1._2.map(VariableDecl(_, p._1._1._2, mod))
       val identifiers = p._1._2.map(Identifier.fromString(_))
       if (!mod.isEntity && p._2.isEmpty){
-        InstructionList(decl ::: List(VariableAssigment(identifiers.map(Left(_)), ":=", DefaultValue)))
+        InstructionList(decl ::: List(VariableAssigment(identifiers.map(l => (Left(l), Selector.self)), ":=", DefaultValue)))
       }
       else if (!mod.isEntity && !p._2.isEmpty){
-        InstructionList(decl ::: List(VariableAssigment(identifiers.map(Left(_)), "=", p._2.get)))
+        InstructionList(decl ::: List(VariableAssigment(identifiers.map(l => (Left(l), Selector.self)), "=", p._2.get)))
       }
       else{
         InstructionList(decl)
@@ -191,6 +191,7 @@ object Parser extends StandardTokenParsers{
     | identLazy2 ~ ("(" ~> repsep(exprNoTuple, ",") <~ ")") ~ block ^^ { case f ~ a ~ b => FunctionCallValue(VariableValue(f), a ::: List(LambdaValue(List(), b))) }
     | identLazy2 ~ rep1("(" ~> repsep(exprNoTuple, ",") <~ ")") ^^ (p => p._2.foldLeft[Expression](VariableValue(p._1))((b, a) => FunctionCallValue(b, a)))
     | identLazy2 ^^ (VariableValue(_))
+    | selector ~ "." ~ identLazy2 ^^ { case s ~ _ ~ n => VariableValue(n, s) }
     | identTag ^^ (VariableValue(_))
     | "(" ~> expr <~ ")"
     | json ^^ (JsonValue(_))

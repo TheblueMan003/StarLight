@@ -84,8 +84,8 @@ object Execute{
         }
 
         ass.expr match
-            case VariableValue(name) => withInstr(With(LinkedVariableValue(context.getVariable(name)), ass.isat, ass.cond, ass.block))
-            case LinkedVariableValue(vari) => 
+            case VariableValue(name, sel) => withInstr(With(LinkedVariableValue(context.getVariable(name), sel), ass.isat, ass.cond, ass.block))
+            case LinkedVariableValue(vari, sel) => 
                 vari.getType() match
                     case EntityType => apply(f"@e[tag=${vari.tagName}]")
                     case _ => throw new Exception(f"Unexpected value in as $ass")
@@ -104,8 +104,8 @@ object Execute{
         }
 
         Utils.simplify(ass.expr) match
-            case VariableValue(name) => atInstr(At(LinkedVariableValue(context.getVariable(name)), ass.block))
-            case LinkedVariableValue(vari) => 
+            case VariableValue(name, sel) => atInstr(At(LinkedVariableValue(context.getVariable(name), sel), ass.block))
+            case LinkedVariableValue(vari, sel) => 
                 vari.getType() match
                     case EntityType => apply(f"@e[tag=${vari.tagName}]")
                     case _ => throw new Exception(f"Unexpected value in as $ass")
@@ -169,21 +169,22 @@ object Execute{
     private def getIfCase(expr: Expression)(implicit context: Context): (List[String], List[IFCase]) = {
         expr match
             case IntValue(value) => if value == 0 then (List(), List(IFFalse)) else (List(), List(IFTrue))
+            case EnumIntValue(value) => if value == 0 then (List(), List(IFFalse)) else (List(), List(IFTrue))
             case FloatValue(value) => if value == 0 then (List(), List(IFFalse)) else (List(), List(IFTrue))
             case BoolValue(value) => if value then (List(), List(IFTrue)) else (List(), List(IFFalse))
             case DefaultValue => (List(), List(IFFalse))
             case NullValue => (List(), List(IFFalse))
             case SelectorValue(value) => (List(), List(IFValueCase(expr)))
-            case VariableValue(iden) => {
+            case VariableValue(iden, sel) => {
                 val vari = context.getVariable(iden)
                 if (vari.modifiers.isLazy){
                     getIfCase(vari.lazyValue)
                 }
                 else{
-                    (List(), List(IFValueCase(LinkedVariableValue(vari))))
+                    (List(), List(IFValueCase(LinkedVariableValue(vari, sel))))
                 }
             }
-            case LinkedVariableValue(vari) => {
+            case LinkedVariableValue(vari, sel) => {
                 if (vari.modifiers.isLazy){
                     getIfCase(vari.lazyValue)
                 }
@@ -191,8 +192,8 @@ object Execute{
                     (List(), List(IFValueCase(expr)))
                 }
             }
-            case BinaryOperation(">" | "<" | ">=" | "<=" | "==" | "!=", VariableValue(left), right) if right.hasIntValue() => (List(), List(IFValueCase(expr)))
-            case BinaryOperation(">" | "<" | ">=" | "<=" | "==" | "!=", left, VariableValue(right)) if left.hasIntValue() => (List(), List(IFValueCase(expr)))
+            case BinaryOperation(">" | "<" | ">=" | "<=" | "==" | "!=", VariableValue(left, sel), right) if right.hasIntValue() => (List(), List(IFValueCase(expr)))
+            case BinaryOperation(">" | "<" | ">=" | "<=" | "==" | "!=", left, VariableValue(right, sel)) if left.hasIntValue() => (List(), List(IFValueCase(expr)))
 
             case BinaryOperation(">" | "<" | ">=" | "<=" | "==" | "!=", left, right)=> {
                 val op = expr.asInstanceOf[BinaryOperation].op
@@ -265,8 +266,8 @@ object Execute{
             case FunctionCallValue(name, args) if name.toString() == "Compiler.isVariable" => {
                 val check = args.forall(arg =>
                     arg match
-                        case VariableValue(name) => true
-                        case LinkedVariableValue(vari) => true
+                        case VariableValue(name, sel) => true
+                        case LinkedVariableValue(vari, sel) => true
                         case other => false
                     )
                 if check then (List(), List(IFTrue)) else (List(), List(IFFalse))
@@ -279,7 +280,7 @@ object Execute{
                     (List(), List(IFBlock("~ ~ ~ "+args.head.toString())))
                 }
             }
-            case FunctionCallValue(VariableValue(name), args) => {
+            case FunctionCallValue(VariableValue(name, sel), args) => {
                 val predicate = context.tryGetPredicate(name, args.map(Utils.typeof(_)))
                 predicate match
                     case None => {
@@ -294,20 +295,27 @@ object Execute{
                 val v = Utils.simplifyToVariable(expr)
                 (v._1, List(IFValueCase(v._2)))
             }
+            case ArrayGetValue(name, index) => {
+                val v = Utils.simplifyToVariable(expr)
+                (v._1, List(IFValueCase(v._2)))
+            }
             case LambdaValue(args, instr) => (List(), List(IFTrue))
             case StringValue(string) => throw new Exception("Can't use if with string")
             case JsonValue(json) => throw new Exception("Can't use if with json")
             case RangeValue(min, max) => throw new Exception("Can't use if with range")
             case TupleValue(values) => throw new Exception("Can't use if with tuple")
+            case RawJsonValue(value) => throw new Exception("Can't use if with rawjson")
+            case NamespacedName(value) => throw new Exception("Can't use if with mcobject")
+            case ConstructorCall(name, args) => throw new Exception("Can't use if with constructor call")
     }
 
     def switch(swit: Switch)(implicit context: Context):List[String] = {
         val expr = Utils.simplify(swit.value)
         expr match{
-            case VariableValue(name) if !swit.copyVariable=> {
+            case VariableValue(name, sel) if !swit.copyVariable=> {
                 makeTree(context.getVariable(name), swit.cases.map(x => (x.expr.getIntValue(), x.instr)))
             }
-            case LinkedVariableValue(vari) if !swit.copyVariable=> {
+            case LinkedVariableValue(vari, sel) if !swit.copyVariable=> {
                 makeTree(vari, swit.cases.map(x => (x.expr.getIntValue(), x.instr)))
             }
             case _ => {
@@ -352,70 +360,70 @@ case class IFValueCase(val value: Expression) extends IFCase{
             case SelectorValue(selector) => {
                 f"if entity ${selector.getString()}"
             }
-            case VariableValue(name) => {
-                IFValueCase(LinkedVariableValue(context.getVariable(name))).get()
+            case VariableValue(name, sel) => {
+                IFValueCase(LinkedVariableValue(context.getVariable(name), sel)).get()
             }
-            case LinkedVariableValue(vari) => {
+            case LinkedVariableValue(vari, sel) => {
                 vari.getType() match{
                     case EntityType => f"if entity @e[tag=${vari.tagName}]"
-                    case _ => f"unless score ${vari.getSelector()} matches 0"
+                    case _ => f"unless score ${vari.getSelector()(sel)} matches 0"
                 }
             }
 
-            case BinaryOperation(">" | "<" | ">=" | "<=" | "==", LinkedVariableValue(left), LinkedVariableValue(right))=> {
+            case BinaryOperation(">" | "<" | ">=" | "<=" | "==", LinkedVariableValue(left, sel1), LinkedVariableValue(right, sel2))=> {
                 val op = value.asInstanceOf[BinaryOperation].op
                 val mcop = if op == "==" then "=" else op
-                f"if score ${left.getSelector()} $mcop ${right.getSelector()}"
+                f"if score ${left.getSelector()(sel1)} $mcop ${right.getSelector()(sel2)}"
             }
-            case BinaryOperation("!=", LinkedVariableValue(left), LinkedVariableValue(right))=> {
-                f"if score ${left.getSelector()} = ${left.getSelector()}"
+            case BinaryOperation("!=", LinkedVariableValue(left, sel1), LinkedVariableValue(right, sel2))=> {
+                f"if score ${left.getSelector()(sel1)} = ${left.getSelector()(sel2)}"
             }
 
-            case BinaryOperation(">" | "<" | ">=" | "<=" | "==", VariableValue(left), VariableValue(right))=> {
+            case BinaryOperation(">" | "<" | ">=" | "<=" | "==", VariableValue(left, sel1), VariableValue(right, sel2))=> {
                 val op = value.asInstanceOf[BinaryOperation].op
                 val mcop = if op == "==" then "=" else op
-                f"if score ${context.getVariable(left).getSelector()} $mcop ${context.getVariable(right).getSelector()}"
+                f"if score ${context.getVariable(left).getSelector()(sel1)} $mcop ${context.getVariable(right).getSelector()(sel2)}"
             }
-            case BinaryOperation("!=", VariableValue(left), VariableValue(right))=> {
-                f"if score ${context.getVariable(left).getSelector()} = ${context.getVariable(left).getSelector()}"
-            }
-
-
-            case BinaryOperation(">" | "<" | ">=" | "<=" | "==", VariableValue(left), right) if right.hasIntValue()=> {
-                val op = value.asInstanceOf[BinaryOperation].op
-                f"if score ${context.getVariable(left).getSelector()} matches ${getComparator(op, right.getIntValue())}"
-            }
-            case BinaryOperation(">" | "<" | ">=" | "<=" | "==", right, VariableValue(left)) if right.hasIntValue()=> {
-                val op = value.asInstanceOf[BinaryOperation].op
-                f"if score ${context.getVariable(left).getSelector()} matches ${getComparatorInverse(op, right.getIntValue())}"
-            }
-            case BinaryOperation(">" | "<" | ">=" | "<=" | "==", LinkedVariableValue(left), right) if right.hasIntValue()=> {
-                val op = value.asInstanceOf[BinaryOperation].op
-                f"if score ${left.getSelector()} matches ${getComparator(op, right.getIntValue())}"
-            }
-            case BinaryOperation(">" | "<" | ">=" | "<=" | "==", right, LinkedVariableValue(left)) if right.hasIntValue()=> {
-                val op = value.asInstanceOf[BinaryOperation].op
-                f"if score ${left.getSelector()} matches ${getComparatorInverse(op, right.getIntValue())}"
+            case BinaryOperation("!=", VariableValue(left, sel1), VariableValue(right, sel2))=> {
+                f"if score ${context.getVariable(left).getSelector()(sel1)} = ${context.getVariable(left).getSelector()(sel2)}"
             }
 
 
-            case BinaryOperation("!=", VariableValue(left), right) if right.hasIntValue()=> {
+            case BinaryOperation(">" | "<" | ">=" | "<=" | "==", VariableValue(left, sel), right) if right.hasIntValue()=> {
                 val op = value.asInstanceOf[BinaryOperation].op
-                f"unless score ${context.getVariable(left).getSelector()} matches ${right.getIntValue()}"
+                f"if score ${context.getVariable(left).getSelector()(sel)} matches ${getComparator(op, right.getIntValue())}"
             }
-            case BinaryOperation("!=", right, VariableValue(left)) if right.hasIntValue()=> {
+            case BinaryOperation(">" | "<" | ">=" | "<=" | "==", right, VariableValue(left, sel)) if right.hasIntValue()=> {
                 val op = value.asInstanceOf[BinaryOperation].op
-                f"unless score ${context.getVariable(left).getSelector()} matches ${right.getIntValue()}"
+                f"if score ${context.getVariable(left).getSelector()(sel)} matches ${getComparatorInverse(op, right.getIntValue())}"
+            }
+            case BinaryOperation(">" | "<" | ">=" | "<=" | "==", LinkedVariableValue(left, sel), right) if right.hasIntValue()=> {
+                val op = value.asInstanceOf[BinaryOperation].op
+                f"if score ${left.getSelector()(sel)} matches ${getComparator(op, right.getIntValue())}"
+            }
+            case BinaryOperation(">" | "<" | ">=" | "<=" | "==", right, LinkedVariableValue(left, sel)) if right.hasIntValue()=> {
+                val op = value.asInstanceOf[BinaryOperation].op
+                f"if score ${left.getSelector()(sel)} matches ${getComparatorInverse(op, right.getIntValue())}"
             }
 
-            case BinaryOperation("==", LinkedVariableValue(left), right) if right.hasIntValue()=> {
+
+            case BinaryOperation("!=", VariableValue(left, sel), right) if right.hasIntValue()=> {
                 val op = value.asInstanceOf[BinaryOperation].op
-                f"unless score ${left.getSelector()} matches ${getComparator(op, right.getIntValue())}"
+                f"unless score ${context.getVariable(left).getSelector()(sel)} matches ${right.getIntValue()}"
+            }
+            case BinaryOperation("!=", right, VariableValue(left, sel)) if right.hasIntValue()=> {
+                val op = value.asInstanceOf[BinaryOperation].op
+                f"unless score ${context.getVariable(left).getSelector()(sel)} matches ${right.getIntValue()}"
             }
 
-            case BinaryOperation("in", LinkedVariableValue(left), RangeValue(min, max)) if min.hasIntValue() && max.hasIntValue()=> {
+            case BinaryOperation("==", LinkedVariableValue(left, sel), right) if right.hasIntValue()=> {
                 val op = value.asInstanceOf[BinaryOperation].op
-                f"if score ${left.getSelector()} matches ${min.getIntValue()}..${max.getIntValue()}"
+                f"unless score ${left.getSelector()(sel)} matches ${getComparator(op, right.getIntValue())}"
+            }
+
+            case BinaryOperation("in", LinkedVariableValue(left, sel), RangeValue(min, max)) if min.hasIntValue() && max.hasIntValue()=> {
+                val op = value.asInstanceOf[BinaryOperation].op
+                f"if score ${left.getSelector()(sel)} matches ${min.getIntValue()}..${max.getIntValue()}"
             }
             
 

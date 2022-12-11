@@ -10,7 +10,7 @@ import objects.types.EntityType
 private val colorMap = Utils.getConfig("color.csv")
                             .map(l => l.split(";").toList)
                             .filter(_.size == 3)
-                            .map{case a :: b :: c :: Nil => (a, (b,c))}
+                            .map{case a :: b :: c :: Nil => (a, (b,c)); case _ =>throw new Exception("WHAT")}
                             .toMap
 
 object Print{
@@ -27,6 +27,7 @@ object Print{
             case DefaultValue => (List(), List(PrintString("default", col, mod)))
             case NullValue => (List(), List(PrintString("null", col, mod)))
             case IntValue(value) => (List(), List(PrintString(f"$value", col, mod)))
+            case EnumIntValue(value) => (List(), List(PrintString(f"$value", col, mod)))
             case FloatValue(value) => (List(), List(PrintString(f"$value", col, mod)))
             case BoolValue(value) => (List(), List(PrintString(f"$value", col, mod)))
             case StringValue(value) => 
@@ -37,24 +38,24 @@ object Print{
                     }
                     case _ => (List(), List(PrintString(f"$value", col, mod)))
             case NamespacedName(value) => (List(), List(PrintString(f"$value", col, mod)))
-            case VariableValue(name) => {
+            case VariableValue(name, sel) => {
                 ctx.tryGetVariable(name) match
                     case Some(vari) => {
-                        toRawJson(LinkedVariableValue(vari))
+                        toRawJson(LinkedVariableValue(vari, sel))
                     }
                     case None => {
                         ???
                     }
             }
             case ArrayGetValue(name, index) => ???
-            case LinkedVariableValue(vari) => {
+            case LinkedVariableValue(vari, sel) => {
                 if (vari.modifiers.isLazy){
                     toRawJson(vari.lazyValue)
                 }
                 else{
                     vari.getType() match
                         case EntityType => (List(), List(PrintSelector(vari.getEntityVariableSelector(), col, mod)))
-                        case other => (List(), List(PrintVariable(vari, col, mod)))
+                        case other => (List(), List(PrintVariable(vari, sel, col, mod)))
                 }
             }
             case LambdaValue(args, instr) => throw new Exception("Cannot transform lambda to rawjson")
@@ -105,7 +106,7 @@ object Print{
                                 print match
                                     case PrintSelector(selector, color, modifier) => PrintSelector(selector, col, mod)
                                     case PrintString(text, color, modifier) => PrintString(text, col, mod)
-                                    case PrintVariable(vari, color, modifier) => PrintVariable(vari, col, mod)
+                                    case PrintVariable(vari, sel, color, modifier) => PrintVariable(vari, sel, col, mod)
                             }
                             values.drop(1).foreach(checkArg(_));
 
@@ -169,11 +170,11 @@ case class PrintString(val text: String, val color: PrintColor, val modifier: Te
     def toBedrock()(implicit ctx: Context): String =
         f"{\"text\":\"§r${modifier.toBedrock()}§${color.toBedrock()}$text\"}"
 }
-case class PrintVariable(val vari: Variable, val color: PrintColor, val modifier: TextModdifier) extends Printable{
+case class PrintVariable(val vari: Variable, val selector: Selector, val color: PrintColor, val modifier: TextModdifier) extends Printable{
     def toJava()(implicit ctx: Context): String = 
-        f"{\"score\": { \"name\": \"${vari.getSelectorName()}\", \"objective\": \"${vari.getSelectorObjective()}\"}, ${modifier.toJava()}, ${color.toJava()}}"
+        f"{\"score\": { \"name\": \"${vari.getSelectorName()(selector)}\", \"objective\": \"${vari.getSelectorObjective()(selector)}\"}, ${modifier.toJava()}, ${color.toJava()}}"
     def toBedrock()(implicit ctx: Context): String = {
-        f"{\"score\": { \"name\": \"${vari.getSelectorName()}\", \"objective\": \"${vari.getSelectorObjective()}\"}"
+        f"{\"score\": { \"name\": \"${vari.getSelectorName()(selector)}\", \"objective\": \"${vari.getSelectorObjective()(selector)}\"}}"
     }
 }
 case class PrintSelector(val selector: Selector, val color: PrintColor, val modifier: TextModdifier) extends Printable{

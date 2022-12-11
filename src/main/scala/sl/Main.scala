@@ -64,12 +64,10 @@ object Main{
       }
 
       // Write all files
-      val bw = new BufferedWriter(new FileWriter(file))
-      content.foreach(line => {
-        bw.write(line);
-        bw.write("\n")}
-      )
-      bw.close()
+      val str = content.foldRight("")(_ + "\n"+ _)
+      val out = new PrintWriter(file, "UTF-8")
+      out.print(str)
+      out.close()
   }
 
   // Return CMD arg

@@ -45,6 +45,15 @@ case class IntValue(val value: Int) extends Expression with SmallValue{
 
     override def getString()(implicit context: Context): String = f"$value"
 }
+case class EnumIntValue(val value: Int) extends Expression with SmallValue{
+    override def toString(): String = value.toString()
+    override def getIntValue(): Int = value
+    override def hasIntValue(): Boolean = true
+    override def hasFloatValue(): Boolean = true
+    override def getFloatValue(): Double = value
+
+    override def getString()(implicit context: Context): String = f"$value"
+}
 case class FloatValue(val value: Double) extends Expression with SmallValue{
     override def toString(): String = value.toString()
     override def getIntValue(): Int = (value * Settings.floatPrec).toInt
@@ -90,7 +99,7 @@ case class NamespacedName(val value: String) extends Expression with SmallValue{
     override def getFloatValue(): Double = ???
     override def getString()(implicit context: Context): String = value
 }
-case class VariableValue(val name: Identifier) extends Expression with SmallValue{
+case class VariableValue(val name: Identifier, val selector: Selector = Selector.self) extends Expression with SmallValue{
     override def toString(): String = name.toString()
     override def getIntValue(): Int = ???
     override def hasIntValue(): Boolean = false
@@ -123,7 +132,7 @@ case class ArrayGetValue(val name: Expression, val index: Expression) extends Ex
         name.getString() + "[" + index.getString() + "]"
     }
 }
-case class LinkedVariableValue(val vari: Variable) extends Expression with SmallValue{
+case class LinkedVariableValue(val vari: Variable, val selector: Selector = Selector.self) extends Expression with SmallValue{
     override def toString(): String = vari.fullName
     override def getIntValue(): Int = ???
     override def hasIntValue(): Boolean = false

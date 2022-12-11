@@ -44,27 +44,33 @@ object Compiler{
                 List()
             }
             case StructDecl(name, block, modifier, parent) => {
-                val parentStruct = parent match
-                    case None => null
-                    case Some(p) => context.getStruct(p)
-                
-                context.addStruct(new Struct(context, name, modifier, block, parentStruct))
+                if (!firstPass){
+                    val parentStruct = parent match
+                        case None => null
+                        case Some(p) => context.getStruct(p)
+                    
+                    context.addStruct(new Struct(context, name, modifier, block, parentStruct))
+                }
                 List()
             }
             case ClassDecl(name, block, modifier, parent) => {
-                val parentClass = parent match
-                    case None => null
-                    case Some(p) => context.getClass(p)
-                
-                context.addClass(new Class(context, name, modifier, block, parentClass)).generate()
+                if (!firstPass){
+                    val parentClass = parent match
+                        case None => if name != "object" then context.getClass("object") else null
+                        case Some(p) => context.getClass(p)
+                    
+                    context.addClass(new Class(context, name, modifier, block, parentClass)).generate()
+                }
                 List()
             }
             case TemplateDecl(name, block, modifier, parent) => {
-                val parentTemplate = parent match
-                    case None => null
-                    case Some(p) => context.getTemplate(p)
-                
-                context.addTemplate(new Template(context, name, modifier, block, parentTemplate))
+                if (!firstPass){
+                    val parentTemplate = parent match
+                        case None => null
+                        case Some(p) => context.getTemplate(p)
+                    
+                    context.addTemplate(new Template(context, name, modifier, block, parentTemplate))
+                }
                 List()
             }
             case PredicateDecl(name, args, block, modifier) => {
@@ -73,23 +79,27 @@ object Compiler{
                 List()
             }
             case TypeDef(name, typ) => {
-                context.addTypeDef(name, typ)
+                if (!firstPass){
+                    context.addTypeDef(name, typ)
+                }
                 List()
             }
             case EnumDecl(name, fields, values, modifier) => {
-                val enm = context.addEnum(new Enum(context, name, modifier, fields.map(x => EnumField(x.name, context.getType(x.typ)))))
-                enm.addValues(values)
+                if (!firstPass){
+                    val enm = context.addEnum(new Enum(context, name, modifier, fields.map(x => EnumField(x.name, context.getType(x.typ)))))
+                    enm.addValues(values)
+                }
                 List()
             }
             case ForGenerate(key, provider, instr) => {
                 val cases = Utils.getForgenerateCases(key, provider)
                 
-                cases.map(lst => lst.sortBy(0 - _._1.length()).foldLeft(instr)((instr, elm) => Utils.subst(instr, elm._1, elm._2))).flatMap(Compiler.compile(_)).toList
+                cases.map(lst => lst.sortBy(0 - _._1.length()).foldLeft(instr)((instr, elm) => Utils.subst(instr, elm._1, elm._2))).flatMap(Compiler.compile(_, firstPass)).toList
             }
             case ForEach(key, provider, instr) => {
                 val cases = Utils.getForeachCases(provider)
                 
-                cases.map(elm => Utils.subst(instr, key.toString(), elm)).flatMap(Compiler.compile(_)).toList
+                cases.map(elm => Utils.subst(instr, key.toString(), elm)).flatMap(Compiler.compile(_, firstPass)).toList
             }
             case VariableDecl(name, typ, modifier) => {
                 val vari = new Variable(context, name, context.getType(typ), modifier)
@@ -124,21 +134,22 @@ object Compiler{
 
             case VariableAssigment(names, op, expr) => {
                 if (names.length == 1){
-                    names.head.get().assign(op, Utils.simplify(expr))
+                    val (i,s) = names.head
+                    i.get().assign(op, Utils.simplify(expr))(context, s)
                 }
                 else{
                     val simplied = Utils.simplify(expr)
-                    val varis = names.map(_.get())
+                    val varis = names.map((i,s) => (i.get(), s))
                     simplied match
-                        case TupleValue(lst) => varis.zip(lst).flatMap(p => p._1.assign(op, p._2))
-                        case VariableValue(name) => {
+                        case TupleValue(lst) => varis.zip(lst).flatMap(p => (p._1._1.assign(op, p._2)(context, p._1._2)))
+                        case VariableValue(name, sel) => {
                             val vari = context.getVariable(name) 
                             vari.getType() match
-                                case TupleType(sub) => varis.zip(vari.tupleVari).flatMap(p => p._1.assign(op, LinkedVariableValue(p._2)))
-                                case _ => varis.flatMap(_.assign(op, simplied))
+                                case TupleType(sub) => varis.zip(vari.tupleVari).flatMap(p => p._1._1.assign(op, LinkedVariableValue(p._2, sel))(context, p._1._2))
+                                case _ => varis.flatMap(l => l._1.assign(op, simplied)(context, l._2))
                             
                         }
-                        case _ => varis.flatMap(_.assign(op, simplied))
+                        case _ => varis.flatMap(l => l._1.assign(op, simplied)(context, l._2))
                 }
             }
             case Return(value) => {
@@ -173,7 +184,7 @@ object Compiler{
                 name.call(args, ret)
             }
             case If(BinaryOperation("||", left, right), ifBlock, elseBlock) => {
-                compile(If(left, ifBlock, ElseIf(right, ifBlock) :: elseBlock))
+                compile(If(left, ifBlock, ElseIf(right, ifBlock) :: elseBlock), firstPass)
             }
             case ifb: If => Execute.ifs(ifb)
             case swit: Switch => Execute.switch(swit)

@@ -17,7 +17,7 @@ object Settings{
     var treeSize = 20
     var target:Target = MCJava
     var debug = false
-    var allFunction = false
+    var allFunction = true
 
     val metaVariable = List(
         ("Compiler.isJava", () => target == MCJava),

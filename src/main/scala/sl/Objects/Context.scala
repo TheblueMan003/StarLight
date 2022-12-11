@@ -312,7 +312,7 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
                     if (vari.modifiers.isLazy){
                         vari.lazyValue match
                             case LambdaValue(args2, instr) => (getFreshLambda(args2, args.map(Utils.typeof(_)(this)), output, instr, true), args)
-                            case VariableValue(name) => getFunction(name, args, output, concrete)
+                            case VariableValue(name, sel) => getFunction(name, args, output, concrete)
                             case other => throw new Exception(f"Illegal call of ${other} with $args")
                     }
                     else{

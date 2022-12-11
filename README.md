@@ -42,6 +42,19 @@ Variables can be assigned
 ```
 If the variable is tuple, then the tuple with be unpack
 
+### Scoreboard
+Scoreboard can be created by adding the `scoreboard` modifier when creating a variable.
+```
+scoreboard int myScore
+```
+Scoreboard variable can be either referred with their name or with a selector followed by a dot and their name.
+```
+with(@a){
+    myScore = 0
+}
+@p.myScore = 1
+```
+
 ## Default Types
 ### int
 Store Normal integer

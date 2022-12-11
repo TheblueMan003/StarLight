@@ -24,6 +24,10 @@ object Selector{
             throw new Exception(f"Invalid Selector: $prefix${filters}")
         }
     }
+
+    def self = {
+        JavaSelector("@s",Map())
+    }
 }
 trait Selector{
     def getString()(implicit context: Context): String

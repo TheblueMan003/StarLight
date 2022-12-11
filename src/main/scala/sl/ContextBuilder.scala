@@ -9,13 +9,13 @@ object ContextBuilder{
         val context = Context.getNew(name)
         val extra = Utils.getLib("__init__").get
 
-        buildRec(inst)(context)
-        buildRec(extra)(context)
-
-        Compiler.compile(inst, true)(context)
-        Compiler.compile(extra, true)(context)
-
         DefaultFunction.get()(context)
+
+        buildRec(extra)(context)
+        buildRec(inst)(context)
+
+        Compiler.compile(extra, true)(context)
+        Compiler.compile(inst, true)(context)
 
         context
     }
@@ -32,7 +32,7 @@ object ContextBuilder{
             }
             case ClassDecl(name, block, modifier, parent) => {
                 val parentClass = parent match
-                    case None => null
+                    case None => if name != "object" then context.getClass("object") else null
                     case Some(p) => context.getClass(p)
                 
                 context.addClass(new Class(context, name, modifier, block, parentClass)).generate()

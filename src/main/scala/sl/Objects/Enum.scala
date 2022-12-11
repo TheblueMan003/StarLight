@@ -1,7 +1,7 @@
 package objects
 
 import sl.*
-import objects.types.Type
+import objects.types.{Type, EnumType}
 
 class Enum(context: Context, name: String, _modifier: Modifier, val fields: List[EnumField]) extends CObject(context, name, _modifier){
     var values = List[EnumValue]()
@@ -9,6 +9,8 @@ class Enum(context: Context, name: String, _modifier: Modifier, val fields: List
     def addValues(v: List[EnumValue])(implicit context: Context) = {
         // Remove Duplicate
         val filtered = v.filter(x => !values.exists( y => x.name == x.name))
+
+        val sub = context.push(name)
 
         // Check fields
         filtered.foreach(x => {
@@ -24,6 +26,12 @@ class Enum(context: Context, name: String, _modifier: Modifier, val fields: List
 
         // Append
         values = values ::: filtered
+
+        filtered.foreach(x => {
+            val mod = Modifier.newPublic()
+            mod.isLazy = true
+            sub.addVariable(new Variable(sub, x.name, EnumType(this), mod)).assign("=", EnumIntValue(values.indexOf(x)))
+        })
     }
 }
 

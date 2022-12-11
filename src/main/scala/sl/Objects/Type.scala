@@ -25,7 +25,7 @@ abstract class Type extends Positional {
                 List(),
                 StringType,
                 Modifier.newPublic(),
-                (args: List[Expression]) => {
+                (args: List[Expression], ctx: Context) => {
                     args match{
                         case Nil => (List(), StringValue(variable.lazyValue.toString()))
                         case other => throw new Exception(f"Illegal Arguments $other for toString")
@@ -90,7 +90,7 @@ object StringType extends Type{
                 List(Argument("start", IntType, None)),
                 StringType,
                 Modifier.newPublic(),
-                (args: List[Expression]) => {
+                (args: List[Expression],ctx: Context) => {
                     args match{
                         case IntValue(start)::Nil => (List(), StringValue(variable.lazyValue.asInstanceOf[StringValue].value.substring(start)))
                         case other => throw new Exception(f"Illegal Arguments $other for substring")
@@ -102,7 +102,7 @@ object StringType extends Type{
                 List(Argument("start", IntType, None), Argument("end", IntType, None)),
                 StringType,
                 Modifier.newPublic(),
-                (args: List[Expression]) => {
+                (args: List[Expression],ctx: Context) => {
                     args match{
                         case IntValue(start)::IntValue(end)::Nil => (List(), StringValue(variable.lazyValue.asInstanceOf[StringValue].value.substring(start, end)))
                         case other => throw new Exception(f"Illegal Arguments $other for substring")
@@ -114,7 +114,7 @@ object StringType extends Type{
                 List(),
                 IntType,
                 Modifier.newPublic(),
-                (args: List[Expression]) => {
+                (args: List[Expression],ctx: Context) => {
                     args match{
                         case Nil => (List(), IntValue(variable.lazyValue.asInstanceOf[StringValue].value.length))
                         case other => throw new Exception(f"Illegal Arguments $other for length")
@@ -126,7 +126,7 @@ object StringType extends Type{
                 List(Argument("predicate", StringType, None)),
                 BoolType,
                 Modifier.newPublic(),
-                (args: List[Expression]) => {
+                (args: List[Expression],ctx: Context) => {
                     args match{
                         case StringValue(pred)::Nil => (List(), BoolValue(variable.lazyValue.asInstanceOf[StringValue].value.contains(pred)))
                         case other => throw new Exception(f"Illegal Arguments $other for contains")
@@ -138,7 +138,7 @@ object StringType extends Type{
                 List(Argument("predicate", StringType, None), Argument("to", StringType, None)),
                 StringType,
                 Modifier.newPublic(),
-                (args: List[Expression]) => {
+                (args: List[Expression],ctx: Context) => {
                     args match{
                         case StringValue(pred)::StringValue(to)::Nil => (List(), StringValue(variable.lazyValue.asInstanceOf[StringValue].value.replaceAllLiterally(pred, to)))
                         case other => throw new Exception(f"Illegal Arguments $other for replace")
@@ -150,7 +150,7 @@ object StringType extends Type{
                 List(),
                 IntType,
                 Modifier.newPublic(),
-                (args: List[Expression]) => {
+                (args: List[Expression],ctx: Context) => {
                     args match{
                         case Nil => (List(), IntValue(scala.util.hashing.MurmurHash3.stringHash(variable.lazyValue.asInstanceOf[StringValue].value)))
                         case other => throw new Exception(f"Illegal Arguments $other for hash")

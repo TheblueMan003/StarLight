@@ -6,6 +6,7 @@ import objects.Modifier
 import objects.{Identifier, Variable, Function, Context}
 import objects.EnumField
 import objects.EnumValue
+import sl.Compilation.Selector.Selector
 
 
 case class Argument(val name: String, val typ: Type, val defValue: Option[Expression])
@@ -50,7 +51,7 @@ case class ForEach(val key: Identifier, val provider: Expression, val instr: Ins
 case class VariableDecl(val name: String, val _type: Type, val modifier: Modifier) extends Instruction {
   override def toString() = f"${_type} ${name}"
 }
-case class VariableAssigment(val name: List[Either[Identifier, Variable]], val op: String, val expr: Expression) extends Instruction {
+case class VariableAssigment(val name: List[(Either[Identifier, Variable], Selector)], val op: String, val expr: Expression) extends Instruction {
   override def toString() = f"${name} ${op} ${expr}"
 }
 case class ArrayAssigment(val name: Either[Identifier, Variable], val index: Expression, val op: String, val expr: Expression) extends Instruction {

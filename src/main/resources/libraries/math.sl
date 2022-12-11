@@ -5,11 +5,9 @@ Return the absolute value of x
 """
 def int abs(int x){
 	if(x < 0){
-		return -x
+		x *= -1
 	}
-	if(x >= 0){
-		return x
-	}
+    return x
 }
 
 """
@@ -17,11 +15,9 @@ Return the absolute value of x
 """
 def float abs(float x){
 	if(x < 0){
-		return -x
+		x *= -1
 	}
-	if(x >= 0){
-		return x
-	}
+    return x
 }
 
 """
@@ -29,11 +25,9 @@ Return the max between the a and b
 """
 def int max(int a, int b){
 	if(a > b){
-		return a
+		b = a
 	}
-	if(b >= a){
-		return b
-	}
+	return b
 }
 
 """
@@ -41,11 +35,9 @@ Return the max between the a and b
 """
 def float max(float a, float b){
 	if(a > b){
-		return a
+		b = a
 	}
-	if(b >= a){
-		return b
-	}
+	return b
 }
 
 """
@@ -53,11 +45,9 @@ Return the min between the a and b
 """
 def int min(int a, int b){
 	if(a < b){
-		return a
+		b = a
 	}
-	if(b <= a){
-		return b
-	}
+	return b
 }
 
 """
@@ -65,11 +55,9 @@ Return the min between the a and b
 """
 def float min(float a, float b){
 	if(a < b){
-		return a
+		b = a
 	}
-	if(b <= a){
-		return b
-	}
+	return b
 }
 
 """

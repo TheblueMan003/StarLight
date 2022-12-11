@@ -80,7 +80,7 @@ abstract class Function(context: Context, name: String, val arguments: List[Argu
         })
     }
     def argMap(args: List[Expression]) = {
-        if args.length > argumentsVariables.length then throw new Exception(f"Too much argument for $fullName: $args")
+        if args.size > argumentsVariables.size then throw new Exception(f"Too much argument for $fullName got: $args expected: $arguments")
         if args.length < minArgCount then throw new Exception(f"Too few argument for $fullName got: $args expected: $arguments")
         argumentsVariables.filter(_.getType() != VoidType)
                 .zip(arguments.map(_.defValue))
@@ -269,7 +269,7 @@ class ClassFunction(variable: Variable, function: Function) extends Function(fun
             Compiler.compile(With(
                 selector, 
                 BoolValue(true), 
-                BinaryOperation("==", LinkedVariableValue(variable), LinkedVariableValue(variable)),
+                BinaryOperation("==", LinkedVariableValue(variable), LinkedVariableValue(ctx.root.push("object").getVariable("__ref"))),
                 LinkedFunctionCall(function, args2, ret)
                 ))
         }
@@ -285,14 +285,15 @@ class ClassFunction(variable: Variable, function: Function) extends Function(fun
 }
 
 
-class CompilerFunction(context: Context, name: String, arguments: List[Argument], typ: Type, _modifier: Modifier, val body: List[Expression]=>(List[String],Expression)) extends Function(context, name, arguments, typ, _modifier){
+class CompilerFunction(context: Context, name: String, arguments: List[Argument], typ: Type, _modifier: Modifier, val body: (List[Expression], Context)=>(List[String],Expression)) extends Function(context, name, arguments, typ, _modifier){
+    generateArgument()(context.push(name))
     override def exists()= false
 
     override def getContent(): List[String] = List()
     override def getName(): String = name
 
     def call(args2: List[Expression], ret: Variable = null)(implicit ctx: Context): List[String] = {
-        val call = body(argMap(args2).map((v,e) => Utils.simplify(e)))
+        val call = body(argMap(args2).map((v,e) => Utils.simplify(e)), ctx)
         if (ret != null){
             call._1 ::: ret.assign("=", call._2)
         }

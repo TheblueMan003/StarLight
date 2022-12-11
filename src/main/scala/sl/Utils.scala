@@ -6,6 +6,7 @@ import objects.types.*
 import objects.{Variable, EnumValue, EnumField}
 import scala.io.Source
 import scala.runtime.stdLibPatches.language.experimental.namedTypeArguments
+import sl.Compilation.Selector.Selector
 
 object Utils{
     def getLib(path: String): Option[Instruction] = {
@@ -46,7 +47,7 @@ object Utils{
             case FunctionCall(name, args) => instr
             case LinkedFunctionCall(name, args, vari) => instr
             case VariableAssigment(name, op, expr) => instr
-            case Return(value) => VariableAssigment(List(Left(to.fullName)), "=", value)
+            case Return(value) => VariableAssigment(List((Left(to.fullName), Selector.self)), "=", value)
             case WhileLoop(cond, instr) => WhileLoop(cond, substReturn(instr, to))
             case DoWhileLoop(cond, instr) => DoWhileLoop(cond, substReturn(instr, to))
 
@@ -84,7 +85,7 @@ object Utils{
             case FunctionCall(name, args) => FunctionCall(name.replaceAllLiterally(from, to), args.map(subst(_, from, to)))
             case LinkedFunctionCall(name, args, vari) => LinkedFunctionCall(name, args.map(subst(_, from, to)), vari)
             case VariableAssigment(name, op, expr) => {
-                VariableAssigment(name.map(subst(_, from, to)), op, subst(expr, from, to))
+                VariableAssigment(name.map((l,s) => (subst(l, from, to), s)), op, subst(expr, from, to))
             }
             case Return(value) => Return(subst(value, from, to))
             case WhileLoop(cond, instr) => WhileLoop(subst(cond, from, to), subst(instr, from, to))
@@ -111,10 +112,11 @@ object Utils{
             case RawJsonValue(value) => instr
             case SelectorValue(content) => instr
             case NamespacedName(value) => instr
+            case EnumIntValue(value) => instr
             case DefaultValue => DefaultValue
             case NullValue => NullValue
             case ArrayGetValue(name, index) => ArrayGetValue(subst(name, from, to), subst(index, from, to))
-            case VariableValue(name) => VariableValue(name.replaceAllLiterally(from, to))
+            case VariableValue(name, sel) => VariableValue(name.replaceAllLiterally(from, to), sel)
             case BinaryOperation(op, left, right) => BinaryOperation(op, subst(left, from, to), subst(right, from, to))
             case UnaryOperation(op, left) => UnaryOperation(op, subst(left, from, to))
             case TupleValue(values) => TupleValue(values.map(subst(_, from, to)))
@@ -166,7 +168,7 @@ object Utils{
             case CMD(value) => CMD(value.replaceAllLiterally(from, to))
             case FunctionCall(name, args) => FunctionCall(name.toString().replaceAllLiterally(from, to), args.map(subst(_, from, to)))
             case LinkedFunctionCall(name, args, vari) => LinkedFunctionCall(name, args.map(subst(_, from, to)), vari)
-            case VariableAssigment(name, op, expr) => VariableAssigment(name.map(subst(_, from, to)), op, subst(expr, from, to))
+            case VariableAssigment(name, op, expr) => VariableAssigment(name.map((l,s) => (subst(l, from, to), s)), op, subst(expr, from, to))
             case Return(value) => Return(subst(value, from, to))
             case WhileLoop(cond, instr) => WhileLoop(subst(cond, from, to), subst(instr, from, to))
             case DoWhileLoop(cond, instr) => DoWhileLoop(subst(cond, from, to), subst(instr, from, to))
@@ -191,11 +193,12 @@ object Utils{
             case NamespacedName(value) => NamespacedName(value.replaceAllLiterally(from, to))
             case StringValue(value) => StringValue(value.replaceAllLiterally(from, to))
             case RawJsonValue(value) => instr
+            case EnumIntValue(value) => instr
             case DefaultValue => DefaultValue
             case NullValue => NullValue
             case ArrayGetValue(name, index) => ArrayGetValue(subst(name, from, to), subst(index, from, to))
             case JsonValue(content) => JsonValue(subst(content, from, to))
-            case VariableValue(name) => VariableValue(name.toString().replaceAllLiterally(from, to))
+            case VariableValue(name, sel) => VariableValue(name.toString().replaceAllLiterally(from, to), sel)
             case BinaryOperation(op, left, right) => BinaryOperation(op, subst(left, from, to), subst(right, from, to))
             case UnaryOperation(op, left) => UnaryOperation(op, subst(left, from, to))
             case TupleValue(values) => TupleValue(values.map(subst(_, from, to)))
@@ -336,12 +339,12 @@ object Utils{
             case LinkedFunctionCall(name, args, vari) => LinkedFunctionCall(name, args.map(fix(_)), vari)
             case VariableAssigment(name, op, expr) => VariableAssigment(name.map(x => 
                 x match
-                    case Left(iden) => {
+                    case (Left(iden), sel) => {
                         context.tryGetVariable(iden) match
                             case None => x
-                            case Some(value) => Right(value)
+                            case Some(value) => (Right(value), sel)
                     }
-                    case Right(vari) => Right(vari)
+                    case (Right(vari), sel) => (Right(vari), sel)
                 ), op, fix(expr))
             case Return(value) => Return(fix(value))
             case WhileLoop(cond, instr) => WhileLoop(fix(cond), fix(instr))
@@ -373,13 +376,14 @@ object Utils{
             case NamespacedName(value) => instr
             case StringValue(value) => instr
             case RawJsonValue(value) => instr
+            case EnumIntValue(value) => instr
             case DefaultValue => DefaultValue
             case NullValue => NullValue
             case JsonValue(content) => JsonValue(fix(content))
             case ArrayGetValue(name, index) => ArrayGetValue(fix(name), fix(index))
-            case VariableValue(name) => context.tryGetVariable(name) match
-                case Some(vari) => LinkedVariableValue(vari)
-                case None => VariableValue(name)
+            case VariableValue(name, sel) => context.tryGetVariable(name) match
+                case Some(vari) => LinkedVariableValue(vari, sel)
+                case None => VariableValue(name, sel)
             case BinaryOperation(op, left, right) => BinaryOperation(op, fix(left), fix(right))
             case UnaryOperation(op, left) => UnaryOperation(op, fix(left))
             case TupleValue(values) => TupleValue(values.map(fix(_)))
@@ -414,10 +418,11 @@ object Utils{
             case JsonValue(content) => instr
             case SelectorValue(content) => instr
             case NamespacedName(value) => instr
+            case EnumIntValue(value) => instr
             case ArrayGetValue(name, index) => ArrayGetValue(subst(name, from, to), subst(index, from, to))
             case DefaultValue => DefaultValue
             case NullValue => NullValue
-            case VariableValue(name) => if name.toString() == from then to else instr
+            case VariableValue(name, sel) => if name.toString() == from then to else instr
             case BinaryOperation(op, left, right) => BinaryOperation(op, subst(left, from, to), subst(right, from, to))
             case UnaryOperation(op, left) => UnaryOperation(op, subst(left, from, to))
             case TupleValue(values) => TupleValue(values.map(subst(_, from, to)))
@@ -431,8 +436,8 @@ object Utils{
 
     def simplifyToVariable(expr: Expression)(implicit context: Context): (List[String], LinkedVariableValue) = {
         expr match
-            case VariableValue(name) => (List(), LinkedVariableValue(context.getVariable(name)))
-            case LinkedVariableValue(name) => (List(), LinkedVariableValue(name))
+            case VariableValue(name, sel) => (List(), LinkedVariableValue(context.getVariable(name), sel))
+            case LinkedVariableValue(name, sel) => (List(), LinkedVariableValue(name, sel))
             case other => {
                 val vari = context.getFreshVariable(typeof(other))
                 (vari.assign("=", other), LinkedVariableValue(vari))
@@ -449,6 +454,7 @@ object Utils{
             case JsonValue(content) => JsonType
             case SelectorValue(content) => EntityType
             case LambdaValue(args, instr) => LambdaType(args.length)
+            case EnumIntValue(value) => IntType
             case NamespacedName(value) => MCObjectType
             case ArrayGetValue(name, index) => {
                 typeof(name) match
@@ -457,7 +463,7 @@ object Utils{
             }
             case DefaultValue => throw new Exception("default value has no type")
             case NullValue => throw new Exception("null value has no type")
-            case VariableValue(name) => {
+            case VariableValue(name, sel) => {
                 val vari = context.tryGetVariable(name)
                 vari match
                     case None => {
@@ -471,7 +477,7 @@ object Utils{
             case TupleValue(values) => TupleType(values.map(typeof(_)))
             case FunctionCallValue(name, args) => {
                 name match
-                    case VariableValue(name) => context.getFunction(name, args, AnyType)._1.getType()
+                    case VariableValue(name, sel) => context.getFunction(name, args, AnyType)._1.getType()
                     case other => typeof(name) match
                         case FuncType(sources, output) => output
                         case other => throw new Exception(f"Cannot call $other")
@@ -480,7 +486,7 @@ object Utils{
                 context.getType(IdentifierType(name.toString()))
             }
             case RangeValue(min, max) => RangeType(typeof(min))
-            case LinkedVariableValue(vari) => vari.getType()
+            case LinkedVariableValue(vari, sel) => vari.getType()
     }
 
     def combineType(op: String, t1: Type, t2: Type, expr: Expression): Type = {
@@ -537,16 +543,16 @@ object Utils{
                     case (JsonValue(a), JsonValue(b)) => JsonValue(combine(op, a, b))
                     case _ => BinaryOperation(op, nl, nr)
             }
-            case VariableValue(iden) if iden.toString() == "Compiler.isJava" => {
+            case VariableValue(iden, sel) if iden.toString() == "Compiler.isJava" => {
                 BoolValue(Settings.target == MCJava)
             }
-            case VariableValue(iden) if iden.toString() == "Compiler.isBedrock" => {
+            case VariableValue(iden, sel) if iden.toString() == "Compiler.isBedrock" => {
                 BoolValue(Settings.target == MCBedrock)
             }
-            case LinkedVariableValue(vari) => {
+            case LinkedVariableValue(vari, sel) => {
                 if vari.modifiers.isLazy then vari.lazyValue else expr
             }
-            case VariableValue(iden) => {
+            case VariableValue(iden, sel) => {
                 val vari = context.tryGetVariable(iden)
                 vari match
                     case None => expr
@@ -694,7 +700,7 @@ object Utils{
         provider match
             case RangeValue(IntValue(min), IntValue(max)) => Range(min, max+1).map(elm => List((key, elm.toString())))
             case TupleValue(lst) => lst.map(elm => List((key, elm.toString())))
-            case VariableValue(iden) if iden.toString().startsWith("@") => {
+            case VariableValue(iden, sel) if iden.toString().startsWith("@") => {
                 context.getFunctionTags(iden).getCompilerFunctionsName().map(name => List((key, name)))
             }
             case _ => throw new Exception(f"Unknown generator: $provider")
@@ -703,7 +709,7 @@ object Utils{
         provider match
             case RangeValue(IntValue(min), IntValue(max)) => Range(min, max+1).map(elm => IntValue(elm))
             case TupleValue(lst) => lst.map(elm => elm)
-            case VariableValue(iden) if iden.toString().startsWith("@") => {
+            case VariableValue(iden, sel) if iden.toString().startsWith("@") => {
                 context.getFunctionTags(iden).getCompilerFunctionsName().map(name => VariableValue(name))
             }
             case _ => throw new Exception(f"Unknown generator: $provider")

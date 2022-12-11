@@ -1,3 +1,10 @@
 package main
 
-int a
+
+class test{
+    def __init__(){
+
+    }
+}
+
+test lol = new test()
