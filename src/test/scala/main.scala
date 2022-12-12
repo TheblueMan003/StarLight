@@ -21,6 +21,7 @@ class ListFunSuite extends AnyFlatSpec with should.Matchers with BeforeAndAfterA
     var output: PrintStream = null
 
     val testFiles = List(("math.sl", 1))
+    val compileTests = List("comparaison.sl")
 
 
     override def beforeAll() = {
@@ -74,6 +75,13 @@ class ListFunSuite extends AnyFlatSpec with should.Matchers with BeforeAndAfterA
         assert(checkForText("Done"))
         clearChat()
     }
+
+    compileTests.foreach((f, n) => {
+        deleteDirectory(new File("./test_env/world/datapacks/test"))
+        f should "compile" in {
+            sl.Main.main(Array("compile", "-i", "./src/test/resources/"+f, "-o", "./test_env/world/datapacks/test/"))
+        }
+    })
 
     testFiles.foreach((f, n) => {
         deleteDirectory(new File("./test_env/world/datapacks/test"))

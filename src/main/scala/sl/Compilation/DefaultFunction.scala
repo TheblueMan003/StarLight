@@ -22,6 +22,19 @@ object DefaultFunction{
                         }
                     }
                 ))
+        ctx.addFunction("addClassTags", CompilerFunction(context, "addClassTags", 
+                List(Argument("class", MCObjectType, None)),
+                MCObjectType,
+                Modifier.newPublic(),
+                (args: List[Expression],ctx: Context) => {
+                    args match{
+                        case StringValue(vari)::Nil => {
+                            (ctx.getClass(vari).addClassTags(), NullValue)
+                        }
+                        case other => throw new Exception(f"Illegal Arguments $other for random")
+                    }
+                }
+            ))
         ctx.addFunction("getObjective", CompilerFunction(context, "getObjective", 
                 List(Argument("vari", MCObjectType, None)),
                 MCObjectType,

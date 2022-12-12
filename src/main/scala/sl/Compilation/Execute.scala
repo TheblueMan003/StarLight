@@ -253,10 +253,10 @@ object Execute{
                 (v._1, List(IFValueCase(v._2)))
             }
             case FunctionCallValue(name, args, sel) if name.toString() == "Compiler.isBedrock" => {
-                if Settings.target == MCBedrock then (List(), List(IFFalse)) else (List(), List(IFTrue))
+                if Settings.target == MCBedrock then (List(), List(IFTrue)) else (List(), List(IFFalse))
             }
             case FunctionCallValue(name, args, sel) if name.toString() == "Compiler.isJava" => {
-                if Settings.target == MCJava then (List(), List(IFFalse)) else (List(), List(IFTrue))
+                if Settings.target == MCJava then (List(), List(IFTrue)) else (List(), List(IFFalse))
             }
             case FunctionCallValue(name, args, sel) if name.toString() == "Compiler.isVariable" => {
                 val check = args.forall(arg =>
@@ -384,6 +384,12 @@ case class IFValueCase(val value: Expression) extends IFCase{
 
 
 
+
+            case BinaryOperation("!=", LinkedVariableValue(right, sel), left) if left.hasIntValue()=> {
+                val op = value.asInstanceOf[BinaryOperation].op
+                f"unless score ${right.getSelector()(sel)} matches ${left.getIntValue()}"
+            }
+            
             case BinaryOperation("!=", right, LinkedVariableValue(left, sel)) if right.hasIntValue()=> {
                 val op = value.asInstanceOf[BinaryOperation].op
                 f"unless score ${left.getSelector()(sel)} matches ${right.getIntValue()}"

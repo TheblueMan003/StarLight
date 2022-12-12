@@ -171,13 +171,13 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
     def requestConstant(value: Int): Unit = {
         val r = root
         r.synchronized{
-            constants.add(value)
+            r.constants.add(value)
         }
     }
     def getAllConstant(): List[Int] = {
         val r = root
         r.synchronized{
-            constants.toList
+            r.constants.toList
         }
     }
 

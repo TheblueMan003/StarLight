@@ -782,7 +782,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 							case typ@ClassType(clazz) => {
 								if (typ == getType()){
 									deref()
-									::: assign("=", FunctionCallValue(VariableValue("__initInstance"), List())) 
+									::: assign("=", FunctionCallValue(VariableValue("__initInstance"), List(StringValue(clazz.fullName)))) 
 									::: context.getFunction(name + ".__init__", args, getType(), false).call()
 								}
 								else{

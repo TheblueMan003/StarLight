@@ -74,4 +74,12 @@ class Class(context: Context, name: String, _modifier: Modifier, val block: Inst
             false
         }
     }
+    def addClassTags():List[String] = {
+        List(f"tag @s add #class.$fullName") ::: (if (parent != null){
+            parent.addClassTags()
+        }
+        else{
+            Nil
+        })
+    }
 }
