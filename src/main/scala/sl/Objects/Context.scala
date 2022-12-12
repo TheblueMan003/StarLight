@@ -327,7 +327,7 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
     def resolveVariable(vari: Expression) = {
 		val VariableValue(name, sel) = vari
 		tryGetProperty(name) match
-			case Some(Property(_, getter, setter)) => FunctionCallValue(LinkedFunctionValue(getter), List(), sel)
+			case Some(Property(_, getter, setter, variable)) => FunctionCallValue(LinkedFunctionValue(getter), List(), sel)
 			case _ => LinkedVariableValue(getVariable(name), sel)
 	}
 

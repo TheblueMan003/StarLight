@@ -12,7 +12,11 @@ object Variable {
 	extension (value: Either[Identifier, Variable]) {
 		def get()(implicit context: Context):Variable = {
 			value match{
-				case Left(value) => context.getVariable(value)
+				case Left(value) => {
+					context.tryGetProperty(value) match
+						case Some(Property(name, getter, setter, variable)) => PropertySetVariable(context, getter, setter, variable)
+						case None => context.getVariable(value)
+				}
 				case Right(value) => value
 			}
 		}
@@ -873,5 +877,29 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 
 	def getEntityVariableSelector(): Selector = {
 		JavaSelector("@e", Map(("tag", SelectorIdentifier(tagName))))
+	}
+}
+
+class PropertySetVariable(context: Context, getter: Function, setter: Function, variable: Variable) extends Variable(context, "", VoidType, Modifier.newPublic()){
+	override def assign(op: String, value: Expression)(implicit context: Context, selector: Compilation.Selector.Selector): List[String] = {
+		if (op == ":=") throw new Exception("Operator not supported for Properties")
+		if (op == "="){
+			if (selector != Selector.self){
+				Compiler.compile(With(SelectorValue(selector), BoolValue(true), BoolValue(true), LinkedFunctionCall(setter, List(value))))
+			}
+			else{
+				(setter,List(value)).call()
+			}
+		}
+		else{
+			if (variable == null){
+				val set = BinaryOperation(op.replace("=",""), FunctionCallValue(LinkedFunctionValue(getter), List()), value)
+				assign("=", set)
+			}
+			else{
+				val set = BinaryOperation(op.replace("=",""), LinkedVariableValue(variable), value)
+				assign("=", set)
+			}
+		}
 	}
 }

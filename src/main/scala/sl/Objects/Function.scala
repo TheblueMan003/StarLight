@@ -9,7 +9,7 @@ import sl.Compilation.Print
 
 object Function {
   extension (str: (Function, List[Expression])) {
-    def call(ret: Variable = null, op: String = null)(implicit context: Context) = {
+    def call(ret: Variable = null, op: String = "=")(implicit context: Context) = {
         if (str._1.hasRawJsonArg()){
             val prefix = str._2.take(str._1.arguments.length - 1)
             val sufix = str._2.drop(str._1.arguments.length - 1)
@@ -177,20 +177,23 @@ class LazyFunction(context: Context, name: String, arguments: List[Argument], ty
         val sub = ctx.push(ctx.getLazyCallId())
         sub.inherit(context)
         
-        argMap(args).foreach((a, v) => {
+        argMap(args).sortBy((a,v) => -a.name.length).foreach((a, v) => {
             val vari = Variable(sub, a.name, a.getType(), a.modifiers)
             vari.generate()(sub)
             sub.addVariable(vari).assign("=", v)
             block = if a.name.startsWith("$") then Utils.subst(block, a.name, v.getString()) else Utils.subst(block, a.name, v)
         })
 
-        if (op == "="){
-            block = Utils.substReturn(block, ret)
+        if (ret == null){
+            sl.Compiler.compile(block)(if modifiers.isInline then ctx else sub)
+        }
+        else if (op == "="){
+            block = Utils.subst(Utils.substReturn(block, ret), "_ret", LinkedVariableValue(ret))
             sl.Compiler.compile(block)(if modifiers.isInline then ctx else sub)
         }
         else{
             val vari = ctx.getFreshVariable(getType())
-            block = Utils.substReturn(block, vari)
+            block = Utils.subst(Utils.substReturn(block, vari), "_ret", LinkedVariableValue(ret))
             sl.Compiler.compile(block)(if modifiers.isInline then ctx else sub) ::: (if ret == null then List() else ret.assign(op, LinkedVariableValue(vari)))
         }
     }

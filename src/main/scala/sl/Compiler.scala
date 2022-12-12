@@ -1,6 +1,6 @@
 package sl
 
-import objects.{Context, ConcreteFunction, LazyFunction, Modifier, Struct, Class, Template, Variable, Enum, EnumField, Predicate}
+import objects.{Context, ConcreteFunction, LazyFunction, Modifier, Struct, Class, Template, Variable, Enum, EnumField, Predicate, Property}
 import objects.Identifier
 import objects.types.{VoidType, TupleType}
 import sl.Compilation.Execute
@@ -23,7 +23,7 @@ object Compiler{
             context.getAllPredicates().flatMap(_.getFiles()):::
             Settings.target.getExtraFiles(context)
     }
-    def compile(instruction: Instruction, firstPass: Boolean = false)(implicit context: Context):List[String]={        
+    def compile(instruction: Instruction, firstPass: Boolean = false)(implicit context: Context):List[String]={   
         instruction match{
             case FunctionDecl(name, block, typ, args, modifier) =>{
                 val fname = context.getFunctionWorkingName(name)
@@ -126,11 +126,21 @@ object Compiler{
                 ret
             }
             case TemplateUse(iden, name, block) => {
-                val template = context.getTemplate(iden)
-                val sub = context.push(name)
+                if (iden.toString() == "property"){
+                    val sub = context.push(name)
 
-                sub.inherit(template.context)
-                compile(Utils.fix(template.block)(template.context), true)(sub) ::: compile(block, true)(sub)
+                    compile(block, true)(sub)
+
+                    context.addProperty(Property(name, sub.getFunction("get"), sub.getFunction("set"), null))
+                    List()
+                }
+                else{
+                    val template = context.getTemplate(iden)
+                    val sub = context.push(name)
+
+                    sub.inherit(template.context)
+                    compile(Utils.fix(template.block)(template.context), true)(sub) ::: compile(block, true)(sub)
+                }
             }
 
 

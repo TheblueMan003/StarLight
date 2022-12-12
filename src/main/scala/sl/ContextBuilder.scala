@@ -76,7 +76,8 @@ object ContextBuilder{
             }
             case Import(lib, value, alias) => {
                 val ret = if (context.importFile(lib)){
-                    buildRec(Utils.getLib(lib).get)(context.root)
+                    val libC = Utils.getLib(lib).get
+                    buildRec(libC)(context.root)
                 }
                 else{
                     List()

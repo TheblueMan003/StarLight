@@ -34,6 +34,10 @@ object DefaultFunction{
                         case VariableValue(vari, sel)::Nil => {
                             (List(), NamespacedName(ctx.getVariable(vari).getSelectorObjective()))
                         }
+                        case sv::Nil if sv.hasIntValue() => {
+                            context.requestConstant(sv.getIntValue())
+                            (List(), NamespacedName(Settings.constScoreboard))
+                        }
                         case other => throw new Exception(f"Illegal Arguments $other for random")
                     }
                 }
@@ -50,10 +54,15 @@ object DefaultFunction{
                         case VariableValue(vari, sel)::Nil => {
                             (List(), NamespacedName(ctx.getVariable(vari).getSelectorName()(sel)))
                         }
+                        case sv::Nil if sv.hasIntValue() => {
+                            context.requestConstant(sv.getIntValue())
+                            (List(), NamespacedName(sv.getIntValue().toString))
+                        }
                         case other => throw new Exception(f"Illegal Arguments $other for random")
                     }
                 }
             ))
+
         if (Settings.target == MCJava){
             ctx.addFunction("cmdstore", CompilerFunction(context, "cmdstore", 
                     List(Argument("vari", MCObjectType, None), Argument("cmd", FuncType(List(), VoidType), None)),

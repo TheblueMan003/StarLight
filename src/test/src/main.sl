@@ -1,5 +1,10 @@
 package main
 
-import math
+import mc.entity.nbt as nbt
 
-int a = math.abs(5)
+if (nbt.x > 10){
+    /say hi
+}
+nbt.x = 10
+int a = 2
+a = a*5
