@@ -1,6 +1,7 @@
 package objects
 
 import scala.collection.mutable.ArrayBuffer
+import sl.Expression
 
 object Modifier{
     def newPrivate()= {
@@ -27,7 +28,7 @@ class Modifier(){
     var isStatic = false
     var isHelper = false
     var tags = ArrayBuffer[String]()
-    var attributes = Map[String,String]()
+    var attributes = Map[String,Expression]()
 
     def combine(other: Modifier): Modifier = {
         val ret = Modifier()
@@ -42,7 +43,7 @@ class Modifier(){
         ret.isHelper = isHelper | other.isHelper
         ret.isStatic = isStatic | other.isStatic
         ret.tags = tags ++ other.tags
-        ret.attributes = attributes
+        ret.attributes = attributes ++ other.attributes
         ret
     }
 }

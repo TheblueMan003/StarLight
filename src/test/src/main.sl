@@ -1,6 +1,9 @@
 package main
 
-import mc.entity.nbt as nbt
+class wolf with minecraft:dog{
+    def __init__(){
 
-int a
-a = a * 5
+    }
+}
+
+wolf test = new wolf()

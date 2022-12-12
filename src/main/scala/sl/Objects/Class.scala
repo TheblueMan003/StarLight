@@ -5,9 +5,9 @@ import objects.ConcreteFunction
 import sl.*
 import sl.Compilation.Selector.Selector
 
-class Class(context: Context, name: String, _modifier: Modifier, val block: Instruction, val parent: Class) extends CObject(context, name, _modifier) with Typed(IdentifierType(context.getPath()+"."+name)){
+class Class(context: Context, name: String, _modifier: Modifier, val block: Instruction, val parent: Class, val entity: NamespacedName) extends CObject(context, name, _modifier) with Typed(IdentifierType(context.getPath()+"."+name)){
     def generate()={
-        val ctx = context.push(name)
+        val ctx = context.push(name, this)
         ctx.push("this", ctx)
         if (parent != null){
             ctx.inherit(parent.context.push(parent.name))
@@ -75,11 +75,24 @@ class Class(context: Context, name: String, _modifier: Modifier, val block: Inst
         }
     }
     def addClassTags():List[String] = {
-        List(f"tag @s add #class.$fullName") ::: (if (parent != null){
+        List(f"tag @s add ${getTag()}") ::: (if (parent != null){
             parent.addClassTags()
         }
         else{
             Nil
         })
+    }
+    def getTag()=f"#class.$fullName"
+
+    def getEntity(): NamespacedName = {
+        if (entity != null){
+            entity
+        }
+        else if (parent != null){
+            parent.getEntity()
+        }
+        else{
+            null
+        }
     }
 }

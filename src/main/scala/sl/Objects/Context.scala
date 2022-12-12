@@ -52,6 +52,7 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
 
     private var function: Function = null
     private var variable: Variable = null
+    private var clazz: Class = null
 
     def getPath(): String ={
         return path
@@ -223,6 +224,27 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
             push(iden.head()).push(iden.drop(), fct)
         }
     }
+    /**
+     * Return a new context for a sub block
+     */
+    def push(iden: Identifier, clz: Class): Context = {
+        if (iden.isSingleton()){
+            val name = iden.toString()
+            val ret = if (child.contains(name)){
+            child(name)
+            }
+            else{
+                val n = new Context(name, this, root)
+                child.addOne(name, n)
+                n
+            }
+            ret.clazz = clz
+            ret
+        }
+        else{
+            push(iden.head()).push(iden.drop(), clz)
+        }
+    }
 
     /**
      * Add a context as a child
@@ -265,6 +287,9 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
     }
     def getCurrentVariable(): Variable = {
         if variable == null && parent != null then parent.getCurrentVariable() else variable
+    }
+    def getCurrentClass(): Class = {
+        if clazz == null && parent != null then parent.getCurrentClass() else clazz
     }
 
 
@@ -405,6 +430,7 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
         if (function.modifiers.tags.length > 0){
             function match
                 case cf: ConcreteFunction => tagCtx.addFunctionToTags(cf)
+                case cf: ClassFunction => {}
                 case other => throw new Exception(f"Function: ${other} cannot be put in a tag")
         }
         function

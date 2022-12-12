@@ -7,6 +7,7 @@ def ticking __load__(){
             @__loading__()
         }
     }
+    @tick()
 }
 
 int __totalRefCount
@@ -26,7 +27,7 @@ class object{
     }
 }
 
-lazy object __initInstance(mcobject clazz, mcobject $entity = marker){
+lazy object __initInstance(mcobject $entity = marker){
     __totalRefCount++
     if (Compiler.isJava()){
         /summon $entity ~ ~ ~ {Tags:["__class__","cls_trg"]}
@@ -34,7 +35,6 @@ lazy object __initInstance(mcobject clazz, mcobject $entity = marker){
             object.__ref = __totalRefCount
             object.__refCount = 1
             /tag @s remove cls_trg
-            Compiler.addClassTags(clazz)
         }
     }
     if (Compiler.isBedrock()){
@@ -44,7 +44,6 @@ lazy object __initInstance(mcobject clazz, mcobject $entity = marker){
             object.__ref = __totalRefCount
             object.__refCount = 1
             /tag @s add __class__
-            Compiler.addClassTags(clazz)
         }
     }
     return __totalRefCount

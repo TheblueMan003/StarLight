@@ -52,13 +52,13 @@ object Compiler{
                 }
                 List()
             }
-            case ClassDecl(name, block, modifier, parent) => {
+            case ClassDecl(name, block, modifier, parent, entity) => {
                 if (!firstPass){
                     val parentClass = parent match
                         case None => if name != "object" then context.getClass("object") else null
                         case Some(p) => context.getClass(p)
                     
-                    context.addClass(new Class(context, name, modifier, block, parentClass)).generate()
+                    context.addClass(new Class(context, name, modifier, block, parentClass, entity.getOrElse(null))).generate()
                 }
                 List()
             }

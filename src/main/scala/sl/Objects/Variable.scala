@@ -781,8 +781,10 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 							case StructType(struct) => throw new Exception("Cannot call struct constructor for class")
 							case typ@ClassType(clazz) => {
 								if (typ == getType()){
+									val entity = clazz.getEntity()
+									val initarg = List(StringValue(clazz.fullName))::: (if entity != null then List(entity) else List())
 									deref()
-									::: assign("=", FunctionCallValue(VariableValue("__initInstance"), List(StringValue(clazz.fullName)))) 
+									::: assign("=", FunctionCallValue(VariableValue("__initInstance"), initarg))
 									::: context.getFunction(name + ".__init__", args, getType(), false).call()
 								}
 								else{

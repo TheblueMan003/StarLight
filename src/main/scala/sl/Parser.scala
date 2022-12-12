@@ -100,7 +100,7 @@ object Parser extends StandardTokenParsers{
   def arrayAssign:Parser[Instruction] = (identLazy2 <~ "[") ~ (rep1sep(expr, ",") <~ "]") ~ assignmentOp ~ expr ^^ { case a ~ i ~ o ~ e => ArrayAssigment(Left(a), i, o, e) }
   def foreach: Parser[Instruction] = ("foreach" ~> ident <~ "in") ~ expr ~ program ^^ { case v ~ e ~ i => ForEach(v, e, i) }
   def packageInstr: Parser[Instruction] = "package" ~> identLazy2 ~ program ^^ (p => Package(p._1, p._2))
-  def classDecl: Parser[Instruction] = (modifier <~ "class") ~ identLazy ~ opt("extends" ~> ident2) ~ block ^^ { case mod ~ iden ~ par ~ block => ClassDecl(iden, block, mod, par) }
+  def classDecl: Parser[Instruction] = (modifier <~ "class") ~ identLazy ~ opt("extends" ~> ident2) ~ opt("with" ~> namespacedName2) ~ block ^^ { case mod ~ iden ~ par ~ entity ~ block => ClassDecl(iden, block, mod, par, entity) }
   def structDecl: Parser[Instruction] = (modifier <~ "struct") ~ identLazy ~ opt("extends" ~> ident2) ~ block ^^ { case mod ~ iden ~ par ~ block => StructDecl(iden, block, mod, par) }
   def typedef: Parser[Instruction] = "typedef" ~> types ~ identLazy ^^ { case _1 ~ _2 => TypeDef(_2, _1) }
   def templateUse: Parser[Instruction] = ident2 ~ ident ~ block ^^ {case iden ~ name ~ instr => TemplateUse(iden, name, instr)}
@@ -179,6 +179,7 @@ object Parser extends StandardTokenParsers{
 
   def stringLit2: Parser[String] = stringLit ^^ {p => p.replaceAllLiterally("◘", "\\\"")}
   def namespacedName = ident ~ ":" ~ ident2 ^^ { case a ~ b ~ c => NamespacedName(a+b+c) }
+  def namespacedName2 = opt(identLazy <~ ":") ~ identLazy2 ^^ { case a ~ c => if a.isEmpty then NamespacedName(c) else NamespacedName(a.get+":"+c)}
   def exprBottom: Parser[Expression] = 
     (numericLit <~ "..") ~ numericLit ^^ (p => RangeValue(IntValue(p._1.toInt), IntValue(p._2.toInt)))
     | floatValue ^^ (p => FloatValue(p))
@@ -252,11 +253,14 @@ object Parser extends StandardTokenParsers{
                             nonRecTypes
 
   def modifierSub: Parser[String] = ("override" | "lazy" | "inline"| "scoreboard" | "ticking" | "loading" | "helper" | "static")
+  def modifierAttribute: Parser[(String,Expression)] = ident2 ~ "=" ~ expr ^^ {case i ~ _ ~ e => (i, e)}
+  def modifierAttributes: Parser[Map[String,Expression]] = opt("[" ~> rep1sep(modifierAttribute,",") <~"]") ^^ {(_.getOrElse(List()).toMap)}
   def modifier: Parser[Modifier] = 
-    (opt(stringLit2 ~ stringLit2 ~ stringLit2)~opt("public" | "private" | "protected") ~ rep(modifierSub) ~ rep(identTag)) ^^ 
-    { case doc ~ protection ~ subs ~ tags => {
+    (opt(stringLit2 ~ stringLit2 ~ stringLit2) ~ modifierAttributes ~ opt("public" | "private" | "protected") ~ rep(modifierSub) ~ rep(identTag)) ^^ 
+    { case doc ~ attributes ~ protection ~ subs ~ tags => {
       val mod = new Modifier()
       mod.tags.addAll(tags)
+      mod.attributes = attributes
       protection match{
         case Some("public") => mod.protection = Protection.Public
         case Some("private") => mod.protection = Protection.Private

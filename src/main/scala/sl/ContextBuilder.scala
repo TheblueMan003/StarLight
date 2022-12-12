@@ -30,12 +30,12 @@ object ContextBuilder{
                 context.addStruct(new Struct(context, name, modifier, block, parentStruct))
                 List()
             }
-            case ClassDecl(name, block, modifier, parent) => {
+            case ClassDecl(name, block, modifier, parent, entity) => {
                 val parentClass = parent match
                     case None => if name != "object" then context.getClass("object") else null
                     case Some(p) => context.getClass(p)
                 
-                context.addClass(new Class(context, name, modifier, block, parentClass)).generate()
+                context.addClass(new Class(context, name, modifier, block, parentClass, entity.getOrElse(null))).generate()
                 List()
             }
             case EnumDecl(name, fields, values, modifier) => {

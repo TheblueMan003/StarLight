@@ -26,6 +26,7 @@ abstract class Function(context: Context, name: String, val arguments: List[Argu
     val minArgCount = getMinArgCount(arguments)
     val maxArgCount = getMaxArgCount(arguments)
     var argumentsVariables: List[Variable] = List()
+    val clazz = context.getCurrentClass()
 
     private def getMaxArgCount(args: List[Argument]): Int = {
         if args.length == 0 then 0 else
@@ -261,8 +262,23 @@ class TagFunction(context: Context, name: String, arguments: List[Argument]) ext
 
     override def exists()= true
 
+    def getFunctions() = {
+        functions.toList.sortBy(f => {
+            Utils.simplify(f.modifiers.attributes.getOrElse("tag.order", IntValue(0)))(context) match {
+                case IntValue(n) => n.toDouble
+                case FloatValue(n) => n
+                case _ => 0.0
+            }
+        })
+    }
+
     override def compile(): Unit = {
-        content = sl.Compiler.compile(InstructionList(functions.map(LinkedFunctionCall(_, argumentsVariables.map(LinkedVariableValue(_)))).toList))(context.push(name, this))
+        val normal: List[Instruction] = getFunctions().filter(_.clazz == null).map(LinkedFunctionCall(_, argumentsVariables.map(LinkedVariableValue(_)))).toList
+        val clazz: List[Instruction] = getFunctions().filter(_.clazz != null).map(f => {
+            With(SelectorValue(JavaSelector("@e",Map(("tag", SelectorIdentifier(f.clazz.getTag()))))), BoolValue(true), BoolValue(true),
+            LinkedFunctionCall(f, argumentsVariables.map(LinkedVariableValue(_))))}).toList
+
+        content = sl.Compiler.compile(InstructionList(normal ::: clazz))(context.push(name, this))
     }
 }
 

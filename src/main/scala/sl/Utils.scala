@@ -24,7 +24,7 @@ object Utils{
         instr match
             case Package(name, block) => Package(name, substReturn(block, to))
             case StructDecl(name, block, modifier, parent) => StructDecl(name, substReturn(block, to), modifier, parent)
-            case ClassDecl(name, block, modifier, parent) => ClassDecl(name, substReturn(block, to), modifier, parent)
+            case ClassDecl(name, block, modifier, parent, entity) => ClassDecl(name, substReturn(block, to), modifier, parent, entity)
             case FunctionDecl(name, block, typ, args, modifier) => FunctionDecl(name, substReturn(block, to), typ, args, modifier)
             case PredicateDecl(name, args, block, modifier) => instr
             case ForGenerate(key, provider, instr) => ForGenerate(key, provider, substReturn(instr, to))
@@ -63,7 +63,7 @@ object Utils{
         instr match
             case Package(name, block) => Package(name, subst(block, from, to))
             case StructDecl(name, block, modifier, parent) => StructDecl(name, subst(block, from, to), modifier, parent)
-            case ClassDecl(name, block, modifier, parent) => ClassDecl(name, subst(block, from, to), modifier, parent)
+            case ClassDecl(name, block, modifier, parent, entity) => ClassDecl(name, subst(block, from, to), modifier, parent, entity)
             case FunctionDecl(name, block, typ, args, modifier) => FunctionDecl(name, subst(block, from, to), typ, args, modifier)
             case PredicateDecl(name, args, block, modifier) => PredicateDecl(name, args, block, modifier)
             case VariableDecl(name, _type, modifier) => instr
@@ -137,7 +137,10 @@ object Utils{
         instr match
             case Package(name, block) => Package(name.replaceAllLiterally(from, to), subst(block, from, to))
             case StructDecl(name, block, modifier, parent) => StructDecl(name.replaceAllLiterally(from, to), subst(block, from, to), modifier, parent)
-            case ClassDecl(name, block, modifier, parent) => ClassDecl(name.replaceAllLiterally(from, to), subst(block, from, to), modifier, parent)
+            case ClassDecl(name, block, modifier, parent, Some(NamespacedName(entity))) =>
+                ClassDecl(name.replaceAllLiterally(from, to), subst(block, from, to), modifier, parent, Some(NamespacedName(entity.replaceAllLiterally(from, to))))
+            case ClassDecl(name, block, modifier, parent, entity) =>
+                ClassDecl(name.replaceAllLiterally(from, to), subst(block, from, to), modifier, parent, entity)
             case FunctionDecl(name, block, typ, args, modifier) => {
                 if (args.exists(x => x.name == from)){
                     instr
@@ -234,7 +237,7 @@ object Utils{
         instr match
             case Package(name, block) => Package(name, subst(block, from, to))
             case StructDecl(name, block, modifier, parent) => StructDecl(name, subst(block, from, to), modifier, parent)
-            case ClassDecl(name, block, modifier, parent) => ClassDecl(name, subst(block, from, to), modifier, parent)
+            case ClassDecl(name, block, modifier, parent, entity) => ClassDecl(name, subst(block, from, to), modifier, parent, entity)
             case FunctionDecl(name, block, typ, args, modifier) => {
                 if (args.exists(x => x.name == from)){
                     instr
@@ -282,7 +285,7 @@ object Utils{
         instr match
             case Package(name, block) => Package(name, rmFunctions(block))
             case StructDecl(name, block, modifier, parent) => StructDecl(name, rmFunctions(block), modifier, parent)
-            case ClassDecl(name, block, modifier, parent) => ClassDecl(name, rmFunctions(block), modifier, parent)
+            case ClassDecl(name, block, modifier, parent, entity) => ClassDecl(name, rmFunctions(block), modifier, parent, entity)
             case FunctionDecl(name, block, typ, args, modifier) => InstructionList(List())
             case PredicateDecl(name, args, block, modifier) => instr
             case EnumDecl(name, fields, values, modifier) => EnumDecl(name, fields, values, modifier)
@@ -330,7 +333,7 @@ object Utils{
         instr match
             case Package(name, block) => Package(name, fix(block))
             case StructDecl(name, block, modifier, parent) => StructDecl(name, fix(block), modifier, parent)
-            case ClassDecl(name, block, modifier, parent) => ClassDecl(name, fix(block), modifier, parent)
+            case ClassDecl(name, block, modifier, parent, entity) => ClassDecl(name, fix(block), modifier, parent, entity)
             case FunctionDecl(name, block, typ, args, modifier) => FunctionDecl(name, fix(block), typ, args, modifier)
             case PredicateDecl(name, args, block, modifier) => PredicateDecl(name, args, fix(block), modifier)
             case EnumDecl(name, fields, values, modifier) => EnumDecl(name, fields, values.map(v => EnumValue(v.name, v.fields.map(fix(_)))), modifier)

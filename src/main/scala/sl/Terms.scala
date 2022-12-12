@@ -21,7 +21,7 @@ case class Package(val name: String, val block: Instruction) extends Instruction
 case class StructDecl(val name: String, val block: Instruction, val modifier: Modifier, val parent: Option[String]) extends Instruction {
   override def toString() = f"struct ${name} ${block}"
 }
-case class ClassDecl(val name: String, val block: Instruction, val modifier: Modifier, val parent: Option[String]) extends Instruction {
+case class ClassDecl(val name: String, val block: Instruction, val modifier: Modifier, val parent: Option[String], val entity: Option[NamespacedName]) extends Instruction {
   override def toString() = f"struct ${name} ${block}"
 }
 case class EnumDecl(val name: String, val fields: List[EnumField], val values: List[EnumValue], val modifier: Modifier) extends Instruction {
