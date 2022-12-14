@@ -1,4 +1,4 @@
-def ticking __load__(){
+def [compile.order=999999] ticking __load__(){
     if (Compiler.isBedrock){
         int v
         lazy int id = Compiler.random()
@@ -7,14 +7,21 @@ def ticking __load__(){
             @__loading__()
         }
     }
-    @tick()
+    if (@tick){
+        @tick()
+    }
+    if (@playertick){
+        with(@a, true){
+            @playertick()
+        }
+    }
 }
 
 int __totalRefCount
 
 class object{
-    int __ref
-    int __refCount
+    private int __ref
+    private int __refCount
 
     def __addRef(){
         __refCount++
@@ -25,26 +32,27 @@ class object{
             /kill
         }
     }
-}
-
-lazy object __initInstance(mcobject $entity = marker){
-    __totalRefCount++
-    if (Compiler.isJava()){
-        /summon $entity ~ ~ ~ {Tags:["__class__","cls_trg"]}
-        with(@e[tag=cls_trg]){
-            object.__ref = __totalRefCount
-            object.__refCount = 1
-            /tag @s remove cls_trg
+    static lazy object __initInstance(mcobject clazz, mcobject $entity = marker){
+        __totalRefCount++
+        if (Compiler.isJava()){
+            /summon $entity ~ ~ ~ {Tags:["__class__","cls_trg"]}
+            with(@e[tag=cls_trg]){
+                object.__ref = __totalRefCount
+                object.__refCount = 1
+                /tag @s remove cls_trg
+                Compiler.addClassTags(clazz)
+            }
         }
-    }
-    if (Compiler.isBedrock()){
-        /tag @e[tag=!object.__tagged] add object.__tagged
-        /summon $entity
-        with(@e[tag=!object.__tagged]){
-            object.__ref = __totalRefCount
-            object.__refCount = 1
-            /tag @s add __class__
+        if (Compiler.isBedrock()){
+            /tag @e[tag=!object.__tagged] add object.__tagged
+            /summon $entity
+            with(@e[tag=!object.__tagged]){
+                object.__ref = __totalRefCount
+                object.__refCount = 1
+                /tag @s add __class__
+                Compiler.addClassTags(clazz)
+            }
         }
+        return __totalRefCount
     }
-    return __totalRefCount
 }

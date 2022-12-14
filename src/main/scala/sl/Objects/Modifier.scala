@@ -1,7 +1,7 @@
 package objects
 
 import scala.collection.mutable.ArrayBuffer
-import sl.Expression
+import sl.*
 
 object Modifier{
     def newPrivate()= {
@@ -18,9 +18,10 @@ object Modifier{
 
 class Modifier(){
     var protection: Protection = Protection.Protected
+    var isAbstract = false
+    var isVirtual = false
     var isOverride = false
     var isLazy = false
-    var isInline = false
     var isEntity = false
     var isConst = false
     var isTicking = false
@@ -29,13 +30,15 @@ class Modifier(){
     var isHelper = false
     var tags = ArrayBuffer[String]()
     var attributes = Map[String,Expression]()
+    var doc: String = ""
 
     def combine(other: Modifier): Modifier = {
         val ret = Modifier()
         ret.protection = protection
+        ret.isVirtual = isVirtual | other.isVirtual
+        ret.isAbstract = isAbstract | other.isAbstract
         ret.isOverride = isOverride | other.isOverride
-        ret.isLazy = isLazy | other.isLazy
-        ret.isInline = isInline | other.isInline
+        ret.isLazy = isLazy | other.isLazy        
         ret.isEntity = isEntity | other.isEntity
         ret.isConst = isConst | other.isConst
         ret.isTicking = isTicking | other.isTicking
@@ -45,6 +48,27 @@ class Modifier(){
         ret.tags = tags ++ other.tags
         ret.attributes = attributes ++ other.attributes
         ret
+    }
+
+    def getAttributesString(key: String, default: ()=>String)(implicit context: Context): String = {
+        attributes.getOrElse(key, null) match
+            case null => default()
+            case StringValue(value) => value
+            case other => Utils.simplify(other)(context).toString()
+    }
+
+    def hasAttributes(key: String)(implicit context: Context): Boolean = {
+        attributes.getOrElse(key, BoolValue(false)) match
+            case BoolValue(value) => value
+            case other => Utils.simplify(other)(context) == BoolValue(true)
+    }
+
+    def withDoc(text: Option[String])={
+        text match
+            case None => {}
+            case Some(value) => doc += value
+        
+        this
     }
 }
 

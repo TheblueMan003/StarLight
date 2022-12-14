@@ -2,6 +2,7 @@ package sl.Compilation
 
 import sl.{If, SmallValue, Expression, ElseIf}
 import objects.{Context, Variable}
+import objects.types.*
 import sl.*
 import objects.types.IntType
 import objects.types.EntityType
@@ -162,6 +163,14 @@ object Execute{
     }
 
 
+    private def checkComparaisonError(lType: Type, rType: Type, expr: Expression)(implicit context: Context):Unit ={
+        if (!rType.isSubtypeOf(lType) && ! lType.isSubtypeOf(rType)) throw new Exception(f"Cannot compare $lType with $rType in $expr")
+    }
+    private def checkComparaison(lType: Type, rType: Type)(implicit context: Context):Boolean ={
+        if (!rType.isSubtypeOf(lType) && ! lType.isSubtypeOf(rType)) return false
+        return true
+    }
+
     /**
      * get IfCase from Expression
      */
@@ -175,7 +184,14 @@ object Execute{
             case NullValue => (List(), List(IFFalse))
             case LinkedFunctionValue(fct) => (List(), List(IFTrue))
             case SelectorValue(value) => (List(), List(IFValueCase(expr)))
-            case VariableValue(iden, sel) => getIfCase(context.resolveVariable(expr))
+            case VariableValue(iden, sel) => {
+                if (iden.toString().startsWith("@")){
+                    if context.getFunctionTags(iden).getFunctions().length == 0 then (List(), List(IFFalse)) else (List(), List(IFTrue))
+                }
+                else{
+                    getIfCase(context.resolveVariable(expr))
+                }
+            }
             case LinkedVariableValue(vari, sel) => {
                 if (vari.modifiers.isLazy){
                     getIfCase(vari.lazyValue)
@@ -187,8 +203,82 @@ object Execute{
             case BinaryOperation(op, VariableValue(left, sel), right) => getIfCase(BinaryOperation(op, context.resolveVariable(VariableValue(left, sel)), right))
             case BinaryOperation(op, left, VariableValue(right, sel)) => getIfCase(BinaryOperation(op, left, context.resolveVariable(VariableValue(right, sel))))
 
-            case BinaryOperation(">" | "<" | ">=" | "<=" | "==" | "!=", LinkedVariableValue(left, sel), right) if right.hasIntValue() => (List(), List(IFValueCase(expr)))
-            case BinaryOperation(">" | "<" | ">=" | "<=" | "==" | "!=", left, LinkedVariableValue(right, sel)) if left.hasIntValue() => (List(), List(IFValueCase(expr)))
+            // Tuple
+            case BinaryOperation("==", LinkedVariableValue(left, sel), right) 
+                if right.hasIntValue() && left.getType().isDirectComparable() => 
+                    (List(), List(IFValueCase(expr)))
+
+            // Directly Comparable Value (int, float, bool, etc...)
+            case BinaryOperation(">" | "<" | ">=" | "<=", LinkedVariableValue(left, sel), LinkedVariableValue(right, sel2))
+                if left.getType().isDirectComparable()=> 
+                    checkComparaisonError(right.getType(), left.getType(), expr)
+                    (List(), List(IFValueCase(expr)))
+
+            case BinaryOperation(">" | "<" | ">=" | "<=", LinkedVariableValue(left, sel), right) 
+                if left.getType().isDirectComparable() && right.hasIntValue() => 
+                    checkComparaisonError(Utils.typeof(right), left.getType(), expr)
+                    (List(), List(IFValueCase(expr)))
+
+            case BinaryOperation(">" | "<" | ">=" | "<=", left, LinkedVariableValue(right, sel)) 
+                if left.hasIntValue() && right.getType().isDirectComparable() => 
+                    checkComparaisonError(right.getType(), Utils.typeof(left), expr)
+                    (List(), List(IFValueCase(expr)))
+
+
+            // Directly Equilable Value (int, float, bool, function, etc...)
+            case BinaryOperation("==" | "!=", LinkedVariableValue(left, sel), LinkedVariableValue(right, sel2)) 
+                if left.getType().isDirectEqualitable() && checkComparaison(left.getType(), right.getType()) => 
+                    (List(), List(IFValueCase(expr)))
+
+            case BinaryOperation("==" | "!=", LinkedVariableValue(left, sel), right) 
+                if right.hasIntValue() && left.getType().isDirectEqualitable() && checkComparaison(left.getType(), Utils.typeof(right)) => 
+                    checkComparaisonError(Utils.typeof(right), left.getType(), expr)
+                    (List(), List(IFValueCase(expr)))
+
+            case BinaryOperation("==" | "!=", left, LinkedVariableValue(right, sel)) 
+                if left.hasIntValue() && right.getType().isDirectEqualitable() && checkComparaison(Utils.typeof(left), right.getType())=> 
+                    checkComparaisonError(right.getType(), Utils.typeof(left), expr)
+                    (List(), List(IFValueCase(expr)))
+
+            // Special Case for class
+            case BinaryOperation("==" | "!=", LinkedVariableValue(left, sel), LinkedVariableValue(right, sel2)) 
+                if left.getType().isDirectEqualitable() && right.name == "__ref" => 
+                    (List(), List(IFValueCase(expr)))
+
+
+            // Comparable Value (class/struct)
+            case BinaryOperation(">" | "<" | ">=" | "<=", LinkedVariableValue(left, sel), right)
+                if left.getType().isComparaisonSupported() => 
+                    val op = expr.asInstanceOf[BinaryOperation].op
+                    getIfCase(FunctionCallValue(VariableValue(left.fullName + "." + Utils.getOpFunctionName(op)), List(right)))
+
+            case BinaryOperation(">" | "<" | ">=" | "<=", left, LinkedVariableValue(right, sel)) 
+                if right.getType().isComparaisonSupported() => 
+                    val op = expr.asInstanceOf[BinaryOperation].op
+                    getIfCase(FunctionCallValue(VariableValue(right.fullName + "." + Utils.getOpFunctionName(Utils.invertOperator(op))), List(left)))
+
+
+            // Directly Equilable Value (int, float, bool, function, etc...)
+            case BinaryOperation("==" | "!=", LinkedVariableValue(left, sel), right) 
+                if left.getType().isEqualitySupported() => 
+                    val op = expr.asInstanceOf[BinaryOperation].op
+                    getIfCase(FunctionCallValue(VariableValue(left.fullName + "." + Utils.getOpFunctionName(op)), List(right)))
+            
+            case BinaryOperation("==" | "!=", left, LinkedVariableValue(right, sel)) 
+                if right.getType().isEqualitySupported() => 
+                    val op = expr.asInstanceOf[BinaryOperation].op
+                    getIfCase(FunctionCallValue(VariableValue(right.fullName + "." + Utils.getOpFunctionName(op)), List(left)))
+
+            // Error Cases
+            case BinaryOperation(op, LinkedVariableValue(left, sel), right) 
+                if left.getType().isEqualitySupported() && left.getType().isComparaisonSupported() => 
+                    throw new Exception(f"Operation $op not supported for $left and $right")
+            
+            case BinaryOperation(op, left, LinkedVariableValue(right, sel)) 
+                if right.getType().isEqualitySupported() && right.getType().isComparaisonSupported() => 
+                    throw new Exception(f"Operation $op not supported for $left and $right")
+
+            
 
             case BinaryOperation(">" | "<" | ">=" | "<=" | "==" | "!=", left, right)=> {
                 val op = expr.asInstanceOf[BinaryOperation].op
@@ -279,16 +369,18 @@ object Execute{
                 val predicate = context.tryGetPredicate(name, args.map(Utils.typeof(_)))
                 predicate match
                     case None => {
-                        val v = Utils.simplifyToVariable(expr)
-                        (v._1, List(IFValueCase(v._2)))
+                        val (p, v) = Utils.simplifyToLazyVariable(expr)
+                        val (p2, c) = getIfCase(v)
+                        (p:::p2, c)
                     }
                     case Some(value) => {
                         (List(), List(IFPredicate(value.call(args))))
                     }
             }
             case FunctionCallValue(name, args, sel) => {
-                val v = Utils.simplifyToVariable(expr)
-                (v._1, List(IFValueCase(v._2)))
+                val (p, v) = Utils.simplifyToLazyVariable(expr)
+                val (p2, c) = getIfCase(v)
+                (p:::p2, c)
             }
             case ArrayGetValue(name, index) => {
                 val v = Utils.simplifyToVariable(expr)
@@ -306,18 +398,55 @@ object Execute{
 
     def switch(swit: Switch)(implicit context: Context):List[String] = {
         val expr = Utils.simplify(swit.value)
-        expr match{
-            case VariableValue(name, sel) if !swit.copyVariable=> {
-                makeTree(context.getVariable(name), swit.cases.map(x => (x.expr.getIntValue(), x.instr)))
+        Utils.typeof(expr) match
+            case IntType | FloatType | BoolType | FuncType(_, _) => {
+                expr match{
+                    case VariableValue(name, sel) if !swit.copyVariable=> {
+                        makeTree(context.getVariable(name), swit.cases.map(x => (x.expr.getIntValue(), x.instr)))
+                    }
+                    case LinkedVariableValue(vari, sel) if !swit.copyVariable=> {
+                        makeTree(vari, swit.cases.map(x => (x.expr.getIntValue(), x.instr)))
+                    }
+                    case _ => {
+                        val vari = context.getFreshVariable(Utils.typeof(swit.value))
+                        vari.assign("=", swit.value) ::: makeTree(vari, swit.cases.map(x => (x.expr.getIntValue(), x.instr)))
+                    }
+                }
             }
-            case LinkedVariableValue(vari, sel) if !swit.copyVariable=> {
-                makeTree(vari, swit.cases.map(x => (x.expr.getIntValue(), x.instr)))
+            case TupleType(sub) => {
+                def getHead(expr: Expression): Expression = {
+                    expr match
+                        case TupleValue(values) => values.head
+                        case VariableValue(name, selector) => getHead(LinkedVariableValue(context.getVariable(name), selector))
+                        case LinkedVariableValue(vari, selector) => {
+                            LinkedVariableValue(vari.tupleVari.head)
+                        }
+                        case other => throw new Exception(f"Not a valid tupple: $other for a switch")
+                }
+                def getTail(expr: Expression): Expression = {
+                    expr match
+                        case TupleValue(values) => TupleValue(values.tail)
+                        case VariableValue(name, selector) => getTail(LinkedVariableValue(context.getVariable(name), selector))
+                        case LinkedVariableValue(vari, selector) => {
+                            val TupleType(inner) = vari.getType()
+                            val fake = Variable(vari.context, vari.name, TupleType(inner.tail), vari.modifiers)
+                            fake.tupleVari = vari.tupleVari.tail
+                            LinkedVariableValue(fake)
+                        }
+                        case other => throw new Exception(f"Not a valid tupple: $other for a switch")
+                }
+                
+                if (sub.size == 1){
+                    switch(Switch(getHead(expr), swit.cases.map(c => SwitchCase(getHead(c.expr), c.instr))))
+                }
+                else{
+                    val cases = swit.cases.groupBy(c => getHead(c.expr))
+                                          .map((g, cases) => SwitchCase(g, Switch(getTail(expr), cases.map(c => SwitchCase(getTail(c.expr), c.instr)))))
+                                          .toList
+                                          
+                    switch(Switch(getHead(expr), cases))
+                }
             }
-            case _ => {
-                val vari = context.getFreshVariable(Utils.typeof(swit.value))
-                vari.assign("=", swit.value) ::: makeTree(vari, swit.cases.map(x => (x.expr.getIntValue(), x.instr)))
-            }
-        }
     }
 
     def makeTree(cond: Variable, values: List[(Int, Instruction)])(implicit context: Context):List[String] = {

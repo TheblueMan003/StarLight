@@ -31,7 +31,9 @@ object Variable {
 class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) extends CObject(context, name, _modifier) with Typed(typ){
 	var tupleVari: List[Variable] = List()
 	val tagName = fullName
-	lazy val scoreboard = if modifiers.isEntity then "s"+context.getScoreboardID(this) else ""
+	lazy val scoreboard = if modifiers.isEntity then modifiers.getAttributesString("name", ()=>"s"+context.getScoreboardID(this))(context) else ""
+	lazy val inGameName = modifiers.getAttributesString("name", ()=>fullName)(context)
+	lazy val criterion = modifiers.getAttributesString("criterion", ()=>"dummy")(context)
 	var lazyValue: Expression = DefaultValue
 	var isFunctionArgument = false
 
@@ -348,7 +350,8 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					}
 				}
 			}
-			case _ => List(f"scoreboard players operation ${getSelector()} ${op} ${vari.getSelector()(oselector)}")
+			case other if other.isSubtypeOf(getType()) => List(f"scoreboard players operation ${getSelector()} ${op} ${vari.getSelector()(oselector)}")
+			case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()}")
 		}
 	}
 
@@ -443,15 +446,21 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 			case DefaultValue => List(f"scoreboard players set 0")
 			case VariableValue(name, sel) => assignBool(op, context.resolveVariable(value))
 			case LinkedVariableValue(vari, sel) => 
-				op match
-					case "&=" => List(f"scoreboard players operation ${getSelector()} *= ${vari.getSelector()(sel)}")
-					case "&&=" => List(f"scoreboard players operation ${getSelector()} *= ${vari.getSelector()(sel)}")
-					case "|=" => List(f"scoreboard players operation ${getSelector()} += ${vari.getSelector()(sel)}")
-					case "||=" => List(f"scoreboard players operation ${getSelector()} += ${vari.getSelector()(sel)}")
-					case _ => List(f"scoreboard players operation ${getSelector()} $op ${vari.getSelector()(sel)}")
+				vari.getType() match
+					case a if a.isSubtypeOf(BoolType) => {
+						op match
+							case "&=" => List(f"scoreboard players operation ${getSelector()} *= ${vari.getSelector()(sel)}")
+							case "&&=" => List(f"scoreboard players operation ${getSelector()} *= ${vari.getSelector()(sel)}")
+							case "|=" => List(f"scoreboard players operation ${getSelector()} += ${vari.getSelector()(sel)}")
+							case "||=" => List(f"scoreboard players operation ${getSelector()} += ${vari.getSelector()(sel)}")
+							case _ => List(f"scoreboard players operation ${getSelector()} $op ${vari.getSelector()(sel)}")
+					}
+					case EntityType => f"scoreboard players set ${getSelector()} 0"::Compiler.compile(If(value, VariableAssigment(List((Right(this), selector)), "=", BoolValue(true)), List()))
+					case other => throw new Exception(f"Cannot assign $value of type $other to $fullName of type ${getType()}")
 			case FunctionCallValue(name, args, selector) => handleFunctionCall(op, name, args, selector)
 			case ArrayGetValue(name, index) => handleArrayGetValue(op, name, index)
 			case bin: BinaryOperation => assignBinaryOperator(op, bin)
+			case SelectorValue(sel) => f"scoreboard players set ${getSelector()} 0"::Compiler.compile(If(value, VariableAssigment(List((Right(this), selector)), "=", BoolValue(true)), List()))
 			case _ => throw new Exception(f"Unknown cast to bool $value")
 	}
 
@@ -498,7 +507,8 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					}
 				}
 			}
-			case _ => List(f"scoreboard players operation ${getSelector()} ${op} ${vari.getSelector()(sel)}")
+			case a if a.isSubtypeOf(getType()) => List(f"scoreboard players operation ${getSelector()} ${op} ${vari.getSelector()(sel)}")
+			case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()}")
 		}
 	}
 
@@ -557,7 +567,9 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 				}
 			}
 			case LinkedVariableValue(vari, sel) => {
-				List(f"scoreboard players operation ${getSelector()} = ${vari.getSelector()(sel)}")
+				vari.getType() match
+					case other if other.isSubtypeOf(getType()) => List(f"scoreboard players operation ${getSelector()} = ${vari.getSelector()(sel)}")
+					case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()}")
 			}
 			case LambdaValue(args, instr) => {
 				val typ = getType().asInstanceOf[FuncType]
@@ -584,15 +596,21 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 				expr match
 					case VariableValue(name, sel) => {
 						val vari = context.getVariable(name)
-
-						// Remove tag to previous entities
-						removeEntityTag():::
-						// copy fields
-						tupleVari.zip(vari.tupleVari).flatMap((t, v) => t.assign(op, LinkedVariableValue(v))) :::
-						// Add tag to new entities
-						Compiler.compile(If(LinkedVariableValue(tupleVari(0)), 
-											CMD(f"tag @a[tag=${vari.tagName}] add $tagName"), 
-											List(ElseIf(BoolValue(true), CMD(f"tag @e[tag=${vari.tagName}] add $tagName")))))
+						assignEntity(op, LinkedVariableValue(vari, sel))
+					}
+					case LinkedVariableValue(vari, sel) => {
+						vari.getType() match
+							case EntityType => {
+								// Remove tag to previous entities
+								removeEntityTag():::
+								// copy fields
+								tupleVari.zip(vari.tupleVari).flatMap((t, v) => t.assign(op, LinkedVariableValue(v))) :::
+								// Add tag to new entities
+								Compiler.compile(If(LinkedVariableValue(tupleVari(0)), 
+													CMD(f"tag @a[tag=${vari.tagName}] add $tagName"), 
+													List(ElseIf(BoolValue(true), CMD(f"tag @e[tag=${vari.tagName}] add $tagName")))))
+							}
+							case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()}")
 					}
 					case NullValue => {
 						val vari = context.getVariable(name)
@@ -616,13 +634,19 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 				expr match
 					case VariableValue(name, sel) => {
 						val vari = context.getVariable(name)
-
-						// copy fields
-						tupleVari.zip(vari.tupleVari).flatMap((t, v) => t.assign(op, LinkedVariableValue(v, sel))) :::
-						// Add tag to new entities
-						Compiler.compile(If(LinkedVariableValue(tupleVari(0)), 
-											CMD(f"tag @a[tag=${vari.tagName}] add $tagName"), 
-											List(ElseIf(BoolValue(true), CMD(f"tag @e[tag=${vari.tagName}] add $tagName")))))
+						assignEntity(op, LinkedVariableValue(vari, sel))
+					}
+					case LinkedVariableValue(vari, sel) => {
+						vari.getType() match
+							case EntityType => {
+								// copy fields
+								tupleVari.zip(vari.tupleVari).flatMap((t, v) => t.assign(op, LinkedVariableValue(v, sel))) :::
+								// Add tag to new entities
+								Compiler.compile(If(LinkedVariableValue(tupleVari(0)), 
+													CMD(f"tag @a[tag=${vari.tagName}] add $tagName"), 
+													List(ElseIf(BoolValue(true), CMD(f"tag @e[tag=${vari.tagName}] add $tagName")))))
+							}
+							case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()}")
 					}
 					case IntValue(0) => List()
 					case SelectorValue(value) => {
@@ -639,11 +663,17 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 				expr match
 					case VariableValue(name, sel) => {
 						val vari = context.getVariable(name)
-
-						// Add tag to new entities
-						Compiler.compile(If(LinkedVariableValue(tupleVari(0), sel), 
-											CMD(f"tag @a[tag=${vari.tagName}] remove $tagName"), 
-											List(ElseIf(BoolValue(true), CMD(f"tag @e[tag=${vari.tagName}] remove $tagName")))))
+						assignEntity(op, LinkedVariableValue(vari, sel))
+					}
+					case LinkedVariableValue(vari, sel) => {
+						vari.getType() match
+							case EntityType => {
+								// Add tag to new entities
+								Compiler.compile(If(LinkedVariableValue(tupleVari(0), sel), 
+													CMD(f"tag @a[tag=${vari.tagName}] remove $tagName"), 
+													List(ElseIf(BoolValue(true), CMD(f"tag @e[tag=${vari.tagName}] remove $tagName")))))
+							}
+							case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()}")
 					}
 					case IntValue(0) => List()
 					case SelectorValue(value) => {
@@ -705,6 +735,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 												f"data modify storage ${fullName} json merge from storage ${fullName} tmp")
 							}
 						}
+						case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()}")
 					}
 				case FunctionCallValue(name, args, selector) => handleFunctionCall(op, name, args, selector)
 				case ArrayGetValue(name, index) => handleArrayGetValue(op, name, index)
@@ -747,13 +778,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					}
 					case _ => context.getFunction(name + ".__set__", List(value), getType(), false).call()
 			}
-			case "+=" => context.getFunction(name + ".__add__",  List(value), getType(), false).call()
-			case "-=" => context.getFunction(name + ".__sub__",  List(value), getType(), false).call()
-			case "*=" => context.getFunction(name + ".__mult__", List(value), getType(), false).call()
-			case "/=" => context.getFunction(name + ".__div__",  List(value), getType(), false).call()
-			case "%=" => context.getFunction(name + ".__mod__",  List(value), getType(), false).call()
-			case "&=" => context.getFunction(name + ".__and__",  List(value), getType(), false).call()
-			case "|=" => context.getFunction(name + ".__or__",   List(value), getType(), false).call()
+			case op => context.getFunction(name + "." + Utils.getOpFunctionName(op),  List(value), getType(), false).call()
 	}
 
 	def deref()(implicit context: Context) = context.getFunction(this.name + ".__remRef", List[Expression](), getType(), false).call()
@@ -784,7 +809,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 									val entity = clazz.getEntity()
 									val initarg = List(StringValue(clazz.fullName))::: (if entity != null then List(entity) else List())
 									deref()
-									::: assign("=", FunctionCallValue(VariableValue("__initInstance"), initarg))
+									::: assign("=", FunctionCallValue(VariableValue("object.__initInstance"), initarg))
 									::: context.getFunction(name + ".__init__", args, getType(), false).call()
 								}
 								else{
@@ -851,7 +876,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 			f"${selector} ${scoreboard}"
 		}
 		else{
-			f"${fullName} ${Settings.variableScoreboard}"
+			f"${inGameName} ${Settings.variableScoreboard}"
 		}
 	}
 
@@ -862,7 +887,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 			f"${selector}"
 		}
 		else{
-			f"${fullName}"
+			f"${inGameName}"
 		}
 	}
 

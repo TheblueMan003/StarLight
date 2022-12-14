@@ -67,7 +67,7 @@ case object MCJava extends Target{
                             f"scoreboard objectives add ${Settings.constScoreboard} dummy",
                             f"scoreboard objectives add ${Settings.variableScoreboard} dummy")::: 
                             context.getAllConstant().map(v => f"scoreboard players set $v ${Settings.constScoreboard} $v"):::
-                            context.getAllVariable().filter(_.modifiers.isEntity).map(v => f"scoreboard objectives add ${v.scoreboard} dummy")
+                            context.getAllVariable().filter(_.modifiers.isEntity).map(v => f"scoreboard objectives add ${v.scoreboard} ${v.criterion}")
 
         
 

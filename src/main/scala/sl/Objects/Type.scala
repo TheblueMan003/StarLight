@@ -19,6 +19,11 @@ abstract class Type extends Positional {
     def getDistance(other: Type)(implicit context: Context): Int
     def isSubtypeOf(other: Type)(implicit context: Context): Boolean
     def getName()(implicit context: Context): String
+    def isDirectComparable(): Boolean
+    def isDirectEqualitable(): Boolean
+
+    def isComparaisonSupported(): Boolean
+    def isEqualitySupported(): Boolean
 
     def generateCompilerFunction(variable: Variable)(implicit context: Context) = {
         if (variable.modifiers.isLazy){
@@ -46,7 +51,31 @@ object AnyType extends Type{
             case _ => false
     }
     override def getName()(implicit context: Context): String = "any"
+    override def isDirectComparable(): Boolean = false
+    override def isDirectEqualitable(): Boolean = false
+    override def isComparaisonSupported(): Boolean = false
+    override def isEqualitySupported(): Boolean = false
 }
+
+object MCObjectType extends Type{
+    override def allowAdditionSimplification(): Boolean = false
+    override def getDistance(other: Type)(implicit context: Context): Int = {
+        other match
+            case MCObjectType => 0
+            case _ => outOfBound
+    }
+    override def isSubtypeOf(other: Type)(implicit context: Context): Boolean = {
+        other match
+            case MCObjectType => true
+            case _ => false
+    }
+    override def getName()(implicit context: Context): String = "mcobject"
+    override def isDirectComparable(): Boolean = false
+    override def isDirectEqualitable(): Boolean = false
+    override def isComparaisonSupported(): Boolean = false
+    override def isEqualitySupported(): Boolean = false
+}
+
 object IntType extends Type{
     override def allowAdditionSimplification(): Boolean = true
     override def getDistance(other: Type)(implicit context: Context): Int = {
@@ -66,20 +95,10 @@ object IntType extends Type{
             case _ => false
     }
     override def getName()(implicit context: Context): String = "int"
-}
-object MCObjectType extends Type{
-    override def allowAdditionSimplification(): Boolean = false
-    override def getDistance(other: Type)(implicit context: Context): Int = {
-        other match
-            case MCObjectType => 0
-            case _ => outOfBound
-    }
-    override def isSubtypeOf(other: Type)(implicit context: Context): Boolean = {
-        other match
-            case MCObjectType => true
-            case _ => false
-    }
-    override def getName()(implicit context: Context): String = "mcobject"
+    override def isDirectComparable(): Boolean = true
+    override def isDirectEqualitable(): Boolean = true
+    override def isComparaisonSupported(): Boolean = true
+    override def isEqualitySupported(): Boolean = true
 }
 object FloatType extends Type{
     override def allowAdditionSimplification(): Boolean = true
@@ -98,6 +117,10 @@ object FloatType extends Type{
             case _ => false
     }
     override def getName()(implicit context: Context): String = "float"
+    override def isDirectComparable(): Boolean = true
+    override def isDirectEqualitable(): Boolean = true
+    override def isComparaisonSupported(): Boolean = true
+    override def isEqualitySupported(): Boolean = true
 }
 object StringType extends Type{
     override def allowAdditionSimplification(): Boolean = true
@@ -192,6 +215,10 @@ object StringType extends Type{
             ))
         }
     }
+    override def isDirectComparable(): Boolean = false
+    override def isDirectEqualitable(): Boolean = false
+    override def isComparaisonSupported(): Boolean = false
+    override def isEqualitySupported(): Boolean = false
 }
 object BoolType extends Type{
     override def allowAdditionSimplification(): Boolean = true
@@ -212,6 +239,10 @@ object BoolType extends Type{
             case _ => false
     }
     override def getName()(implicit context: Context): String = "Boolean"
+    override def isDirectComparable(): Boolean = true
+    override def isDirectEqualitable(): Boolean = true
+    override def isComparaisonSupported(): Boolean = true
+    override def isEqualitySupported(): Boolean = true
 }
 object VoidType extends Type{
     override def allowAdditionSimplification(): Boolean = false
@@ -225,6 +256,10 @@ object VoidType extends Type{
             case _ => false
     }
     override def getName()(implicit context: Context): String = "void"
+    override def isDirectComparable(): Boolean = false
+    override def isDirectEqualitable(): Boolean = false
+    override def isComparaisonSupported(): Boolean = false
+    override def isEqualitySupported(): Boolean = false
 }
 object ParamsType extends Type{
     override def allowAdditionSimplification(): Boolean = false
@@ -238,6 +273,10 @@ object ParamsType extends Type{
             case _ => false
     }
     override def getName()(implicit context: Context): String = "params"
+    override def isDirectComparable(): Boolean = false
+    override def isDirectEqualitable(): Boolean = false
+    override def isComparaisonSupported(): Boolean = false
+    override def isEqualitySupported(): Boolean = false
 }
 object RawJsonType extends Type{
     override def allowAdditionSimplification(): Boolean = false
@@ -252,6 +291,10 @@ object RawJsonType extends Type{
             case _ => false
     }
     override def getName()(implicit context: Context): String = "rawjson"
+    override def isDirectComparable(): Boolean = false
+    override def isDirectEqualitable(): Boolean = false
+    override def isComparaisonSupported(): Boolean = false
+    override def isEqualitySupported(): Boolean = false
 }
 object EntityType extends Type{
     override def allowAdditionSimplification(): Boolean = false
@@ -268,6 +311,10 @@ object EntityType extends Type{
             case _ => false
     }
     override def getName()(implicit context: Context): String = "entity"
+    override def isDirectComparable(): Boolean = false
+    override def isDirectEqualitable(): Boolean = false
+    override def isComparaisonSupported(): Boolean = false
+    override def isEqualitySupported(): Boolean = false
 }
 
 case class TupleType(sub: List[Type]) extends Type{
@@ -287,6 +334,10 @@ case class TupleType(sub: List[Type]) extends Type{
             case _ => false
     }
     override def getName()(implicit context: Context): String = f"(${sub.map(_.getName()).reduce(_ + ", " + _)})"
+    override def isDirectComparable(): Boolean = false
+    override def isDirectEqualitable(): Boolean = true
+    override def isComparaisonSupported(): Boolean = false
+    override def isEqualitySupported(): Boolean = true
 }
 case class ArrayType(inner: Type, size: Expression) extends Type{
     override def allowAdditionSimplification(): Boolean = false
@@ -305,6 +356,10 @@ case class ArrayType(inner: Type, size: Expression) extends Type{
             case _ => false
     }
     override def getName()(implicit context: Context): String = f"$inner[$size]"
+    override def isDirectComparable(): Boolean = false
+    override def isDirectEqualitable(): Boolean = false
+    override def isComparaisonSupported(): Boolean = false
+    override def isEqualitySupported(): Boolean = true
 }
 case class LambdaType(val nb: Int) extends Type{
     override def allowAdditionSimplification(): Boolean = false
@@ -323,6 +378,10 @@ case class LambdaType(val nb: Int) extends Type{
             case _ => false
     }
     override def getName()(implicit context: Context): String = f"lambda"
+    override def isDirectComparable(): Boolean = false
+    override def isDirectEqualitable(): Boolean = false
+    override def isComparaisonSupported(): Boolean = false
+    override def isEqualitySupported(): Boolean = false
 }
 case class FuncType(sources: List[Type], output: Type) extends Type{
     override def allowAdditionSimplification(): Boolean = false
@@ -341,6 +400,10 @@ case class FuncType(sources: List[Type], output: Type) extends Type{
             case _ => false
     }
     override def getName()(implicit context: Context): String = f"(${sources.map(_.getName()).reduce(_ + ", " + _)}) => $output"
+    override def isDirectComparable(): Boolean = false
+    override def isDirectEqualitable(): Boolean = true
+    override def isComparaisonSupported(): Boolean = false
+    override def isEqualitySupported(): Boolean = true
 }
 case class IdentifierType(name: String) extends Type{
     override def allowAdditionSimplification(): Boolean = false
@@ -358,6 +421,10 @@ case class IdentifierType(name: String) extends Type{
             case _ => false
     }
     override def getName()(implicit context: Context): String = name
+    override def isDirectComparable(): Boolean = false
+    override def isDirectEqualitable(): Boolean = false
+    override def isComparaisonSupported(): Boolean = false
+    override def isEqualitySupported(): Boolean = false
 }
 case class StructType(struct: Struct) extends Type{
     override def allowAdditionSimplification(): Boolean = false
@@ -377,6 +444,10 @@ case class StructType(struct: Struct) extends Type{
             case _ => false
     }
     override def getName()(implicit context: Context): String = struct.fullName
+    override def isDirectComparable(): Boolean = false
+    override def isDirectEqualitable(): Boolean = false
+    override def isComparaisonSupported(): Boolean = true
+    override def isEqualitySupported(): Boolean = true
 }
 case class ClassType(clazz: Class) extends Type{
     override def allowAdditionSimplification(): Boolean = false
@@ -396,12 +467,17 @@ case class ClassType(clazz: Class) extends Type{
             case _ => false
     }
     override def getName()(implicit context: Context): String = clazz.fullName
+    override def isDirectComparable(): Boolean = false
+    override def isDirectEqualitable(): Boolean = true
+    override def isComparaisonSupported(): Boolean = true
+    override def isEqualitySupported(): Boolean = true
 }
 case class EnumType(enm: objects.Enum) extends Type{
     override def allowAdditionSimplification(): Boolean = false
     override def getDistance(other: Type)(implicit context: Context): Int = {
         other match
             case EnumType(sub2) if sub2 == enm => 0
+            case IntType => 1
             case MCObjectType => 1000
             case AnyType => 10000
             case _ => outOfBound
@@ -409,11 +485,16 @@ case class EnumType(enm: objects.Enum) extends Type{
     override def isSubtypeOf(other: Type)(implicit context: Context): Boolean = {
         other match
             case EnumType(other) => enm == other
+            case IntType => true
             case AnyType => true
             case MCObjectType => true
             case _ => false
     }
     override def getName()(implicit context: Context): String = enm.fullName
+    override def isDirectComparable(): Boolean = true
+    override def isDirectEqualitable(): Boolean = true
+    override def isComparaisonSupported(): Boolean = true
+    override def isEqualitySupported(): Boolean = true
 }
 case class RangeType(sub: Type) extends Type{
     override def allowAdditionSimplification(): Boolean = false
@@ -432,6 +513,10 @@ case class RangeType(sub: Type) extends Type{
             case _ => false
     }
     override def getName()(implicit context: Context): String = f"$sub..$sub"
+    override def isDirectComparable(): Boolean = false
+    override def isDirectEqualitable(): Boolean = false
+    override def isComparaisonSupported(): Boolean = false
+    override def isEqualitySupported(): Boolean = false
 }
 
 
@@ -452,4 +537,8 @@ case object JsonType extends Type{
             case _ => false
     }
     override def getName()(implicit context: Context): String = "json"
+    override def isDirectComparable(): Boolean = false
+    override def isDirectEqualitable(): Boolean = false
+    override def isComparaisonSupported(): Boolean = false
+    override def isEqualitySupported(): Boolean = false
 }

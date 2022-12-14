@@ -28,6 +28,10 @@ abstract class Function(context: Context, name: String, val arguments: List[Argu
     var argumentsVariables: List[Variable] = List()
     val clazz = context.getCurrentClass()
 
+    if (modifiers.isVirtual){
+
+    }
+
     private def getMaxArgCount(args: List[Argument]): Int = {
         if args.length == 0 then 0 else
         args.last.typ match
@@ -186,16 +190,16 @@ class LazyFunction(context: Context, name: String, arguments: List[Argument], ty
         })
 
         if (ret == null){
-            sl.Compiler.compile(block)(if modifiers.isInline then ctx else sub)
+            sl.Compiler.compile(block)(if modifiers.hasAttributes("inline") then ctx else sub)
         }
         else if (op == "="){
             block = Utils.subst(Utils.substReturn(block, ret), "_ret", LinkedVariableValue(ret))
-            sl.Compiler.compile(block)(if modifiers.isInline then ctx else sub)
+            sl.Compiler.compile(block)(if modifiers.hasAttributes("inline") then ctx else sub)
         }
         else{
             val vari = ctx.getFreshVariable(getType())
             block = Utils.subst(Utils.substReturn(block, vari), "_ret", LinkedVariableValue(ret))
-            sl.Compiler.compile(block)(if modifiers.isInline then ctx else sub) ::: (if ret == null then List() else ret.assign(op, LinkedVariableValue(vari)))
+            sl.Compiler.compile(block)(if modifiers.hasAttributes("inline") then ctx else sub) ::: (if ret == null then List() else ret.assign(op, LinkedVariableValue(vari)))
         }
     }
     override def generateArgument()(implicit ctx: Context):Unit = {

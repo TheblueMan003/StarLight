@@ -30,20 +30,24 @@ java -jar build <path_to/build.slconf>
 ## Variables
 Variables can be declared with 
 ```
-<modifier> <type> <variable1_name>, [variable2_name], [variable3_name] ...
+int a
+int b, c
 ```
 Variables can be declared and assigned 
 ```
-<modifier> <type> <variable1_name>, [variable2_name], [variable3_name] ... = <expression>
+float a = 10
+float b, c = 10
+float d, e = (10, 11)
 ```
 Variables can be assigned 
 ```
-<variable1_name>, [variable2_name], [variable3_name] ... = <expression>
+a = 10
+a, b = 10
+d, e = (10, 11)
 ```
-If the variable is tuple, then the tuple with be unpack
 
 ### Scoreboard
-Scoreboard can be created by adding the `scoreboard` modifier when creating a variable.
+Scoreboard can be created by adding the `scoreboard` modifier befor the type when creating a variable.
 ```
 scoreboard int myScore
 ```
@@ -54,6 +58,50 @@ with(@a){
 }
 @p.myScore = 1
 ```
+
+### Private, Protected, Public
+Access modifiers like `private`, `protected` & `public` can be added before the type when creating a variable.
+```
+private int a
+```
+Private ban the access to the variable from from another context.
+Protected allow the variable to be accessed anywhere.
+Public allow the variable to be accessed anywhere & are exported to the interface for other datapack.
+By default variable start with `protected`.
+
+### Lazy
+Variable that are mark as `lazy` will have there value computed during the compilation.
+```
+lazy int a = 5
+a += 10
+int b = a
+```
+Will result into the following code:
+```
+int b = 15
+```
+If value of the variable cannot be computed during the compilation the global expression will be keep:
+```
+int f
+lazy int a = 5 * f
+int b = a
+```
+Will result into the following code:
+```
+int f
+int b = 5 * f
+```
+This can be useful for string and json operation at compile time.
+
+### Attributes
+Attributes can be added to function to specify thing to the compiler.
+```
+[criterion="minecraft.used:minecraft.carrot_on_a_stick"] scoreboard int a
+```
+Here is a list of used attributes by the compiler:
+- `criterion`: Use to specify the criterion when other than dummy. (JAVA Only)
+- `name`: Use to force the name of the variable
+
 
 ## Default Types
 ### int
@@ -136,6 +184,31 @@ else{
 ```
 If a case is always true if will be remove the other following cases in the output code. If a case is always false it will be removed from the output code.
 
+### Switch
+A more simplier way of having multiple if is to use a switch statement:
+```
+int a
+switch(a){
+    0 -> do_stuff()
+    1 -> {
+        do_other_stuff()
+    }
+    2 -> {
+        /say hi
+    }
+}
+```
+The switch statement will build a tree if the number of cases if big enough. (20 by defaut)
+In addition to that switch also support tupple value.
+(int, int) a
+switch(a){
+    (0,0) -> do_stuff1()
+    (0,1) -> do_stuff2()
+    (1,0) -> do_stuff2()
+    (1,1) -> do_stuff2()
+}
+```
+In that case it will build nested trees.
 
 ### Loop
 The language also support the following loop: for, while, do while with a c like syntax:
@@ -239,6 +312,32 @@ Lambda can be created with the following syntax:
 int=>int fct = (a)=> {return a}
 ```
 
+### Function Tags
+Function can also belong to a tag by adding an name prefixed by `@`:
+```
+def @tagExample test(){
+
+}
+```
+If the tag doesn't exist before it will be created.
+Tags allow you to call all the function that belong to it by calling the tag name:
+```
+@tagExample()
+```
+Note that tags are global across the code context.
+
+### Attributes
+Attributes can be added to function to specify thing to the compiler.
+```
+def [tag.order=10] @tick test(){
+
+}
+```
+Here is a list of used attributes by the compiler:
+- `tag.order`: (float or int) Order for which it will run when call by a tag. Lower number are call first.
+- `compile.order`: (float or int) Order for the function is compile. Lower number are compiled first.
+- `inline`: (bool) Make that lazy function call is not on a sub context. It allow to make the inner state of the function visible outside the call.
+
 ## Import
 Library can be imported with the following syntax:
 ```
@@ -263,6 +362,12 @@ Imported object can also be given alias uppon importation:
 from math.vector3 import Vector3 as v3
 
 v3 vec
+```
+You can also import everything from a package:
+```
+from math.vector3 import _
+
+Vector3 vec
 ```
 
 ## JSON File
@@ -325,11 +430,17 @@ Here is the list of possible operator overloading:
 * `__set__`: `=`
 * `__add__`: `+=`
 * `__sub__`: `-=`
-* `__mult__`: `*=`
+* `__mul__`: `*=`
 * `__div__`: `/=`
 * `__mod__`: `%=`
 * `__and__`: `&=`
 * `__or__`: `|=`
+* `__lt__`: `<`
+* `__le__`: `<=`
+* `__eq__`: `==`
+* `__ne__`: `!=`
+* `__ge__`: `>=`
+* `__gt__`: `>`
 * `__init__`: Constructor
 
 Structs can also be extended. They will recieve all the methode & variable from the parent struct.
@@ -414,3 +525,4 @@ This can be used to compile according to some compilation settings. Here is a li
 * `Compiler.isJava`: Tell if the target is MC Java
 * `Compiler.isBedrock`: Tell if the target is MC Bedrock
 * `Compiler.isDebug`: Used to add extra info in the datapack that can be used to debug
+* `@tagExample`: where tagExample is a function tag. Tell if there is at least one function inside the tag.

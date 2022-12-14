@@ -94,35 +94,6 @@ def lazy despawn(entity $a = @s){
 	}
 }
 
-def lazy winner(entity selector, int score){
-	entity winner
-	int previous = int.minValue
-	as(selector){
-		if (score > previous){
-			previous = score
-			winner = @s
-		}
-		else if (score == previous){
-			winner += @s
-		}
-	}
-}
-
-def lazy loser(entity selector, int score){
-	entity winner
-	int previous = int.maxValue
-	as(selector){
-		if (score < previous){
-			previous = score
-			winner = @s
-		}
-		else if (score == previous){
-			winner += @s
-		}
-	}
-}
-
-
 predicate onFire(){
     "condition": "minecraft:entity_properties",
     "entity": "this",
@@ -173,49 +144,20 @@ predicate isBaby(){
     }
 }
 
-bool onGround(){
-    if (@s[nbt={OnGround:true}]){
-        return true
-    }
-    else{
-        return false
-    }
+if (Compiler.isJava()){
+	lazy bool onGround(){
+		return @s[nbt={OnGround:true}]
+	}
 }
-
-bool creative(){
-    if (@s[gamemode=creative]){
-        return true
-    }
-    else{
-        return false
-    }
-}
-
-bool survival(){
-    if (@s[gamemode=survival]){
-        return true
-    }
-    else{
-        return false
-    }
-}
-
-bool adventure(){
-    if (@s[gamemode=adventure]){
-        return true
-    }
-    else{
-        return false
-    }
-}
-
-bool spectator(){
-    if (@s[gamemode=spectator]){
-        return true
-    }
-    else{
-        return false
-    }
+if (Compiler.isBedrock()){
+	bool onGround(){
+		/*if (!block(~ ~-0.1 ~ air)){
+			return true
+		}
+		else{
+			return false
+		}*/
+	}
 }
 
 predicate overworld(){
@@ -260,23 +202,4 @@ def lazy angerAngaist(entity $e1, entity $e2){
     with($e1){
         angerAngaist($e)
     }
-}
-
-def lazy gamemode(mcobject $gamemode, entity $e = @s){
-	/gamemode $gamemode $e
-}
-
-def lazy gamemode(int gamemode, entity $e = @s){
-	if (gamemode == 0){
-		/gamemode survival $e
-	}
-	else if (gamemode == 1){
-		/gamemode creative $e
-	}
-	else if (gamemode == 2){
-		/gamemode adventure $e
-	}
-	else if (gamemode == 3){
-		/gamemode spectator $e
-	}
 }

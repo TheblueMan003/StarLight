@@ -464,6 +464,21 @@ object Utils{
                 (vari.assign("=", other), LinkedVariableValue(vari))
             }
     }
+    def simplifyToLazyVariable(expr: Expression)(implicit context: Context): (List[String], LinkedVariableValue) = {
+        expr match
+            case VariableValue(name, sel) => simplifyToLazyVariable(context.resolveVariable(expr))
+            case LinkedVariableValue(name, sel) => (List(), LinkedVariableValue(name, sel))
+            case FunctionCallValue(VariableValue(name, sel), args, selector) => {
+                val vari = context.getFreshVariable(typeof(expr))
+                vari.modifiers.isLazy = true
+                (context.getFunction(name, args, VoidType).call(vari), LinkedVariableValue(vari))
+            }
+            case other => {
+                val vari = context.getFreshVariable(typeof(other))
+                vari.modifiers.isLazy = true
+                (vari.assign("=", other), LinkedVariableValue(vari))
+            }
+    }
 
     def typeof(expr: Expression)(implicit context: Context): Type = {
         expr match
@@ -740,5 +755,31 @@ object Utils{
                 context.getFunctionTags(iden).getCompilerFunctionsName().map(name => VariableValue(name))
             }
             case _ => throw new Exception(f"Unknown generator: $provider")
+    }
+    def getOpFunctionName(op: String)={
+        op match{
+            case "+=" => "__add__"
+            case "-=" => "__sub__"
+            case "*=" => "__mul__"
+            case "/=" => "__div__"
+            case "^=" => "__pow__"
+            case "%=" => "__mod__"
+            case "&=" => "__and__"
+            case "|=" => "__or__"
+            case "<"  => "__lt__"
+            case "<=" => "__le__"
+            case "==" => "__eq__"
+            case "!=" => "__ne__"
+            case ">"  => "__gt__"
+            case ">=" => "__ge__"
+        }
+    }
+    def invertOperator(op: String)={
+        op match{
+            case "<" => ">="
+            case "<=" => ">"
+            case ">" => "<="
+            case ">=" => "<"
+        }
     }
 }

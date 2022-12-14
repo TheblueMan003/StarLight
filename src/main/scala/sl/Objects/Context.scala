@@ -2,7 +2,7 @@ package objects
 
 import scala.collection.mutable
 import objects.types.*
-import sl.{Settings, Utils, LinkedVariableValue, FunctionCallValue, LinkedFunctionValue, Argument}
+import sl.{Settings, Utils, LinkedVariableValue, FunctionCallValue, LinkedFunctionValue, Argument, FloatValue, IntValue}
 import sl.Expression
 import sl.Instruction
 import sl.LambdaValue
@@ -79,7 +79,13 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
         val r = root
         r.synchronized{
             if (!r.funcToCompile.contains(fct)){
-                r.funcToCompile = fct :: r.funcToCompile
+                r.funcToCompile = (fct :: r.funcToCompile).sortBy(f => {
+                    Utils.simplify(f.modifiers.attributes.getOrElse("compile.order", IntValue(0)))(this) match {
+                        case IntValue(n) => n.toDouble
+                        case FloatValue(n) => n
+                        case _ => 0.0
+                    }
+                })
             }
         }
     }
@@ -150,8 +156,8 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
         val r = fctCtx
         r.synchronized{
             r.varId += 1
-            val fct = BlockFunction(r, "_"+r.varId.toString(), List(), content)
-            r.addFunction("_"+r.varId.toString(), fct)
+            val fct = BlockFunction(r, r.varId.toString(), List(), content)
+            r.addFunction(r.varId.toString(), fct)
             fct
         }
     }
@@ -402,7 +408,7 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
     def getFunctionTags(tag: Identifier, args: List[Argument] = List()) = {
         tagCtx.synchronized{
             if (!tagCtx.functionTags.contains(tag)){
-                val name = getLazyCallId()
+                val name = tagCtx.getLazyCallId()
                 val fct = new TagFunction(tagCtx, name, args)
                 tagCtx.functionTags.addOne(tag, fct)
                 tagCtx.addFunction(name, fct)
@@ -657,41 +663,100 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
 
 
     def addObjectFrom(name: String, alias: String, other: Context) = {
-        if (other.classes.contains(name)){
-            classes.addOne(alias, other.classes(name))
-            child.addOne(alias, other.push(name))
-        }
-        else if (other.templates.contains(name)){
-            templates.addOne(alias, other.templates(name))
-            child.addOne(alias, other.push(name))
-        }
-        else if (other.structs.contains(name)){
-            structs.addOne(alias, other.structs(name))
-            child.addOne(alias, other.push(name))
-        }
-        else if (other.enums.contains(name)){
-            enums.addOne(alias, other.enums(name))
-            child.addOne(alias, other.push(name))
-        }
-        else if (other.predicates.contains(name)){
-            predicates.addOne(alias, other.predicates(name))
-        }
-        else if (other.functions.contains(name)){
-            functions.addOne(alias, other.functions(name))
-        }
-        else if (other.variables.contains(name)){
-            variables.addOne(alias, other.variables(name))
+        if (name == "_"){
+            other.classes.foreach((k, v) =>{
+                classes.addOne(k, v)
+                child.addOne(k, other.push(k))
+            })
+            other.templates.foreach((k, v) =>{
+                templates.addOne(k, v)
+                child.addOne(k, other.push(k))
+            })
+            other.structs.foreach((k, v) =>{
+                structs.addOne(k, v)
+                child.addOne(k, other.push(k))
+            })
+            other.enums.foreach((k, v) =>{
+                enums.addOne(k, v)
+                child.addOne(k, other.push(k))
+            })
+
+            other.predicates.foreach((k, v) =>{
+                predicates.addOne(k, v)
+            })
+            other.functions.foreach((k, v) =>{
+                functions.addOne(k, v)
+            })
+            other.variables.foreach((k, v) =>{
+                variables.addOne(k, v)
+            })
         }
         else{
-            throw new Exception(f"$name Not Found in ${other.getPath()}")
+            if (other.classes.contains(name)){
+                classes.addOne(alias, other.classes(name))
+                child.addOne(alias, other.push(name))
+            }
+            else if (other.templates.contains(name)){
+                templates.addOne(alias, other.templates(name))
+                child.addOne(alias, other.push(name))
+            }
+            else if (other.structs.contains(name)){
+                structs.addOne(alias, other.structs(name))
+                child.addOne(alias, other.push(name))
+            }
+            else if (other.enums.contains(name)){
+                enums.addOne(alias, other.enums(name))
+                child.addOne(alias, other.push(name))
+            }
+            else if (other.predicates.contains(name)){
+                predicates.addOne(alias, other.predicates(name))
+            }
+            else if (other.functions.contains(name)){
+                functions.addOne(alias, other.functions(name))
+            }
+            else if (other.variables.contains(name)){
+                variables.addOne(alias, other.variables(name))
+            }
+            else{
+                throw new Exception(f"$name Not Found in ${other.getPath()}")
+            }
         }
     }
 
 
+    def isChildOf(other: Context): Boolean={
+        if (other == this || (other.child.contains(name) && other.child(name) == this)) then{ 
+            true
+        }
+        else if (parent != null){
+            parent.isChildOf(other)
+        }
+        else{
+            false
+        }
+    }
+
+
+
     private def tryGetElement[T](mapGetter: (Context)=>mutable.Map[String, T])(identifier: Identifier, down: Boolean = false): Option[T] = {
+        val value = tryGetElementNoCheck(mapGetter)(identifier, down)
+        value match
+            case None => None
+            case Some(value) => {
+                if (value.isInstanceOf[CObject]) then{
+                    val obj = value.asInstanceOf[CObject]
+                    if (obj.modifiers.protection == Protection.Private && !isChildOf(value.asInstanceOf[CObject].context)){
+                        throw new Exception(f"Cannot access private object: $identifier")
+                    }
+                    Some(value)
+                }
+                Some(value)
+            }
+    }
+    private def tryGetElementNoCheck[T](mapGetter: (Context)=>mutable.Map[String, T])(identifier: Identifier, down: Boolean = false): Option[T] = {
         val value = tryGetElementInner(mapGetter)(identifier, down)
         value match
-            case None => if inheritted != null then inheritted.tryGetElement(mapGetter)(identifier, down) else None
+            case None => if inheritted != null then inheritted.tryGetElementNoCheck(mapGetter)(identifier, down) else None
             case Some(_) => value
     }
 
@@ -706,7 +771,7 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
             }
             // Check parent
             else if (parent != null && !down){
-                parent.tryGetElement(mapGetter)(identifier, down)
+                parent.tryGetElementNoCheck(mapGetter)(identifier, down)
             }
             else{
                 None
@@ -715,20 +780,20 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
         else{
             // Check if child has begin
             if (child.contains(identifier.head())){
-                val ret = child(identifier.head()).tryGetElement(mapGetter)(identifier.drop(), true)
+                val ret = child(identifier.head()).tryGetElementNoCheck(mapGetter)(identifier.drop(), true)
                 if (ret != None) return ret
             }
             // Check parent
             if (parent != null && !down){
-                val ret = parent.tryGetElement(mapGetter)(identifier, down)
+                val ret = parent.tryGetElementNoCheck(mapGetter)(identifier, down)
                 if (ret != None) return ret
             }
             if (name == identifier.head() && child.contains(identifier.drop().head())){
-                val ret = child(identifier.drop().head()).tryGetElement(mapGetter)(identifier.drop().drop(), true)
+                val ret = child(identifier.drop().head()).tryGetElementNoCheck(mapGetter)(identifier.drop().drop(), true)
                 if (ret != None) return ret
             }
             if (root == this && child.contains(identifier.head())){
-                val ret = child(identifier.head()).tryGetElement(mapGetter)(identifier, true)
+                val ret = child(identifier.head()).tryGetElementNoCheck(mapGetter)(identifier, true)
                 if (ret != None) return ret
             }
             None

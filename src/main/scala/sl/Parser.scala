@@ -14,13 +14,13 @@ import javax.swing.text.DefaultEditorKit.PasteAction
 
 object Parser extends StandardTokenParsers{
   lexical.delimiters ++= List("(", ")", "\\", ".", "..", ":", "=", "->", "{", "}", ",", "*", "[", "]", "/", "+", "-", "*", "/", "\\", "%", "&&", "||", "=>", ";",
-                              "+=", "-=", "/=", "*=", "?=", ":=", "%", "@", "@e", "@a", "@s", "@r", "@p", "~", "^", "<=", "==", ">=", "<", ">", "!=", "%%%", "$",
+                              "+=", "-=", "/=", "*=", "?=", ":=", "%", "@", "@e", "@a", "@s", "@r", "@p", "~", "^", "<=", "==", ">=", "<", ">", "!=", "%%%", "???", "$",
                               "!", "!=")
   lexical.reserved   ++= List("true", "false", "if", "then", "else", "return", "switch", "for", "do", "while",
                               "as", "at", "with", "to", "import", "doc", "template", "null", "typedef", "foreach", "in",
                               "var", "val", "def", "package", "struct", "enum", "class", "lazy", "jsonfile",
                               "public", "protected", "private", "scoreboard", "forgenerate", "from",
-                              "ticking", "loading", "predicate", "extends", "new", "static")
+                              "ticking", "loading", "predicate", "extends", "new", "static", "virtual", "abstract", "override")
 
 
   def block: Parser[Instruction] = "{" ~> rep(instruction) <~ "}" ^^ (p => InstructionBlock(p))
@@ -62,10 +62,9 @@ object Parser extends StandardTokenParsers{
   def argument: Parser[Argument] = types ~ identLazy ~ opt("=" ~> exprNoTuple) ^^ { p => Argument(p._1._2, p._1._1, p._2) }
   def arguments: Parser[List[Argument]] = "(" ~> repsep(argument, ",") <~ ")"
 
-  def functionDoc: Parser[String] = ("doc" ~ "(") ~> stringLit2 <~ ")"
   def instruction: Parser[Instruction] = 
-      ((((opt(functionDoc) ~> "def" ~> modifier) ~ identLazy)) ~ arguments) ~ instruction ^^ (p => FunctionDecl(p._1._1._2, p._2, VoidType, p._1._2, p._1._1._1))
-      | ((((opt(functionDoc) ~> opt("def") ~> modifier) ~ types) ~ identLazy) ~ arguments) ~ instruction ^^ (p => FunctionDecl(p._1._1._2, p._2, p._1._1._1._2, p._1._2, p._1._1._1._1))
+      ((((doc ~ ("def" ~> modifier)) ~ identLazy)) ~ arguments) ~ instruction ^^ { case doc ~ mod ~ n ~ a ~i  => FunctionDecl(n, i, VoidType, a, mod.withDoc(doc)) }
+      | ((((doc ~ (opt("def") ~> modifier)) ~ types) ~ identLazy) ~ arguments) ~ instruction ^^ { case doc ~ mod ~ t ~ n ~ a ~i  => FunctionDecl(n, i, t, a, mod.withDoc(doc)) }
       | (((identFunction <~ "(") ~ repsep(exprNoTuple, ",")) <~ ")") ~ block ^^ (p => FunctionCall(p._1._1, p._1._2 ::: List(LambdaValue(List(), p._2))))
       | ((identFunction <~ "(") ~ repsep(exprNoTuple, ",")) <~ ")" ^^ (p => FunctionCall(p._1, p._2)) // Function Call
       | packageInstr
@@ -96,15 +95,15 @@ object Parser extends StandardTokenParsers{
 
   def anyKeyword: Parser[String] = lexical.reserved.map(f => f ^^ (p => p)).reduce(_ | _)
 
-  def predicate:Parser[Instruction] = (modifier <~ "predicate") ~ identLazy ~ arguments ~ json ^^ {case mod ~ name ~ args ~ json => PredicateDecl(name, args, json, mod)}
+  def predicate:Parser[Instruction] = doc ~ (modifier <~ "predicate") ~ identLazy ~ arguments ~ json ^^ {case doc ~ mod ~ name ~ args ~ json => PredicateDecl(name, args, json, mod.withDoc(doc))}
   def arrayAssign:Parser[Instruction] = (identLazy2 <~ "[") ~ (rep1sep(expr, ",") <~ "]") ~ assignmentOp ~ expr ^^ { case a ~ i ~ o ~ e => ArrayAssigment(Left(a), i, o, e) }
   def foreach: Parser[Instruction] = ("foreach" ~> ident <~ "in") ~ expr ~ program ^^ { case v ~ e ~ i => ForEach(v, e, i) }
   def packageInstr: Parser[Instruction] = "package" ~> identLazy2 ~ program ^^ (p => Package(p._1, p._2))
-  def classDecl: Parser[Instruction] = (modifier <~ "class") ~ identLazy ~ opt("extends" ~> ident2) ~ opt("with" ~> namespacedName2) ~ block ^^ { case mod ~ iden ~ par ~ entity ~ block => ClassDecl(iden, block, mod, par, entity) }
-  def structDecl: Parser[Instruction] = (modifier <~ "struct") ~ identLazy ~ opt("extends" ~> ident2) ~ block ^^ { case mod ~ iden ~ par ~ block => StructDecl(iden, block, mod, par) }
+  def classDecl: Parser[Instruction] = doc ~ (modifier <~ "class") ~ identLazy ~ opt("extends" ~> ident2) ~ opt("with" ~> namespacedName2) ~ block ^^ { case doc ~ mod ~ iden ~ par ~ entity ~ block => ClassDecl(iden, block, mod.withDoc(doc), par, entity) }
+  def structDecl: Parser[Instruction] = doc ~ (modifier <~ "struct") ~ identLazy ~ opt("extends" ~> ident2) ~ block ^^ { case doc ~ mod ~ iden ~ par ~ block => StructDecl(iden, block, mod.withDoc(doc), par) }
   def typedef: Parser[Instruction] = "typedef" ~> types ~ identLazy ^^ { case _1 ~ _2 => TypeDef(_2, _1) }
   def templateUse: Parser[Instruction] = ident2 ~ ident ~ block ^^ {case iden ~ name ~ instr => TemplateUse(iden, name, instr)}
-  def templateDesc: Parser[Instruction] = (modifier <~ "template") ~ identLazy ~ opt("extends" ~> ident2) ~ instruction ^^ {case mod ~ name ~ parent ~ instr => TemplateDecl(name, instr, mod, parent)}
+  def templateDesc: Parser[Instruction] = doc ~ (modifier <~ "template") ~ identLazy ~ opt("extends" ~> ident2) ~ instruction ^^ {case doc ~ mod ~ name ~ parent ~ instr => TemplateDecl(name, instr, mod.withDoc(doc), parent)}
   def importInst: Parser[Instruction] = "import"~>ident2 ~ opt("as" ~> ident2) ^^ {case file ~ alias => Import(file, null, alias.getOrElse(null))}
   def fromImportInst: Parser[Instruction] = "from"~>ident2 ~ ("import" ~> ident2) ~ opt("as" ~> ident2) ^^ {case file ~ res ~ alias => Import(file, res, alias.getOrElse(null))}
   def forgenerate: Parser[Instruction] = (("forgenerate" ~> "(" ~> identLazy <~ ",") ~ exprNoTuple <~ ")") ~ instruction ^^ (p => ForGenerate(p._1._1, p._1._2, p._2))
@@ -121,8 +120,8 @@ object Parser extends StandardTokenParsers{
   def switchCase: Parser[SwitchCase] = (expr <~ "->") ~ instruction ^^ (p => SwitchCase(p._1, p._2))
 
 
-  def enumInstr: Parser[EnumDecl] = (modifier ~ ("enum" ~> identLazy) ~ opt("("~>repsep(enumField,",")<~")") <~ "{") ~ repsep(enumValue, ",") <~ "}" ^^ 
-                                    (p => EnumDecl(p._1._1._2, p._1._2.getOrElse(List()), p._2, p._1._1._1))
+  def enumInstr: Parser[EnumDecl] = (doc ~ modifier ~ ("enum" ~> identLazy) ~ opt("("~>repsep(enumField,",")<~")") <~ "{") ~ repsep(enumValue, ",") <~ "}" ^^ 
+                                    { case doc ~ mod ~ n ~ f ~ v => EnumDecl(n, f.getOrElse(List()), v, mod.withDoc(doc)) }
   def enumField: Parser[EnumField] = types ~ identLazy ^^ { p => EnumField(p._2, p._1) }
   def enumValue: Parser[EnumValue] = identLazy ~ opt("("~>repsep(exprNoTuple,",")<~")") ^^ (p => EnumValue(p._1, p._2.getOrElse(List())))
 
@@ -132,20 +131,22 @@ object Parser extends StandardTokenParsers{
       VariableAssigment(identifiers.map((i,s) => (Left(i), s)), p._1._2, p._2)
     })
 
-  def varDeclaration: Parser[Instruction] = (modifier ~ types ~ rep1sep(identLazy, ",") ~ opt("=" ~> expr)) ^^ (p => {
-      val mod = p._1._1._1
-      val decl = p._1._2.map(VariableDecl(_, p._1._1._2, mod))
-      val identifiers = p._1._2.map(Identifier.fromString(_))
-      if (!mod.isEntity && p._2.isEmpty){
+  def varDeclaration: Parser[Instruction] = (doc ~ modifier ~ types ~ rep1sep(identLazy, ",") ~ opt("=" ~> expr)) ^^ {
+    case doc ~ mod1 ~ typ ~ names ~ expr => {
+      val mod = mod1.withDoc(doc)
+      val decl = names.map(VariableDecl(_, typ, mod))
+      val identifiers = names.map(Identifier.fromString(_))
+      if (!mod.isEntity && expr.isEmpty){
         InstructionList(decl ::: List(VariableAssigment(identifiers.map(l => (Left(l), Selector.self)), ":=", DefaultValue)))
       }
-      else if (!p._2.isEmpty){
-        InstructionList(decl ::: List(VariableAssigment(identifiers.map(l => (Left(l), Selector.self)), "=", p._2.get)))
+      else if (!expr.isEmpty){
+        InstructionList(decl ::: List(VariableAssigment(identifiers.map(l => (Left(l), Selector.self)), "=", expr.get)))
       }
       else{
         InstructionList(decl)
       }
-    }) // Variable Dec
+    }
+  } // Variable Dec
   def ifs: Parser[If] = ("if" ~> "(" ~> expr <~ ")") ~ instruction ~ 
       rep(("else" ~> "if" ~> "(" ~> expr <~ ")") ~ instruction) ~
       opt("else" ~> instruction) ^^ {p => 
@@ -252,8 +253,8 @@ object Parser extends StandardTokenParsers{
                             ((nonRecTypes <~ "[") ~ expr) <~ "]" ^^ (p => ArrayType(p._1, p._2)) |
                             nonRecTypes
 
-  def modifierSub: Parser[String] = ("override" | "lazy" | "inline"| "scoreboard" | "ticking" | "loading" | "helper" | "static")
-  def modifierAttribute: Parser[(String,Expression)] = ident2 ~ "=" ~ expr ^^ {case i ~ _ ~ e => (i, e)}
+  def modifierSub: Parser[String] = ("override" | "lazy" | "scoreboard" | "ticking" | "loading" | "helper" | "static")
+  def modifierAttribute: Parser[(String,Expression)] = ident2 ~ "=" ~ exprNoTuple ^^ {case i ~ _ ~ e => (i, e)}
   def modifierAttributes: Parser[Map[String,Expression]] = opt("[" ~> rep1sep(modifierAttribute,",") <~"]") ^^ {(_.getOrElse(List()).toMap)}
   def modifier: Parser[Modifier] = 
     (opt(stringLit2 ~ stringLit2 ~ stringLit2) ~ modifierAttributes ~ opt("public" | "private" | "protected") ~ rep(modifierSub) ~ rep(identTag)) ^^ 
@@ -268,9 +269,10 @@ object Parser extends StandardTokenParsers{
         case _ => {}
       }
 
+      if subs.contains("virtual") then {mod.isVirtual = true}
+      if subs.contains("abstract") then {mod.isAbstract = true}
       if subs.contains("override") then {mod.isOverride = true}
       if subs.contains("lazy")     then {mod.isLazy = true}
-      if subs.contains("inline")   then {mod.isInline = true}
       if subs.contains("scoreboard")   then {mod.isEntity = true}
       if subs.contains("ticking")   then {mod.isTicking = true}
       if subs.contains("loading")   then {mod.isLoading = true}
@@ -280,6 +282,8 @@ object Parser extends StandardTokenParsers{
       mod
     }
   }
+
+  def doc: Parser[Option[String]] = opt("???"~>stringLit<~"???")
 
   def program: Parser[Instruction] = rep(instruction) ^^ (InstructionList(_))
 
