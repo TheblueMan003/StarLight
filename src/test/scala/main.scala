@@ -20,21 +20,25 @@ class ListFunSuite extends AnyFlatSpec with should.Matchers with BeforeAndAfterA
 
     var output: PrintStream = null
 
-    val testFiles = List(("math.sl", 1))
-    val compileTests = List("comparaison.sl")
+    val testFiles: List[(String, Int)] = List()
+    val compileTests: List[String] = List("comparaison.sl", "math.sl")
 
 
     override def beforeAll() = {
-        chat = mutable.ListBuffer[String]()
-        pio = new ProcessIO(stdin => (output = PrintStream(stdin, true)),
-                        stdout => scala.io.Source.fromInputStream(stdout)
-                          .getLines.foreach(line => {println(line);chat.synchronized{chat.append(line)}}),
-                        stderr => scala.io.Source.fromInputStream(stderr)
-                          .getLines.foreach(line => {println(line)}))
-        server = Process("java -Xmx1024M -Xms1024M -jar server.jar nogui", new java.io.File("./test_env")).run(pio)
+        if (testFiles.length > 0){
+            chat = mutable.ListBuffer[String]()
+            pio = new ProcessIO(stdin => (output = PrintStream(stdin, true)),
+                            stdout => scala.io.Source.fromInputStream(stdout)
+                            .getLines.foreach(line => {println(line);chat.synchronized{chat.append(line)}}),
+                            stderr => scala.io.Source.fromInputStream(stderr)
+                            .getLines.foreach(line => {println(line)}))
+            server = Process("java -Xmx1024M -Xms1024M -jar server.jar nogui", new java.io.File("./test_env")).run(pio)
+        }
     }
     override def afterAll() = {
-        server.destroy()
+        if (testFiles.length > 0){
+            server.destroy()
+        }
     }
 
     def checkForText(text: String):Boolean={
@@ -61,22 +65,25 @@ class ListFunSuite extends AnyFlatSpec with should.Matchers with BeforeAndAfterA
         directoryToBeDeleted.delete()
     }
 
-    "server" should "have started" in {
-        assert(server.isAlive())
-    }
-
-    
-    "server" should "load world" in {
-        val start =  LocalDateTime.now()
-        var end =  LocalDateTime.now()
-        while(!checkForText("Done") && ChronoUnit.SECONDS.between(start, end) < 100){
-            end = LocalDateTime.now()
+    if (testFiles.length > 0){
+        "server" should "have started" in {
+            assert(server.isAlive())
         }
-        assert(checkForText("Done"))
-        clearChat()
     }
 
-    compileTests.foreach((f, n) => {
+    if (testFiles.length > 0){
+        "server" should "load world" in {
+            val start =  LocalDateTime.now()
+            var end =  LocalDateTime.now()
+            while(!checkForText("Done") && ChronoUnit.SECONDS.between(start, end) < 100){
+                end = LocalDateTime.now()
+            }
+            assert(checkForText("Done"))
+            clearChat()
+        }
+    }
+
+    compileTests.foreach(f => {
         deleteDirectory(new File("./test_env/world/datapacks/test"))
         f should "compile" in {
             sl.Main.main(Array("compile", "-i", "./src/test/resources/"+f, "-o", "./test_env/world/datapacks/test/"))

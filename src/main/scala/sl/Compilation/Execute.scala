@@ -208,6 +208,15 @@ object Execute{
                 if right.hasIntValue() && left.getType().isDirectComparable() => 
                     (List(), List(IFValueCase(expr)))
 
+            case BinaryOperation(op, LinkedVariableValue(left, sel), BinaryOperation(op2, l, r)) =>
+                val (p,v) = Utils.simplifyToVariable(BinaryOperation(op2, l, r))
+                val (p2,c) = getIfCase(BinaryOperation(op, LinkedVariableValue(left, sel), v))
+                (p:::p2, c)
+            case BinaryOperation(op, BinaryOperation(op2, l, r), LinkedVariableValue(right, sel)) =>
+                val (p,v) = Utils.simplifyToVariable(BinaryOperation(op2, l, r))
+                val (p2,c) = getIfCase(BinaryOperation(op, LinkedVariableValue(right, sel), v))
+                (p:::p2, c)
+
             // Directly Comparable Value (int, float, bool, etc...)
             case BinaryOperation(">" | "<" | ">=" | "<=", LinkedVariableValue(left, sel), LinkedVariableValue(right, sel2))
                 if left.getType().isDirectComparable()=> 

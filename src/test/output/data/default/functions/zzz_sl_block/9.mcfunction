@@ -4,4 +4,4 @@ scoreboard players operation default.math.root._0 tbms.var *= default.math.root.
 scoreboard players operation default.math.root._0 tbms.var /= 1000 tbms.const
 scoreboard players operation default.math.root._0 tbms.var *= default.math.root.lo tbms.var
 scoreboard players operation default.math.root._0 tbms.var /= 1000 tbms.const
-execute if score default.math.root._0 tbms.var < default.math.root.n tbms.var run function default/zzz_sl_block/_9
+execute if score default.math.root.n tbms.var < default.math.root._0 tbms.var run function default/zzz_sl_block/9
