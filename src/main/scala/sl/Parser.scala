@@ -8,6 +8,7 @@ import objects.types.VoidType
 import scala.util.parsing.combinator._
 import objects.Identifier
 import sl.Compilation.Selector.*
+import sl.Reporter
 import objects.EnumField
 import objects.EnumValue
 import javax.swing.text.DefaultEditorKit.PasteAction
@@ -214,7 +215,8 @@ object Parser extends StandardTokenParsers{
   def exprSub: Parser[Expression] = exprMult ~ rep("-" ~> exprSub) ^^ {unpack("-", _)}
   def exprAdd: Parser[Expression] = exprSub ~ rep("+" ~> exprAdd) ^^ {unpack("+", _)}
   def exprComp: Parser[Expression] = exprAdd ~ rep(comparator ~ exprComp) ^^ {unpack(_)}
-  def exprAnd: Parser[Expression] = exprComp ~ rep("&&" ~> exprAnd) ^^ {unpack("&&", _)}
+  def exprIn: Parser[Expression] = exprComp ~ rep("in" ~> exprIn) ^^ {unpack("in", _)}
+  def exprAnd: Parser[Expression] = exprIn ~ rep("&&" ~> exprAnd) ^^ {unpack("&&", _)}
   def exprOr: Parser[Expression] = exprAnd ~ rep("||" ~> exprOr) ^^ {unpack("||", _)}
   def exprNoTuple = exprOr
   def expr: Parser[Expression] = rep1sep(exprNoTuple, ",") ^^ (p => if p.length == 1 then p.head else TupleValue(p))
@@ -294,9 +296,10 @@ object Parser extends StandardTokenParsers{
   }
 
   def parse(file: String, args: String): Option[Instruction] = {
-    val tokens = new lexical.Scanner(Preparser.parse(args))
+    val tokens = new lexical.Scanner(Preparser.parse(file, args))
     phrase(program)(tokens) match {
       case Success(trees, _) =>
+        Reporter.ok(f"Parsed: $file")
         Some(trees)
       case e =>
         println(f"Error in file '${file}'': ${e}")

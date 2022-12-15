@@ -26,7 +26,7 @@ def reset(){
 """
 Show text in the actionbar
 """
-def lazy show(rawjson $text){
+def lazy force(rawjson $text){
     if (Compiler.isJava()){
         /title @s actionbar $text
     }
@@ -40,7 +40,7 @@ Show text in the actionbar with priority `priority` and time `time`
 """
 def lazy show(int priority, int time, rawjson text){
     if (currentPriority <= priority){
-        show(text)
+        force(text)
         currentTime = time
         currentPriority = priority
     }

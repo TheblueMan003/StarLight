@@ -3,7 +3,8 @@ package sl
 import objects.Context
 import java.util.Random
 
-object Settings{
+case class PackInfo(var version: Int, var description: String, var min_engine_version: List[Int])
+class SettingsContext(){
     var variableScoreboard = "tbms.var"
     var valueScoreboard = "tbms.value"
     var constScoreboard = "tbms.const"
@@ -13,18 +14,26 @@ object Settings{
     var multiplexFolder = "zzz_sl_mux"
     var tagsFolder = "zzz_sl_tags"
     var outputName = "default"
+
+    var java_datapack_version = PackInfo(10, "Made With StarLight", List(1,19,3))
+    var java_resourcepack_version = PackInfo(10, "Made With StarLight", List(1,19,3))
+
+    var bedrock_behaviorpack_version = PackInfo(2, "Made With StarLight", List(1,19,3))
+    var bedrock_resourcepack_version = PackInfo(2, "Made With StarLight", List(1,19,3))
+
     var floatPrec = 1000
     var treeSize = 20
-    var target:Target = MCJava
+    var target: Target = MCJava
     var debug = false
     var allFunction = true
 
-    val metaVariable = List(
+    var metaVariable = List(
         ("Compiler.isJava", () => target == MCJava),
         ("Compiler.isBedrock", () => target == MCBedrock),
         ("Compiler.isDebug", () => debug)
     )
 }
+var Settings = SettingsContext()
 
 trait Target{
     def getFunctionPath(path: String): String

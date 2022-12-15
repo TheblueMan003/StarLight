@@ -174,6 +174,7 @@ object Execute{
     /**
      * get IfCase from Expression
      */
+    private val comparator = List(">", "<", ">=", "<=", "==", "!=")
     private def getIfCase(expr: Expression)(implicit context: Context): (List[String], List[IFCase]) = {
         expr match
             case IntValue(value) => if value == 0 then (List(), List(IFFalse)) else (List(), List(IFTrue))
@@ -185,7 +186,10 @@ object Execute{
             case LinkedFunctionValue(fct) => (List(), List(IFTrue))
             case SelectorValue(value) => (List(), List(IFValueCase(expr)))
             case VariableValue(iden, sel) => {
-                if (iden.toString().startsWith("@")){
+                if (Settings.metaVariable.exists(_._1 == iden.toString())) {
+                    if Settings.metaVariable.find(_._1 == iden.toString()).get._2() then (List(), List(IFTrue)) else (List(), List(IFFalse))
+                }
+                else if (iden.toString().startsWith("@")){
                     if context.getFunctionTags(iden).getFunctions().length == 0 then (List(), List(IFFalse)) else (List(), List(IFTrue))
                 }
                 else{
@@ -200,19 +204,21 @@ object Execute{
                     (List(), List(IFValueCase(expr)))
                 }
             }
-            case BinaryOperation(op, VariableValue(left, sel), right) => getIfCase(BinaryOperation(op, context.resolveVariable(VariableValue(left, sel)), right))
-            case BinaryOperation(op, left, VariableValue(right, sel)) => getIfCase(BinaryOperation(op, left, context.resolveVariable(VariableValue(right, sel))))
+            case BinaryOperation(op, VariableValue(left, sel), right) =>
+                getIfCase(BinaryOperation(op, context.resolveVariable(VariableValue(left, sel)), right))
+            case BinaryOperation(op, left, VariableValue(right, sel)) =>
+                getIfCase(BinaryOperation(op, left, context.resolveVariable(VariableValue(right, sel))))
 
             // Tuple
             case BinaryOperation("==", LinkedVariableValue(left, sel), right) 
                 if right.hasIntValue() && left.getType().isDirectComparable() => 
                     (List(), List(IFValueCase(expr)))
 
-            case BinaryOperation(op, LinkedVariableValue(left, sel), BinaryOperation(op2, l, r)) =>
+            case BinaryOperation(op, LinkedVariableValue(left, sel), BinaryOperation(op2, l, r)) if comparator.contains(op) =>
                 val (p,v) = Utils.simplifyToVariable(BinaryOperation(op2, l, r))
                 val (p2,c) = getIfCase(BinaryOperation(op, LinkedVariableValue(left, sel), v))
                 (p:::p2, c)
-            case BinaryOperation(op, BinaryOperation(op2, l, r), LinkedVariableValue(right, sel)) =>
+            case BinaryOperation(op, BinaryOperation(op2, l, r), LinkedVariableValue(right, sel)) if comparator.contains(op) =>
                 val (p,v) = Utils.simplifyToVariable(BinaryOperation(op2, l, r))
                 val (p2,c) = getIfCase(BinaryOperation(op, LinkedVariableValue(right, sel), v))
                 (p:::p2, c)
@@ -279,12 +285,14 @@ object Execute{
                     getIfCase(FunctionCallValue(VariableValue(right.fullName + "." + Utils.getOpFunctionName(op)), List(left)))
 
             // Error Cases
-            case BinaryOperation(op, LinkedVariableValue(left, sel), right) 
+            case BinaryOperation(">" | "<" | ">=" | "<=" | "==" | "!=", LinkedVariableValue(left, sel), right) 
                 if left.getType().isEqualitySupported() && left.getType().isComparaisonSupported() => 
+                    val op = expr.asInstanceOf[BinaryOperation].op
                     throw new Exception(f"Operation $op not supported for $left and $right")
             
-            case BinaryOperation(op, left, LinkedVariableValue(right, sel)) 
+            case BinaryOperation(">" | "<" | ">=" | "<=" | "==" | "!=", left, LinkedVariableValue(right, sel)) 
                 if right.getType().isEqualitySupported() && right.getType().isComparaisonSupported() => 
+                    val op = expr.asInstanceOf[BinaryOperation].op
                     throw new Exception(f"Operation $op not supported for $left and $right")
 
             
@@ -351,11 +359,8 @@ object Execute{
                 val v = Utils.simplifyToVariable(expr)
                 (v._1, List(IFValueCase(v._2)))
             }
-            case FunctionCallValue(name, args, sel) if name.toString() == "Compiler.isBedrock" => {
-                if Settings.target == MCBedrock then (List(), List(IFTrue)) else (List(), List(IFFalse))
-            }
-            case FunctionCallValue(name, args, sel) if name.toString() == "Compiler.isJava" => {
-                if Settings.target == MCJava then (List(), List(IFTrue)) else (List(), List(IFFalse))
+            case FunctionCallValue(name, args, sel) if Settings.metaVariable.exists(_._1 == name.toString()) => {
+                if Settings.metaVariable.find(_._1 == name.toString()).get._2() then (List(), List(IFTrue)) else (List(), List(IFFalse))
             }
             case FunctionCallValue(name, args, sel) if name.toString() == "Compiler.isVariable" => {
                 val check = args.forall(arg =>

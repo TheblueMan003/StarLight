@@ -7,9 +7,10 @@ def [compile.order=999999] ticking __load__(){
             @__loading__()
         }
     }
-    if (@tick){
-        @tick()
-    }
+    
+    @tick()
+}
+def @tick __playertick__(){
     if (@playertick){
         with(@a, true){
             @playertick()

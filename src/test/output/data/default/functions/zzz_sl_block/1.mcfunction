@@ -1,2 +1,2 @@
-scoreboard players set default.classComparaison.e.__ne__.a tbms.var 0
-function default:class-comparaison/e/__ne__
+scoreboard players set default.time.s tbms.var 59
+scoreboard players remove default.time.m tbms.var 1

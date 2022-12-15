@@ -68,6 +68,7 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
 
     def importFile(string: String) = root.synchronized{
         if (!root.imports.contains(string)){
+            root.imports = string::root.imports
             true
         }
         else{

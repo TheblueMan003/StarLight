@@ -78,6 +78,8 @@ object ContextBuilder{
                 val ret = if (context.importFile(lib)){
                     val libC = Utils.getLib(lib).get
                     buildRec(libC)(context.root)
+                    Compiler.compile(libC, true)(context.root)
+                    List()
                 }
                 else{
                     List()

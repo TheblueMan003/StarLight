@@ -1,2 +1,2 @@
-scoreboard players set default.classComparaison.e.__lt__.a tbms.var 0
-function default:class-comparaison/e/__lt__
+scoreboard players set default.time.stat tbms.var 3
+execute unless score default.time.hasEventEnd tbms.var matches 0 run function default/zzz_sl_block/3

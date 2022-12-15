@@ -200,6 +200,7 @@ switch(a){
 ```
 The switch statement will build a tree if the number of cases if big enough. (20 by defaut)
 In addition to that switch also support tupple value.
+```
 (int, int) a
 switch(a){
     (0,0) -> do_stuff1()

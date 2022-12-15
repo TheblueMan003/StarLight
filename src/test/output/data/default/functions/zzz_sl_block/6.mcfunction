@@ -1,3 +1,2 @@
-scoreboard players operation default.math.pow.m tbms.var *= default.math.pow.x tbms.var
-scoreboard players operation default.math.pow.m tbms.var /= 1000 tbms.const
-scoreboard players remove default.math.pow.n tbms.var 1
+execute if score @s s1586534280 matches ..10 run scoreboard players set @s s1902338816 10
+execute if score @s s1586534280 matches ..10 run scoreboard players set @s s1586534280 10

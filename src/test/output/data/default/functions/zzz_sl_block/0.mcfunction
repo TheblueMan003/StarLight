@@ -1,2 +1,2 @@
-scoreboard players set default.classComparaison.e.__eq__.a tbms.var 0
-function default:class-comparaison/e/__eq__
+scoreboard players set default.time.t tbms.var 19
+scoreboard players remove default.time.s tbms.var 1

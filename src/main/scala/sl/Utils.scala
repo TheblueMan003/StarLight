@@ -9,10 +9,18 @@ import scala.runtime.stdLibPatches.language.experimental.namedTypeArguments
 import sl.Compilation.Selector.Selector
 
 object Utils{
+    def getFile(path: String): String = {
+        val source = scala.io.Source.fromFile(path)
+        source.getLines mkString "\n"
+    }
+    def getFileLines(path: String): List[String] = {
+        val source = scala.io.Source.fromFile(path)
+        source.getLines.toList
+    }
     def getLib(path: String): Option[Instruction] = {
         val cpath = path.replace(".","/")
         val ipath = path.replace("/",".").replace("\\",".")
-        Parser.parse(path, Preparser.parse(Source.fromResource("libraries/"+cpath+".sl").getLines.reduce((x,y) => x + "\n" +y)))
+        Parser.parse(path, Source.fromResource("libraries/"+cpath+".sl").getLines.reduce((x,y) => x + "\n" +y))
     }
     def getConfig(path: String): List[String] = {
         Source.fromResource("configs/"+path).getLines.toList

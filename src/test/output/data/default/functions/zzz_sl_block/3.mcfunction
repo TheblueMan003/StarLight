@@ -1,2 +1,2 @@
-scoreboard players set default.classComparaison.e.__gt__.a tbms.var 0
-function default:class-comparaison/e/__gt__
+scoreboard players operation default.zzz_sl_mux.void___to___void.__fct__ tbms.var = default.time.eventEnd tbms.var
+function default:zzz_sl_mux/void___to___void

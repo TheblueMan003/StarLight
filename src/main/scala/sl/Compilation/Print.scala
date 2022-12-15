@@ -94,7 +94,7 @@ object Print{
                         }
                         case _ =>{
                             def checkArg(value: Expression):Unit = {
-                                value match
+                                Utils.simplify(value) match
                                     case StringValue("strikethrough") => mod.strikethrough = true
                                     case StringValue("bold") => mod.bold = true
                                     case StringValue("italic") => mod.italic = true

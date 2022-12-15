@@ -351,6 +351,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 				}
 			}
 			case other if other.isSubtypeOf(getType()) => List(f"scoreboard players operation ${getSelector()} ${op} ${vari.getSelector()(oselector)}")
+			case FuncType(sources, output) => List(f"scoreboard players operation ${getSelector()} ${op} ${vari.getSelector()(oselector)}")
 			case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()}")
 		}
 	}
@@ -569,6 +570,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 			case LinkedVariableValue(vari, sel) => {
 				vari.getType() match
 					case other if other.isSubtypeOf(getType()) => List(f"scoreboard players operation ${getSelector()} = ${vari.getSelector()(sel)}")
+					case IntType => List(f"scoreboard players operation ${getSelector()} = ${vari.getSelector()(sel)}")
 					case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()}")
 			}
 			case LambdaValue(args, instr) => {

@@ -29,7 +29,7 @@ object Main{
     safeWriteFile(directory+"/src/main.sl", List("package main", "","def ticking main(){","","}"))
   }
   def build(args: Array[String]): Unit = {
-    getFile(args(1)).split("\n").foreach(line => main(line.split(" ")))
+    Utils.getFile(args(1)).split("\n").foreach(line => main(line.split(" ")))
   }
   def compile(args: Array[String]): Unit = {
     if (hasArg(args, "-bedrock")){
@@ -111,11 +111,7 @@ object Main{
     lst
   }
   def getFiles(paths: List[String]): List[(String, String)] = {
-    paths.flatMap(path => getListOfFiles(path)).map(p => (p,getFile(p)))
-  }
-  def getFile(path: String): String = {
-    val source = scala.io.Source.fromFile(path)
-    source.getLines mkString "\n"
+    paths.flatMap(path => getListOfFiles(path)).map(p => (p,Utils.getFile(p)))
   }
   def getListOfFiles(dir: String):List[String] = {
     val d = new File(dir)
