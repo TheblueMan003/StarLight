@@ -88,6 +88,19 @@ int f
 int b = 5 * f
 ```
 This can be useful for string and json operation at compile time.
+### Const
+Variable can be marked as constant with the `const` keyword. This will prevent reassignement of the variable. 
+```
+const int a = 0
+```
+Note that this only prevent the variable from being reassign within its block, meaning that it can be reassign when a function is called multiple time.
+### val, var
+If you don't want to use type for your variable you can use the `val` and `var` keyword.
+```
+val a = 4
+var b = 5
+```
+`val` is equivalent to `const <type>`. The type of the variable is infered by the right expression. The type cannot change after that.
 
 ### Attributes
 Attributes can be added to function to specify thing to the compiler.
@@ -160,6 +173,13 @@ if (a && @e[tag=hello]){
 
 }
 ```
+You can test if an entity belong to the variable with the following syntax:
+```
+entity set
+if (@s in set){
+
+}
+```
 
 ## Flow Controls
 ### If
@@ -190,6 +210,9 @@ switch(a){
         do_other_stuff()
     }
     2 -> {
+        /say hi
+    }
+    3..4 -> {
         /say hi
     }
 }
@@ -230,6 +253,12 @@ at(@a){
     do_stuff()
 }
 ```
+Instructions can be executed **at** a position with:
+```
+at(~ ~1 ~){
+    do_stuff()
+}
+```
 Instructions can be executed **as** an entity with:
 ```
 as(@a){
@@ -238,11 +267,11 @@ as(@a){
 ```
 For compatibility with BluePhoenix the following also work:
 ```
-// as @a at @s
+// as @a at @s if a == 0
 with(@a, true, a == 0){
     do_stuff()
 }
-// as @a
+// as @a if a == 0
 with(@a, false, a == 0){
     do_stuff()
 }
