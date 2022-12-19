@@ -191,7 +191,7 @@ struct Room{
             return x >= sx && x < ex && y >= sy && y < ey && z >= sz && z < ez
         }
         if (Compiler.isBedrock){
-
+            return @s[x=]
         }
     }
     def @game.room.tick main(){

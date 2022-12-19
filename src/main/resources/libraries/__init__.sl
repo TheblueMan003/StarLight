@@ -1,13 +1,9 @@
-def [compile.order=999999] ticking __load__(){
-    if (Compiler.isBedrock){
-        int v
-        lazy int id = Compiler.random()
-        if (v != id){
-            v = id
-            @__loading__()
-        }
+if (Compiler.isBedrock){
+    def __load__(){
+        @__loading__()
     }
-    
+}
+def [compile.order=999999] ticking __tick__(){
     @tick()
 }
 def @tick __playertick__(){

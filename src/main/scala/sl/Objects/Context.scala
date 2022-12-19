@@ -35,9 +35,9 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
     private val child = mutable.Map[String, Context]()
     private var inheritted: Context = null
 
-    private lazy val fctCtx = root.push(Settings.functionFolder)
-    private lazy val muxCtx = root.push(Settings.multiplexFolder)
-    private lazy val tagCtx = root.push(Settings.tagsFolder)
+    lazy val fctCtx = root.push(Settings.functionFolder)
+    lazy val muxCtx = root.push(Settings.multiplexFolder)
+    lazy val tagCtx = root.push(Settings.tagsFolder)
 
 
     private var funcToCompile = List[ConcreteFunction]()
@@ -53,6 +53,7 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
     private var function: Function = null
     private var variable: Variable = null
     private var clazz: Class = null
+    private var inLazyCall: Boolean = false
 
     def getPath(): String ={
         return path
@@ -143,7 +144,7 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
         }
     }
     def getFreshLambda(argument: List[String], types: List[Type], output: Type, instr: Instruction, isLazy: Boolean = false): Function = synchronized{
-        val args = argument.zip(types).map((v, t) => Argument(v, t, None))
+        val args = argument.zipAll(types, "_", VoidType).map((v, t) => Argument(v, t, None))
         val name = "lambda_"+getLazyCallId()
         val ctx = push(name)
         val mod = Modifier.newPrivate()
@@ -298,6 +299,12 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
     def getCurrentClass(): Class = {
         if clazz == null && parent != null then parent.getCurrentClass() else clazz
     }
+    def setLazyCall()={
+        inLazyCall = true
+    }
+    def isInLazyCall(): Boolean = {
+        if inLazyCall then true else if parent != null then parent.isInLazyCall() else false
+    }
 
 
     def addName(name: String) = {
@@ -320,6 +327,11 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
     def addVariable(variable: Variable): Variable = {
         addName(variable.name)
         variables.addOne(variable.name, variable)
+        variable
+    }
+    def addVariable(name: String, variable: Variable): Variable = {
+        addName(name)
+        variables.addOne(name, variable)
         variable
     }
     def getScoreboardID(variable: Variable): Int = {
@@ -357,7 +369,7 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
     }
 
     def resolveVariable(vari: Expression) = {
-		val VariableValue(name, sel) = vari
+		val VariableValue(name, sel) = vari: @unchecked
 		tryGetProperty(name) match
 			case Some(Property(_, getter, setter, variable)) => FunctionCallValue(LinkedFunctionValue(getter), List(), sel)
 			case _ => LinkedVariableValue(getVariable(name), sel)
@@ -376,7 +388,9 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
                 case Some(vari) if vari.getType().isInstanceOf[FuncType] => {
                     if (vari.modifiers.isLazy){
                         vari.lazyValue match
-                            case LambdaValue(args2, instr) => (getFreshLambda(args2, args.map(Utils.typeof(_)(this)), output, instr, true), args)
+                            case LambdaValue(args2, instr) => {
+                                (getFreshLambda(args2, args.map(Utils.typeof(_)(this)), output, instr, true), args)
+                            }
                             case VariableValue(name, sel) => getFunction(name, args, output, concrete)
                             case other => throw new Exception(f"Illegal call of ${other} with $args")
                     }
@@ -469,13 +483,14 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
         }
     }
     def getFunctionWorkingName(name: String): String = synchronized{
-        if (!functions.contains(name)){
+        if (!functions.contains(name) && !predicates.contains(name)){
             name
         }
         else{
-            val fct = functions.get(name).get
+            val fct = functions.get(name).getOrElse(List())
+            val pred = predicates.get(name).getOrElse(List())
             var c = 0
-            while(fct.exists(_.name == name+f"-$c")){
+            while(fct.exists(_.name == name+f"-$c") || pred.exists(_.name == name+f"-$c")){
                 c+=1
             }
             return name+f"-$c"

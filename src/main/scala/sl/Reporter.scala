@@ -8,6 +8,9 @@ object Reporter{
     def ok(value: String) = {
         println(f"[${Console.GREEN}success${Console.WHITE}] ${value}")
     }
+    def input() = {
+        print(f"StarLight${Console.CYAN}>${Console.WHITE} ")
+    }
     def debug(value: Object) = {
         if (debugEnabled){
             println(f"[${Console.MAGENTA}debug${Console.WHITE}] ${value}")

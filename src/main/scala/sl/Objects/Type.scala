@@ -43,6 +43,7 @@ abstract class Type extends Positional {
 }
 
 object AnyType extends Type{
+    override def toString(): String = "any"
     override def allowAdditionSimplification(): Boolean = false
     override def getDistance(other: Type)(implicit context: Context): Int = outOfBound
     override def isSubtypeOf(other: Type)(implicit context: Context): Boolean = {
@@ -58,6 +59,7 @@ object AnyType extends Type{
 }
 
 object MCObjectType extends Type{
+    override def toString(): String = "mcobject"
     override def allowAdditionSimplification(): Boolean = false
     override def getDistance(other: Type)(implicit context: Context): Int = {
         other match
@@ -76,7 +78,28 @@ object MCObjectType extends Type{
     override def isEqualitySupported(): Boolean = false
 }
 
+object MCPositionType extends Type{
+    override def toString(): String = "mcposition"
+    override def allowAdditionSimplification(): Boolean = false
+    override def getDistance(other: Type)(implicit context: Context): Int = {
+        other match
+            case MCPositionType => 0
+            case _ => outOfBound
+    }
+    override def isSubtypeOf(other: Type)(implicit context: Context): Boolean = {
+        other match
+            case MCPositionType => true
+            case _ => false
+    }
+    override def getName()(implicit context: Context): String = "mcposition"
+    override def isDirectComparable(): Boolean = false
+    override def isDirectEqualitable(): Boolean = false
+    override def isComparaisonSupported(): Boolean = false
+    override def isEqualitySupported(): Boolean = false
+}
+
 object IntType extends Type{
+    override def toString(): String = "int"
     override def allowAdditionSimplification(): Boolean = true
     override def getDistance(other: Type)(implicit context: Context): Int = {
         other match
@@ -101,6 +124,7 @@ object IntType extends Type{
     override def isEqualitySupported(): Boolean = true
 }
 object FloatType extends Type{
+    override def toString(): String = "float"
     override def allowAdditionSimplification(): Boolean = true
     override def getDistance(other: Type)(implicit context: Context): Int = {
         other match
@@ -123,6 +147,7 @@ object FloatType extends Type{
     override def isEqualitySupported(): Boolean = true
 }
 object StringType extends Type{
+    override def toString(): String = "string"
     override def allowAdditionSimplification(): Boolean = true
     override def getDistance(other: Type)(implicit context: Context): Int = {
         other match
@@ -221,6 +246,7 @@ object StringType extends Type{
     override def isEqualitySupported(): Boolean = false
 }
 object BoolType extends Type{
+    override def toString(): String = "bool"
     override def allowAdditionSimplification(): Boolean = true
     override def getDistance(other: Type)(implicit context: Context): Int = {
         other match
@@ -245,6 +271,7 @@ object BoolType extends Type{
     override def isEqualitySupported(): Boolean = true
 }
 object VoidType extends Type{
+    override def toString(): String = "void"
     override def allowAdditionSimplification(): Boolean = false
     override def getDistance(other: Type)(implicit context: Context): Int = {
         other match
@@ -262,6 +289,7 @@ object VoidType extends Type{
     override def isEqualitySupported(): Boolean = false
 }
 object ParamsType extends Type{
+    override def toString(): String = "params"
     override def allowAdditionSimplification(): Boolean = false
     override def getDistance(other: Type)(implicit context: Context): Int = {
         other match
@@ -279,6 +307,7 @@ object ParamsType extends Type{
     override def isEqualitySupported(): Boolean = false
 }
 object RawJsonType extends Type{
+    override def toString(): String = "rawjson"
     override def allowAdditionSimplification(): Boolean = false
     override def getDistance(other: Type)(implicit context: Context): Int = {
         other match
@@ -297,6 +326,7 @@ object RawJsonType extends Type{
     override def isEqualitySupported(): Boolean = false
 }
 object EntityType extends Type{
+    override def toString(): String = "entity"
     override def allowAdditionSimplification(): Boolean = false
     override def getDistance(other: Type)(implicit context: Context): Int = {
         other match
@@ -318,6 +348,7 @@ object EntityType extends Type{
 }
 
 case class TupleType(sub: List[Type]) extends Type{
+    override def toString(): String = f"(${sub.map(_.toString()).reduce(_ + "," + _)})"
     override def allowAdditionSimplification(): Boolean = false
     override def getDistance(other: Type)(implicit context: Context): Int = {
         other match
@@ -340,6 +371,7 @@ case class TupleType(sub: List[Type]) extends Type{
     override def isEqualitySupported(): Boolean = true
 }
 case class ArrayType(inner: Type, size: Expression) extends Type{
+    override def toString(): String = f"$inner[$size]"
     override def allowAdditionSimplification(): Boolean = false
     override def getDistance(other: Type)(implicit context: Context): Int = {
         other match
@@ -362,6 +394,7 @@ case class ArrayType(inner: Type, size: Expression) extends Type{
     override def isEqualitySupported(): Boolean = true
 }
 case class LambdaType(val nb: Int) extends Type{
+    override def toString(): String = "()=>"
     override def allowAdditionSimplification(): Boolean = false
     override def getDistance(other: Type)(implicit context: Context): Int = {
         other match
@@ -384,6 +417,7 @@ case class LambdaType(val nb: Int) extends Type{
     override def isEqualitySupported(): Boolean = false
 }
 case class FuncType(sources: List[Type], output: Type) extends Type{
+    override def toString(): String = sources.map(_.toString()).reduceLeftOption(_ + ", "+_).getOrElse("()")+"=>"+output
     override def allowAdditionSimplification(): Boolean = false
     override def getDistance(other: Type)(implicit context: Context): Int = {
         other match
@@ -406,6 +440,7 @@ case class FuncType(sources: List[Type], output: Type) extends Type{
     override def isEqualitySupported(): Boolean = true
 }
 case class IdentifierType(name: String) extends Type{
+    override def toString(): String = f"$name?"
     override def allowAdditionSimplification(): Boolean = false
     override def getDistance(other: Type)(implicit context: Context): Int = {
         other match
@@ -427,6 +462,7 @@ case class IdentifierType(name: String) extends Type{
     override def isEqualitySupported(): Boolean = false
 }
 case class StructType(struct: Struct) extends Type{
+    override def toString(): String = struct.fullName
     override def allowAdditionSimplification(): Boolean = false
     override def getDistance(other: Type)(implicit context: Context): Int = {
         other match
@@ -450,6 +486,7 @@ case class StructType(struct: Struct) extends Type{
     override def isEqualitySupported(): Boolean = true
 }
 case class ClassType(clazz: Class) extends Type{
+    override def toString(): String = clazz.fullName
     override def allowAdditionSimplification(): Boolean = false
     override def getDistance(other: Type)(implicit context: Context): Int = {
         other match
@@ -473,6 +510,7 @@ case class ClassType(clazz: Class) extends Type{
     override def isEqualitySupported(): Boolean = true
 }
 case class EnumType(enm: objects.Enum) extends Type{
+    override def toString(): String = enm.fullName
     override def allowAdditionSimplification(): Boolean = false
     override def getDistance(other: Type)(implicit context: Context): Int = {
         other match
@@ -497,6 +535,7 @@ case class EnumType(enm: objects.Enum) extends Type{
     override def isEqualitySupported(): Boolean = true
 }
 case class RangeType(sub: Type) extends Type{
+    override def toString(): String = f"range<$sub>"
     override def allowAdditionSimplification(): Boolean = false
     override def getDistance(other: Type)(implicit context: Context): Int = {
         other match
@@ -521,6 +560,7 @@ case class RangeType(sub: Type) extends Type{
 
 
 case object JsonType extends Type{
+    override def toString(): String = "json"
     override def allowAdditionSimplification(): Boolean = false
     override def getDistance(other: Type)(implicit context: Context): Int = {
         other match

@@ -12,10 +12,10 @@ forgenerate($name, (absorption, unluck, bad_omen, blindness, conduit_power, dolp
     """
     def lazy $name(entity $ent, int $duration = 999999, int $power = 0, bool $particle = true){
         if (Compiler.isJava()){
-            /effect give $ent $name $power $duration $particle
+            /effect give $ent $name $duration $power $particle
         }
         if (Compiler.isBedrock()){
-            /effect $ent $name $power $duration $particle
+            /effect $ent $name $duration $power $particle
         }
     }
 
@@ -25,10 +25,10 @@ forgenerate($name, (absorption, unluck, bad_omen, blindness, conduit_power, dolp
     """
     def lazy $name(int $duration = 999999, int $power = 0, bool $particle = true){
         if (Compiler.isJava()){
-            /effect give @s $name $power $duration $particle
+            /effect give @s $name $duration $power $particle
         }
         if (Compiler.isBedrock()){
-            /effect @s $name $power $duration $particle
+            /effect @s $name $duration $power $particle
         }
     }
 
@@ -41,6 +41,18 @@ forgenerate($name, (absorption, unluck, bad_omen, blindness, conduit_power, dolp
         }
         if (Compiler.isBedrock()){
             /effect $ent $name 0 0
+        }
+    }
+
+    """
+    Clear all effects for `ent`
+    """
+    def lazy clear(entity $ent = @s){
+        if (Compiler.isJava()){
+            /effect clear $ent
+        }
+        if (Compiler.isBedrock()){
+            /effect $ent clear
         }
     }
 }

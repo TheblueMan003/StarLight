@@ -1,4 +1,4 @@
-package mc.gamemode
+package cmd.gamemode
 
 predicate isAventure(){
     "condition": "minecraft:entity_properties",
@@ -70,25 +70,25 @@ if (Compiler.isBedrock()){
 """
 Set the gamemode to `adventure` for entity `e`
 """
-def adventure(entity $e = @s){
+def lazy adventure(entity $e = @s){
     /gamemode adventure $e
 }
 """
 Set the gamemode to `survival` for entity `e`
 """
-def survival(entity $e = @s){
+def lazy survival(entity $e = @s){
     /gamemode survival $e
 }
 """
 Set the gamemode to `creative` for entity `e`
 """
-def creative(entity $e = @s){
+def lazy creative(entity $e = @s){
     /gamemode creative $e
 }
 """
 Set the gamemode to `spectator` for entity `e`
 """
-def spectator(entity $e = @s){
+def lazy spectator(entity $e = @s){
     /gamemode spectator $e
 }
 

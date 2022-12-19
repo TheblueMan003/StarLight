@@ -5,6 +5,8 @@ import java.util.Random
 
 case class PackInfo(var version: Int, var description: String, var min_engine_version: List[Int])
 class SettingsContext(){
+    var name = "default"
+    var version = List(1,0,0)
     var variableScoreboard = "tbms.var"
     var valueScoreboard = "tbms.value"
     var constScoreboard = "tbms.const"
@@ -20,6 +22,11 @@ class SettingsContext(){
 
     var bedrock_behaviorpack_version = PackInfo(2, "Made With StarLight", List(1,19,3))
     var bedrock_resourcepack_version = PackInfo(2, "Made With StarLight", List(1,19,3))
+
+    var java_datapack_output = List("./output/java_datapack")
+    var java_resourcepack_output = List("./output/java_resourcepack")
+    var bedrock_behaviorpack_output = List("./output/bedrock_datapack")
+    var bedrock_resourcepack_output = List("./output/bedrock_resourcepack")
 
     var floatPrec = 1000
     var treeSize = 20
@@ -75,7 +82,7 @@ case object MCJava extends Target{
                             f"scoreboard objectives add ${Settings.valueScoreboard} dummy",
                             f"scoreboard objectives add ${Settings.constScoreboard} dummy",
                             f"scoreboard objectives add ${Settings.variableScoreboard} dummy")::: 
-                            context.getAllConstant().map(v => f"scoreboard players set $v ${Settings.constScoreboard} $v"):::
+                            context.getAllConstant().map(v => f"scoreboard players set c$v ${Settings.constScoreboard} $v"):::
                             context.getAllVariable().filter(_.modifiers.isEntity).map(v => f"scoreboard objectives add ${v.scoreboard} ${v.criterion}")
 
         
@@ -121,8 +128,9 @@ case object MCBedrock extends Target{
                             f"scoreboard objectives add ${Settings.valueScoreboard} dummy",
                             f"scoreboard objectives add ${Settings.constScoreboard} dummy",
                             f"scoreboard objectives add ${Settings.variableScoreboard} dummy")::: 
-                            context.getAllConstant().map(v => f"scoreboard players set $v ${Settings.constScoreboard} $v"):::
-                            context.getAllVariable().filter(_.modifiers.isEntity).map(v => f"scoreboard objectives add ${v.scoreboard} dummy")
+                            context.getAllConstant().map(v => f"scoreboard players set c$v ${Settings.constScoreboard} $v"):::
+                            context.getAllVariable().filter(_.modifiers.isEntity).map(v => f"scoreboard objectives add ${v.scoreboard} dummy"):::
+                            context.getAllVariable().filter(v => !v.modifiers.isEntity && !v.modifiers.isLazy).map(v => f"scoreboard players set ${v.getSelector()} 0")
 
         List((f"manifest.json", List(getManifestContent())),
             (f"functions/__init__.mcfunction", dfScore),
@@ -132,20 +140,20 @@ case object MCBedrock extends Target{
     def getManifestContent(): String = {
         f"""
 {
-    "format_version": 2,
+    "format_version": ${Settings.bedrock_behaviorpack_version.version},
     "header": {
-        "description": "Made with Project Star Light",
+        "description": "${Settings.bedrock_behaviorpack_version.description}",
         "name": "${Settings.outputName}",
         "uuid": "${getUUID(Settings.outputName)}",
-        "version": [0, 0, 1],
+        "version": [${Settings.version(0)}, ${Settings.version(1)}, ${Settings.version(2)}],
         "min_engine_version": [1, 19, 50]
     },
     "modules": [
         {
-            "description": "Made with Project Star Light",
+            "description": "${Settings.bedrock_behaviorpack_version.description}",
             "type": "data",
             "uuid": "${getUUID(Settings.outputName+"_")}",
-            "version": [0, 0, 1]
+            "version": [${Settings.version(0)}, ${Settings.version(1)}, ${Settings.version(2)}]
         }
     ]
 }

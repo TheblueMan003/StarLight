@@ -25,6 +25,9 @@ object Utils{
     def getConfig(path: String): List[String] = {
         Source.fromResource("configs/"+path).getLines.toList
     }
+    def getResources(path: String)={
+        Source.fromResource(path).getLines.reduce((x,y) => x + "\n" +y)
+    }
     def stringify(string: String): String = {
         f"\"${string.replaceAllLiterally("\\\\", "\\\\").replaceAllLiterally("\"", "\\\"")}\""
     }
@@ -38,7 +41,7 @@ object Utils{
             case ForGenerate(key, provider, instr) => ForGenerate(key, provider, substReturn(instr, to))
             case ForEach(key, provider, instr) => ForEach(key, provider, substReturn(instr, to))
             case EnumDecl(name, fields, values, modifier) => instr
-            case VariableDecl(name, _type, modifier) => instr
+            case VariableDecl(name, _type, modifier, op, expr) => instr
             case JSONFile(name, json) => instr
             case Import(lib, value, alias) => instr
             
@@ -74,7 +77,7 @@ object Utils{
             case ClassDecl(name, block, modifier, parent, entity) => ClassDecl(name, subst(block, from, to), modifier, parent, entity)
             case FunctionDecl(name, block, typ, args, modifier) => FunctionDecl(name, subst(block, from, to), typ, args, modifier)
             case PredicateDecl(name, args, block, modifier) => PredicateDecl(name, args, block, modifier)
-            case VariableDecl(name, _type, modifier) => instr
+            case VariableDecl(name, _type, modifier, op, expr) => VariableDecl(name, _type, modifier, op, subst(expr, from, to))
             case ForGenerate(key, provider, instr) => ForGenerate(key, subst(provider, from, to), subst(instr, from, to))
             case ForEach(key, provider, instr) => ForEach(key, subst(provider, from, to), subst(instr, from, to))
             case EnumDecl(name, fields, values, modifier) => EnumDecl(name, fields, values.map(v => EnumValue(v.name, v.fields.map(subst(_, from, to)))), modifier)
@@ -126,6 +129,7 @@ object Utils{
             case NamespacedName(value) => instr
             case EnumIntValue(value) => instr
             case LinkedFunctionValue(fct) => instr
+            case PositionValue(value) => instr
             case DefaultValue => DefaultValue
             case NullValue => NullValue
             case ArrayGetValue(name, index) => ArrayGetValue(subst(name, from, to), index.map(subst(_, from, to)))
@@ -169,7 +173,7 @@ object Utils{
             case ForGenerate(key, provider, instr) => ForGenerate(key, subst(provider, from, to), subst(instr, from, to))
             case ForEach(key, provider, instr) => ForEach(key, subst(provider, from, to), subst(instr, from, to))
             case EnumDecl(name, fields, values, modifier) => EnumDecl(name.replaceAllLiterally(from, to), fields, values.map(v => EnumValue(v.name.replaceAllLiterally(from, to), v.fields.map(subst(_, from, to)))), modifier)
-            case VariableDecl(name, _type, modifier) => VariableDecl(name.replaceAllLiterally(from, to), _type, modifier)
+            case VariableDecl(name, _type, modifier, op, expr) => VariableDecl(name.map(_.replaceAllLiterally(from, to)), _type, modifier, op, subst(expr, from, to))
             case JSONFile(name, json) => JSONFile(name.replaceAllLiterally(from, to), subst(json, from, to))
 
             case InstructionList(list) => InstructionList(list.map(subst(_, from, to)))
@@ -211,6 +215,7 @@ object Utils{
             case SelectorValue(content) => instr
             case NamespacedName(value) => NamespacedName(value.replaceAllLiterally(from, to))
             case StringValue(value) => StringValue(value.replaceAllLiterally(from, to))
+            case PositionValue(value) => PositionValue(value.replaceAllLiterally(from, to))
             case RawJsonValue(value) => instr
             case EnumIntValue(value) => instr
             case LinkedFunctionValue(fct) => instr
@@ -259,7 +264,7 @@ object Utils{
             case ForGenerate(key, provider, instr) => ForGenerate(key, subst(provider, from, to), subst(instr, from, to))
             case ForEach(key, provider, instr) => ForEach(key, subst(provider, from, to), subst(instr, from, to))
             case EnumDecl(name, fields, values, modifier) => EnumDecl(name, fields, values.map(v => EnumValue(v.name, v.fields.map(subst(_, from, to)))), modifier)
-            case VariableDecl(name, _type, modifier) => VariableDecl(name, _type, modifier)
+            case VariableDecl(name, _type, modifier, op, expr) => VariableDecl(name, _type, modifier, op, subst(expr, from, to))
 
             case InstructionList(list) => InstructionList(list.map(subst(_, from, to)))
             case InstructionBlock(list) => InstructionBlock(list.map(subst(_, from, to)))
@@ -297,7 +302,7 @@ object Utils{
             case FunctionDecl(name, block, typ, args, modifier) => InstructionList(List())
             case PredicateDecl(name, args, block, modifier) => instr
             case EnumDecl(name, fields, values, modifier) => EnumDecl(name, fields, values, modifier)
-            case VariableDecl(name, _type, modifier) => VariableDecl(name, _type, modifier)
+            case VariableDecl(name, _type, modifier, op, expr) => VariableDecl(name, _type, modifier, op, expr)
             case ForGenerate(key, provider, instr) => ForGenerate(key, provider, rmFunctions(instr))
             case ForEach(key, provider, instr) => ForEach(key, provider, rmFunctions(instr))
             case Import(lib, value, alias) => instr
@@ -345,7 +350,7 @@ object Utils{
             case FunctionDecl(name, block, typ, args, modifier) => FunctionDecl(name, fix(block), typ, args, modifier)
             case PredicateDecl(name, args, block, modifier) => PredicateDecl(name, args, fix(block), modifier)
             case EnumDecl(name, fields, values, modifier) => EnumDecl(name, fields, values.map(v => EnumValue(v.name, v.fields.map(fix(_)))), modifier)
-            case VariableDecl(name, _type, modifier) => VariableDecl(name, fix(_type), modifier)
+            case VariableDecl(name, _type, modifier, op, expr) => VariableDecl(name, fix(_type), modifier, op, fix(expr))
             case ForGenerate(key, provider, instr) => ForGenerate(key, fix(provider), fix(instr))
             case ForEach(key, provider, instr) => ForEach(key, fix(provider), fix(instr))
             case Import(lib, value, alias) => instr
@@ -407,6 +412,7 @@ object Utils{
             case LinkedFunctionValue(fct) => instr
             case DefaultValue => DefaultValue
             case NullValue => NullValue
+            case PositionValue(value) => instr
             case JsonValue(content) => JsonValue(fix(content))
             case ArrayGetValue(name, index) => ArrayGetValue(fix(name), index.map(fix(_)))
             case VariableValue(name, sel) => context.tryGetVariable(name) match
@@ -448,6 +454,7 @@ object Utils{
             case NamespacedName(value) => instr
             case EnumIntValue(value) => instr
             case LinkedFunctionValue(fct) => instr
+            case PositionValue(value) => instr
             case ArrayGetValue(name, index) => ArrayGetValue(subst(name, from, to), index.map(subst(_, from, to)))
             case DefaultValue => DefaultValue
             case NullValue => NullValue
@@ -500,6 +507,7 @@ object Utils{
             case LambdaValue(args, instr) => LambdaType(args.length)
             case EnumIntValue(value) => IntType
             case NamespacedName(value) => MCObjectType
+            case PositionValue(value) => MCPositionType
             case ArrayGetValue(name, index) => {
                 typeof(name) match
                     case ArrayType(inner, size) => inner
@@ -515,8 +523,12 @@ object Utils{
                         val property = context.tryGetProperty(name)
                         property match
                             case None => {
-                                val fct = context.getFunction(name)
-                                FuncType(fct.arguments.map(_.typ), fct.getType())
+                                try{
+                                    val fct = context.getFunction(name)
+                                    FuncType(fct.arguments.map(_.typ), fct.getType())
+                                }catch{
+                                    _ => AnyType
+                                }
                             }
                             case Some(v) => v.getter.getType()
                     }
@@ -526,11 +538,15 @@ object Utils{
             case UnaryOperation(op, left) => BoolType
             case TupleValue(values) => TupleType(values.map(typeof(_)))
             case FunctionCallValue(name, args, selector) => {
-                name match
-                    case VariableValue(name, sel) => context.getFunction(name, args, AnyType)._1.getType()
-                    case other => typeof(name) match
-                        case FuncType(sources, output) => output
-                        case other => throw new Exception(f"Cannot call $other")
+                try{
+                    name match
+                        case VariableValue(name, sel) => context.getFunction(name, args, AnyType)._1.getType()
+                        case other => typeof(name) match
+                            case FuncType(sources, output) => output
+                            case other => throw new Exception(f"Cannot call $other")
+                }catch{
+                    _ => AnyType
+                }
             }
             case ConstructorCall(name, args) => {
                 context.getType(IdentifierType(name.toString()))
@@ -541,6 +557,7 @@ object Utils{
 
     def combineType(op: String, t1: Type, t2: Type, expr: Expression): Type = {
         op match{
+            case "in" => BoolType
             case "==" | "<=" | "<" | ">" | ">=" => BoolType
             case "+" | "-" | "*" | "/" | "%" | "^" => {
                 (t1, t2) match
@@ -606,8 +623,9 @@ object Utils{
                 val vari = context.tryGetVariable(iden)
                 vari match
                     case None => expr
-                    case Some(vari) => if vari.modifiers.isLazy then vari.lazyValue else expr
+                    case Some(vari) => if vari.modifiers.isLazy then vari.lazyValue else LinkedVariableValue(vari, sel)
             }
+            case RangeValue(min, max) => RangeValue(simplify(min), simplify(max))
             case other => other
     }
 
@@ -756,7 +774,7 @@ object Utils{
             case _ => throw new Exception(f"Unknown generator: $provider")
     }
     def getForeachCases(provider: Expression)(implicit context: Context): IterableOnce[Expression] = {
-        provider match
+        Utils.simplify(provider) match
             case RangeValue(IntValue(min), IntValue(max)) => Range(min, max+1).map(elm => IntValue(elm))
             case TupleValue(lst) => lst.map(elm => elm)
             case VariableValue(iden, sel) if iden.toString().startsWith("@") => {

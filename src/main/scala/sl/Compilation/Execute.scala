@@ -8,6 +8,7 @@ import objects.types.IntType
 import objects.types.EntityType
 import objects.Identifier
 import objects.types.BoolType
+import sl.Compilation.Selector.*
 
 object Execute{
     def ifs(ifb: If)(implicit context: Context): List[String] = {
@@ -100,7 +101,7 @@ object Execute{
     }
     def atInstr(ass: At)(implicit context: Context):List[String] = {
         def apply(selector: String)={
-            makeExecute(f" @s $selector", Compiler.compile(ass.block))
+            makeExecute(f" at $selector", Compiler.compile(ass.block))
         }
 
         Utils.simplify(ass.expr) match
@@ -114,6 +115,7 @@ object Execute{
             }
             case TupleValue(values) => values.flatMap(p => atInstr(At(p, ass.block)))
             case SelectorValue(value) => apply(value.getString())
+            case PositionValue(value) => makeExecute(f" positioned $value", Compiler.compile(ass.block))
                 
         
             case BinaryOperation(op, left, right) => 
@@ -303,6 +305,26 @@ object Execute{
                 val rr = Utils.simplifyToVariable(right)
                 (ll._1:::rr._1, List(IFValueCase(BinaryOperation(op, ll._2, rr._2))))
             }
+
+            case BinaryOperation("in", SelectorValue(v), right)=> {
+                val rr = Utils.simplifyToVariable(right)
+                (rr._1, List(IFValueCase(BinaryOperation("in", SelectorValue(v), rr._2))))
+            }
+
+            case BinaryOperation("in", left, right)=> {
+                val op = expr.asInstanceOf[BinaryOperation].op
+                val ll = Utils.simplifyToVariable(left)
+                val rr = Utils.simplify(right)
+                rr match
+                    case RangeValue(min, max) => (ll._1, List(IFValueCase(BinaryOperation(op, ll._2, rr))))
+                    case VariableValue(name, selector) => (ll._1, List(IFValueCase(BinaryOperation(op, ll._2, rr))))
+                    case LinkedVariableValue(name, selector) => (ll._1, List(IFValueCase(BinaryOperation(op, ll._2, rr))))
+                    case other => {
+                        val rr2 = Utils.simplifyToVariable(right)
+                        (ll._1:::rr2._1, List(IFValueCase(BinaryOperation(op, ll._2, rr2._2))))
+                    }
+            }
+
             case BinaryOperation(op, lft, rght) => {
                 op match{
                     case "&&" => {
@@ -372,11 +394,20 @@ object Execute{
                 if check then (List(), List(IFTrue)) else (List(), List(IFFalse))
             }
             case FunctionCallValue(name, args, sel) if name.toString() == "block" && args.length > 0 => {
-                if (args.length > 1){
-                    (List(), List(IFBlock(args.map(_.getString()).reduce(_ +" "+ _))))
+                if (Settings.target == MCJava){
+                    args.map(Utils.simplify(_)) match
+                        case PositionValue(pos)::NamespacedName(block)::Nil => (List(), List(IFBlock(pos+" "+block)))
+                        case NamespacedName(block)::Nil => (List(), List(IFBlock("~ ~ ~ "+block)))
+                        case other => throw new Exception(f"Invalid argument to block: $other")
                 }
-                else{
-                    (List(), List(IFBlock("~ ~ ~ "+args.head.toString())))
+                else if (Settings.target == MCBedrock){
+                    args.map(Utils.simplify(_)) match
+                        case PositionValue(pos)::NamespacedName(block)::Nil => (List(), List(IFBlock(pos+" "+BlockConverter.getBlockName(block)+" "+BlockConverter.getBlockID(block))))
+                        case NamespacedName(block)::Nil => (List(), List(IFBlock("~ ~ ~ "+BlockConverter.getBlockName(block)+" "+BlockConverter.getBlockID(block))))
+                        case other => throw new Exception(f"Invalid argument to block: $other")
+                }
+                else {
+                    throw new Exception(f"unsupported if block for target: ${Settings.target}")
                 }
             }
             case FunctionCallValue(VariableValue(name, sel), args, _) => {
@@ -408,22 +439,63 @@ object Execute{
             case RawJsonValue(value) => throw new Exception("Can't use if with rawjson")
             case NamespacedName(value) => throw new Exception("Can't use if with mcobject")
             case ConstructorCall(name, args) => throw new Exception("Can't use if with constructor call")
+            case PositionValue(value) => throw new Exception("Can't use if with position")
     }
 
     def switch(swit: Switch)(implicit context: Context):List[String] = {
         val expr = Utils.simplify(swit.value)
         Utils.typeof(expr) match
-            case IntType | FloatType | BoolType | FuncType(_, _) => {
+            case IntType | FloatType | BoolType | FuncType(_, _) | EnumType(_) => {
+                val cases = swit.cases.map(c => SwitchCase(Utils.simplify(c.expr), c.instr))
                 expr match{
                     case VariableValue(name, sel) if !swit.copyVariable=> {
-                        makeTree(context.getVariable(name), swit.cases.map(x => (x.expr.getIntValue(), x.instr)))
+                        makeTree(context.getVariable(name), cases.filter(_.expr.hasIntValue()).map(x => (x.expr.getIntValue(), x.instr))):::
+                        cases.filter(!_.expr.hasIntValue()).flatMap(x => ifs(If(BinaryOperation("in", VariableValue(name), x.expr), x.instr, List())))
                     }
                     case LinkedVariableValue(vari, sel) if !swit.copyVariable=> {
-                        makeTree(vari, swit.cases.map(x => (x.expr.getIntValue(), x.instr)))
+                        makeTree(vari, cases.filter(_.expr.hasIntValue()).map(x => (x.expr.getIntValue(), x.instr))):::
+                        cases.filter(!_.expr.hasIntValue()).flatMap(x => ifs(If(BinaryOperation("in", LinkedVariableValue(vari), x.expr), x.instr, List())))
+                    }
+                    case IntValue(value) => {
+                        val tail = cases.filter(!_.expr.hasIntValue())
+                        val head = cases.filter(c => c.expr.hasIntValue() && c.expr.getIntValue() == value).flatMap(x => Compiler.compile(x.instr))
+                        if (tail.isEmpty){
+                            head
+                        }
+                        else{
+                            val vari = context.getFreshVariable(Utils.typeof(swit.value))
+                            vari.assign("=", swit.value) ::: head ::: 
+                            tail.flatMap(x => ifs(If(BinaryOperation("in", LinkedVariableValue(vari), x.expr), x.instr, List())))
+                        }
+                    }
+                    case FloatValue(value) => {
+                        val tail = cases.filter(!_.expr.hasFloatValue())
+                        val head = cases.filter(c => c.expr.hasFloatValue() && c.expr.getFloatValue() == value).flatMap(x => Compiler.compile(x.instr))
+                        if (tail.isEmpty){
+                            head
+                        }
+                        else{
+                            val vari = context.getFreshVariable(Utils.typeof(swit.value))
+                            vari.assign("=", swit.value) ::: head ::: 
+                            tail.flatMap(x => ifs(If(BinaryOperation("in", LinkedVariableValue(vari), x.expr), x.instr, List())))
+                        }
+                    }
+                    case EnumIntValue(value) => {
+                        val tail = cases.filter(!_.expr.hasIntValue())
+                        val head = cases.filter(c => c.expr.hasIntValue() && c.expr.getIntValue() == value).flatMap(x => Compiler.compile(x.instr))
+                        if (tail.isEmpty){
+                            head
+                        }
+                        else{
+                            val vari = context.getFreshVariable(Utils.typeof(swit.value))
+                            vari.assign("=", swit.value) ::: head ::: 
+                            tail.flatMap(x => ifs(If(BinaryOperation("in", LinkedVariableValue(vari), x.expr), x.instr, List())))
+                        }
                     }
                     case _ => {
                         val vari = context.getFreshVariable(Utils.typeof(swit.value))
-                        vari.assign("=", swit.value) ::: makeTree(vari, swit.cases.map(x => (x.expr.getIntValue(), x.instr)))
+                        vari.assign("=", swit.value) ::: makeTree(vari, cases.filter(_.expr.hasIntValue()).map(x => (x.expr.getIntValue(), x.instr)))::: 
+                        cases.filter(!_.expr.hasIntValue()).flatMap(x => ifs(If(BinaryOperation("in", LinkedVariableValue(vari), x.expr), x.instr, List())))
                     }
                 }
             }
@@ -442,7 +514,7 @@ object Execute{
                         case TupleValue(values) => TupleValue(values.tail)
                         case VariableValue(name, selector) => getTail(LinkedVariableValue(context.getVariable(name), selector))
                         case LinkedVariableValue(vari, selector) => {
-                            val TupleType(inner) = vari.getType()
+                            val TupleType(inner) = vari.getType(): @unchecked
                             val fake = Variable(vari.context, vari.name, TupleType(inner.tail), vari.modifiers)
                             fake.tupleVari = vari.tupleVari.tail
                             LinkedVariableValue(fake)
@@ -544,8 +616,32 @@ case class IFValueCase(val value: Expression) extends IFCase{
             }
 
             case BinaryOperation("in", LinkedVariableValue(left, sel), RangeValue(min, max)) if min.hasIntValue() && max.hasIntValue()=> {
-                val op = value.asInstanceOf[BinaryOperation].op
                 f"if score ${left.getSelector()(sel)} matches ${min.getIntValue()}..${max.getIntValue()}"
+            }
+
+            case BinaryOperation("in", LinkedVariableValue(left, sel), RangeValue(LinkedVariableValue(right, sel2), max)) if max.hasIntValue()=> {
+                f"if score ${left.getSelector()(sel)} >= ${right.getSelector()(sel2)} if score ${left.getSelector()(sel)} matches ..${max.getIntValue()}"
+            }
+
+            case BinaryOperation("in", LinkedVariableValue(left, sel), RangeValue(min, LinkedVariableValue(right, sel2))) if min.hasIntValue()=> {
+                f"if score ${left.getSelector()(sel)} matches ${min.getIntValue()}.. if score ${left.getSelector()(sel)} <= ${right.getSelector()(sel2)} "
+            }
+
+            case BinaryOperation("in", LinkedVariableValue(left, sel), RangeValue(LinkedVariableValue(right1, sel1), LinkedVariableValue(right2, sel2))) => {
+                f"if score ${left.getSelector()(sel1)} >= ${right1.getSelector()(sel1)} if score ${left.getSelector()(sel1)} <= ${right2.getSelector()(sel2)} "
+            }
+
+            case BinaryOperation("in", LinkedVariableValue(left, sel), value) if value.hasIntValue()=> {
+                f"if score ${left.getSelector()(sel)} matches ${value.getIntValue()}..${value.getIntValue()}"
+            }
+
+            case BinaryOperation("in", LinkedVariableValue(left, sel1), LinkedVariableValue(right, sel2)) => {
+                f"if score ${left.getSelector()(sel1)} = ${right.getSelector()(sel2)}"
+            }
+
+            case BinaryOperation("in", SelectorValue(sel1), LinkedVariableValue(right, sel2)) if right.getType() == EntityType => {
+                val sel = sel1.add("tag", SelectorIdentifier(right.tagName))
+                f"if entity ${sel.getString()}"
             }
             
 

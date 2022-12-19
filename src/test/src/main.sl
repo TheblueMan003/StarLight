@@ -1,5 +1,7 @@
-from game.timer import Timer
-from game.countdown import Countdown
+import standard
 
-Countdown time
-time.tick()
+package a
+import math.raycast as rc
+
+lazy var a = "lol"
+a = "b"

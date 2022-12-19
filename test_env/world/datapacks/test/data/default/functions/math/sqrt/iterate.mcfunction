@@ -1,6 +1,6 @@
 scoreboard players operation default.math.sqrt.iterate.next tbms.var = default.math.sqrt.value tbms.var
 scoreboard players operation default.math.sqrt.iterate.next tbms.var /= default.math.sqrt.iterate.guess tbms.var
-scoreboard players operation default.math.sqrt.iterate.next tbms.var *= 1000 tbms.const
+scoreboard players operation default.math.sqrt.iterate.next tbms.var *= c1000 tbms.const
 scoreboard players operation default.math.sqrt.iterate.next tbms.var += default.math.sqrt.iterate.guess tbms.var
 scoreboard players operation default.math.sqrt.iterate.next tbms.var /= 2 tbms.const
 scoreboard players operation default.math.isClose.x tbms.var = default.math.sqrt.iterate.next tbms.var

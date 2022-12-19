@@ -48,7 +48,7 @@ case class ForEach(val key: Identifier, val provider: Expression, val instr: Ins
   override def toString() = f"foreach($key, $provider)$instr"
 }
 
-case class VariableDecl(val name: String, val _type: Type, val modifier: Modifier) extends Instruction {
+case class VariableDecl(val name: List[String], val _type: Type, val modifier: Modifier, val op: String, val expr: Expression) extends Instruction {
   override def toString() = f"${_type} ${name}"
 }
 case class VariableAssigment(val name: List[(Either[Identifier, Variable], Selector)], val op: String, val expr: Expression) extends Instruction {

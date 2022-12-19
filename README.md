@@ -8,15 +8,11 @@ Here are some notion used in this ReadMe:
 `value*` repeated value (usually splitted by a commat)
 
 # How to use
-java -jar <new|build|compile>
+java -jar <file>
 ## compile arguments
--i <list of source files>: Specifify which files to use. Order doesn't matter. If a directory is given, all the files in it will be taken.
-
--o <output path>: Specifify the output of the datapack
-
--n <top level name>: Namespace name for the datapack
-
--bedrock: If present export as a Behavor pack
+- help: Show the list of available command
+- new: Create a new project in the current directory
+- build: Compile & Generate the packs
 
 ## new arguments
 -p <path>: path where to place the project

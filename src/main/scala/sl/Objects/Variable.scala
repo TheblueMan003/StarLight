@@ -31,6 +31,7 @@ object Variable {
 class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) extends CObject(context, name, _modifier) with Typed(typ){
 	var tupleVari: List[Variable] = List()
 	val tagName = fullName
+	var wasAssigned = false
 	lazy val scoreboard = if modifiers.isEntity then modifiers.getAttributesString("name", ()=>"s"+context.getScoreboardID(this))(context) else ""
 	lazy val inGameName = modifiers.getAttributesString("name", ()=>fullName)(context)
 	lazy val criterion = modifiers.getAttributesString("criterion", ()=>"dummy")(context)
@@ -46,8 +47,9 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 			isFunctionArgument = parent.isFunctionArgument
 			parent.tupleVari = parent.tupleVari ::: List(this)
 		}
-
-		typ.generateCompilerFunction(this)(context.push(name))
+		if (!context.getCurrentFunction().isInstanceOf[CompilerFunction]){
+			//typ.generateCompilerFunction(this)(context.push(name))
+		}
 
 		typ match
 			case StructType(struct) => {
@@ -79,7 +81,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 			}
 			case TupleType(sub) => {
 				val ctx = context.push(name)
-				tupleVari = sub.zipWithIndex.map((t, i) => ctx.addVariable(new Variable(ctx, f"$i", t, _modifier)))
+				tupleVari = sub.zipWithIndex.map((t, i) => ctx.addVariable(new Variable(ctx, f"_$i", t, _modifier)))
 				tupleVari.map(_.generate()(ctx))
 			}
 			case EntityType => {
@@ -94,6 +96,8 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 
 
 	def assign(op: String, value: Expression)(implicit context: Context, selector: Selector = Selector.self): List[String] = {
+		if (modifiers.isConst && wasAssigned) throw new Exception(f"Cannot reassign variable $fullName")
+		wasAssigned = true
 		if (modifiers.isLazy){
 			getType() match{
 				case StructType(struct) => {
@@ -146,9 +150,16 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 				case other => {
 					value match{
 						case FunctionCallValue(VariableValue(name, sel), args, _) => 
-							val res = context.getFunction(name, args, getType(), false)
-							if (res._1.canBeCallAtCompileTime){
-								return res.call(this, op)
+							try{
+								val res = context.getFunction(name, args, getType(), false)
+								if (res._1.canBeCallAtCompileTime){
+									return res.call(this, op)
+								}
+							}
+							catch{
+								case _ =>
+									lazyValue = value
+									List()
 							}
 						case _ => {
 						}
@@ -212,7 +223,15 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 	
 
 	def defaultAssign(expr: Expression)(implicit context: Context, selector: Selector = Selector.self) = {
-		Execute.makeExecute(checkNull(), assign("=", expr))
+		if (Settings.target == MCBedrock){
+			List()
+		}
+		else if (Settings.target == MCJava){
+			Execute.makeExecute(checkNull(), assign("=", expr))
+		}
+		else{
+			???
+		}
 	}
 
 
@@ -272,7 +291,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					case "-=" => List(f"scoreboard players remove ${getSelector()} ${value}")
 					case "*=" | "/=" | "%=" => {
 						context.requestConstant(value)
-						List(f"scoreboard players operation ${getSelector()} ${op} ${value} ${Settings.constScoreboard}")
+						List(f"scoreboard players operation ${getSelector()} ${op} c${value} ${Settings.constScoreboard}")
 					}
 				}
 			}
@@ -326,7 +345,6 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					}
 					case other => assign(op, FunctionCallValue(VariableValue(vari.fullName+".__get__"), index))
 			}
-			case _ => throw new Exception(f"Unsupported Array Get on: $name")
 		}
 		)
 	}
@@ -338,13 +356,13 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					case "=" => {
 						context.requestConstant(Settings.floatPrec)
 						List(f"scoreboard players operation ${getSelector()} ${op} ${vari.getSelector()(oselector)}",
-								f"scoreboard players operation ${getSelector()} /= ${Settings.floatPrec}")
+								f"scoreboard players operation ${getSelector()} /= c${Settings.floatPrec} ${Settings.constScoreboard}")
 					}
 					case other => {
 						val tmp = context.getFreshId()
 						context.requestConstant(Settings.floatPrec)
 						List(f"scoreboard players operation ${tmp} ${Settings.tmpScoreboard} ${op} ${vari.getSelector()(oselector)}",
-								f"scoreboard players operation ${tmp} ${Settings.tmpScoreboard} /= ${Settings.floatPrec}",
+								f"scoreboard players operation ${tmp} ${Settings.tmpScoreboard} /= c${Settings.floatPrec} ${Settings.constScoreboard}",
 								f"scoreboard players operation ${getSelector()} = ${tmp} ${Settings.tmpScoreboard}"
 						)
 					}
@@ -394,18 +412,18 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					case "*=" => {
 						context.requestConstant(fvalue)
 						context.requestConstant(Settings.floatPrec)
-						List(f"scoreboard players operation ${getSelector()} *= ${fvalue} ${Settings.constScoreboard}",
-							f"scoreboard players operation ${getSelector()} /= ${Settings.floatPrec} ${Settings.constScoreboard}")
+						List(f"scoreboard players operation ${getSelector()} *= c${fvalue} ${Settings.constScoreboard}",
+							f"scoreboard players operation ${getSelector()} /= c${Settings.floatPrec} ${Settings.constScoreboard}")
 					}
 					case "/=" => {
 						context.requestConstant(fvalue)
 						context.requestConstant(Settings.floatPrec)
-						List(f"scoreboard players operation ${getSelector()} /= ${fvalue} ${Settings.constScoreboard}",
-							f"scoreboard players operation ${getSelector()} *= ${Settings.floatPrec} ${Settings.constScoreboard}")
+						List(f"scoreboard players operation ${getSelector()} /= c${fvalue} ${Settings.constScoreboard}",
+							f"scoreboard players operation ${getSelector()} *= c${Settings.floatPrec} ${Settings.constScoreboard}")
 					}
 					case "%=" => {
 						context.requestConstant(fvalue)
-						List(f"scoreboard players operation ${getSelector()} %%= ${fvalue} ${Settings.constScoreboard}")
+						List(f"scoreboard players operation ${getSelector()} %%= c${fvalue} ${Settings.constScoreboard}")
 					}
 				}
 			}
@@ -475,15 +493,14 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					case "*=" => {
 						context.requestConstant(Settings.floatPrec)
 						List(f"scoreboard players operation ${getSelector()} *= ${vari.getSelector()(sel)}",
-							f"scoreboard players operation ${getSelector()} /= ${Settings.floatPrec} ${Settings.constScoreboard}")
+							f"scoreboard players operation ${getSelector()} /= c${Settings.floatPrec} ${Settings.constScoreboard}")
 					}
 					case "/=" => {
 						context.requestConstant(Settings.floatPrec)
 						List(f"scoreboard players operation ${getSelector()} /= ${vari.getSelector()(sel)}",
-							f"scoreboard players operation ${getSelector()} *= ${Settings.floatPrec} ${Settings.constScoreboard}")
+							f"scoreboard players operation ${getSelector()} *= c${Settings.floatPrec} ${Settings.constScoreboard}")
 					}
 					case "%=" => {
-						context.requestConstant(Settings.floatPrec)
 						List(f"scoreboard players operation ${getSelector()} %%= ${vari.getSelector()(sel)}")
 					}
 				}
@@ -493,7 +510,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					case "=" => {
 						context.requestConstant(Settings.floatPrec)
 						List(f"scoreboard players operation ${getSelector()} ${op} ${vari.getSelector()(sel)}",
-								f"scoreboard players operation ${getSelector()} *= ${Settings.floatPrec}")
+								f"scoreboard players operation ${getSelector()} *= c${Settings.floatPrec} ${Settings.constScoreboard}")
 					}
 					case "*=" | "/=" => {
 						List(f"scoreboard players operation ${getSelector()} $op ${vari.getSelector()(sel)}")
@@ -502,7 +519,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 						val tmp = context.getFreshId()
 						context.requestConstant(Settings.floatPrec)
 						List(f"scoreboard players operation ${tmp} ${Settings.tmpScoreboard} = ${vari.getSelector()(sel)}",
-								f"scoreboard players operation ${tmp} ${Settings.tmpScoreboard} *= ${Settings.floatPrec}",
+								f"scoreboard players operation ${tmp} ${Settings.tmpScoreboard} *= c${Settings.floatPrec} ${Settings.constScoreboard}",
 								f"scoreboard players operation ${getSelector()} ${op} ${tmp} ${Settings.tmpScoreboard}"
 						)
 					}
@@ -532,7 +549,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 	}
 
 	def assignArray(op: String, expr2: Expression)(implicit context: Context, selector: Selector = Selector.self)={
-		val ArrayType(sub, IntValue(size)) = getType().asInstanceOf[ArrayType]
+		val ArrayType(sub, IntValue(size)) = getType().asInstanceOf[ArrayType]: @unchecked
 		val expr = Utils.simplify(expr2)
 		expr match
 			case TupleValue(value) if size == value.size => tupleVari.zip(value).flatMap((t, v) => t.assign(op, v))
@@ -848,6 +865,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 			case EnumIntValue(value) => false
 			case NamespacedName(value) => false
 			case LinkedFunctionValue(fct) => false
+			case PositionValue(value) => false
 			case ArrayGetValue(name, index) => isPresentIn(name)
 			case LambdaValue(args, instr) => false
 			case VariableValue(name1, sel) => context.tryGetVariable(name1) == Some(this) && sel == selector
@@ -869,6 +887,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 			getType() match
 				case JsonType => throw new Exception("Cannot have selector for json type")
 				case RawJsonType => throw new Exception("Cannot have selector for rawjson type")
+				case other => {}
 		}
 	}
 	def getSelector()(implicit selector: Selector = Selector.self): String = {
@@ -905,7 +924,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 	} 
 
 	def getEntityVariableSelector(): Selector = {
-		JavaSelector("@e", Map(("tag", SelectorIdentifier(tagName))))
+		JavaSelector("@e", List(("tag", SelectorIdentifier(tagName))))
 	}
 }
 

@@ -23,6 +23,10 @@ object Function {
   }
 }
 abstract class Function(context: Context, name: String, val arguments: List[Argument], typ: Type, _modifier: Modifier) extends CObject(context, name, _modifier) with Typed(typ){
+    val parentFunction = context.getCurrentFunction()
+    val parentVariable = context.getCurrentVariable()
+    val parentClass = context.getCurrentClass()
+    override lazy val fullName: String = if (context.isInLazyCall() || parentFunction != null || parentVariable != null) then context.fctCtx.getFreshId()else context.getPath() + "." + name
     val minArgCount = getMinArgCount(arguments)
     val maxArgCount = getMaxArgCount(arguments)
     var argumentsVariables: List[Variable] = List()
@@ -30,6 +34,9 @@ abstract class Function(context: Context, name: String, val arguments: List[Argu
 
     if (modifiers.isVirtual){
 
+    }
+    if (modifiers.isConst){
+        throw new Exception("Function cannot be marked as const")
     }
 
     private def getMaxArgCount(args: List[Argument]): Int = {
@@ -106,6 +113,7 @@ class ConcreteFunction(context: Context, name: String, arguments: List[Argument]
         val ctx = context.push(name)
         val vari = new Variable(ctx, "_ret", typ, Modifier.newPrivate())
         vari.isFunctionArgument = true
+        vari.generate()(context.push(name))
         ctx.addVariable(vari)
     }
     private lazy val muxID = context.getFunctionMuxID(this)
@@ -180,6 +188,7 @@ class LazyFunction(context: Context, name: String, arguments: List[Argument], ty
     def call(args: List[Expression], ret: Variable = null, op: String = "=")(implicit ctx: Context): List[String] = {
         var block = body
         val sub = ctx.push(ctx.getLazyCallId())
+        sub.setLazyCall()
         sub.inherit(context)
         
         argMap(args).sortBy((a,v) => -a.name.length).foreach((a, v) => {
@@ -189,16 +198,17 @@ class LazyFunction(context: Context, name: String, arguments: List[Argument], ty
             block = if a.name.startsWith("$") then Utils.subst(block, a.name, v.getString()) else Utils.subst(block, a.name, v)
         })
 
+        if (ret != null) sub.addVariable("_ret", ret)
         if (ret == null){
             sl.Compiler.compile(block)(if modifiers.hasAttributes("inline") then ctx else sub)
         }
         else if (op == "="){
-            block = Utils.subst(Utils.substReturn(block, ret), "_ret", LinkedVariableValue(ret))
+            block = Utils.substReturn(block, ret)
             sl.Compiler.compile(block)(if modifiers.hasAttributes("inline") then ctx else sub)
         }
         else{
             val vari = ctx.getFreshVariable(getType())
-            block = Utils.subst(Utils.substReturn(block, vari), "_ret", LinkedVariableValue(ret))
+            block = Utils.substReturn(block, vari)
             sl.Compiler.compile(block)(if modifiers.hasAttributes("inline") then ctx else sub) ::: (if ret == null then List() else ret.assign(op, LinkedVariableValue(vari)))
         }
     }
@@ -279,7 +289,7 @@ class TagFunction(context: Context, name: String, arguments: List[Argument]) ext
     override def compile(): Unit = {
         val normal: List[Instruction] = getFunctions().filter(_.clazz == null).map(LinkedFunctionCall(_, argumentsVariables.map(LinkedVariableValue(_)))).toList
         val clazz: List[Instruction] = getFunctions().filter(_.clazz != null).map(f => {
-            With(SelectorValue(JavaSelector("@e",Map(("tag", SelectorIdentifier(f.clazz.getTag()))))), BoolValue(true), BoolValue(true),
+            With(SelectorValue(JavaSelector("@e",List(("tag", SelectorIdentifier(f.clazz.getTag()))))), BoolValue(true), BoolValue(true),
             LinkedFunctionCall(f, argumentsVariables.map(LinkedVariableValue(_))))}).toList
 
         content = sl.Compiler.compile(InstructionList(normal ::: clazz))(context.push(name, this))
@@ -293,7 +303,7 @@ class ClassFunction(variable: Variable, function: Function) extends Function(fun
     override def getName(): String = function.name
 
     def call(args2: List[Expression], ret: Variable = null, op: String = "=")(implicit ctx: Context): List[String] = {
-        val selector = SelectorValue(JavaSelector("@e", Map(("tag", SelectorIdentifier("__class__")))))
+        val selector = SelectorValue(JavaSelector("@e", List(("tag", SelectorIdentifier("__class__")))))
 
         def callNoEntity(ret: Variable = null) = {
             Compiler.compile(With(
@@ -316,7 +326,7 @@ class ClassFunction(variable: Variable, function: Function) extends Function(fun
 
 
 class CompilerFunction(context: Context, name: String, arguments: List[Argument], typ: Type, _modifier: Modifier, val body: (List[Expression], Context)=>(List[String],Expression)) extends Function(context, name, arguments, typ, _modifier){
-    generateArgument()(context.push(name))
+    generateArgument()(context.push(name, this))
     override def exists()= false
 
     override def getContent(): List[String] = List()

@@ -15,17 +15,17 @@ import javax.swing.text.DefaultEditorKit.PasteAction
 
 object Parser extends StandardTokenParsers{
   lexical.delimiters ++= List("(", ")", "\\", ".", "..", ":", "=", "->", "{", "}", ",", "*", "[", "]", "/", "+", "-", "*", "/", "\\", "%", "&&", "||", "=>", ";",
-                              "+=", "-=", "/=", "*=", "?=", ":=", "%", "@", "@e", "@a", "@s", "@r", "@p", "~", "^", "<=", "==", ">=", "<", ">", "!=", "%%%", "???", "$",
+                              "+=", "-=", "/=", "*=", "%=", "?=", ":=", "%", "@", "@e", "@a", "@s", "@r", "@p", "~", "^", "<=", "==", ">=", "<", ">", "!=", "%%%", "???", "$",
                               "!", "!=")
   lexical.reserved   ++= List("true", "false", "if", "then", "else", "return", "switch", "for", "do", "while",
                               "as", "at", "with", "to", "import", "doc", "template", "null", "typedef", "foreach", "in",
-                              "var", "val", "def", "package", "struct", "enum", "class", "lazy", "jsonfile",
+                              "def", "package", "struct", "enum", "class", "lazy", "jsonfile",
                               "public", "protected", "private", "scoreboard", "forgenerate", "from",
-                              "ticking", "loading", "predicate", "extends", "new", "static", "virtual", "abstract", "override")
+                              "ticking", "loading", "predicate", "extends", "new", "const", "static", "virtual", "abstract", "override")
 
 
   def block: Parser[Instruction] = "{" ~> rep(instruction) <~ "}" ^^ (p => InstructionBlock(p))
-  def assignmentOp: Parser[String] = ("=" | "+=" | "-=" | "*=" | "/=" | ":=")
+  def assignmentOp: Parser[String] = ("=" | "+=" | "-=" | "*=" | "/=" | ":=" | "%=")
 
   def ident2: Parser[String] = rep1sep(ident, ".") ^^ { p => p.reduce(_ + "." + _) }
   def subident: Parser[String] = opt("$") ~ ident ^^ { case _1 ~ _2 => _1.getOrElse("") + _2 }
@@ -98,7 +98,7 @@ object Parser extends StandardTokenParsers{
 
   def predicate:Parser[Instruction] = doc ~ (modifier <~ "predicate") ~ identLazy ~ arguments ~ json ^^ {case doc ~ mod ~ name ~ args ~ json => PredicateDecl(name, args, json, mod.withDoc(doc))}
   def arrayAssign:Parser[Instruction] = (identLazy2 <~ "[") ~ (rep1sep(expr, ",") <~ "]") ~ assignmentOp ~ expr ^^ { case a ~ i ~ o ~ e => ArrayAssigment(Left(a), i, o, e) }
-  def foreach: Parser[Instruction] = ("foreach" ~> ident <~ "in") ~ expr ~ program ^^ { case v ~ e ~ i => ForEach(v, e, i) }
+  def foreach: Parser[Instruction] = (("foreach" ~ opt("(") ~> ident <~ "in") ~ expr <~ opt(")")) ~ program ^^ { case v ~ e ~ i => ForEach(v, e, i) }
   def packageInstr: Parser[Instruction] = "package" ~> identLazy2 ~ program ^^ (p => Package(p._1, p._2))
   def classDecl: Parser[Instruction] = doc ~ (modifier <~ "class") ~ identLazy ~ opt("extends" ~> ident2) ~ opt("with" ~> namespacedName2) ~ block ^^ { case doc ~ mod ~ iden ~ par ~ entity ~ block => ClassDecl(iden, block, mod.withDoc(doc), par, entity) }
   def structDecl: Parser[Instruction] = doc ~ (modifier <~ "struct") ~ identLazy ~ opt("extends" ~> ident2) ~ block ^^ { case doc ~ mod ~ iden ~ par ~ block => StructDecl(iden, block, mod.withDoc(doc), par) }
@@ -135,16 +135,15 @@ object Parser extends StandardTokenParsers{
   def varDeclaration: Parser[Instruction] = (doc ~ modifier ~ types ~ rep1sep(identLazy, ",") ~ opt("=" ~> expr)) ^^ {
     case doc ~ mod1 ~ typ ~ names ~ expr => {
       val mod = mod1.withDoc(doc)
-      val decl = names.map(VariableDecl(_, typ, mod))
       val identifiers = names.map(Identifier.fromString(_))
       if (!mod.isEntity && expr.isEmpty){
-        InstructionList(decl ::: List(VariableAssigment(identifiers.map(l => (Left(l), Selector.self)), ":=", DefaultValue)))
+        VariableDecl(names, typ, mod, ":=", DefaultValue)
       }
       else if (!expr.isEmpty){
-        InstructionList(decl ::: List(VariableAssigment(identifiers.map(l => (Left(l), Selector.self)), "=", expr.get)))
+        VariableDecl(names, typ, mod, "=", expr.get)
       }
       else{
-        InstructionList(decl)
+        VariableDecl(names, typ, mod, null, null)
       }
     }
   } // Variable Dec
@@ -182,8 +181,24 @@ object Parser extends StandardTokenParsers{
   def stringLit2: Parser[String] = stringLit ^^ {p => p.replaceAllLiterally("◘", "\\\"")}
   def namespacedName = ident ~ ":" ~ ident2 ^^ { case a ~ b ~ c => NamespacedName(a+b+c) }
   def namespacedName2 = opt(identLazy <~ ":") ~ identLazy2 ^^ { case a ~ c => if a.isEmpty then NamespacedName(c) else NamespacedName(a.get+":"+c)}
+
+  def relCoordinateFloat: Parser[String] = "~"~>floatValue ^^ {"~"+_}
+  def relCoordinateInt: Parser[String] = "~"~>numericLit ^^ {"~"+_}
+  def relCoordinateHere: Parser[String] = "~"~>identLazy ^^ {"~"+_}
+  def relCoordinateIdent: Parser[String] = "~" ^^^ "~"
+  def relCoordinate: Parser[String] = relCoordinateFloat | relCoordinateIdent | relCoordinateInt | identLazy | relCoordinateHere | (floatValue ^^ {_.toString()}) | numericLit
+  def frontCoordinateFloat: Parser[String] = "^"~>floatValue ^^ {"^"+_}
+  def frontCoordinateInt: Parser[String] = "^"~>numericLit ^^ {"^"+_}
+  def frontCoordinateIdent: Parser[String] = "^"~>identLazy ^^ {"^"+_}
+  def frontCoordinateHere: Parser[String] = "^" ^^^ "^"
+  def frontCoordinate: Parser[String] = frontCoordinateInt | frontCoordinateIdent | frontCoordinateFloat | frontCoordinateHere
+
+  def frontPosition: Parser[String] = frontCoordinate ~ frontCoordinate ~ frontCoordinate ^^ {case x ~ y ~ z => f"$x $y $z"}
+  def relPosition: Parser[String] = relCoordinate ~ relCoordinate ~ relCoordinate ^^ {case x ~ y ~ z => f"$x $y $z"}
+  def position: Parser[PositionValue] = (frontPosition | relPosition) ^^ {case a => PositionValue(a)}
+
   def exprBottom: Parser[Expression] = 
-    (numericLit <~ "..") ~ numericLit ^^ (p => RangeValue(IntValue(p._1.toInt), IntValue(p._2.toInt)))
+    position
     | floatValue ^^ (p => FloatValue(p))
     | numericLit ^^ (p => IntValue(p.toInt))
     | "-" ~> numericLit ^^ (p => IntValue(f"-$p".toInt))
@@ -208,7 +223,8 @@ object Parser extends StandardTokenParsers{
 
   def comparator: Parser[String] = "<" | "<=" | ">=" | ">" | "==" | "!="
 
-  def exprArray: Parser[Expression] = exprBottom ~ rep("[" ~> rep1sep(expr, ",") <~ "]") ^^ {case e ~ g => g.foldLeft(e)((e, i) => ArrayGetValue(e, i))}
+  def exprRange: Parser[Expression] = exprBottom ~ opt(".."~>exprBottom) ^^ { case e ~ None => e; case e1 ~ Some(e2) => RangeValue(e1, e2)}
+  def exprArray: Parser[Expression] = exprRange ~ rep("[" ~> rep1sep(expr, ",") <~ "]") ^^ {case e ~ g => g.foldLeft(e)((e, i) => ArrayGetValue(e, i))}
   def exprMod: Parser[Expression] = exprArray ~ rep("%" ~> exprMod) ^^ {unpack("%", _)}
   def exprDiv: Parser[Expression] = exprMod ~ rep(("/" | "\\") ~> exprDiv) ^^ {unpack("/", _)}
   def exprMult: Parser[Expression] = exprDiv ~ rep("*" ~> exprMult) ^^ {unpack("*", _)}
@@ -240,6 +256,7 @@ object Parser extends StandardTokenParsers{
         case "json" => JsonType
         case "entity" => EntityType
         case "mcobject" => MCObjectType
+        case "mcposition" => MCPositionType
         case "params" => ParamsType
         case "rawjson" => RawJsonType
         case other => IdentifierType(other)
@@ -255,7 +272,7 @@ object Parser extends StandardTokenParsers{
                             ((nonRecTypes <~ "[") ~ expr) <~ "]" ^^ (p => ArrayType(p._1, p._2)) |
                             nonRecTypes
 
-  def modifierSub: Parser[String] = ("override" | "lazy" | "scoreboard" | "ticking" | "loading" | "helper" | "static")
+  def modifierSub: Parser[String] = ("override" | "lazy" | "scoreboard" | "ticking" | "loading" | "helper" | "static" | "const")
   def modifierAttribute: Parser[(String,Expression)] = ident2 ~ "=" ~ exprNoTuple ^^ {case i ~ _ ~ e => (i, e)}
   def modifierAttributes: Parser[Map[String,Expression]] = opt("[" ~> rep1sep(modifierAttribute,",") <~"]") ^^ {(_.getOrElse(List()).toMap)}
   def modifier: Parser[Modifier] = 
@@ -280,6 +297,7 @@ object Parser extends StandardTokenParsers{
       if subs.contains("loading")   then {mod.isLoading = true}
       if subs.contains("helper")   then {mod.isHelper = true}
       if subs.contains("static")   then {mod.isStatic = true}
+      if subs.contains("const")   then {mod.isConst = true}
       
       mod
     }

@@ -2,8 +2,9 @@ package sl
 
 import objects.{Context, ConcreteFunction, LazyFunction, Modifier, Struct, Class, Template, Variable, Enum, EnumField, Predicate, Property}
 import objects.Identifier
-import objects.types.{VoidType, TupleType}
+import objects.types.{VoidType, TupleType, IdentifierType}
 import sl.Compilation.Execute
+import sl.Compilation.Selector.Selector
 
 object Compiler{
     def compile(context: Context):List[(String, List[String])] = {
@@ -28,7 +29,7 @@ object Compiler{
             case FunctionDecl(name, block, typ, args, modifier) =>{
                 val fname = context.getFunctionWorkingName(name)
                 if (Settings.target == MCBedrock && modifier.isLoading){
-                    modifier.tags.addOne("__loading__")
+                    modifier.tags.addOne("@__loading__")
                 }
                 if (!modifier.isLazy){
                     val func = new ConcreteFunction(context, fname, args, context.getType(typ), modifier, block, firstPass)
@@ -36,7 +37,7 @@ object Compiler{
                     func.generateArgument()(context)
                 }
                 else{
-                    val func = new LazyFunction(context, name, args, context.getType(typ), modifier, Utils.fix(block))
+                    val func = new LazyFunction(context, fname, args, context.getType(typ), modifier, Utils.fix(block))
                     context.addFunction(name, func)
                     func.generateArgument()(context)
                 }
@@ -73,7 +74,8 @@ object Compiler{
                 List()
             }
             case PredicateDecl(name, args, block, modifier) => {
-                val pred = context.addPredicate(new Predicate(context, name, args, modifier, block))
+                val fname = context.getFunctionWorkingName(name)
+                val pred = context.addPredicate(new Predicate(context, fname, args, modifier, block))
                 pred.generateArgument()(context)
                 List()
             }
@@ -100,11 +102,40 @@ object Compiler{
                 
                 cases.map(elm => Utils.subst(instr, key.toString(), elm)).flatMap(Compiler.compile(_, firstPass)).toList
             }
-            case VariableDecl(name, typ, modifier) => {
-                val vari = new Variable(context, name, context.getType(typ), modifier)
-                context.addVariable(vari)
-                vari.generate()
-                List()
+            case VariableDecl(names, typ, modifier, op, expr) => {
+                if (typ == IdentifierType("val") || typ == IdentifierType("var")){
+                    if (typ == IdentifierType("val")) modifier.isConst = true
+                    Utils.simplify(expr) match
+                        case TupleValue(values) if values.size == names.size => {
+                            names.zip(values.map(Utils.typeof(_))).map((name, typ2) => {
+                                val vari = new Variable(context, name, context.getType(typ2), modifier)
+                                context.addVariable(vari)
+                                vari.generate()
+                            })
+                        }
+                        case other => {
+                            val typ = Utils.typeof(other)
+                            names.map(name => {
+                                val vari = new Variable(context, name, context.getType(typ), modifier)
+                                context.addVariable(vari)
+                                vari.generate()
+                            })
+                        }
+                    compile(VariableAssigment(names.map(f => (Left[Identifier, Variable](Identifier.fromString(f)), Selector.self)), op, expr))
+                }
+                else{
+                    names.map(name => {
+                        val vari = new Variable(context, name, context.getType(typ), modifier)
+                        context.addVariable(vari)
+                        vari.generate()
+                    })
+                    if (expr != null){
+                        compile(VariableAssigment(names.map(f => (Left[Identifier, Variable](Identifier.fromString(f)), Selector.self)), op, expr))
+                    }
+                    else{
+                        List()
+                    }
+                }
             }
             case sl.JSONFile(name, json) => {
                 context.addJsonFile(new objects.JSONFile(context, name, Modifier.newPrivate(), Utils.compileJson(json)))
@@ -179,16 +210,17 @@ object Compiler{
             }
             case CMD(value) => List(value.replaceAllLiterally("\\\"","\""))
             case Package(name, block) => {
-                val sub = context.root.push(name)
+                val sub = if (name == "_") then context.root else context.root.push(name)
                 val content = compile(block, firstPass)(sub)
                 if (content.length > 0){
                     val init = sub.getNamedBlock("__init__", content)
                     init.modifiers.isLoading = true
-                    if (Settings.target == MCBedrock && init.modifiers.isLoading){
-                        init.modifiers.tags.addOne("__loading__")
+                    if (Settings.target == MCBedrock){
+                        init.modifiers.tags.addOne("@__loading__")
                         sub.addFunctionToTags(init)
                     }
                 }
+                
                 List()
             }
             case InstructionList(block) => {

@@ -9,15 +9,15 @@ scoreboard players operation default.math.root.hi tbms.var = default.math.max-0.
 execute unless score default.math.root.mid tbms.var = default.math.root.mid tbms.var run scoreboard players set default.math.root.mid tbms.var 0
 scoreboard players set default.math.root._1 tbms.var 100000
 scoreboard players operation default.math.root._1 tbms.var *= default.math.root.lo tbms.var
-scoreboard players operation default.math.root._1 tbms.var /= 1000 tbms.const
+scoreboard players operation default.math.root._1 tbms.var /= c1000 tbms.const
 scoreboard players operation default.math.root._1 tbms.var *= default.math.root.lo tbms.var
-scoreboard players operation default.math.root._1 tbms.var /= 1000 tbms.const
+scoreboard players operation default.math.root._1 tbms.var /= c1000 tbms.const
 execute if score default.math.root.n tbms.var < default.math.root._1 tbms.var run function default/zzz_sl_block/9
 scoreboard players set default.math.root._3 tbms.var 100000
 scoreboard players operation default.math.root._3 tbms.var *= default.math.root.hi tbms.var
-scoreboard players operation default.math.root._3 tbms.var /= 1000 tbms.const
+scoreboard players operation default.math.root._3 tbms.var /= c1000 tbms.const
 scoreboard players operation default.math.root._3 tbms.var *= default.math.root.hi tbms.var
-scoreboard players operation default.math.root._3 tbms.var /= 1000 tbms.const
+scoreboard players operation default.math.root._3 tbms.var /= c1000 tbms.const
 execute if score default.math.root.n tbms.var > default.math.root._3 tbms.var run function default/zzz_sl_block/10
 scoreboard players set default.math.root.ret tbms.var 0
 scoreboard players set default.math.root.i tbms.var 0

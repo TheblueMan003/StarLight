@@ -77,7 +77,7 @@ case class StringValue(val value: String) extends Expression with SmallValue{
     override def hasIntValue(): Boolean = false
     override def hasFloatValue(): Boolean = false
     override def getFloatValue(): Double = ???
-    override def getString()(implicit context: Context): String = Utils.stringify(value)
+    override def getString()(implicit context: Context): String = value
 }
 case class RawJsonValue(val value: List[Printable]) extends Expression with SmallValue{
     override def toString(): String = value.toString()
@@ -218,6 +218,14 @@ case class SelectorValue(val value: Selector) extends Expression{
     override def hasFloatValue(): Boolean = false
     override def getFloatValue(): Double = ???
     override def getString()(implicit context: Context): String = value.getString()
+}
+case class PositionValue(val value: String) extends Expression{
+    override def toString(): String = value.toString()
+    override def getIntValue(): Int = ???
+    override def hasIntValue(): Boolean = false
+    override def hasFloatValue(): Boolean = false
+    override def getFloatValue(): Double = ???
+    override def getString()(implicit context: Context): String = value
 }
 
 

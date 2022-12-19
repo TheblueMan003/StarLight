@@ -28,7 +28,6 @@ object ContextBuilder{
                     case Some(p) => context.getStruct(p)
                 
                 context.addStruct(new Struct(context, name, modifier, block, parentStruct))
-                List()
             }
             case ClassDecl(name, block, modifier, parent, entity) => {
                 val parentClass = parent match
@@ -36,7 +35,6 @@ object ContextBuilder{
                     case Some(p) => context.getClass(p)
                 
                 context.addClass(new Class(context, name, modifier, block, parentClass, entity.getOrElse(null))).generate()
-                List()
             }
             case EnumDecl(name, fields, values, modifier) => {
                 val enm = context.addEnum(new Enum(context, name, modifier, fields))
@@ -49,14 +47,17 @@ object ContextBuilder{
                     case Some(p) => context.getTemplate(p)
                 
                 context.addTemplate(new Template(context, name, modifier, block, parentTemplate))
-                List()
             }
             case TypeDef(name, typ) => {
                 context.addTypeDef(name, typ)
-                List()
             }
             case Package(name, block) => {
-                buildRec(block)(context.push(name))
+                if (name == "_"){
+                    buildRec(block)(context.root)
+                }
+                else{
+                    buildRec(block)(context.root.push(name))
+                }
             }
             case InstructionList(block) => {
                 block.foreach(p => buildRec(p)(context))
@@ -75,15 +76,12 @@ object ContextBuilder{
                 cases.map(elm => Utils.subst(instr, key.toString(), elm)).flatMap(Compiler.compile(_)).toList
             }
             case Import(lib, value, alias) => {
-                val ret = if (context.importFile(lib)){
+                if (context.importFile(lib)){
                     val libC = Utils.getLib(lib).get
                     buildRec(libC)(context.root)
                     Compiler.compile(libC, true)(context.root)
-                    List()
                 }
-                else{
-                    List()
-                }
+
                 if (value != null){
                     try{
                         context.addObjectFrom(value, if alias == null then value else alias, context.root.push(lib))
@@ -92,7 +90,6 @@ object ContextBuilder{
                 else if (alias != null){
                     context.push(alias, context.getContext(lib))
                 }
-                ret
             }
             case _ => {
             }

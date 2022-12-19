@@ -1,4 +1,8 @@
 java;bedrock;id
-stone;stone;0
-white_concrete;concrete;0
-orange_concrete;concrete;1
+minecraft:air;air;0
+minecraft:stone;stone;0
+minecraft:grass_block;grass;0
+minecraft:dirt;dirt;0
+minecraft:cobblestone;cobblestone;0
+minecraft:white_concrete;concrete;0
+minecraft:orange_concrete;concrete;1

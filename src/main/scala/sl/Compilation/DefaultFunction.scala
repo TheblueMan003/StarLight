@@ -56,25 +56,123 @@ object DefaultFunction{
                 }
             ))
         ctx.addFunction("getSelector", CompilerFunction(context, "getSelector", 
-                List(Argument("vari", MCObjectType, None)),
-                MCObjectType,
-                Modifier.newPublic(),
-                (args: List[Expression],ctx: Context) => {
-                    args match{
-                        case LinkedVariableValue(vari, sel)::Nil => {
-                            (List(), NamespacedName(vari.getSelectorName()(sel)))
-                        }
-                        case VariableValue(vari, sel)::Nil => {
-                            (List(), NamespacedName(ctx.getVariable(vari).getSelectorName()(sel)))
-                        }
-                        case sv::Nil if sv.hasIntValue() => {
-                            context.requestConstant(sv.getIntValue())
-                            (List(), NamespacedName(sv.getIntValue().toString))
-                        }
-                        case other => throw new Exception(f"Illegal Arguments $other for random")
+            List(Argument("vari", MCObjectType, None)),
+            MCObjectType,
+            Modifier.newPublic(),
+            (args: List[Expression],ctx: Context) => {
+                args match{
+                    case LinkedVariableValue(vari, sel)::Nil => {
+                        (List(), NamespacedName(vari.getSelectorName()(sel)))
                     }
+                    case VariableValue(vari, sel)::Nil => {
+                        (List(), NamespacedName(ctx.getVariable(vari).getSelectorName()(sel)))
+                    }
+                    case sv::Nil if sv.hasIntValue() => {
+                        context.requestConstant(sv.getIntValue())
+                        (List(), NamespacedName(sv.getIntValue().toString))
+                    }
+                    case other => throw new Exception(f"Illegal Arguments $other for random")
                 }
-            ))
+            }
+        ))
+
+        ctx.addFunction("getProjectVersionMajor", CompilerFunction(context, "getProjectVersionMajor", 
+            List(),
+            IntType,
+            Modifier.newPublic(),
+            (args: List[Expression],ctx: Context) => {
+                args match{
+                    case Nil => {
+                        (List(), IntValue(Settings.version(0)))
+                    }
+                    case other => throw new Exception(f"Illegal Arguments $other for getProjectVersionMajor")
+                }
+            }
+        ))
+
+        ctx.addFunction("getProjectVersionMinor", CompilerFunction(context, "getProjectVersionMinor", 
+            List(),
+            IntType,
+            Modifier.newPublic(),
+            (args: List[Expression],ctx: Context) => {
+                args match{
+                    case Nil => {
+                        (List(), IntValue(Settings.version(1)))
+                    }
+                    case other => throw new Exception(f"Illegal Arguments $other for getProjectVersionMinor")
+                }
+            }
+        ))
+
+        ctx.addFunction("getProjectVersionPatch", CompilerFunction(context, "getProjectVersionPatch", 
+            List(),
+            IntType,
+            Modifier.newPublic(),
+            (args: List[Expression],ctx: Context) => {
+                args match{
+                    case Nil => {
+                        (List(), IntValue(Settings.version(2)))
+                    }
+                    case other => throw new Exception(f"Illegal Arguments $other for getProjectVersionPatch")
+                }
+            }
+        ))
+
+        ctx.addFunction("getProjectName", CompilerFunction(context, "getProjectName", 
+            List(),
+            StringType,
+            Modifier.newPublic(),
+            (args: List[Expression],ctx: Context) => {
+                args match{
+                    case Nil => {
+                        (List(), StringValue(Settings.name))
+                    }
+                    case other => throw new Exception(f"Illegal Arguments $other for getProjectName")
+                }
+            }
+        ))
+
+        ctx.addFunction("getJavaBlock", CompilerFunction(context, "getJavaBlock", 
+            List(Argument("block", MCObjectType, None)),
+            MCObjectType,
+            Modifier.newPublic(),
+            (args: List[Expression],ctx: Context) => {
+                args match{
+                    case NamespacedName(block) :: Nil => {
+                        (List(), NamespacedName(block))
+                    }
+                    case other => throw new Exception(f"Illegal Arguments $other for getJavaBlock")
+                }
+            }
+        ))
+
+        ctx.addFunction("getBedrockBlock", CompilerFunction(context, "getBedrockBlock", 
+            List(Argument("block", MCObjectType, None)),
+            MCObjectType,
+            Modifier.newPublic(),
+            (args: List[Expression],ctx: Context) => {
+                args match{
+                    case NamespacedName(block) :: Nil => {
+                        (List(), NamespacedName(BlockConverter.getBlockName(block)))
+                    }
+                    case other => throw new Exception(f"Illegal Arguments $other for getBedrockBlock")
+                }
+            }
+        ))
+
+        ctx.addFunction("getBedrockBlockID", CompilerFunction(context, "getBedrockBlockID", 
+            List(Argument("block", MCObjectType, None)),
+            MCObjectType,
+            Modifier.newPublic(),
+            (args: List[Expression],ctx: Context) => {
+                args match{
+                    case NamespacedName(block) :: Nil => {
+                        (List(), IntValue(BlockConverter.getBlockID(block)))
+                    }
+                    case other => throw new Exception(f"Illegal Arguments $other for getBedrockBlockID")
+                }
+            }
+        ))
 
         if (Settings.target == MCJava){
             ctx.addFunction("cmdstore", CompilerFunction(context, "cmdstore", 

@@ -3,11 +3,7 @@ package Selector
 
 import objects.Context
 import objects.Identifier
-import sl.Settings
-import sl.MCBedrock
-import sl.MCJava
-import sl.JsonValue
-import sl.JSONElement
+import sl.*
 
 object Selector{
     private val bedrockElement = List("x", "y", "z", "dx", "dy", "dz", "r", "rm", "scores", "tag", "name", "type", "familly", "rx", "rxm", "ry", "rym", "l", "lm", "m", "c")
@@ -15,10 +11,10 @@ object Selector{
 
     def parse(prefix: String, filters: List[(String, SelectorFilterValue)]): Selector = {
         if (filters.forall((k,v) => javaElement.contains(k))){
-            JavaSelector(prefix, filters.toMap)
+            JavaSelector(prefix, filters)
         }
         else if (filters.forall((k,v) => bedrockElement.contains(k))){
-            BedrockSelector(prefix, filters.toMap)
+            BedrockSelector(prefix, filters)
         }
         else{
             throw new Exception(f"Invalid Selector: $prefix${filters}")
@@ -26,7 +22,7 @@ object Selector{
     }
 
     def self = {
-        JavaSelector("@s",Map())
+        JavaSelector("@s",List())
     }
 }
 trait Selector{
@@ -45,9 +41,11 @@ trait Selector{
     def makeGreater(v1: SelectorFilterValue): SelectorFilterValue = {
         SelectorGreaterRange(v1.asInstanceOf[SelectorNumber].value)
     }
+
+    def add(name: String, s: SelectorFilterValue):Selector
 }
 
-case class BedrockSelector(val prefix: String, val filters: Map[String, SelectorFilterValue]) extends Selector{
+case class BedrockSelector(val prefix: String, val filters: List[(String, SelectorFilterValue)]) extends Selector{
     override def getString()(implicit context: Context): String = {
         if (filters.size == 0){
             prefix
@@ -62,7 +60,7 @@ case class BedrockSelector(val prefix: String, val filters: Map[String, Selector
             throw new Exception(f"Unsupported target: ${Settings.target}")
         }
     }
-    def filterToJava(key: String, value: SelectorFilterValue, lst: Map[String, SelectorFilterValue]): List[(String, SelectorFilterValue)] = {
+    def filterToJava(key: String, value: SelectorFilterValue, lst: List[(String, SelectorFilterValue)]): List[(String, SelectorFilterValue)] = {
         key match{
             case "c" => List(("limit", value), ("sort", SelectorIdentifier("nearest")))
             case "r" => {
@@ -120,24 +118,27 @@ case class BedrockSelector(val prefix: String, val filters: Map[String, Selector
             case _ => false
         }
     override def toString(): String = getString()(Context.getNew("default"))
+    def add(name: String, s: SelectorFilterValue):Selector = {
+        BedrockSelector(prefix, (name -> s)::filters)
+    }
 }
-case class JavaSelector(val prefix: String, val filters: Map[String, SelectorFilterValue]) extends Selector{
+case class JavaSelector(val prefix: String, val filters: List[(String, SelectorFilterValue)]) extends Selector{
     override def getString()(implicit context: Context): String = {
         if (filters.size == 0){
             prefix
         }
         else if (Settings.target == MCJava){
-            prefix + "[" + filters.map((k,v) => f"$k=$v").reduce(_ + "," + _) + "]"
+            prefix + "[" + filters.map((k,v) => f"$k=${v.getString()}").reduce(_ + "," + _) + "]"
         }
         else if (Settings.target == MCBedrock){
-            prefix + "[" + filters.flatMap((k,v)=>(filterToBedrock(k, v, filters))).map((k,v) => f"$k=$v").reduce(_ + "," + _) + "]"
+            prefix + "[" + filters.flatMap((k,v)=>(filterToBedrock(k, v, filters))).map((k,v) => f"$k=${v.getString()}").reduce(_ + "," + _) + "]"
         }
         else{
             throw new Exception(f"Unsupported target: ${Settings.target}")
         }
     }
 
-    def filterToBedrock(key: String, value: SelectorFilterValue, lst: Map[String, SelectorFilterValue]): List[(String, SelectorFilterValue)] = {
+    def filterToBedrock(key: String, value: SelectorFilterValue, lst: List[(String, SelectorFilterValue)]): List[(String, SelectorFilterValue)] = {
         key match{
             case "limit" => {
                 value match
@@ -187,34 +188,50 @@ case class JavaSelector(val prefix: String, val filters: Map[String, SelectorFil
             case _ => false
         }
     override def toString(): String = getString()(Context.getNew("default"))
+    def add(name: String, s: SelectorFilterValue):Selector = {
+        JavaSelector(prefix, (name -> s)::filters)
+    }
 }
 
 
 trait SelectorFilterValue{
+    def getString()(implicit context: Context): String
 }
 case class SelectorRange(val min: Double, val max: Double) extends SelectorFilterValue{
-    override def toString(): String = f"$min..$max"
+    override def getString()(implicit context: Context): String = f"$min..$max"
 }
 case class SelectorLowerRange(val max: Double) extends SelectorFilterValue{
-    override def toString(): String = f"..$max"
+    override def getString()(implicit context: Context): String = f"..$max"
 }
 case class SelectorGreaterRange(val min: Double) extends SelectorFilterValue{
-    override def toString(): String = f"$min.."
+    override def getString()(implicit context: Context): String = f"$min.."
 }
 case class SelectorNumber(val value: Double) extends SelectorFilterValue{
-    override def toString(): String = f"$value"
+    override def getString()(implicit context: Context): String = f"$value"
 }
 case class SelectorString(val value: String) extends SelectorFilterValue{
-    override def toString(): String = f"\"${value.replaceAll("\\\\","\\\\")}\""
+    override def getString()(implicit context: Context): String = f"\"${value.replaceAll("\\\\","\\\\")}\""
 }
 case class SelectorIdentifier(val value: String) extends SelectorFilterValue{
-    override def toString(): String = value
+    override def getString()(implicit context: Context): String = {
+        context.tryGetVariable(value) match
+            case Some(vari) if vari.modifiers.isLazy => {
+                vari.lazyValue match
+                    case IntValue(n) => SelectorNumber(n).getString()
+                    case FloatValue(n) => SelectorNumber(n).getString()
+                    case NamespacedName(n) => n
+                    case StringValue(value) => SelectorString(value).getString()
+                    case JsonValue(value) => SelectorNbt(value).getString()
+                    case _ => value
+            }
+            case _ => value
+    }
 }
 
 case class SelectorNbt(val value: JSONElement) extends SelectorFilterValue{
-    override def toString(): String = value.getNbt()
+    override def getString()(implicit context: Context): String = value.getNbt()
 }
 
 case class SelectorInvert(val value: SelectorFilterValue) extends SelectorFilterValue{
-    override def toString(): String = f"!${value.toString()}"
+    override def getString()(implicit context: Context): String = f"!${value.getString()}"
 }

@@ -198,8 +198,8 @@ def lazy angerAngaist(entity $e){
     }
 }
 
-def lazy angerAngaist(entity $e1, entity $e2){
-    with($e1){
-        angerAngaist($e)
+def lazy angerAngaist(entity e1, entity e2){
+    with(e1){
+        angerAngaist(e2)
     }
 }
