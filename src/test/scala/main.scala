@@ -21,7 +21,7 @@ class ListFunSuite extends AnyFlatSpec with should.Matchers with BeforeAndAfterA
     var output: PrintStream = null
 
     val testFiles: List[(String, Int)] = List()
-    val compileTests: List[String] = List("comparaison.sl", "math.sl")
+    val compileTests: List[String] = List("comparaison.sl", "math.sl", "enum.sl")
 
 
     override def beforeAll() = {

@@ -163,6 +163,12 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
             fct
         }
     }
+    def getFreshContext(): Context = {
+        synchronized{
+            varId += 1
+            push("_"+varId.toString())
+        }
+    }
     def getNamedBlock(name: String, content: List[String]): Function = {
         val name2 = getFunctionWorkingName(name)
         synchronized{
@@ -281,7 +287,7 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
     def getContext(identifier: Identifier): Context = {
         tryGetElement(_.child)(identifier) match{
             case Some(value) => value
-            case None => throw new Exception(f"Unknown package: $identifier in context: $path\n${root.asPrettyString("")}")
+            case None => throw new ObjectNotFoundException(f"Unknown package: $identifier in context: $path\n${root.asPrettyString("")}")
         }
     }
 
@@ -318,7 +324,7 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
     def getVariable(identifier: Identifier): Variable = {
         tryGetElement(_.variables)(identifier) match{
             case Some(value) => value
-            case None => throw new Exception(f"Unknown variable: $identifier in context: $path")
+            case None => throw new ObjectNotFoundException(f"Unknown variable: $identifier in context: $path")
         }
     }
     def tryGetVariable(identifier: Identifier): Option[Variable] = {
@@ -333,6 +339,14 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
         addName(name)
         variables.addOne(name, variable)
         variable
+    }
+    def addVariable(iden: Identifier, variable: Variable): Variable = {
+        if (iden.isSingleton()){
+            addVariable(iden.toString(), variable)
+        }
+        else{
+            push(iden.head()).addVariable(iden.drop(), variable)
+        }
     }
     def getScoreboardID(variable: Variable): Int = {
         val r = root
@@ -356,7 +370,7 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
     def getProperty(identifier: Identifier): Property = {
         tryGetElement(_.properties)(identifier) match{
             case Some(value) => value
-            case None => throw new Exception(f"Unknown property: $identifier in context: $path")
+            case None => throw new ObjectNotFoundException(f"Unknown property: $identifier in context: $path")
         }
     }
     def tryGetProperty(identifier: Identifier): Option[Property] = {
@@ -405,18 +419,18 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
     def getFunction(identifier: Identifier, args: List[Type], output: Type, concrete: Boolean): Function = {
         if (identifier.toString().startsWith("@")) return getFunctionTags(identifier)
         val fcts = getElementList(_.functions)(identifier)
-        if (fcts.size == 0) throw new Exception(f"Unknown function: $identifier in context: $path")
+        if (fcts.size == 0) throw new ObjectNotFoundException(f"Unknown function: $identifier in context: $path")
         if (fcts.size == 1) return fcts.head
         val filtered = fcts.filter(fct => args.size >= fct.minArgCount && args.size <= fct.maxArgCount && (fct.isInstanceOf[ConcreteFunction] || !concrete))
         if (filtered.length == 1) return filtered.head
-        if (filtered.size == 0) throw new Exception(f"Unknown function: $identifier for args: $args in context: $path")
+        if (filtered.size == 0) throw new ObjectNotFoundException(f"Unknown function: $identifier for args: $args in context: $path")
         val ret = filtered.sortBy(_.arguments.zip(args).map((a, v)=> v.getDistance(a.typ)(this)).reduceOption(_ + _).getOrElse(0)).head
         ret
     }
     def getFunction(identifier: Identifier): Function = {
         if (identifier.toString().startsWith("@")) return getFunctionTags(identifier)
         val fcts = getElementList(_.functions)(identifier)
-        if (fcts.size == 0) throw new Exception(f"Unknown function: $identifier in context: $path")
+        if (fcts.size == 0) throw new ObjectNotFoundException(f"Unknown function: $identifier in context: $path")
         if (fcts.size == 1) return fcts.head
         throw new Exception(f"Ambiguity for function: $identifier in context: $path ${fcts.map(_.prototype())}")
     }
@@ -519,7 +533,7 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
     def getStruct(identifier: Identifier): Struct = {
         tryGetElement(_.structs)(identifier) match{
             case Some(value) => value
-            case None => throw new Exception(f"Unknown struct: $identifier in context: $path")
+            case None => throw new ObjectNotFoundException(f"Unknown struct: $identifier in context: $path")
         }
     }
     def tryGetStruct(identifier: Identifier): Option[Struct] = {
@@ -576,7 +590,7 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
     def getTemplate(identifier: Identifier): Template = {
         tryGetElement(_.templates)(identifier) match{
             case Some(value) => value
-            case None => throw new Exception(f"Unknown template: $identifier in context: $path")
+            case None => throw new ObjectNotFoundException(f"Unknown template: $identifier in context: $path")
         }
     }
     def tryGetTemplate(identifier: Identifier): Option[Template] = {
@@ -608,7 +622,7 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
     def getEnum(identifier: Identifier): Enum = {
         tryGetElement(_.enums)(identifier) match{
             case Some(value) => value
-            case None => throw new Exception(f"Unknown enum: $identifier in context: $path")
+            case None => throw new ObjectNotFoundException(f"Unknown enum: $identifier in context: $path")
         }
     }
     def tryGetEnum(identifier: Identifier): Option[Enum] = {
@@ -662,7 +676,7 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
     def getJsonFile(identifier: Identifier): JSONFile = {
         tryGetElement(_.jsonfiles)(identifier) match{
             case Some(value) => value
-            case None => throw new Exception(f"Unknown jsonfile: $identifier in context: $path")
+            case None => throw new ObjectNotFoundException(f"Unknown jsonfile: $identifier in context: $path")
         }
     }
     def tryGetJsonFile(identifier: Identifier): Option[JSONFile] = {
@@ -734,7 +748,7 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
                 variables.addOne(alias, other.variables(name))
             }
             else{
-                throw new Exception(f"$name Not Found in ${other.getPath()}")
+                throw new ObjectNotFoundException(f"$name Not Found in ${other.getPath()}")
             }
         }
     }
@@ -860,3 +874,4 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
         }
     }
 }
+case class ObjectNotFoundException(msg: String) extends Exception(msg)

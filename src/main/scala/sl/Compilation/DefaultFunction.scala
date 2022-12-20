@@ -31,7 +31,25 @@ object DefaultFunction{
                         case StringValue(vari)::Nil => {
                             (ctx.getClass(vari).addClassTags(), NullValue)
                         }
-                        case other => throw new Exception(f"Illegal Arguments $other for random")
+                        case other => throw new Exception(f"Illegal Arguments $other for addClassTags")
+                    }
+                }
+            ))
+        ctx.addFunction("pushUpward", CompilerFunction(context, "pushUpward", 
+                List(Argument("class", MCObjectType, None)),
+                VoidType,
+                Modifier.newPublic(),
+                (args: List[Expression],ctx: Context) => {
+                    args match{
+                        case VariableValue(vari, sel)::Nil => {
+                            context.parent.addVariable(context.getVariable(vari))
+                            (List(), NullValue)
+                        }
+                        case LinkedVariableValue(vari, sel)::Nil =>{
+                            context.parent.addVariable(vari)
+                            (List(), NullValue)
+                        }
+                        case other => throw new Exception(f"Illegal Arguments $other for pushUpward")
                     }
                 }
             ))
@@ -146,7 +164,7 @@ object DefaultFunction{
             }
         ))
 
-        ctx.addFunction("getBedrockBlock", CompilerFunction(context, "getBedrockBlock", 
+        ctx.addFunction("getBedrockBlockName", CompilerFunction(context, "getBedrockBlockName", 
             List(Argument("block", MCObjectType, None)),
             MCObjectType,
             Modifier.newPublic(),
@@ -155,7 +173,7 @@ object DefaultFunction{
                     case NamespacedName(block) :: Nil => {
                         (List(), NamespacedName(BlockConverter.getBlockName(block)))
                     }
-                    case other => throw new Exception(f"Illegal Arguments $other for getBedrockBlock")
+                    case other => throw new Exception(f"Illegal Arguments $other for getBedrockBlockName")
                 }
             }
         ))

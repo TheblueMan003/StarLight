@@ -18,7 +18,7 @@ class Enum(context: Context, name: String, _modifier: Modifier, val fields: List
                 throw new Exception(f"Wrong number of fields in enum value ${x.name}. Expected: ${fields.length} got ${x.fields.length}")
             }
             x.fields.map(Utils.typeof(_)).zip(fields).foreach((a, b) => {
-                if (a.getDistance(b.typ) > 1000){
+                if (a.isSubtypeOf(b.typ)){
                     throw new Exception(f"Unexpected type in enum value ${x.name}. Expected: ${b.typ} got ${a}")
                 }
             })

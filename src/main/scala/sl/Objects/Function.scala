@@ -124,7 +124,7 @@ class ConcreteFunction(context: Context, name: String, arguments: List[Argument]
     
     def call(args2: List[Expression], ret: Variable = null, op: String = "=")(implicit ctx: Context): List[String] = {
         markAsUsed()
-        val r = argMap(args2).flatMap(p => p._1.assign("=", p._2)) :::
+        val r = argMap(args2).flatMap(p => p._1.assign("=", Utils.simplify(p._2))) :::
             List("function " + Settings.target.getFunctionName(fullName))
 
         if (ret != null){

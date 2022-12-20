@@ -5,8 +5,8 @@ import objects.Context
 import objects.types.*
 import objects.{Variable, EnumValue, EnumField}
 import scala.io.Source
-import scala.runtime.stdLibPatches.language.experimental.namedTypeArguments
-import sl.Compilation.Selector.Selector
+import scala.collection.parallel.CollectionConverters._
+import sl.Compilation.Selector.*
 
 object Utils{
     def getFile(path: String): String = {
@@ -439,6 +439,16 @@ object Utils{
             case JsonBoolean(value) => JsonBoolean(value)
             case JsonInt(value) => JsonInt(value)
             case JsonFloat(value) => JsonFloat(value)
+            case JsonIdentifier(value) => {
+                context.tryGetVariable(Identifier.fromString(value)) match{
+                    case Some(vari) if vari.modifiers.isLazy => toJson(vari.lazyValue)
+                    case _ => JsonIdentifier(value)
+                }
+            }
+            case JsonCall(value, args) => {
+                val (fct, args2) = context.getFunction(value, args, JsonType)
+                JsonCall(fct.fullName, args2)
+            }
         } 
     }
 
@@ -608,6 +618,7 @@ object Utils{
                     case (BoolValue(a), BoolValue(b)) => BoolValue(combine(op, a, b))
                     case (StringValue(a), StringValue(b)) => StringValue(combine(op, a, b))
                     case (JsonValue(a), JsonValue(b)) => JsonValue(combine(op, a, b))
+                    case (JsonValue(a), b) => JsonValue(combine(op, a, toJson(b)))
                     case _ => BinaryOperation(op, nl, nr)
             }
             case VariableValue(iden, sel) if iden.toString() == "Compiler.isJava" => {
@@ -644,6 +655,16 @@ object Utils{
             case other => elm1
     }
 
+    def toJson(expr: Expression)(implicit context: Context): JSONElement = {
+        expr match
+            case JsonValue(content) => compileJson(content)
+            case StringValue(value) => JsonString(value)
+            case IntValue(value) => JsonInt(value)
+            case FloatValue(value) => JsonFloat(value)
+            case BoolValue(value) => JsonBoolean(value)
+            case v => throw new Exception(f"Cannot cast $v to json")
+    }
+
     def compileJson(elm: JSONElement)(implicit context: Context): JSONElement = {
         elm match
             case JsonArray(content) => JsonArray(content.map(compileJson(_)))
@@ -651,17 +672,41 @@ object Utils{
             case JsonCall(value, args) => {
                 Settings.target match
                     case MCJava => {
-                        val fct = context.getFunction(value, args, VoidType).call()
-                        if (fct.length == 1){
-                            JsonString(fct.last.replaceAll("function ", ""))
+                        val fct = context.getFunction(value, args, VoidType)
+                        if (fct._1.modifiers.isLazy){
+                            var vari = context.getFreshVariable(fct._1.getType())
+                            vari.modifiers.isLazy = true
+                            val call = context.getFunction(value, args, VoidType).call(vari)
+                            toJson(vari.lazyValue)
                         }
                         else{
-                            val block = context.getFreshBlock(fct)
-                            JsonString(MCJava.getFunctionName(block.fullName))
+                            val fct = context.getFunction(value, args, VoidType).call()
+                            if (fct.length == 1){
+                                JsonString(fct.last.replaceAll("function ", ""))
+                            }
+                            else{
+                                val block = context.getFreshBlock(fct)
+                                JsonString(MCJava.getFunctionName(block.fullName))
+                            }
                         }
                     }
                     case MCBedrock => {
-                        JsonArray(context.getFunction(value, args, VoidType).call().map(JsonString(_)))
+                        val fct = context.getFunction(value, args, VoidType)
+                        if (fct._1.modifiers.isLazy){
+                            var vari = context.getFreshVariable(fct._1.getType())
+                            vari.modifiers.isLazy = true
+                            val call = context.getFunction(value, args, VoidType).call(vari)
+                            vari.lazyValue match
+                                case JsonValue(content) => compileJson(content)
+                                case StringValue(value) => JsonString(value)
+                                case IntValue(value) => JsonInt(value)
+                                case FloatValue(value) => JsonFloat(value)
+                                case BoolValue(value) => JsonBoolean(value)
+                                case v => throw new Exception(f"Cannot cast $v to json")
+                        }
+                        else{
+                            JsonArray(fct.call().map(JsonString(_)))
+                        }
                     }
             }
             case JsonIdentifier(value) => {
@@ -765,22 +810,74 @@ object Utils{
     }
 
     def getForgenerateCases(key: String, provider: Expression)(implicit context: Context): IterableOnce[List[(String, String)]] = {
-        provider match
+        simplify(provider) match
             case RangeValue(IntValue(min), IntValue(max)) => Range(min, max+1).map(elm => List((key, elm.toString())))
             case TupleValue(lst) => lst.map(elm => List((key, elm.toString())))
             case VariableValue(iden, sel) if iden.toString().startsWith("@") => {
                 context.getFunctionTags(iden).getCompilerFunctionsName().map(name => List((key, name)))
             }
-            case _ => throw new Exception(f"Unknown generator: $provider")
-    }
-    def getForeachCases(provider: Expression)(implicit context: Context): IterableOnce[Expression] = {
-        Utils.simplify(provider) match
-            case RangeValue(IntValue(min), IntValue(max)) => Range(min, max+1).map(elm => IntValue(elm))
-            case TupleValue(lst) => lst.map(elm => elm)
-            case VariableValue(iden, sel) if iden.toString().startsWith("@") => {
-                context.getFunctionTags(iden).getCompilerFunctionsName().map(name => VariableValue(name))
+            case VariableValue(iden, sel) => {
+                val enm = context.tryGetEnum(iden)
+                enm match
+                    case Some(value) => value.values.par.map(v => (key, v.name) :: v.fields.zip(value.fields).map((p, f) => (key+"."+f.name, p.getString()))).toList
+                    case None => {
+                        throw new Exception(f"Unknown generator: $provider")
+                    }
+            }
+            case JsonValue(content) => {
+                content match{
+                    case JsonArray(content) => content.map(v => List((key, JsonValue(v).getString())))
+                    case JsonDictionary(map) => map.map(v => List((key+"."+v._1, JsonValue(v._2).getString())))
+                    throw new Exception(f"JSON Generator Not supported: $provider")
+                }
             }
             case _ => throw new Exception(f"Unknown generator: $provider")
+    }
+    def getForeachCases(key: String, provider: Expression)(implicit context: Context): IterableOnce[List[(String, Expression)]] = {
+        Utils.simplify(provider) match
+            case RangeValue(IntValue(min), IntValue(max)) => Range(min, max+1).map(elm => List((key,IntValue(elm))))
+            case TupleValue(lst) => lst.map(elm => List((key, elm)))
+            case VariableValue(iden, sel) if iden.toString().startsWith("@") => {
+                context.getFunctionTags(iden).getCompilerFunctionsName().map(name => List((key, VariableValue(name))))
+            }
+            case VariableValue(iden, sel) => {
+                val enm = context.tryGetEnum(iden)
+                enm match
+                    case Some(value) => value.values.par.map(v => (key, VariableValue(value.fullName+"."+ v.name)) :: v.fields.zip(value.fields).map((p, f) => (key+"."+f.name, p))).toList
+                    case None => {
+                        throw new Exception(f"Unknown generator: $provider")
+                    }
+            }
+            case JsonValue(content) => {
+                content match{
+                    case JsonArray(content) => content.map(v => List((key, JsonValue(v))))
+                    throw new Exception(f"JSON Generator Not supported: $provider")
+                }
+            }
+            case _ => throw new Exception(f"Unknown generator: $provider")
+    }
+    def getSelector(expr: Expression)(implicit context: Context): (List[String],Selector) = {
+        expr match
+            case VariableValue(name, sel) => {
+                context.tryGetClass(name) match
+                    case None => getSelector(context.resolveVariable(expr))
+                    case Some(value) => {
+                        (List(),JavaSelector("@e", List(("tag", SelectorIdentifier(value.getTag())))))
+                    }
+            }
+            case LinkedVariableValue(vari, sel) => 
+                vari.getType() match
+                    case EntityType => (List(),JavaSelector("@e", List(("tag", SelectorIdentifier(vari.tagName)))))
+                    case _ => throw new Exception(f"Not a selector: $expr")
+            case TupleValue(values) => ???
+            case SelectorValue(value) => (List(), value)
+                
+        
+            case BinaryOperation(op, left, right) => 
+                val (prefix, vari) = Utils.simplifyToVariable(expr)
+                val (p2, s) = getSelector(vari)
+                (prefix ::: p2, s)
+            case _ => throw new Exception(f"Unexpected value in as $expr")
     }
     def getOpFunctionName(op: String)={
         op match{

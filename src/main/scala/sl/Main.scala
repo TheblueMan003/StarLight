@@ -12,24 +12,20 @@ object Main{
       mainLoop()
     }
     else{
-      if (args(0) == "new"){
-        newProject(args)
-      }
-      if (args(0) == "build"){
-        println("building project")
-        build(args(1))
-      }
       if (args(0) == "compile"){
         println("compiling project")
         compile(args)
       }
+      else{
+        mainLoop(args)
+      }
     }
   }
-  def mainLoop()={
+  def mainLoop(argsOri: Array[String] = null)={
     var ended = false
     while(!ended){
       Reporter.input()
-      val args = scala.io.StdIn.readLine().split(" ")
+      val args = if argsOri != null then argsOri else scala.io.StdIn.readLine().split(" ")
       try{
         args(0) match
           case "doc" => {
@@ -66,6 +62,9 @@ object Main{
       }
       catch{
         case e => Reporter.error(e.getMessage())
+      }
+      if (argsOri != null){
+        ended = true
       }
     }
   }
@@ -114,23 +113,31 @@ object Main{
   def compile(inputs: List[String], outputs: List[String]): Context = {
     val start = LocalDateTime.now()
     var files = getFiles(inputs)
+
     var tokenized = files.par.map((f, c) => Parser.parse(f, c)).toList
+
     if (tokenized.contains(None)) return null;
     val context = ContextBuilder.build(Settings.name, InstructionList(tokenized.map(_.get)))
     var output = Compiler.compile(context)
 
-    val outputPath = outputs.map(path => 
-      if (!path.endsWith("/") && !path.endsWith("\\"))then path + "/" else path
-    )
-
-    exportOutput(outputPath, output)
-
-    val end = LocalDateTime.now()
-    val time = ChronoUnit.MILLIS.between(start, end)
+    val time = ChronoUnit.MILLIS.between(start, LocalDateTime.now())
     Reporter.info(f"Number of files: ${output.size}")
     Reporter.info(f"Number of mcfunctions: ${output.filter(_._1.endsWith(".mcfunction")).size}")
     Reporter.info(f"Number of commands: ${output.filter(_._1.endsWith(".mcfunction")).map(_._2.size).foldRight(0)(_ + _)}")
     Reporter.info(f"Total compile Time: ${time}ms")
+
+    val exportStart = LocalDateTime.now()
+    val outputPath = outputs.map(path => 
+      if (!path.endsWith("/") && !path.endsWith("\\"))then path + "/" else path
+    ).toList
+
+    exportOutput(outputPath, output)
+
+    val time2 = ChronoUnit.MILLIS.between(exportStart, LocalDateTime.now())
+    Reporter.info(f"Total export Time: ${time2}ms")
+
+    val time3 = ChronoUnit.MILLIS.between(start, LocalDateTime.now())
+    Reporter.info(f"Total Time: ${time3}ms")
 
     context
   }
@@ -140,12 +147,31 @@ object Main{
    */
   def exportOutput(dirs: List[String], output: List[(String, List[String])]):Unit={
     dirs.foreach(deleteDirectory(_))
-    output.foreach((path, content) =>{
-      dirs.foreach(dir => {
-        val filename = dir + path
-        safeWriteFile(filename, content)
-      })
-    })
+    dirs.foreach(dir => {
+      if (dir.endsWith(".zip/")){
+        exportOutputZip(dir.replaceAllLiterally(".zip/",".zip"), output)
+      }
+      else{
+        output.foreach((path, content) =>{
+          val filename = dir + path
+          safeWriteFile(filename, content)
+        })
+      }})
+  }
+
+  def exportOutputZip(out: String, files: List[(String, List[String])]) = {
+    import java.io.{ BufferedInputStream, FileInputStream, FileOutputStream }
+    import java.util.zip.{ ZipEntry, ZipOutputStream }
+
+    val zip = new ZipOutputStream(new FileOutputStream(out))
+    val writer = new PrintWriter(zip)
+    files.foreach { (name, content) =>
+      zip.putNextEntry(new ZipEntry(if name.startsWith("/") then name.drop(1) else name))
+      content.foreach(x => writer.println(x))
+      writer.flush()
+      zip.closeEntry()
+    }
+    zip.close()
   }
 
   def safeWriteFile(filename: String, content: List[String]):Unit = {
@@ -162,9 +188,8 @@ object Main{
     }
 
     // Write all files
-    val str = content.foldRight("")(_ + "\n"+ _)
     val out = new PrintWriter(file, "UTF-8")
-    out.print(str)
+    content.foreach(out.println(_))
     out.close()
   }
 

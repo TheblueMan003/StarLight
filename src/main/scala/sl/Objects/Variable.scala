@@ -44,8 +44,10 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 	def generate(isStructFunctionArgument: Boolean = false)(implicit context: Context):Unit = {
 		val parent = context.getCurrentVariable()
 		if (parent != null){
-			isFunctionArgument = parent.isFunctionArgument
-			parent.tupleVari = parent.tupleVari ::: List(this)
+			if (!isFunctionArgument){
+				parent.tupleVari = parent.tupleVari ::: List(this)
+			}
+			isFunctionArgument |= parent.isFunctionArgument
 		}
 		if (!context.getCurrentFunction().isInstanceOf[CompilerFunction]){
 			//typ.generateCompilerFunction(this)(context.push(name))
@@ -157,7 +159,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 								}
 							}
 							catch{
-								case _ =>
+								case ObjectNotFoundException(_) =>
 									lazyValue = value
 									List()
 							}
@@ -165,16 +167,19 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 						}
 					}
 
+					val fixed = Utils.fix(value)
+
 					op match{
-						case "=" => lazyValue = Utils.simplify(value)
-						case "+=" => lazyValue = Utils.simplify(BinaryOperation("+", LinkedVariableValue(this), value))
-						case "-=" => lazyValue = Utils.simplify(BinaryOperation("-", LinkedVariableValue(this), value))
-						case "/=" => lazyValue = Utils.simplify(BinaryOperation("/", LinkedVariableValue(this), value))
-						case "*=" => lazyValue = Utils.simplify(BinaryOperation("*", LinkedVariableValue(this), value))
-						case "%=" => lazyValue = Utils.simplify(BinaryOperation("%", LinkedVariableValue(this), value))
-						case "&=" => lazyValue = Utils.simplify(BinaryOperation("&", LinkedVariableValue(this), value))
-						case "|=" => lazyValue = Utils.simplify(BinaryOperation("|", LinkedVariableValue(this), value))
-						case "^=" => lazyValue = Utils.simplify(BinaryOperation("^", LinkedVariableValue(this), value))
+						case "=" => lazyValue = Utils.simplify(fixed)
+						case "+=" => lazyValue = Utils.simplify(BinaryOperation("+", LinkedVariableValue(this), fixed))
+						case "-=" => lazyValue = Utils.simplify(BinaryOperation("-", LinkedVariableValue(this), fixed))
+						case "/=" => lazyValue = Utils.simplify(BinaryOperation("/", LinkedVariableValue(this), fixed))
+						case "*=" => lazyValue = Utils.simplify(BinaryOperation("*", LinkedVariableValue(this), fixed))
+						case "%=" => lazyValue = Utils.simplify(BinaryOperation("%", LinkedVariableValue(this), fixed))
+						case "&=" => lazyValue = Utils.simplify(BinaryOperation("&", LinkedVariableValue(this), fixed))
+						case "|=" => lazyValue = Utils.simplify(BinaryOperation("|", LinkedVariableValue(this), fixed))
+						case "^=" => lazyValue = Utils.simplify(BinaryOperation("^", LinkedVariableValue(this), fixed))
+						case ":=" => {}
 						case other => throw new Exception(f"Unsupported operation: $fullName $op $value")
 					}
 				}

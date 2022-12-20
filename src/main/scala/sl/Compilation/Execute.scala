@@ -9,6 +9,7 @@ import objects.types.EntityType
 import objects.Identifier
 import objects.types.BoolType
 import sl.Compilation.Selector.*
+import scala.collection.parallel.CollectionConverters._
 
 object Execute{
     def ifs(ifb: If)(implicit context: Context): List[String] = {
@@ -84,20 +85,8 @@ object Execute{
                 }
         }
 
-        ass.expr match
-            case VariableValue(name, sel) => withInstr(With(context.resolveVariable(ass.expr), ass.isat, ass.cond, ass.block))
-            case LinkedVariableValue(vari, sel) => 
-                vari.getType() match
-                    case EntityType => apply(f"@e[tag=${vari.tagName}]")
-                    case _ => throw new Exception(f"Unexpected value in as $ass")
-            case TupleValue(values) => values.flatMap(p => withInstr(With(p, ass.isat, ass.cond, ass.block)))
-            case SelectorValue(value) => apply(value.getString())
-                
-        
-            case BinaryOperation(op, left, right) => 
-                val (prefix, vari) = Utils.simplifyToVariable(ass.expr)
-                prefix ::: withInstr(With(vari, ass.isat, ass.cond, ass.block))
-            case _ => throw new Exception(f"Unexpected value in as $ass")
+        val (prefix, selector) = Utils.getSelector(ass.expr)
+        prefix:::apply(selector.getString())
     }
     def atInstr(ass: At)(implicit context: Context):List[String] = {
         def apply(selector: String)={
@@ -105,23 +94,11 @@ object Execute{
         }
 
         Utils.simplify(ass.expr) match
-            case VariableValue(name, sel) => atInstr(At(context.resolveVariable(ass.expr), ass.block))
-            case LinkedVariableValue(vari, sel) => 
-                vari.getType() match
-                    case EntityType => apply(f"@e[tag=${vari.tagName}]")
-                    case _ => throw new Exception(f"Unexpected value in as $ass")
-            case TupleValue(List(x, y, z)) if x.hasFloatValue() && y.hasFloatValue() && z.hasFloatValue() => {
-                makeExecute(f" positioned ${x.getFloatValue()} ${y.getFloatValue()} ${z.getFloatValue()}", Compiler.compile(ass.block))
-            }
-            case TupleValue(values) => values.flatMap(p => atInstr(At(p, ass.block)))
-            case SelectorValue(value) => apply(value.getString())
             case PositionValue(value) => makeExecute(f" positioned $value", Compiler.compile(ass.block))
-                
-        
-            case BinaryOperation(op, left, right) => 
-                val (prefix, vari) = Utils.simplifyToVariable(ass.expr)
-                prefix ::: atInstr(At(vari, ass.block))
-            case _ => throw new Exception(f"Unexpected value in as $ass")
+            case _ => {
+                val (prefix, selector) = Utils.getSelector(ass.expr)
+                prefix:::apply(selector.getString())
+            }
     }
 
     /**
@@ -449,16 +426,16 @@ object Execute{
                 val cases = swit.cases.map(c => SwitchCase(Utils.simplify(c.expr), c.instr))
                 expr match{
                     case VariableValue(name, sel) if !swit.copyVariable=> {
-                        makeTree(context.getVariable(name), cases.filter(_.expr.hasIntValue()).map(x => (x.expr.getIntValue(), x.instr))):::
-                        cases.filter(!_.expr.hasIntValue()).flatMap(x => ifs(If(BinaryOperation("in", VariableValue(name), x.expr), x.instr, List())))
+                        makeTree(context.getVariable(name), cases.par.filter(_.expr.hasIntValue()).map(x => (x.expr.getIntValue(), x.instr)).toList):::
+                        cases.par.filter(!_.expr.hasIntValue()).flatMap(x => ifs(If(BinaryOperation("in", VariableValue(name), x.expr), x.instr, List()))).toList
                     }
                     case LinkedVariableValue(vari, sel) if !swit.copyVariable=> {
-                        makeTree(vari, cases.filter(_.expr.hasIntValue()).map(x => (x.expr.getIntValue(), x.instr))):::
-                        cases.filter(!_.expr.hasIntValue()).flatMap(x => ifs(If(BinaryOperation("in", LinkedVariableValue(vari), x.expr), x.instr, List())))
+                        makeTree(vari, cases.par.filter(_.expr.hasIntValue()).map(x => (x.expr.getIntValue(), x.instr)).toList):::
+                        cases.par.filter(!_.expr.hasIntValue()).flatMap(x => ifs(If(BinaryOperation("in", LinkedVariableValue(vari), x.expr), x.instr, List()))).toList
                     }
                     case IntValue(value) => {
-                        val tail = cases.filter(!_.expr.hasIntValue())
-                        val head = cases.filter(c => c.expr.hasIntValue() && c.expr.getIntValue() == value).flatMap(x => Compiler.compile(x.instr))
+                        val tail = cases.par.filter(!_.expr.hasIntValue()).toList
+                        val head = cases.par.filter(c => c.expr.hasIntValue() && c.expr.getIntValue() == value).flatMap(x => Compiler.compile(x.instr)).toList
                         if (tail.isEmpty){
                             head
                         }
@@ -542,7 +519,8 @@ object Execute{
             )
         }
         else{
-            val subTree = values.zipWithIndex.groupBy(_._2 * Settings.treeSize / values.length).map((g,l)=>l).toList.sortBy(_.head._2)
+            val length = values.length
+            val subTree = values.zipWithIndex.groupBy(_._2 * Settings.treeSize / length).map((g,l)=>l).toList.sortBy(_.head._2)
             subTree.flatMap(x => {
                 if (x.length > 1){
                     val block = context.getFreshBlock(makeTree(cond, x.map(p => p._1).sortBy(_._1)))

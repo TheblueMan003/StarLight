@@ -1,9 +1,13 @@
 package math
 
+
+val pi = 3.1415
+val e = 2.718
+
 """
 Return the absolute value of x
 """
-def int abs(int x){
+int abs(int x){
 	if(x < 0){
 		x *= -1
 	}
@@ -13,7 +17,7 @@ def int abs(int x){
 """
 Return the absolute value of x
 """
-def float abs(float x){
+float abs(float x){
 	if(x < 0){
 		x *= -1
 	}
@@ -23,7 +27,7 @@ def float abs(float x){
 """
 Return the max between the a and b
 """
-def int max(int a, int b){
+int max(int a, int b){
 	if(a > b){
 		b = a
 	}
@@ -33,7 +37,7 @@ def int max(int a, int b){
 """
 Return the max between the a and b
 """
-def float max(float a, float b){
+float max(float a, float b){
 	if(a > b){
 		b = a
 	}
@@ -43,7 +47,7 @@ def float max(float a, float b){
 """
 Return the min between the a and b
 """
-def int min(int a, int b){
+int min(int a, int b){
 	if(a < b){
 		b = a
 	}
@@ -53,7 +57,7 @@ def int min(int a, int b){
 """
 Return the min between the a and b
 """
-def float min(float a, float b){
+float min(float a, float b){
 	if(a < b){
 		b = a
 	}
@@ -63,9 +67,8 @@ def float min(float a, float b){
 """
 return true if difference between x and y smaller than maxDiff
 """
-def bool isClose(float x, float y, float maxDiff = 0.01){
-    float diff = x - y
-    diff = abs(diff)
+bool isClose(float x, float y, float maxDiff = 0.01){
+    float diff = abs(x - y)
     
     if (diff < maxDiff){
         return true
@@ -78,7 +81,7 @@ def bool isClose(float x, float y, float maxDiff = 0.01){
 """
 return squart root of value
 """
-def float sqrt(float value){
+float sqrt(float value){
     if (value < 0){
         //exception.invalidArgument("value in math.sqrt")
     }
@@ -183,4 +186,123 @@ def int pow(int x, int n, int m = 1){
         x*=x
         return(pow(x, n, m))
     }
+}
+
+"""
+Return sign of the argument
+-1 if value smaller than 0
+1 otherwise
+"""
+int sign(float value){
+    if (value >= 0){
+        return(1)
+    }
+    if (value < 0){
+        return(-1)
+    }
+}
+
+"""
+Return sign of the argument
+-1 if value smaller than 0
+1 otherwise
+"""
+int sign(int value){
+    if (value >= 0){
+        return(1)
+    }
+    if (value < 0){
+        return(-1)
+    }
+}
+
+"""
+Round float to closest value
+"""
+float round(float value){
+    value += 0.5
+    value /= 1000
+    value *= 1000
+    return(value)
+}
+
+"""
+Round float to lowest value
+"""
+float floor(float value){
+    value /= 1000
+    value *= 1000
+    return(value)
+}
+
+"""
+Round float to upper value
+"""
+float ceil(float value){
+    value += 0.999
+    value /= 1000
+    value *= 1000
+    return(value)
+}
+
+"""
+Clamp the value between a and b
+"""
+int clamp(int value, int a, int b){
+    return(math.max(math.min(value, a),b))
+}
+
+"""
+Clamp the value between a and b
+"""
+float clamp(float value, float a, float b){
+    return(math.max(math.min(value, a),b))
+}
+
+"""
+Return (a,b) if a <= b else return (b,a)
+"""
+(int,int) sorted(int a, int b){
+    if (a > b){
+        return(b, a)
+    }
+    if (a <= b){
+        return(a, b)
+    }
+}
+
+"""
+Return (a,b) if a <= b else return (b,a)
+"""
+(float,float) sorted(float a, float b){
+    if (a > b){
+        return(b, a)
+    }
+    if (a <= b){
+        return(a, b)
+    }
+}
+
+
+"""
+Return the linear interpolated value of a0 and a1 with coefficient w
+"""
+float linearLerp(float a0, float a1, float w){
+    return((1.0-w)*a0 + a1*w)
+}
+
+"""
+Return the 3rd degree interpolated value of a0 and a1 with coefficient w
+"""
+float smoothLerp(float a0, float a1, float w){
+    w = w*w*(3-2*w)
+    float value = (1.0 - w)*a0 + (w * a1)
+    (float,float) s = sorted(a0, a1)
+    if (value < s._0){
+        value = s._0
+    }
+    if (value > s._1){
+        value = s._1
+    }
+    return value
 }

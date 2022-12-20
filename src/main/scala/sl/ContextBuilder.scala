@@ -71,9 +71,9 @@ object ContextBuilder{
                 cases.map(lst => lst.sortBy(0 - _._1.length()).foldLeft(instr)((instr, elm) => Utils.subst(instr, elm._1, elm._2))).flatMap(Compiler.compile(_)).toList
             }
             case ForEach(key, provider, instr) => {
-                val cases = Utils.getForeachCases(provider)
+                val cases = Utils.getForeachCases(key.toString(), provider)
                 
-                cases.map(elm => Utils.subst(instr, key.toString(), elm)).flatMap(Compiler.compile(_)).toList
+                cases.map(lst => lst.sortBy(0 - _._1.length()).foldLeft(instr)((instr, elm) => Utils.subst(instr, elm._1, elm._2))).flatMap(Compiler.compile(_)).toList
             }
             case Import(lib, value, alias) => {
                 if (context.importFile(lib)){

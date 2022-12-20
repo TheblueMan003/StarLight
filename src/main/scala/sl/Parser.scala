@@ -49,14 +49,17 @@ object Parser extends StandardTokenParsers{
   def jsonValue: Parser[JSONElement] = floatValue ^^ { p => JsonFloat(p) } 
                                     | numericLit ^^ { p => JsonInt(p.toInt) } 
                                     | stringLit2 ^^ { p => JsonString(p) }
+                                    | jsonCall
                                     | identLazy2 ^^ { p => JsonIdentifier(p) }
                                     | "true" ^^^ (JsonBoolean(true))
                                     | "false" ^^^ (JsonBoolean(false))
                                     | json
-                                    | ("[" ~> repsep(jsonValue, ",")) <~ "]" ^^ { p => JsonArray(p)}
-                                    
+
+  def jsonCall: Parser[JSONElement] = identLazy2 ~ ("(" ~> repsep(exprNoTuple, ",") <~ ")") ^^ {case f ~ a => JsonCall(f, a)}
+  def jsonArray: Parser[JSONElement] = ("[" ~> repsep(jsonValue, ",")) <~ "]" ^^ { p => JsonArray(p)}
   def jsonKeypair: Parser[(String, JSONElement)] = ((stringLit2 | identLazy) <~ ":") ~ jsonValue ^^ { p => (p._1, p._2) }
-  def json: Parser[JSONElement] = "{" ~> repsep(jsonKeypair, ",") <~ "}" ^^ { p => JsonDictionary(p.toMap) }
+  def jsonDic: Parser[JSONElement] = "{" ~> repsep(jsonKeypair, ",") <~ "}" ^^ { p => JsonDictionary(p.toMap) }
+  def json: Parser[JSONElement] = jsonDic | jsonArray
 
 
 
@@ -182,24 +185,21 @@ object Parser extends StandardTokenParsers{
   def namespacedName = ident ~ ":" ~ ident2 ^^ { case a ~ b ~ c => NamespacedName(a+b+c) }
   def namespacedName2 = opt(identLazy <~ ":") ~ identLazy2 ^^ { case a ~ c => if a.isEmpty then NamespacedName(c) else NamespacedName(a.get+":"+c)}
 
-  def relCoordinateFloat: Parser[String] = "~"~>floatValue ^^ {"~"+_}
-  def relCoordinateInt: Parser[String] = "~"~>numericLit ^^ {"~"+_}
-  def relCoordinateHere: Parser[String] = "~"~>identLazy ^^ {"~"+_}
-  def relCoordinateIdent: Parser[String] = "~" ^^^ "~"
-  def relCoordinate: Parser[String] = relCoordinateFloat | relCoordinateIdent | relCoordinateInt | identLazy | relCoordinateHere | (floatValue ^^ {_.toString()}) | numericLit
-  def frontCoordinateFloat: Parser[String] = "^"~>floatValue ^^ {"^"+_}
-  def frontCoordinateInt: Parser[String] = "^"~>numericLit ^^ {"^"+_}
-  def frontCoordinateIdent: Parser[String] = "^"~>identLazy ^^ {"^"+_}
+  def validCordNumber1: Parser[String] = floatValue^^{_.toString()} | numericLit | identLazy
+  def validCordNumber2: Parser[String] = ("-" ~> validCordNumber1 ^^ {"-"+_}) | validCordNumber1
+  def relCoordinate1: Parser[String] = "~"~>validCordNumber2 ^^ {"~"+_}
+  def relCoordinate2: Parser[String] = "~" ^^^ "~"
+  def relCoordinate: Parser[String] = relCoordinate1 | relCoordinate2 | validCordNumber2
+  def frontCoordinateNumber: Parser[String] = "^"~>validCordNumber2 ^^ {"^"+_}
   def frontCoordinateHere: Parser[String] = "^" ^^^ "^"
-  def frontCoordinate: Parser[String] = frontCoordinateInt | frontCoordinateIdent | frontCoordinateFloat | frontCoordinateHere
+  def frontCoordinate: Parser[String] = frontCoordinateNumber | frontCoordinateHere
 
   def frontPosition: Parser[String] = frontCoordinate ~ frontCoordinate ~ frontCoordinate ^^ {case x ~ y ~ z => f"$x $y $z"}
   def relPosition: Parser[String] = relCoordinate ~ relCoordinate ~ relCoordinate ^^ {case x ~ y ~ z => f"$x $y $z"}
   def position: Parser[PositionValue] = (frontPosition | relPosition) ^^ {case a => PositionValue(a)}
 
   def exprBottom: Parser[Expression] = 
-    position
-    | floatValue ^^ (p => FloatValue(p))
+    floatValue ^^ (p => FloatValue(p))
     | numericLit ^^ (p => IntValue(p.toInt))
     | "-" ~> numericLit ^^ (p => IntValue(f"-$p".toInt))
     | "-" ~> exprBottom ^^ (BinaryOperation("-", IntValue(0), _))
@@ -209,7 +209,6 @@ object Parser extends StandardTokenParsers{
     | "null" ^^^ NullValue
     | namespacedName
     | stringLit2 ^^ (StringValue(_))
-    | lambda
     | "new" ~> identLazy2 ~ ("(" ~> repsep(exprNoTuple, ",") <~ ")") ~ block ^^ { case f ~ a ~ b => ConstructorCall(f, a ::: List(LambdaValue(List(), b))) }
     | "new" ~> identLazy2 ~ ("(" ~> repsep(exprNoTuple, ",") <~ ")") ^^ { case f ~ a => ConstructorCall(f, a) }
     | identLazy2 ~ ("(" ~> repsep(exprNoTuple, ",") <~ ")") ~ block ^^ { case f ~ a ~ b => FunctionCallValue(VariableValue(f), a ::: List(LambdaValue(List(), b))) }
@@ -234,7 +233,7 @@ object Parser extends StandardTokenParsers{
   def exprIn: Parser[Expression] = exprComp ~ rep("in" ~> exprIn) ^^ {unpack("in", _)}
   def exprAnd: Parser[Expression] = exprIn ~ rep("&&" ~> exprAnd) ^^ {unpack("&&", _)}
   def exprOr: Parser[Expression] = exprAnd ~ rep("||" ~> exprOr) ^^ {unpack("||", _)}
-  def exprNoTuple = exprOr
+  def exprNoTuple = exprOr | position | lambda
   def expr: Parser[Expression] = rep1sep(exprNoTuple, ",") ^^ (p => if p.length == 1 then p.head else TupleValue(p))
 
   def unpack(op: String, p: (Expression ~ List[Expression])): Expression = {

@@ -191,7 +191,7 @@ case class FunctionCallValue(val name: Expression, val args: List[Expression], v
     override def hasIntValue(): Boolean = false
     override def hasFloatValue(): Boolean = false
     override def getFloatValue(): Double = ???
-    override def getString()(implicit context: Context): String = throw new Exception(f"Function call cannot be transformed to string")
+    override def getString()(implicit context: Context): String = throw new Exception(f"Function call cannot be transformed to string: $name()")
 }
 
 case class ConstructorCall(val name: Identifier, val args: List[Expression]) extends Expression{
@@ -265,18 +265,18 @@ trait JSONElement{
 
 case class JsonDictionary(val map: Map[String, JSONElement]) extends JSONElement{
     def getString()(implicit context: Context): String = {
-        map.map((k, v) => f"{${Utils.stringify(k)}:${v.getString()}}").reduceOption(_ +", "+ _).getOrElse("")
+        "{"+map.map((k, v) => f"${Utils.stringify(k)}:${v.getString()}").reduceOption(_ +", "+ _).getOrElse("")+"}"
     }
     def getNbt(): String = {
-        map.map((k, v) => f"{${Utils.stringify(k)}:${v.getNbt()}}").reduceOption(_ +", "+ _).getOrElse("")
+        "{"+map.map((k, v) => f"${Utils.stringify(k)}:${v.getNbt()}").reduceOption(_ +", "+ _).getOrElse("")+"}"
     }
 }
 case class JsonArray(val content: List[JSONElement]) extends JSONElement{
     def getString()(implicit context: Context): String = {
-        content.map(v=> f"[${v.getString()}]").reduceOption(_ +", "+ _).getOrElse("")
+        "["+content.map(v=> f"${v.getString()}").reduceOption(_ +", "+ _).getOrElse("")+"]"
     }
     def getNbt(): String = {
-        content.map(v => f"[${v.getNbt()}]").reduceOption(_ +", "+ _).getOrElse("")
+        "["+content.map(v => f"${v.getNbt()}").reduceOption(_ +", "+ _).getOrElse("")+"]"
     }
 }
 case class JsonString(val value: String) extends JSONElement{

@@ -51,10 +51,10 @@ case class BedrockSelector(val prefix: String, val filters: List[(String, Select
             prefix
         }
         else if (Settings.target == MCBedrock){
-            prefix + "[" + filters.map((k,v) => f"$k=$v").reduce(_ + "," + _) + "]"
+            prefix + "[" + filters.map((k,v) => f"$k=${v.getString()}").reduce(_ + "," + _) + "]"
         }
         else if (Settings.target == MCJava){
-            prefix + "[" + filters.flatMap((k,v)=>(filterToJava(k, v, filters))).map((k,v) => f"$k=$v").reduce(_ + "," + _) + "]"
+            prefix + "[" + filters.flatMap((k,v)=>(filterToJava(k, v, filters))).map((k,v) => f"$k=${v.getString()}").reduce(_ + "," + _) + "]"
         }
         else{
             throw new Exception(f"Unsupported target: ${Settings.target}")
@@ -207,7 +207,9 @@ case class SelectorGreaterRange(val min: Double) extends SelectorFilterValue{
     override def getString()(implicit context: Context): String = f"$min.."
 }
 case class SelectorNumber(val value: Double) extends SelectorFilterValue{
-    override def getString()(implicit context: Context): String = f"$value"
+    override def getString()(implicit context: Context): String = 
+        val int = value.toInt
+        if int == value then f"$int" else f"$value"
 }
 case class SelectorString(val value: String) extends SelectorFilterValue{
     override def getString()(implicit context: Context): String = f"\"${value.replaceAll("\\\\","\\\\")}\""

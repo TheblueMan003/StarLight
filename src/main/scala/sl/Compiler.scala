@@ -2,7 +2,7 @@ package sl
 
 import objects.{Context, ConcreteFunction, LazyFunction, Modifier, Struct, Class, Template, Variable, Enum, EnumField, Predicate, Property}
 import objects.Identifier
-import objects.types.{VoidType, TupleType, IdentifierType}
+import objects.types.{VoidType, TupleType, IdentifierType, ArrayType}
 import sl.Compilation.Execute
 import sl.Compilation.Selector.Selector
 
@@ -98,9 +98,19 @@ object Compiler{
                 cases.map(lst => lst.sortBy(0 - _._1.length()).foldLeft(instr)((instr, elm) => Utils.subst(instr, elm._1, elm._2))).flatMap(Compiler.compile(_, firstPass)).toList
             }
             case ForEach(key, provider, instr) => {
-                val cases = Utils.getForeachCases(provider)
+                val cases = Utils.getForeachCases(key.toString(), provider)
                 
-                cases.map(elm => Utils.subst(instr, key.toString(), elm)).flatMap(Compiler.compile(_, firstPass)).toList
+                //cases.map(lst => lst.sortBy(0 - _._1.length()).foldLeft(instr)((instr, elm) => Utils.subst(instr, elm._1, elm._2))).flatMap(Compiler.compile(_)).toList
+                cases.flatMap(v =>{
+                    val ctx = context.getFreshContext()
+                    v.flatMap(v => {
+                        val mod = Modifier.newPrivate()
+                        mod.isLazy = true
+                        val vari = new Variable(ctx, "dummy", Utils.typeof(v._2), mod)
+                        ctx.addVariable(Identifier.fromString(v._1), vari)
+                        vari.assign("=", v._2)
+                    }):::Compiler.compile(instr)(ctx)
+                }).toList
             }
             case VariableDecl(names, typ, modifier, op, expr) => {
                 if (typ == IdentifierType("val") || typ == IdentifierType("var")){
@@ -196,11 +206,31 @@ object Compiler{
                 }
             }
             case ArrayAssigment(name, index, op, value) => {
-                if (op == "="){
-                    compile(FunctionCall(name.path()+"."+"set", index ::: List(value)))
+                def call()={
+                    if (op == "="){
+                        compile(FunctionCall(name.path()+"."+"set", index ::: List(value)))
+                    }
+                    else{
+                        compile(FunctionCall(name.path()+"."+"set", index:::List(BinaryOperation("+", FunctionCallValue(VariableValue(name.path()+"."+"get"), index), value))))
+                    }
+                }
+                def indexed(index: Int)={
+                    compile(VariableAssigment(List((Left(Identifier.fromString(name.path()+"."+index.toString())), Selector.self)), op, value))
+                }
+                if (index.length == 1){
+                    val typ = name match
+                        case Left(value) => Utils.typeof(VariableValue(value))
+                        case Right(value) => Utils.typeof(LinkedVariableValue(value))
+                    
+                    (typ, Utils.simplify(index.head)) match
+                        case (ArrayType(sub, v), IntValue(index)) => indexed(index)
+                        case (ArrayType(sub, v), EnumIntValue(index)) => indexed(index)
+                        case _ =>{
+                            call()
+                        }
                 }
                 else{
-                    compile(FunctionCall(name.path()+"."+"set", index:::List(BinaryOperation("+", FunctionCallValue(VariableValue(name.path()+"."+"get"), index), value))))
+                    call()
                 }
             }
             case Return(value) => {
