@@ -116,3 +116,7 @@ case class With(val expr: Expression, val isat: Expression, val cond: Expression
 case class JSONFile(val name: String, val json: JSONElement) extends Instruction {
   override def toString() = f"jsonfile $name"
 }
+
+case class Blocktag(val name: String, val values: List[String]) extends Instruction {
+  override def toString() = f"blocktag $name"
+}

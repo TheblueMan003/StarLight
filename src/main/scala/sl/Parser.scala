@@ -16,10 +16,10 @@ import javax.swing.text.DefaultEditorKit.PasteAction
 object Parser extends StandardTokenParsers{
   lexical.delimiters ++= List("(", ")", "\\", ".", "..", ":", "=", "->", "{", "}", ",", "*", "[", "]", "/", "+", "-", "*", "/", "\\", "%", "&&", "||", "=>", ";",
                               "+=", "-=", "/=", "*=", "%=", "?=", ":=", "%", "@", "@e", "@a", "@s", "@r", "@p", "~", "^", "<=", "==", ">=", "<", ">", "!=", "%%%", "???", "$",
-                              "!", "!=")
+                              "!", "!=", "#")
   lexical.reserved   ++= List("true", "false", "if", "then", "else", "return", "switch", "for", "do", "while",
                               "as", "at", "with", "to", "import", "doc", "template", "null", "typedef", "foreach", "in",
-                              "def", "package", "struct", "enum", "class", "lazy", "jsonfile",
+                              "def", "package", "struct", "enum", "class", "lazy", "jsonfile", "blocktag",
                               "public", "protected", "private", "scoreboard", "forgenerate", "from",
                               "ticking", "loading", "predicate", "extends", "new", "const", "static", "virtual", "abstract", "override")
 
@@ -122,6 +122,9 @@ object Parser extends StandardTokenParsers{
       | ((("with" ~> "(" ~> exprNoTuple <~ ",") ~ exprNoTuple <~ ",") ~ exprNoTuple <~ ")") ~ instruction ^^ (p => With(p._1._1._1, p._1._1._2, p._1._2, p._2))
   def switch: Parser[Switch] = ("switch" ~> expr <~ "{") ~ rep(switchCase) <~ "}" ^^ (p => Switch(p._1, p._2))
   def switchCase: Parser[SwitchCase] = (expr <~ "->") ~ instruction ^^ (p => SwitchCase(p._1, p._2))
+
+  def blocktag: Parser[Instruction] = doc ~ modifier ~"blocktag" ~> identLazy2 ~ "{" ~ repsep(tagentry, ",") ~"}" ^^ { case d ~ m ~ _ ~ n ~ _ ~ c ~ _ => }
+  def tagentry: Parser[String] = identLazy2 | (namespacedName ^^ {_.value})
 
 
   def enumInstr: Parser[EnumDecl] = (doc ~ modifier ~ ("enum" ~> identLazy) ~ opt("("~>repsep(enumField,",")<~")") <~ "{") ~ repsep(enumValue, ",") <~ "}" ^^ 
