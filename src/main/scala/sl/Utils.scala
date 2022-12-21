@@ -232,6 +232,7 @@ object Utils{
             case RangeValue(min, max) => RangeValue(subst(min, from, to), subst(max, from, to))
             case LambdaValue(args, instr) => LambdaValue(args.map(_.replaceAllLiterally(from, to)), subst(instr, from, to))
             case lk: LinkedVariableValue => lk
+            case null => null
     }
 
     def subst(json: JSONElement, from: String, to: String): JSONElement = {
@@ -332,8 +333,9 @@ object Utils{
             case Switch(cond, cases, cv) => Switch(cond, cases.map(x => SwitchCase(x.expr, rmFunctions(x.instr))), cv)
     }
 
-    def fix(name: Either[Identifier, Variable])(implicit context: Context) = {
+    def fix(name: Either[Identifier, Variable])(implicit context: Context, ignore: Set[Identifier]) = {
         name match
+            case Left(iden) if ignore.contains(iden) => name
             case Left(iden) => {
                 context.tryGetVariable(iden) match
                     case None => name
@@ -342,12 +344,12 @@ object Utils{
             case Right(vari) => Right(vari)
     }
 
-    def fix(instr: Instruction)(implicit context: Context): Instruction = {
+    def fix(instr: Instruction)(implicit context: Context, ignore: Set[Identifier]): Instruction = {
         instr match
             case Package(name, block) => Package(name, fix(block))
             case StructDecl(name, block, modifier, parent) => StructDecl(name, fix(block), modifier, parent)
             case ClassDecl(name, block, modifier, parent, entity) => ClassDecl(name, fix(block), modifier, parent, entity)
-            case FunctionDecl(name, block, typ, args, modifier) => FunctionDecl(name, fix(block), typ, args, modifier)
+            case FunctionDecl(name, block, typ, args, modifier) => FunctionDecl(name, fix(block)(context, ignore ++ args.map(a => Identifier.fromString(a.name)).toSet), typ, args, modifier)
             case PredicateDecl(name, args, block, modifier) => PredicateDecl(name, args, fix(block), modifier)
             case EnumDecl(name, fields, values, modifier) => EnumDecl(name, fields, values.map(v => EnumValue(v.name, v.fields.map(fix(_)))), modifier)
             case VariableDecl(name, _type, modifier, op, expr) => VariableDecl(name, fix(_type), modifier, op, fix(expr))
@@ -365,7 +367,7 @@ object Utils{
             case ElseIf(cond, ifBlock) => ElseIf(fix(cond), fix(ifBlock))
             case If(cond, ifBlock, elseBlock) => If(fix(cond), fix(ifBlock), elseBlock.map(fix(_).asInstanceOf[ElseIf]))
             case CMD(value) => instr
-            case FunctionCall(name, args) => {
+            case FunctionCall(name, args) => if ignore.contains(name) then FunctionCall(name, args.map(fix(_))) else{ 
                 val argF = args.map(fix(_))
                 try{
                     val fct = context.getFunction(name, argF, VoidType)
@@ -388,7 +390,7 @@ object Utils{
 
             case Switch(cond, cases, cv) => Switch(fix(cond), cases.map(x => SwitchCase(fix(x.expr), fix(x.instr))), cv)
     }
-    def fix(typ: Type)(implicit context: Context): Type = {
+    def fix(typ: Type)(implicit context: Context, ignore: Set[Identifier]): Type = {
         typ match
             case TupleType(sub) => TupleType(sub.map(fix(_)))
             case ArrayType(inner, size) => ArrayType(fix(inner), size)
@@ -399,7 +401,7 @@ object Utils{
             case other => other
         
     }
-    def fix(instr: Expression)(implicit context: Context): Expression = {
+    def fix(instr: Expression)(implicit context: Context, ignore: Set[Identifier]): Expression = {
         instr match
             case IntValue(value) => instr
             case FloatValue(value) => instr
@@ -415,14 +417,15 @@ object Utils{
             case PositionValue(value) => instr
             case JsonValue(content) => JsonValue(fix(content))
             case ArrayGetValue(name, index) => ArrayGetValue(fix(name), index.map(fix(_)))
-            case VariableValue(name, sel) => context.tryGetVariable(name) match
-                case Some(vari) => LinkedVariableValue(vari, sel)
-                case None => VariableValue(name, sel)
+            case VariableValue(name, sel) => if ignore.contains(name) then instr else
+                context.tryGetVariable(name) match
+                    case Some(vari) => LinkedVariableValue(vari, sel)
+                    case None => VariableValue(name, sel)
             case BinaryOperation(op, left, right) => BinaryOperation(op, fix(left), fix(right))
             case UnaryOperation(op, left) => UnaryOperation(op, fix(left))
             case TupleValue(values) => TupleValue(values.map(fix(_)))
             case FunctionCallValue(name, args, sel) => FunctionCallValue(fix(name), args.map(fix(_)), sel)
-            case ConstructorCall(name, args) => 
+            case ConstructorCall(name, args) => if ignore.contains(name) then ConstructorCall(name, args.map(fix(_))) else
                 context.getType(IdentifierType(name.toString())) match
                     case StructType(struct) => ConstructorCall(struct.fullName, args.map(fix(_)))
                     case ClassType(clazz) => ConstructorCall(clazz.fullName, args.map(fix(_)))
@@ -430,8 +433,9 @@ object Utils{
             case RangeValue(min, max) => RangeValue(fix(min), fix(max))
             case LambdaValue(args, instr) => LambdaValue(args, fix(instr))
             case lk: LinkedVariableValue => lk
+            case null => null
     }
-    def fix(json: JSONElement)(implicit context: Context): JSONElement = {
+    def fix(json: JSONElement)(implicit context: Context, ignore: Set[Identifier]): JSONElement = {
         json match{
             case JsonArray(content) => JsonArray(content.map(fix(_)))
             case JsonDictionary(map) => JsonDictionary(map.map((k,v) => (k, fix(v))))
@@ -440,14 +444,17 @@ object Utils{
             case JsonInt(value) => JsonInt(value)
             case JsonFloat(value) => JsonFloat(value)
             case JsonIdentifier(value) => {
+                if ignore.contains(Identifier.fromString(value)) then JsonIdentifier(value) else
                 context.tryGetVariable(Identifier.fromString(value)) match{
                     case Some(vari) if vari.modifiers.isLazy => toJson(vari.lazyValue)
                     case _ => JsonIdentifier(value)
                 }
             }
             case JsonCall(value, args) => {
-                val (fct, args2) = context.getFunction(value, args, JsonType)
-                JsonCall(fct.fullName, args2)
+                if ignore.contains(Identifier.fromString(value)) then JsonIdentifier(value) else{
+                    val (fct, args2) = context.getFunction(value, args.map(fix(_)), JsonType)
+                    JsonCall(fct.fullName, args2)
+                }
             }
         } 
     }
@@ -524,8 +531,8 @@ object Utils{
                     case other => throw new Exception(f"Illegal access of $other")
             }
             case LinkedFunctionValue(fct) => FuncType(fct.arguments.map(_.typ), fct.getType())
-            case DefaultValue => throw new Exception("default value has no type")
-            case NullValue => throw new Exception("null value has no type")
+            case DefaultValue => throw new Exception(f"default value has no type")
+            case NullValue => AnyType
             case VariableValue(name, sel) => {
                 val vari = context.tryGetVariable(name)
                 vari match

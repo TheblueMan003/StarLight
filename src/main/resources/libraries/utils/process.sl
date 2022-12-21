@@ -122,4 +122,9 @@ template Process{
     def @process.stop stopall(){
         stop()
     }
+
+    def onStop(){
+    }
+    def onStart(){
+    }
 }

@@ -8,6 +8,7 @@ import sl.Instruction
 import sl.LambdaValue
 import sl.VariableValue
 import sl.Compilation.Selector.Selector
+import sl.NullValue
 
 object Context{
     def getNew(name: String):Context = {
@@ -144,7 +145,7 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
         }
     }
     def getFreshLambda(argument: List[String], types: List[Type], output: Type, instr: Instruction, isLazy: Boolean = false): Function = synchronized{
-        val args = argument.zipAll(types, "_", VoidType).map((v, t) => Argument(v, t, None))
+        val args = argument.zipAll(types, "_", VoidType).filter((v, t) => t != VoidType).map((v, t) => Argument(v, t, None))
         val name = "lambda_"+getLazyCallId()
         val ctx = push(name)
         val mod = Modifier.newPrivate()
@@ -406,6 +407,7 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
                                 (getFreshLambda(args2, args.map(Utils.typeof(_)(this)), output, instr, true), args)
                             }
                             case VariableValue(name, sel) => getFunction(name, args, output, concrete)
+                            case NullValue => (null, args)
                             case other => throw new Exception(f"Illegal call of ${other} with $args")
                     }
                     else{
@@ -418,7 +420,8 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
     }
     def getFunction(identifier: Identifier, args: List[Type], output: Type, concrete: Boolean): Function = {
         if (identifier.toString().startsWith("@")) return getFunctionTags(identifier)
-        val fcts = getElementList(_.functions)(identifier)
+        val fcts2 = getElementList(_.functions)(identifier)
+        val fcts = fcts2.filter(f => !fcts2.exists(g => g.overridedFunction == f))
         if (fcts.size == 0) throw new ObjectNotFoundException(f"Unknown function: $identifier in context: $path")
         if (fcts.size == 1) return fcts.head
         val filtered = fcts.filter(fct => args.size >= fct.minArgCount && args.size <= fct.maxArgCount && (fct.isInstanceOf[ConcreteFunction] || !concrete))

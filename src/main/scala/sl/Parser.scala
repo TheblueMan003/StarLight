@@ -24,7 +24,7 @@ object Parser extends StandardTokenParsers{
                               "ticking", "loading", "predicate", "extends", "new", "const", "static", "virtual", "abstract", "override")
 
 
-  def block: Parser[Instruction] = "{" ~> rep(instruction) <~ "}" ^^ (p => InstructionBlock(p))
+  def block: Parser[Instruction] = "{" ~> repsep(instruction, opt(";")) <~ "}" ^^ (p => InstructionBlock(p))
   def assignmentOp: Parser[String] = ("=" | "+=" | "-=" | "*=" | "/=" | ":=" | "%=")
 
   def ident2: Parser[String] = rep1sep(ident, ".") ^^ { p => p.reduce(_ + "." + _) }
@@ -287,16 +287,16 @@ object Parser extends StandardTokenParsers{
         case _ => {}
       }
 
-      if subs.contains("virtual") then {mod.isVirtual = true}
-      if subs.contains("abstract") then {mod.isAbstract = true}
-      if subs.contains("override") then {mod.isOverride = true}
-      if subs.contains("lazy")     then {mod.isLazy = true}
-      if subs.contains("scoreboard")   then {mod.isEntity = true}
+      if subs.contains("virtual")   then {mod.isVirtual = true}
+      if subs.contains("abstract")  then {mod.isAbstract = true}
+      if subs.contains("override")  then {mod.isOverride = true}
+      if subs.contains("lazy")      then {mod.isLazy = true}
+      if subs.contains("scoreboard")then {mod.isEntity = true}
       if subs.contains("ticking")   then {mod.isTicking = true}
       if subs.contains("loading")   then {mod.isLoading = true}
-      if subs.contains("helper")   then {mod.isHelper = true}
-      if subs.contains("static")   then {mod.isStatic = true}
-      if subs.contains("const")   then {mod.isConst = true}
+      if subs.contains("helper")    then {mod.isHelper = true}
+      if subs.contains("static")    then {mod.isStatic = true}
+      if subs.contains("const")     then {mod.isConst = true}
       
       mod
     }
@@ -304,7 +304,7 @@ object Parser extends StandardTokenParsers{
 
   def doc: Parser[Option[String]] = opt("???"~>stringLit<~"???")
 
-  def program: Parser[Instruction] = rep(instruction) ^^ (InstructionList(_))
+  def program: Parser[Instruction] = repsep(instruction, opt(";")) ^^ (InstructionList(_))
 
   /** Print an error message, together with the position where it occured. */
   case class TypeError(t: Instruction, msg: String) extends Exception(msg) {

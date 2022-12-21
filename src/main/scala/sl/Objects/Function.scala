@@ -10,7 +10,10 @@ import sl.Compilation.Print
 object Function {
   extension (str: (Function, List[Expression])) {
     def call(ret: Variable = null, op: String = "=")(implicit context: Context) = {
-        if (str._1.hasRawJsonArg()){
+        if (str._1 == null){
+            List()
+        }
+        else if (str._1.hasRawJsonArg()){
             val prefix = str._2.take(str._1.arguments.length - 1)
             val sufix = str._2.drop(str._1.arguments.length - 1)
             val (prep, json) = Print.toRawJson(sufix)
@@ -31,6 +34,7 @@ abstract class Function(context: Context, name: String, val arguments: List[Argu
     val maxArgCount = getMaxArgCount(arguments)
     var argumentsVariables: List[Variable] = List()
     val clazz = context.getCurrentClass()
+    var overridedFunction: Function = null
 
     if (modifiers.isVirtual){
 
@@ -147,7 +151,7 @@ class ConcreteFunction(context: Context, name: String, arguments: List[Argument]
         content = content ::: cnt
     }
 
-    def exists(): Boolean = wasCompiled || Settings.allFunction
+    def exists(): Boolean = (wasCompiled || Settings.allFunction) && content.length > 0
     def getContent(): List[String] = content
     def getName(): String = Settings.target.getFunctionPath(fullName)
 

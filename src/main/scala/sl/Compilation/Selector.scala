@@ -68,6 +68,9 @@ case class BedrockSelector(val prefix: String, val filters: List[(String, Select
                     case None => List(("distance", makeLower(value)))
                     case Some(v2) => List(("distance", makeRange(value, v2._2)))
             }
+            case "m" => {
+                List(("gamemode", value))
+            }
             case "rx" => {
                 lst.find(_._1 == "rxm") match
                     case None => List(("x_rotation‌", makeLower(value)))
@@ -175,6 +178,7 @@ case class JavaSelector(val prefix: String, val filters: List[(String, SelectorF
             case "predicate" | "advancements‌" | "sort" => {
                 throw new Exception(f"$key not Supported for bedrock")
             }
+            case "gamemode" => List(("m", value))
             case _: String => List((key, value))
         }
     }

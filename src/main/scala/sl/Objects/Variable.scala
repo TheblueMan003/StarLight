@@ -167,7 +167,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 						}
 					}
 
-					val fixed = Utils.fix(value)
+					val fixed = Utils.fix(value)(context, Set())
 
 					op match{
 						case "=" => lazyValue = Utils.simplify(fixed)

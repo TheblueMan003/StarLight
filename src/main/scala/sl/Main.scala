@@ -151,6 +151,9 @@ object Main{
       if (dir.endsWith(".zip/")){
         exportOutputZip(dir.replaceAllLiterally(".zip/",".zip"), output)
       }
+      else if (dir.endsWith(".mcpack/")){
+        exportOutputZip(dir.replaceAllLiterally(".mcpack/",".mcpack"), output)
+      }
       else{
         output.foreach((path, content) =>{
           val filename = dir + path
