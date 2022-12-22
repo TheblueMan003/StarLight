@@ -1,1 +1,1 @@
-function default:game/room/player
+function default:__playertick__

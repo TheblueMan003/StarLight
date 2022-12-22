@@ -22,6 +22,23 @@ object DefaultFunction{
                         }
                     }
                 ))
+        ctx.addFunction("variableExist", CompilerFunction(ctx, "variableExist", 
+                List(Argument("class", MCObjectType, None)),
+                BoolType,
+                Modifier.newPublic(),
+                (args: List[Expression],ctx: Context) => {
+                    args match{
+                        case VariableValue(vari, sel)::Nil => {
+                            ctx.tryGetVariable(vari) match{
+                                case Some(v) => (List(), BoolValue(true))
+                                case a => (List(), BoolValue(false))
+                            }
+                        }
+                        case LinkedVariableValue(vari, sel)::Nil => (List(), BoolValue(true))
+                        case other => throw new Exception(f"Illegal Arguments $other for variableExist")
+                    }
+                }
+            ))
         ctx.addFunction("addClassTags", CompilerFunction(ctx, "addClassTags", 
                 List(Argument("class", MCObjectType, None)),
                 MCObjectType,

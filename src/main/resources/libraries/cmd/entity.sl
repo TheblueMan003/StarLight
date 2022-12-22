@@ -4,25 +4,99 @@ if (Compiler.isJava()){
     private lazy void _summon(mcobject $name, string $meta){
         /summon $name ~ ~ ~ $meta
     }
+    private lazy void _summon(mcobject $name){
+        /summon $name
+    }
+    lazy entity summon(mcobject name, json data, void=>void fct){
+        if (Compiler.variableExist(_ret)){
+            lazy string tag = Compiler.getVariableTag(_ret)
+            lazy json ndata = {Tags:[tag]}
+            ndata += data
+            lazy string nbt = Compiler.toNBT(ndata)
+            _summon(name, nbt)
+            with(_ret, true){
+                fct()
+            }
+        }
+        else{
+            entity tmp
+            lazy string tag = Compiler.getVariableTag(tmp)
+            lazy json ndata = {Tags:[tag]}
+            ndata += data
+            lazy string nbt = Compiler.toNBT(ndata)
+            _summon(name, nbt)
+            with(tmp, true){
+                fct()
+            }
+        }
+    }
     lazy entity summon(mcobject name, json data = {}){
-        lazy string tag = Compiler.getVariableTag(_ret)
-        lazy json ndata = {Tags:[tag]}
-        ndata += data
-        lazy string nbt = Compiler.toNBT(ndata)
-        _summon(name, nbt)
+        if (Compiler.variableExist(_ret)){
+            lazy string tag = Compiler.getVariableTag(_ret)
+            lazy json ndata = {Tags:[tag]}
+            ndata += data
+            lazy string nbt = Compiler.toNBT(ndata)
+            _summon(name, nbt)
+        }
+        else{
+            lazy string nbt = Compiler.toNBT(data)
+            _summon(name, nbt)
+        }
+    }
+    lazy entity summon(mcobject name, void=>void fct){
+        if (Compiler.variableExist(_ret)){
+            lazy string tag = Compiler.getVariableTag(_ret)
+            lazy json ndata = {Tags:[tag]}
+            lazy string nbt = Compiler.toNBT(ndata)
+            _summon(name, nbt)
+            with(_ret, true){
+                fct()
+            }
+        }
+        else{
+            entity tmp
+            lazy string tag = Compiler.getVariableTag(tmp)
+            lazy json ndata = {Tags:[tag]}
+            lazy string nbt = Compiler.toNBT(ndata)
+            _summon(name, nbt)
+            with(tmp, true){
+                fct()
+            }
+        }
     }
 }
 if (Compiler.isBedrock()){
-    private lazy void _summon(mcobject $name, string $tag){
+    private lazy void _summon(mcobject $name, string $tag, void=>void fct = null){
         /tag @e[tag=!object.__tagged] add object.__tagged
         /summon $name
         with(@e[tag=!object.__tagged]){
             /tag add @s $tag
+            /tag add @s object.__tagged
+            fct()
+        }
+    }
+    private lazy void _summon(mcobject $name){
+        /summon $name
+    }
+    lazy entity summon(mcobject name, void=>void fct){
+        if (Compiler.variableExist(_ret)){
+            lazy string tag = Compiler.getVariableTag(_ret)
+            _summon(name, tag, fct)
+        }
+        else{
+            entity tmp
+            lazy string tag = Compiler.getVariableTag(tmp)
+            _summon(name, tag, fct)
         }
     }
     lazy entity summon(mcobject name){
-        lazy string tag = Compiler.getVariableTag(_ret)
-        _summon(name, tag)
+        if (Compiler.variableExist(_ret)){
+            lazy string tag = Compiler.getVariableTag(_ret)
+            _summon(name, tag, null)
+        }
+        else{
+            _summon(name)
+        }
     }
 }
 

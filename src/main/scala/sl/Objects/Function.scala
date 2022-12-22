@@ -199,7 +199,7 @@ class LazyFunction(context: Context, name: String, arguments: List[Argument], ty
             val vari = Variable(sub, a.name, a.getType(), a.modifiers)
             vari.generate()(sub)
             sub.addVariable(vari).assign("=", v)
-            block = if a.name.startsWith("$") then Utils.subst(block, a.name, v.getString()) else Utils.subst(block, a.name, v)
+            block = if a.name.startsWith("$") then Utils.subst(block, a.name, v.getString()) else block
         })
 
         if (ret != null) sub.addVariable("_ret", ret)
