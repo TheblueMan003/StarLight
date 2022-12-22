@@ -38,6 +38,7 @@ object Utils{
             case ClassDecl(name, block, modifier, parent, entity) => ClassDecl(name, substReturn(block, to), modifier, parent, entity)
             case FunctionDecl(name, block, typ, args, modifier) => FunctionDecl(name, substReturn(block, to), typ, args, modifier)
             case PredicateDecl(name, args, block, modifier) => instr
+            case BlocktagDecl(name, values, modifier) => instr
             case ForGenerate(key, provider, instr) => ForGenerate(key, provider, substReturn(instr, to))
             case ForEach(key, provider, instr) => ForEach(key, provider, substReturn(instr, to))
             case EnumDecl(name, fields, values, modifier) => instr
@@ -78,6 +79,7 @@ object Utils{
             case FunctionDecl(name, block, typ, args, modifier) => FunctionDecl(name, subst(block, from, to), typ, args, modifier)
             case PredicateDecl(name, args, block, modifier) => PredicateDecl(name, args, block, modifier)
             case VariableDecl(name, _type, modifier, op, expr) => VariableDecl(name, _type, modifier, op, subst(expr, from, to))
+            case BlocktagDecl(name, values, modifier) => BlocktagDecl(name, values.map(subst(_, from, to)), modifier)
             case ForGenerate(key, provider, instr) => ForGenerate(key, subst(provider, from, to), subst(instr, from, to))
             case ForEach(key, provider, instr) => ForEach(key, subst(provider, from, to), subst(instr, from, to))
             case EnumDecl(name, fields, values, modifier) => EnumDecl(name, fields, values.map(v => EnumValue(v.name, v.fields.map(subst(_, from, to)))), modifier)
@@ -130,6 +132,7 @@ object Utils{
             case EnumIntValue(value) => instr
             case LinkedFunctionValue(fct) => instr
             case PositionValue(value) => instr
+            case TagValue(value) => instr
             case DefaultValue => DefaultValue
             case NullValue => NullValue
             case ArrayGetValue(name, index) => ArrayGetValue(subst(name, from, to), index.map(subst(_, from, to)))
@@ -169,6 +172,7 @@ object Utils{
                     PredicateDecl(name.replaceAllLiterally(from, to), args, subst(block, from, to), modifier)
                 }
             }
+            case BlocktagDecl(name, values, modifier) => BlocktagDecl(name.replaceAllLiterally(from, to), values.map(subst(_, from, to)), modifier)
             case Import(lib, value, alias) => instr
             case ForGenerate(key, provider, instr) => ForGenerate(key, subst(provider, from, to), subst(instr, from, to))
             case ForEach(key, provider, instr) => ForEach(key, subst(provider, from, to), subst(instr, from, to))
@@ -216,6 +220,7 @@ object Utils{
             case NamespacedName(value) => NamespacedName(value.replaceAllLiterally(from, to))
             case StringValue(value) => StringValue(value.replaceAllLiterally(from, to))
             case PositionValue(value) => PositionValue(value.replaceAllLiterally(from, to))
+            case TagValue(value) => TagValue(value.replaceAllLiterally(from, to))
             case RawJsonValue(value) => instr
             case EnumIntValue(value) => instr
             case LinkedFunctionValue(fct) => instr
@@ -261,6 +266,7 @@ object Utils{
                 }
             }
             case PredicateDecl(name, args, block, modifier) => instr
+            case BlocktagDecl(name, values, modifier) => BlocktagDecl(name, values.map(subst(_, from, to)), modifier)
             case Import(lib, value, alias) => instr
             case ForGenerate(key, provider, instr) => ForGenerate(key, subst(provider, from, to), subst(instr, from, to))
             case ForEach(key, provider, instr) => ForEach(key, subst(provider, from, to), subst(instr, from, to))
@@ -302,6 +308,7 @@ object Utils{
             case ClassDecl(name, block, modifier, parent, entity) => ClassDecl(name, rmFunctions(block), modifier, parent, entity)
             case FunctionDecl(name, block, typ, args, modifier) => InstructionList(List())
             case PredicateDecl(name, args, block, modifier) => instr
+            case BlocktagDecl(name, values, modifier) => instr
             case EnumDecl(name, fields, values, modifier) => EnumDecl(name, fields, values, modifier)
             case VariableDecl(name, _type, modifier, op, expr) => VariableDecl(name, _type, modifier, op, expr)
             case ForGenerate(key, provider, instr) => ForGenerate(key, provider, rmFunctions(instr))
@@ -353,6 +360,7 @@ object Utils{
             case PredicateDecl(name, args, block, modifier) => PredicateDecl(name, args, fix(block), modifier)
             case EnumDecl(name, fields, values, modifier) => EnumDecl(name, fields, values.map(v => EnumValue(v.name, v.fields.map(fix(_)))), modifier)
             case VariableDecl(name, _type, modifier, op, expr) => VariableDecl(name, fix(_type), modifier, op, fix(expr))
+            case BlocktagDecl(name, values, modifier) => BlocktagDecl(name, values.map(fix(_)), modifier)
             case ForGenerate(key, provider, instr) => ForGenerate(key, fix(provider), fix(instr))
             case ForEach(key, provider, instr) => ForEach(key, fix(provider), fix(instr))
             case Import(lib, value, alias) => instr
@@ -395,6 +403,8 @@ object Utils{
             case TupleType(sub) => TupleType(sub.map(fix(_)))
             case ArrayType(inner, size) => ArrayType(fix(inner), size)
             case RangeType(sub) => RangeType(fix(sub))
+            case IdentifierType("val") => typ
+            case IdentifierType("var") => typ
             case IdentifierType(name) => {
                 context.getType(typ)
             }
@@ -412,6 +422,7 @@ object Utils{
             case RawJsonValue(value) => instr
             case EnumIntValue(value) => instr
             case LinkedFunctionValue(fct) => instr
+            case TagValue(value) => instr
             case DefaultValue => DefaultValue
             case NullValue => NullValue
             case PositionValue(value) => instr
@@ -472,6 +483,7 @@ object Utils{
             case EnumIntValue(value) => instr
             case LinkedFunctionValue(fct) => instr
             case PositionValue(value) => instr
+            case TagValue(value) => instr
             case ArrayGetValue(name, index) => ArrayGetValue(subst(name, from, to), index.map(subst(_, from, to)))
             case DefaultValue => DefaultValue
             case NullValue => NullValue
@@ -525,6 +537,7 @@ object Utils{
             case EnumIntValue(value) => IntType
             case NamespacedName(value) => MCObjectType
             case PositionValue(value) => MCPositionType
+            case TagValue(value) => MCObjectType
             case ArrayGetValue(name, index) => {
                 typeof(name) match
                     case ArrayType(inner, size) => inner

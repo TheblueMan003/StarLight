@@ -37,6 +37,10 @@ case class FunctionDecl(val name: String, val block: Instruction, val typ: Type,
 case class TemplateDecl(val name: String, val block: Instruction, val modifier: Modifier, val parent: Option[String]) extends Instruction {
   override def toString() = f"template ${name} ${block}"
 }
+case class BlocktagDecl(val name: String, val values: List[Expression], val modifier: Modifier) extends Instruction {
+  override def toString() = f"blocktag $name"
+}
+
 case class TypeDef(val name: String, val typ: Type) extends Instruction {
   override def toString() = f"typedef ${typ} ${name}"
 }
@@ -115,8 +119,4 @@ case class With(val expr: Expression, val isat: Expression, val cond: Expression
 
 case class JSONFile(val name: String, val json: JSONElement) extends Instruction {
   override def toString() = f"jsonfile $name"
-}
-
-case class Blocktag(val name: String, val values: List[String]) extends Instruction {
-  override def toString() = f"blocktag $name"
 }

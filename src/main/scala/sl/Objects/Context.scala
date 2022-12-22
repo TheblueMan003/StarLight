@@ -28,6 +28,7 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
     private val typedefs = mutable.Map[String, Type]()
     private val jsonfiles = mutable.Map[String, JSONFile]()
     private val predicates = mutable.Map[String, List[Predicate]]()
+    private val blocktags = mutable.Map[String, Tag]()
     private val names = mutable.Set[String]()
 
     private val functionTags = mutable.Map[Identifier, TagFunction]()
@@ -694,6 +695,24 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
     }
 
 
+    def getBlockTag(identifier: Identifier): Tag = {
+        tryGetElement(_.blocktags)(identifier) match{
+            case Some(value) => value
+            case None => throw new ObjectNotFoundException(f"Unknown jsonfile: $identifier in context: $path")
+        }
+    }
+    def tryGetBlockTag(identifier: Identifier): Option[Tag] = {
+        tryGetElement(_.blocktags)(identifier)
+    }
+    def addBlockTag(blocktag: Tag): Tag = synchronized{
+        blocktags.addOne(blocktag.name, blocktag)
+        blocktag
+    }
+    def getAllBlockTag():List[Tag] = {
+        blocktags.values.toList ::: child.filter(_._2 != this).map(_._2.getAllBlockTag()).foldLeft(List[Tag]())(_.toList ::: _.toList)
+    }
+
+
 
     def addObjectFrom(name: String, alias: String, other: Context) = {
         if (name == "_"){
@@ -872,6 +891,9 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
             }
             if (name == identifier.head() && child.contains(identifier.drop().head())){
                 lst = lst ::: child(identifier.drop().head()).getElementList(mapGetter)(identifier.drop().drop(), true)
+            }
+            if (root == this && child.contains(identifier.head())){
+                lst = lst ::: child(identifier.head()).getElementList(mapGetter)(identifier, true)
             }
             lst
         }

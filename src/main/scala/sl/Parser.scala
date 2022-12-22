@@ -96,6 +96,7 @@ object Parser extends StandardTokenParsers{
       | typedef
       | foreach
       | predicate
+      | blocktag
 
   def anyKeyword: Parser[String] = lexical.reserved.map(f => f ^^ (p => p)).reduce(_ | _)
 
@@ -123,8 +124,8 @@ object Parser extends StandardTokenParsers{
   def switch: Parser[Switch] = ("switch" ~> expr <~ "{") ~ rep(switchCase) <~ "}" ^^ (p => Switch(p._1, p._2))
   def switchCase: Parser[SwitchCase] = (expr <~ "->") ~ instruction ^^ (p => SwitchCase(p._1, p._2))
 
-  def blocktag: Parser[Instruction] = doc ~ modifier ~"blocktag" ~> identLazy2 ~ "{" ~ repsep(tagentry, ",") ~"}" ^^ { case d ~ m ~ _ ~ n ~ _ ~ c ~ _ => }
-  def tagentry: Parser[String] = identLazy2 | (namespacedName ^^ {_.value})
+  def blocktag: Parser[Instruction] = doc ~ modifier ~ "blocktag" ~ identLazy2 ~ "{" ~ repsep(tagentry, ",") ~ "}" ^^ { case d ~ m ~ _ ~ n ~ _ ~ c ~ _ => BlocktagDecl(n, c, m.withDoc(d))}
+  def tagentry: Parser[Expression] = namespacedName | (identLazy2 ^^ (VariableValue(_)))
 
 
   def enumInstr: Parser[EnumDecl] = (doc ~ modifier ~ ("enum" ~> identLazy) ~ opt("("~>repsep(enumField,",")<~")") <~ "{") ~ repsep(enumValue, ",") <~ "}" ^^ 
@@ -210,6 +211,7 @@ object Parser extends StandardTokenParsers{
     | "true" ^^^ BoolValue(true)
     | "false" ^^^ BoolValue(false)
     | "null" ^^^ NullValue
+    | "#" ~> ident2 ^^ (TagValue(_))
     | namespacedName
     | stringLit2 ^^ (StringValue(_))
     | "new" ~> identLazy2 ~ ("(" ~> repsep(exprNoTuple, ",") <~ ")") ~ block ^^ { case f ~ a ~ b => ConstructorCall(f, a ::: List(LambdaValue(List(), b))) }
@@ -236,7 +238,7 @@ object Parser extends StandardTokenParsers{
   def exprIn: Parser[Expression] = exprComp ~ rep("in" ~> exprIn) ^^ {unpack("in", _)}
   def exprAnd: Parser[Expression] = exprIn ~ rep("&&" ~> exprAnd) ^^ {unpack("&&", _)}
   def exprOr: Parser[Expression] = exprAnd ~ rep("||" ~> exprOr) ^^ {unpack("||", _)}
-  def exprNoTuple = exprOr | position | lambda
+  def exprNoTuple = position | exprOr | lambda
   def expr: Parser[Expression] = rep1sep(exprNoTuple, ",") ^^ (p => if p.length == 1 then p.head else TupleValue(p))
 
   def unpack(op: String, p: (Expression ~ List[Expression])): Expression = {

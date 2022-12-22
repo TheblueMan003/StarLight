@@ -32,6 +32,7 @@ object Print{
             case BoolValue(value) => (List(), List(PrintString(f"$value", col, mod)))
             case LinkedFunctionValue(fct)=> (List(), List(PrintString(f"${fct.fullName}", col, mod)))
             case PositionValue(value) => throw new Exception("Cannot use position inside rawjson")
+            case TagValue(value) => throw new Exception("Cannot use tag inside rawjson")
             case StringValue(value) => 
                 val reg = "[a-zA-Z0-9\\.]+".r
                 reg.findFirstMatchIn(value) match

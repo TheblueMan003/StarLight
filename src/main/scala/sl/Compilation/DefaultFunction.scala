@@ -9,7 +9,7 @@ import java.util.Random
 object DefaultFunction{
     def get()(implicit context: Context) = {
         val ctx = context.root.push("Compiler")
-        ctx.addFunction("random", CompilerFunction(context, "random", 
+        ctx.addFunction("random", CompilerFunction(ctx, "random", 
                     List(),
                     IntType,
                     Modifier.newPublic(),
@@ -22,7 +22,7 @@ object DefaultFunction{
                         }
                     }
                 ))
-        ctx.addFunction("addClassTags", CompilerFunction(context, "addClassTags", 
+        ctx.addFunction("addClassTags", CompilerFunction(ctx, "addClassTags", 
                 List(Argument("class", MCObjectType, None)),
                 MCObjectType,
                 Modifier.newPublic(),
@@ -35,25 +35,25 @@ object DefaultFunction{
                     }
                 }
             ))
-        ctx.addFunction("pushUpward", CompilerFunction(context, "pushUpward", 
+        ctx.addFunction("pushUpward", CompilerFunction(ctx, "pushUpward", 
                 List(Argument("class", MCObjectType, None)),
                 VoidType,
                 Modifier.newPublic(),
                 (args: List[Expression],ctx: Context) => {
                     args match{
                         case VariableValue(vari, sel)::Nil => {
-                            context.parent.addVariable(context.getVariable(vari))
+                            ctx.parent.addVariable(ctx.getVariable(vari))
                             (List(), NullValue)
                         }
                         case LinkedVariableValue(vari, sel)::Nil =>{
-                            context.parent.addVariable(vari)
+                            ctx.parent.addVariable(vari)
                             (List(), NullValue)
                         }
                         case other => throw new Exception(f"Illegal Arguments $other for pushUpward")
                     }
                 }
             ))
-        ctx.addFunction("getObjective", CompilerFunction(context, "getObjective", 
+        ctx.addFunction("getObjective", CompilerFunction(ctx, "getObjective", 
                 List(Argument("vari", MCObjectType, None)),
                 MCObjectType,
                 Modifier.newPublic(),
@@ -66,14 +66,14 @@ object DefaultFunction{
                             (List(), NamespacedName(ctx.getVariable(vari).getSelectorObjective()))
                         }
                         case sv::Nil if sv.hasIntValue() => {
-                            context.requestConstant(sv.getIntValue())
+                            ctx.requestConstant(sv.getIntValue())
                             (List(), NamespacedName(Settings.constScoreboard))
                         }
                         case other => throw new Exception(f"Illegal Arguments $other for random")
                     }
                 }
             ))
-        ctx.addFunction("getSelector", CompilerFunction(context, "getSelector", 
+        ctx.addFunction("getSelector", CompilerFunction(ctx, "getSelector", 
             List(Argument("vari", MCObjectType, None)),
             MCObjectType,
             Modifier.newPublic(),
@@ -86,15 +86,31 @@ object DefaultFunction{
                         (List(), NamespacedName(ctx.getVariable(vari).getSelectorName()(sel)))
                     }
                     case sv::Nil if sv.hasIntValue() => {
-                        context.requestConstant(sv.getIntValue())
+                        ctx.requestConstant(sv.getIntValue())
                         (List(), NamespacedName(sv.getIntValue().toString))
                     }
-                    case other => throw new Exception(f"Illegal Arguments $other for random")
+                    case other => throw new Exception(f"Illegal Arguments $other for getSelector")
+                }
+            }
+        ))
+        ctx.addFunction("getVariableTag", CompilerFunction(ctx, "getVariableTag", 
+            List(Argument("vari", MCObjectType, None)),
+            StringType,
+            Modifier.newPublic(),
+            (args: List[Expression],ctx: Context) => {
+                args match{
+                    case LinkedVariableValue(vari, sel)::Nil => {
+                        (List(), StringValue(vari.tagName))
+                    }
+                    case VariableValue(vari, sel)::Nil => {
+                        (List(), StringValue(ctx.getVariable(vari).tagName))
+                    }
+                    case other => throw new Exception(f"Illegal Arguments $other for getVariableTag")
                 }
             }
         ))
 
-        ctx.addFunction("getProjectVersionMajor", CompilerFunction(context, "getProjectVersionMajor", 
+        ctx.addFunction("getProjectVersionMajor", CompilerFunction(ctx, "getProjectVersionMajor", 
             List(),
             IntType,
             Modifier.newPublic(),
@@ -108,7 +124,7 @@ object DefaultFunction{
             }
         ))
 
-        ctx.addFunction("getProjectVersionMinor", CompilerFunction(context, "getProjectVersionMinor", 
+        ctx.addFunction("getProjectVersionMinor", CompilerFunction(ctx, "getProjectVersionMinor", 
             List(),
             IntType,
             Modifier.newPublic(),
@@ -122,7 +138,7 @@ object DefaultFunction{
             }
         ))
 
-        ctx.addFunction("getProjectVersionPatch", CompilerFunction(context, "getProjectVersionPatch", 
+        ctx.addFunction("getProjectVersionPatch", CompilerFunction(ctx, "getProjectVersionPatch", 
             List(),
             IntType,
             Modifier.newPublic(),
@@ -136,7 +152,7 @@ object DefaultFunction{
             }
         ))
 
-        ctx.addFunction("getProjectName", CompilerFunction(context, "getProjectName", 
+        ctx.addFunction("getProjectName", CompilerFunction(ctx, "getProjectName", 
             List(),
             StringType,
             Modifier.newPublic(),
@@ -150,7 +166,7 @@ object DefaultFunction{
             }
         ))
 
-        ctx.addFunction("getJavaBlock", CompilerFunction(context, "getJavaBlock", 
+        ctx.addFunction("getJavaBlock", CompilerFunction(ctx, "getJavaBlock", 
             List(Argument("block", MCObjectType, None)),
             MCObjectType,
             Modifier.newPublic(),
@@ -164,7 +180,7 @@ object DefaultFunction{
             }
         ))
 
-        ctx.addFunction("getBedrockBlockName", CompilerFunction(context, "getBedrockBlockName", 
+        ctx.addFunction("getBedrockBlockName", CompilerFunction(ctx, "getBedrockBlockName", 
             List(Argument("block", MCObjectType, None)),
             MCObjectType,
             Modifier.newPublic(),
@@ -178,7 +194,7 @@ object DefaultFunction{
             }
         ))
 
-        ctx.addFunction("getBedrockBlockID", CompilerFunction(context, "getBedrockBlockID", 
+        ctx.addFunction("getBedrockBlockID", CompilerFunction(ctx, "getBedrockBlockID", 
             List(Argument("block", MCObjectType, None)),
             MCObjectType,
             Modifier.newPublic(),
@@ -193,7 +209,7 @@ object DefaultFunction{
         ))
 
         if (Settings.target == MCJava){
-            ctx.addFunction("cmdstore", CompilerFunction(context, "cmdstore", 
+            ctx.addFunction("cmdstore", CompilerFunction(ctx, "cmdstore", 
                     List(Argument("vari", MCObjectType, None), Argument("cmd", FuncType(List(), VoidType), None)),
                     VoidType,
                     Modifier.newPublic(),
@@ -213,7 +229,7 @@ object DefaultFunction{
                 ))
         }
         if (Settings.target == MCBedrock){
-            ctx.addFunction("random", CompilerFunction(context, "random", 
+            ctx.addFunction("random", CompilerFunction(ctx, "random", 
                     List(Argument("vari", MCObjectType, None), Argument("min", IntType, None), Argument("max", IntType, None)),
                     VoidType,
                     Modifier.newPublic(),

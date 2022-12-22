@@ -1,10 +1,22 @@
 package test
 
 import standard
+from utils.crocess import Process
 
-template Test{
-    def loading run(){
-        if (main()){
+template Test extends Process{
+    int time
+    def onStart(){
+        time = 0
+        run()
+    }
+    def main(){
+        time ++
+        if (time > getDuration()){
+            stop()
+        }
+    }
+    def onStop(){
+        if (getResult()){
             standard.print(("[PASSED] ","green"),"$this")
             /scoreboard players add __pass__ tbms.var 1
         }
@@ -13,4 +25,12 @@ template Test{
         }
     }
 
+
+    def lazy int getDuration(){
+        return 1
+    }
+    def run(){
+    }
+    def bool getResult(){
+    }
 }

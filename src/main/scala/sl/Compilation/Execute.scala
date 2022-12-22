@@ -375,17 +375,27 @@ object Execute{
                     args.map(Utils.simplify(_)) match
                         case PositionValue(pos)::NamespacedName(block)::Nil => (List(), List(IFBlock(pos+" "+block)))
                         case NamespacedName(block)::Nil => (List(), List(IFBlock("~ ~ ~ "+block)))
+                        case PositionValue(pos)::TagValue(block)::Nil => (List(), List(IFBlock(pos+" "+context.getBlockTag(block))))
+                        case TagValue(block)::Nil => (List(), List(IFBlock("~ ~ ~ "+context.getBlockTag(block))))
                         case other => throw new Exception(f"Invalid argument to block: $other")
                 }
                 else if (Settings.target == MCBedrock){
                     args.map(Utils.simplify(_)) match
                         case PositionValue(pos)::NamespacedName(block)::Nil => (List(), List(IFBlock(pos+" "+BlockConverter.getBlockName(block)+" "+BlockConverter.getBlockID(block))))
                         case NamespacedName(block)::Nil => (List(), List(IFBlock("~ ~ ~ "+BlockConverter.getBlockName(block)+" "+BlockConverter.getBlockID(block))))
+                        case PositionValue(pos)::TagValue(block)::Nil => ???
+                        case TagValue(block)::Nil => ???
                         case other => throw new Exception(f"Invalid argument to block: $other")
                 }
                 else {
                     throw new Exception(f"unsupported if block for target: ${Settings.target}")
                 }
+            }
+            case FunctionCallValue(name, args, sel) if name.toString() == "blocks" && args.length > 0 => {
+                args.map(Utils.simplify(_)) match
+                    case PositionValue(pos1)::PositionValue(pos2)::PositionValue(pos3)::StringValue(mask)::Nil => (List(), List(IFBlocks(pos1+" "+pos2+" "+pos3+" "+mask)))
+                    case PositionValue(pos1)::PositionValue(pos2)::PositionValue(pos3)::Nil => (List(), List(IFBlocks(pos1+" "+pos2+" "+pos3+" all")))
+                    case other => throw new Exception(f"Invalid argument to blocks: $other")
             }
             case FunctionCallValue(VariableValue(name, sel), args, _) => {
                 val predicate = context.tryGetPredicate(name, args.map(Utils.typeof(_)))
@@ -417,6 +427,7 @@ object Execute{
             case NamespacedName(value) => throw new Exception("Can't use if with mcobject")
             case ConstructorCall(name, args) => throw new Exception("Can't use if with constructor call")
             case PositionValue(value) => throw new Exception("Can't use if with position")
+            case TagValue(value) => throw new Exception("Can't use if with tag")
     }
 
     def switch(swit: Switch)(implicit context: Context):List[String] = {
@@ -673,6 +684,11 @@ case class IFPredicate(val value: String) extends IFCase{
 case class IFBlock(val value: String) extends IFCase{
     def get()(implicit context: Context): String = {
         f"if block $value"
+    }
+}
+case class IFBlocks(val value: String) extends IFCase{
+    def get()(implicit context: Context): String = {
+        f"if blocks $value"
     }
 }
 case object IFTrue extends IFCase{

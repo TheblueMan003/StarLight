@@ -29,6 +29,7 @@ object Compiler{
 
         context.getAllFunction().filter(_.exists()).map(fct => (fct.getName(), fct.getContent())) ::: 
             context.getAllJsonFiles().filter(_.exists()).map(fct => (fct.getName(), fct.getContent())):::
+            context.getAllBlockTag().filter(_.exists()).map(fct => (fct.getName(), fct.getContent())):::
             context.getAllPredicates().flatMap(_.getFiles()):::
             Settings.target.getExtraFiles(context)
     }
@@ -161,6 +162,10 @@ object Compiler{
                 }
                 case sl.JSONFile(name, json) => {
                     context.addJsonFile(new objects.JSONFile(context, name, Modifier.newPrivate(), Utils.compileJson(json)))
+                    List()
+                }
+                case sl.BlocktagDecl(name, value, mod) => {
+                    context.addBlockTag(new objects.Tag(context, name, Modifier.newPrivate(), value.map(Utils.fix(_)(context, Set())), objects.BlockTag))
                     List()
                 }
                 case Import(lib, value, alias) => {

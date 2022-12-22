@@ -79,10 +79,6 @@ def lazy swap(entity $a, entity $b){
 	}
 }
 
-def lazy kill(entity $a = @s){
-	/kill $a
-}
-
 def lazy despawn(entity $a = @s){
 	if(Compiler.isBedrock()){
 		/event entity $a to_death

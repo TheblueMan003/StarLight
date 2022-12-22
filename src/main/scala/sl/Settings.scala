@@ -131,7 +131,7 @@ case object MCBedrock extends Target{
                             context.getAllConstant().map(v => f"scoreboard players set c$v ${Settings.constScoreboard} $v"):::
                             context.getAllVariable().filter(_.modifiers.isEntity).map(v => f"scoreboard objectives add ${v.scoreboard} dummy"):::
                             context.getAllVariable().filter(v => !v.modifiers.isEntity && !v.modifiers.isLazy).map(v => f"scoreboard players set ${v.getSelector()} 0"):::
-                            List(f"${context.root.getPath()}/__load__")
+                            List(f"function ${context.root.getPath()}/__load__")
 
         List((f"manifest.json", List(getManifestContent())),
             (f"functions/__init__.mcfunction", dfScore),

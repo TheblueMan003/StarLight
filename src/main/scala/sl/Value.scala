@@ -100,6 +100,14 @@ case class NamespacedName(val value: String) extends Expression with SmallValue{
     override def getFloatValue(): Double = ???
     override def getString()(implicit context: Context): String = value
 }
+case class TagValue(val value: String) extends Expression with SmallValue{
+    override def toString(): String = "#"+value
+    override def getIntValue(): Int = ???
+    override def hasIntValue(): Boolean = false
+    override def hasFloatValue(): Boolean = false
+    override def getFloatValue(): Double = ???
+    override def getString()(implicit context: Context): String = "#"+value
+}
 case class VariableValue(val name: Identifier, val selector: Selector = Selector.self) extends Expression with SmallValue{
     override def toString(): String = name.toString()
     override def getIntValue(): Int = ???

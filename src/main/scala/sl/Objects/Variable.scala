@@ -652,6 +652,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 						List(f"tag ${value.getString()} add $tagName")
 					}
 					case bin: BinaryOperation => assignBinaryOperator(op, bin)
+					case FunctionCallValue(name, args, selector) => handleFunctionCall(op, name, args, selector)
 					case _ => throw new Exception(f"No cast from ${expr} to entity")
 			}
 			case "+=" | "&=" => {
@@ -681,6 +682,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					}
 					case NullValue => List()
 					case bin: BinaryOperation => assignBinaryOperator(op, bin)
+					case FunctionCallValue(name, args, selector) => handleFunctionCall(op, name, args, selector)
 					case _ => throw new Exception(f"No cast from ${expr} to entity")
 			}
 			case "-=" | "/=" => {
@@ -706,6 +708,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					}
 					case NullValue => List()
 					case bin: BinaryOperation => assignBinaryOperator(op, bin)
+					case FunctionCallValue(name, args, selector) => handleFunctionCall(op, name, args, selector)
 					case _ => throw new Exception(f"No cast from ${expr} to entity")
 			}
 			case _ => throw new Exception(f"Illegal operation with ${name}: $op")
@@ -872,6 +875,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 			case LinkedFunctionValue(fct) => false
 			case PositionValue(value) => false
 			case ArrayGetValue(name, index) => isPresentIn(name)
+			case TagValue(value) => false
 			case LambdaValue(args, instr) => false
 			case VariableValue(name1, sel) => context.tryGetVariable(name1) == Some(this) && sel == selector
 			case LinkedVariableValue(vari, sel) => vari == this && sel == selector
