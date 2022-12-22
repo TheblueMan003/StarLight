@@ -159,8 +159,10 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 								}
 							}
 							catch{
-								case ObjectNotFoundException(_) =>
+								case ObjectNotFoundException(e) =>
 									lazyValue = value
+									if (!e.contains("ret_"))
+									throw ObjectNotFoundException(e)
 									List()
 							}
 						case _ => {

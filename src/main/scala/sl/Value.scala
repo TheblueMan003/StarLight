@@ -276,7 +276,7 @@ case class JsonDictionary(val map: Map[String, JSONElement]) extends JSONElement
         "{"+map.map((k, v) => f"${Utils.stringify(k)}:${v.getString()}").reduceOption(_ +", "+ _).getOrElse("")+"}"
     }
     def getNbt(): String = {
-        "{"+map.map((k, v) => f"${Utils.stringify(k)}:${v.getNbt()}").reduceOption(_ +", "+ _).getOrElse("")+"}"
+        "{"+map.map((k, v) => f"${k}:${v.getNbt()}").reduceOption(_ +", "+ _).getOrElse("")+"}"
     }
 }
 case class JsonArray(val content: List[JSONElement]) extends JSONElement{

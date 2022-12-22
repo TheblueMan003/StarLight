@@ -109,6 +109,19 @@ object DefaultFunction{
                 }
             }
         ))
+        ctx.addFunction("toNBT", CompilerFunction(ctx, "toNBT", 
+            List(Argument("vari", MCObjectType, None)),
+            StringType,
+            Modifier.newPublic(),
+            (args: List[Expression],ctx: Context) => {
+                args match{
+                    case JsonValue(value)::Nil => {
+                        (List(), StringValue(value.getNbt()))
+                    }
+                    case other => throw new Exception(f"Illegal Arguments $other for toNBT")
+                }
+            }
+        ))
 
         ctx.addFunction("getProjectVersionMajor", CompilerFunction(ctx, "getProjectVersionMajor", 
             List(),

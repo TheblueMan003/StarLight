@@ -1,14 +1,15 @@
 package cmd.entity
 
 if (Compiler.isJava()){
-    private lazy void _summon(mcobject $name, json $meta){
+    private lazy void _summon(mcobject $name, string $meta){
         /summon $name ~ ~ ~ $meta
     }
     lazy entity summon(mcobject name, json data = {}){
-        lazy string tag = Compiler.getVariableTag(ret_)
+        lazy string tag = Compiler.getVariableTag(_ret)
         lazy json ndata = {Tags:[tag]}
         ndata += data
-        _summon(name, ndata)
+        lazy string nbt = Compiler.toNBT(ndata)
+        _summon(name, nbt)
     }
 }
 if (Compiler.isBedrock()){
@@ -20,7 +21,7 @@ if (Compiler.isBedrock()){
         }
     }
     lazy entity summon(mcobject name){
-        lazy string tag = Compiler.getVariableTag(ret_)
+        lazy string tag = Compiler.getVariableTag(_ret)
         _summon(name, tag)
     }
 }
