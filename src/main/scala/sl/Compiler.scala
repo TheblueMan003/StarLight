@@ -28,7 +28,7 @@ object Compiler{
 
 
         context.getAllFunction().filter(_.exists()).map(fct => (fct.getName(), fct.getContent())) ::: 
-            context.getAllJsonFiles().filter(_.exists()).map(fct => (fct.getName(), fct.getContent())):::
+            context.getAllJsonFiles().filter(f => f.exists() && f.isDatapack()).map(fct => (fct.getName(), fct.getContent())):::
             context.getAllBlockTag().filter(_.exists()).map(fct => (fct.getName(), fct.getContent())):::
             context.getAllPredicates().flatMap(_.getFiles()):::
             Settings.target.getExtraFiles(context)
@@ -88,7 +88,7 @@ object Compiler{
                 }
                 case PredicateDecl(name, args, block, modifier) => {
                     val fname = context.getFunctionWorkingName(name)
-                    val pred = context.addPredicate(new Predicate(context, fname, args, modifier, block))
+                    val pred = context.addPredicate(name, new Predicate(context, fname, args, modifier, block))
                     pred.generateArgument()(context)
                     List()
                 }
@@ -160,12 +160,12 @@ object Compiler{
                         }
                     }
                 }
-                case sl.JSONFile(name, json) => {
-                    context.addJsonFile(new objects.JSONFile(context, name, Modifier.newPrivate(), Utils.compileJson(json)))
+                case sl.JSONFile(name, json, mod) => {
+                    context.addJsonFile(new objects.JSONFile(context, name, mod, Utils.compileJson(json)))
                     List()
                 }
                 case sl.BlocktagDecl(name, value, mod) => {
-                    context.addBlockTag(new objects.Tag(context, name, Modifier.newPrivate(), value.map(Utils.fix(_)(context, Set())), objects.BlockTag))
+                    context.addBlockTag(new objects.Tag(context, name, mod, value.map(Utils.fix(_)(context, Set())), objects.BlockTag))
                     List()
                 }
                 case Import(lib, value, alias) => {
@@ -196,9 +196,9 @@ object Compiler{
                         val template = context.getTemplate(iden)
                         val sub = context.push(name)
 
-                        sub.inherit(template.context)
+                        sub.inherit(template.getContext())
                         sub.push("this", sub)
-                        compile(Utils.fix(template.block)(template.context, Set()), true)(sub) ::: compile(block, true)(sub)
+                        compile(Utils.fix(template.getBlock())(template.context, Set()), true)(sub) ::: compile(block, true)(sub)
                     }
                 }
 
@@ -290,7 +290,7 @@ object Compiler{
                 case swit: Switch => Execute.switch(swit)
                 case whl: WhileLoop => Execute.whileLoop(whl)
                 case whl: DoWhileLoop => Execute.doWhileLoop(whl)
-                case at: At => Execute.atInstr(at)
+                case at: Execute => Execute.executeInstr(at)
                 case wth: With => Execute.withInstr(wth)
                 case ElseIf(cond, ifBlock) => throw new Exception("Unexpected Instruction")
             }

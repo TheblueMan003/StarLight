@@ -31,15 +31,15 @@ trait Selector{
     def isPlayer: Boolean
 
     def makeRange(v1: SelectorFilterValue, v2: SelectorFilterValue): SelectorFilterValue = {
-        SelectorRange(v1.asInstanceOf[SelectorNumber].value, v2.asInstanceOf[SelectorNumber].value)
+        SelectorRange(v1, v2)
     }
 
     def makeLower(v1: SelectorFilterValue): SelectorFilterValue = {
-        SelectorLowerRange(v1.asInstanceOf[SelectorNumber].value)
+        SelectorLowerRange(v1)
     }
 
     def makeGreater(v1: SelectorFilterValue): SelectorFilterValue = {
-        SelectorGreaterRange(v1.asInstanceOf[SelectorNumber].value)
+        SelectorGreaterRange(v1)
     }
 
     def add(name: String, s: SelectorFilterValue):Selector
@@ -146,34 +146,39 @@ case class JavaSelector(val prefix: String, val filters: List[(String, SelectorF
             case "limit" => {
                 value match
                     case SelectorNumber(value) => List(("c", SelectorNumber(value)))
+                    case SelectorIdentifier(value) => List(("c", SelectorIdentifier(value)))
             }
             case "distance" => {
                 value match
                     case SelectorNumber(value) => List(("r", SelectorNumber(value)), ("rm", SelectorNumber(value)))
-                    case SelectorRange(v1, v2) => List(("r", SelectorNumber(v2)), ("rm", SelectorNumber(v1)))
-                    case SelectorGreaterRange(value) => List(("rm", SelectorNumber(value)))
-                    case SelectorLowerRange(value) => List(("r", SelectorNumber(value)))
+                    case SelectorRange(v1, v2) => List(("r", v2), ("rm", v1))
+                    case SelectorGreaterRange(value) => List(("rm", value))
+                    case SelectorLowerRange(value) => List(("r", value))
+                    case SelectorIdentifier(value) => List(("r", SelectorIdentifier(value)), ("rm", SelectorIdentifier(value)))
             }
             case "rotation_x" => {
                 value match
                     case SelectorNumber(value) => List(("rx", SelectorNumber(value)), ("rxm", SelectorNumber(value)))
-                    case SelectorRange(v1, v2) => List(("rx", SelectorNumber(v2)), ("rxm", SelectorNumber(v1)))
-                    case SelectorGreaterRange(value) => List(("rxm", SelectorNumber(value)))
-                    case SelectorLowerRange(value) => List(("rx", SelectorNumber(value)))
+                    case SelectorRange(v1, v2) => List(("rx", v2), ("rxm", v1))
+                    case SelectorGreaterRange(value) => List(("rxm", value))
+                    case SelectorLowerRange(value) => List(("rx", value))
+                    case SelectorIdentifier(value) => List(("rx", SelectorIdentifier(value)), ("rxm", SelectorIdentifier(value)))
             }
             case "rotation_y" => {
                 value match
                     case SelectorNumber(value) => List(("ry", SelectorNumber(value)), ("rym", SelectorNumber(value)))
-                    case SelectorRange(v1, v2) => List(("ry", SelectorNumber(v2)), ("rym", SelectorNumber(v1)))
-                    case SelectorGreaterRange(value) => List(("rym", SelectorNumber(value)))
-                    case SelectorLowerRange(value) => List(("ry", SelectorNumber(value)))
+                    case SelectorRange(v1, v2) => List(("ry", v2), ("rym", v1))
+                    case SelectorGreaterRange(value) => List(("rym", value))
+                    case SelectorLowerRange(value) => List(("ry", value))
+                    case SelectorIdentifier(value) => List(("ry", SelectorIdentifier(value)), ("rym", SelectorIdentifier(value)))
             }
             case "level" => {
                 value match
                     case SelectorNumber(value) => List(("l", SelectorNumber(value)), ("lm", SelectorNumber(value)))
-                    case SelectorRange(v1, v2) => List(("l", SelectorNumber(v2)), ("lm", SelectorNumber(v1)))
-                    case SelectorGreaterRange(value) => List(("lm", SelectorNumber(value)))
-                    case SelectorLowerRange(value) => List(("l", SelectorNumber(value)))
+                    case SelectorRange(v1, v2) => List(("l", v2), ("lm", v1))
+                    case SelectorGreaterRange(value) => List(("lm", value))
+                    case SelectorLowerRange(value) => List(("l", value))
+                    case SelectorIdentifier(value) => List(("l", SelectorIdentifier(value)), ("lm", SelectorIdentifier(value)))
             }
             case "predicate" | "advancements‌" | "sort" => {
                 throw new Exception(f"$key not Supported for bedrock")
@@ -201,14 +206,14 @@ case class JavaSelector(val prefix: String, val filters: List[(String, SelectorF
 trait SelectorFilterValue{
     def getString()(implicit context: Context): String
 }
-case class SelectorRange(val min: Double, val max: Double) extends SelectorFilterValue{
-    override def getString()(implicit context: Context): String = f"$min..$max"
+case class SelectorRange(val min: SelectorFilterValue, val max: SelectorFilterValue) extends SelectorFilterValue{
+    override def getString()(implicit context: Context): String = f"${min.getString()}..${max.getString()}"
 }
-case class SelectorLowerRange(val max: Double) extends SelectorFilterValue{
-    override def getString()(implicit context: Context): String = f"..$max"
+case class SelectorLowerRange(val max: SelectorFilterValue) extends SelectorFilterValue{
+    override def getString()(implicit context: Context): String = f"..${max.getString()}"
 }
-case class SelectorGreaterRange(val min: Double) extends SelectorFilterValue{
-    override def getString()(implicit context: Context): String = f"$min.."
+case class SelectorGreaterRange(val min: SelectorFilterValue) extends SelectorFilterValue{
+    override def getString()(implicit context: Context): String = f"${min.getString()}.."
 }
 case class SelectorNumber(val value: Double) extends SelectorFilterValue{
     override def getString()(implicit context: Context): String = 
@@ -240,4 +245,8 @@ case class SelectorNbt(val value: JSONElement) extends SelectorFilterValue{
 
 case class SelectorInvert(val value: SelectorFilterValue) extends SelectorFilterValue{
     override def getString()(implicit context: Context): String = f"!${value.getString()}"
+}
+
+case class SelectorComposed(val value: Map[String, SelectorFilterValue]) extends SelectorFilterValue{
+    override def getString()(implicit context: Context): String = "{" + value.map((k,v) => f"$k=${v.getString()}").reduce(_ +", "+_) + "}"
 }

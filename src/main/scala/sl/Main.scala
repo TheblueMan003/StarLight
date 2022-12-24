@@ -4,8 +4,11 @@ import java.io.File
 import java.io._
 import scala.collection.parallel.CollectionConverters._
 import objects.Context
+import objects.JSONFile
 import java.time.LocalDateTime
 import java.time.temporal.ChronoUnit
+import sl.files.*
+
 object Main{
   def main(args: Array[String]): Unit = {
     if (args.length == 0){
@@ -74,11 +77,11 @@ object Main{
     val p = getArg(args, "-p")
     val directory = if p == "default" then "." else p
     
-    ConfigLoader.newProjectPath.map(name => createDirectory(directory+"/"+ name))
+    ConfigLoader.newProjectPath.map(name => FileUtils.createDirectory(directory+"/"+ name))
     
-    safeWriteFile(directory+"/java.slconf", ConfigLoader.get("java", name))
-    safeWriteFile(directory+"/bedrock.slconf", ConfigLoader.get("bedrock", name))
-    safeWriteFile(directory+"/src/main.sl", List("package main", "","def ticking main(){","","}"))
+    FileUtils.safeWriteFile(directory+"/java.slconf", ConfigLoader.get("java", name))
+    FileUtils.safeWriteFile(directory+"/bedrock.slconf", ConfigLoader.get("bedrock", name))
+    FileUtils.safeWriteFile(directory+"/src/main.sl", List("package main", "","def ticking main(){","","}"))
     ConfigLoader.saveProject(directory+"/")
   }
   def build(args: String): Unit = {
@@ -104,7 +107,7 @@ object Main{
       compile(List("./src"), List())
     }else null
     ConfigLoader.saveProject()
-    safeWriteFile(prefix+".html", List(DocMaker.make(context, prefix)))
+    FileUtils.safeWriteFile(prefix+".html", List(DocMaker.make(context, prefix)))
   }
   def compile(args: Array[String]): Unit = {
     if (hasArg(args, "-bedrock")) Settings.target= MCBedrock
@@ -112,11 +115,11 @@ object Main{
   }
   def compile(inputs: List[String], outputs: List[String]): Context = {
     val start = LocalDateTime.now()
-    var files = getFiles(inputs)
+    var files = FileUtils.getFiles(inputs)
 
     var tokenized = files.par.map((f, c) => Parser.parse(f, c)).toList
 
-    if (tokenized.contains(None)) return null;
+    if (tokenized.contains(None)) throw new Exception("Failled to Parse")
     val context = ContextBuilder.build(Settings.name, InstructionList(tokenized.map(_.get)))
     var output = Compiler.compile(context)
 
@@ -131,7 +134,17 @@ object Main{
       if (!path.endsWith("/") && !path.endsWith("\\"))then path + "/" else path
     ).toList
 
-    exportOutput(outputPath, output)
+    DataPackBuilder.build(outputPath, output)
+    if (Settings.target == MCJava){
+        Settings.java_resourcepack_output.map(path => 
+          if (!path.endsWith("/") && !path.endsWith("\\"))then path + "/" else path
+        ).foreach(f => ResourcePackBuilder.build("java_resourcepack", f, context.getAllJsonFiles().filter(_.isJavaRP())))
+    }
+    if (Settings.target == MCBedrock){
+        Settings.bedrock_resourcepack_output.map(path => 
+          if (!path.endsWith("/") && !path.endsWith("\\"))then path + "/" else path
+        ).foreach(f => ResourcePackBuilder.build("bedrock_resourcepack", f, context.getAllJsonFiles().filter(_.isBedrockRP())))
+    }
 
     val time2 = ChronoUnit.MILLIS.between(exportStart, LocalDateTime.now())
     Reporter.info(f"Total export Time: ${time2}ms")
@@ -141,78 +154,6 @@ object Main{
 
     context
   }
-
-  /**
-   * Export Output to directory
-   */
-  def exportOutput(dirs: List[String], output: List[(String, List[String])]):Unit={
-    dirs.foreach(deleteDirectory(_))
-    dirs.foreach(dir => {
-      if (dir.endsWith(".zip/")){
-        exportOutputZip(dir.replaceAllLiterally(".zip/",".zip"), output)
-      }
-      else if (dir.endsWith(".mcpack/")){
-        exportOutputZip(dir.replaceAllLiterally(".mcpack/",".mcpack"), output)
-      }
-      else{
-        output.foreach((path, content) =>{
-          val filename = dir + path
-          safeWriteFile(filename, content)
-        })
-      }})
-  }
-
-  def exportOutputZip(out: String, files: List[(String, List[String])]) = {
-    import java.io.{ BufferedInputStream, FileInputStream, FileOutputStream }
-    import java.util.zip.{ ZipEntry, ZipOutputStream }
-
-    val zip = new ZipOutputStream(new FileOutputStream(out))
-    val writer = new PrintWriter(zip)
-    files.foreach { (name, content) =>
-      zip.putNextEntry(new ZipEntry(if name.startsWith("/") then name.drop(1) else name))
-      content.foreach(x => writer.println(x))
-      writer.flush()
-      zip.closeEntry()
-    }
-    zip.close()
-  }
-
-  def safeWriteFile(filename: String, content: List[String]):Unit = {
-    val file = new File(filename)
-    try{
-      val directory = new File(file.getParent())
-
-      // Create Directory
-      if (!directory.exists()){
-          directory.mkdirs()
-      }
-    }catch{
-      case _ => {}
-    }
-
-    // Write all files
-    val out = new PrintWriter(file, "UTF-8")
-    content.foreach(out.println(_))
-    out.close()
-  }
-
-  def createDirectory(filename: String):Unit = {
-    val directory = new File(filename)
-
-    // Create Directory
-    if (!directory.exists()){
-        directory.mkdirs()
-    }
-  }
-
-  def deleteDirectory(dir: String): Boolean = deleteDirectory(new File(dir))
-  def deleteDirectory(directoryToBeDeleted: File):Boolean= {
-        val allContents = directoryToBeDeleted.listFiles()
-        if (allContents != null) {
-            allContents.foreach(f => deleteDirectory(f))
-        }
-        directoryToBeDeleted.delete()
-    }
 
   // Return CMD arg
   def hasArg(args: Array[String], param: String): Boolean ={
@@ -254,18 +195,4 @@ object Main{
     }
     lst
   }
-  def getFiles(paths: List[String]): List[(String, String)] = {
-    paths.flatMap(path => getListOfFiles(path)).map(p => (p,Utils.getFile(p)))
-  }
-  def getListOfFiles(dir: String):List[String] = {
-    val d = new File(dir)
-    if (d.exists && d.isDirectory) {
-        d.listFiles.filter(_.isFile).map(_.getPath()).toList
-    } else if (d.isFile()) {
-        List[String](d.getPath())
-    }
-    else{
-        List()
-    }
-    }
 }

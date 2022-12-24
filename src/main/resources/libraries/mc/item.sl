@@ -49,7 +49,7 @@ template Item{
                 "components":_component
             }
         }
-        json animation_controllers.this{
+        jsonfile animation_controllers.this{
             "format_version": "1.10.0",
             "animation_controllers": {
                 "controller.animation.$this": {

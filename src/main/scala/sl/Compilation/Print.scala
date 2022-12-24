@@ -192,10 +192,10 @@ case class PrintTranslate(val key: String, val rjv: RawJsonValue, val color: Pri
     def toJava()(implicit ctx: Context): String = {
         val RawJsonValue(lst) = rjv
         if (lst.size > 0){
-            f"{\"translate\":\"${key}\", \"with\":\"${rjv.getString()}\", ${modifier.toJava()}, ${color.toJava()}}"
+            f"{\"translate\":\"${key}\", \"with\":\"${rjv.getString()}\"}"
         }
         else{
-            f"{\"translate\":\"${key}\", ${modifier.toJava()}, ${color.toJava()}}"
+            f"{\"translate\":\"${key}\"}"
         }
     }
     def toBedrock()(implicit ctx: Context): String = {

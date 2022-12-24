@@ -105,7 +105,8 @@ object IntType extends Type{
         other match
             case IntType => 0
             case FloatType => 1
-            case AnyType => 2
+            case EnumType(enm) => 2
+            case AnyType => 3
             case MCObjectType => 10
             case _ => outOfBound
     }
@@ -113,6 +114,7 @@ object IntType extends Type{
         other match
             case IntType => true
             case FloatType => true
+            case EnumType(enm) => true
             case AnyType => true
             case MCObjectType => true
             case _ => false

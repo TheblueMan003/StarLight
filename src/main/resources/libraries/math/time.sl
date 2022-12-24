@@ -17,40 +17,40 @@ struct Time{
     def __init__(int h, int m, int s, int t){
         tick = ((h*60+m)*60+s)*20+t
     }
-    lazy __add__(int i){
+    def lazy __add__(int i){
         tick+=i
     }
-    lazy __add__(Time other){
+    def lazy __add__(Time other){
         tick += other.tick
     }
-    lazy __sub__(int i){
+    def lazy __sub__(int i){
         tick-=i
     }
-    lazy __sub__(Time other){
+    def lazy __sub__(Time other){
         tick -= other.tick
     }
-    lazy __set__(int i){
+    def lazy __set__(int i){
         tick = i
     }
-    lazy __set__(Time other){
+    def lazy __set__(Time other){
         tick = other.tick
     }
-    lazy __mult__(int i){
+    def lazy __mult__(int i){
         tick*=i
     }
-    lazy __mult__(Time other){
+    def lazy __mult__(Time other){
         tick*=other.tick
     }
-    lazy __div__(int i){
+    def lazy __div__(int i){
         tick/=i
     }
-    lazy __div__(Time other){
+    def lazy __div__(Time other){
         tick/=other.tick
     }
-    lazy __mod__(int i){
+    def lazy __mod__(int i){
         tick%=i
     }
-    lazy __mod__(Time other){
+    def lazy __mod__(Time other){
         tick%=other.tick
     }
     lazy bool __smaller__(int i){

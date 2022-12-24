@@ -43,7 +43,7 @@ object Utils{
             case ForEach(key, provider, instr) => ForEach(key, provider, substReturn(instr, to))
             case EnumDecl(name, fields, values, modifier) => instr
             case VariableDecl(name, _type, modifier, op, expr) => instr
-            case JSONFile(name, json) => instr
+            case JSONFile(name, json, mod) => instr
             case Import(lib, value, alias) => instr
             
             case InstructionList(list) => InstructionList(list.map(substReturn(_, to)))
@@ -64,7 +64,7 @@ object Utils{
             case WhileLoop(cond, instr) => WhileLoop(cond, substReturn(instr, to))
             case DoWhileLoop(cond, instr) => DoWhileLoop(cond, substReturn(instr, to))
 
-            case At(expr, block) => At(expr, substReturn(block, to))
+            case Execute(typ, expr, block) => Execute(typ, expr, substReturn(block, to))
             case With(expr, isAt, cond, block) => With(expr, isAt, cond, substReturn(block, to))
 
             case Switch(cond, cases, cv) => Switch(cond, cases.map(x => SwitchCase(x.expr, substReturn(x.instr, to))), cv)
@@ -83,7 +83,7 @@ object Utils{
             case ForGenerate(key, provider, instr) => ForGenerate(key, subst(provider, from, to), subst(instr, from, to))
             case ForEach(key, provider, instr) => ForEach(key, subst(provider, from, to), subst(instr, from, to))
             case EnumDecl(name, fields, values, modifier) => EnumDecl(name, fields, values.map(v => EnumValue(v.name, v.fields.map(subst(_, from, to)))), modifier)
-            case JSONFile(name, json) => instr
+            case JSONFile(name, json, mod) => instr
             case Import(lib, value, alias) => instr
             
             case InstructionList(list) => InstructionList(list.map(subst(_, from, to)))
@@ -108,7 +108,7 @@ object Utils{
             case WhileLoop(cond, instr) => WhileLoop(subst(cond, from, to), subst(instr, from, to))
             case DoWhileLoop(cond, instr) => DoWhileLoop(subst(cond, from, to), subst(instr, from, to))
 
-            case At(expr, block) => At(subst(expr, from, to), subst(block, from, to))
+            case Execute(typ, expr, block) => Execute(typ, expr.map(subst(_, from, to)), subst(block, from, to))
             case With(expr, isAt, cond, block) => With(subst(expr, from, to), subst(isAt, from, to), subst(cond, from, to), subst(block, from, to))
 
             case Switch(cond, cases, cv) => Switch(subst(cond, from, to), cases.map(x => SwitchCase(subst(x.expr, from, to), subst(x.instr, from, to))), cv)
@@ -178,7 +178,7 @@ object Utils{
             case ForEach(key, provider, instr) => ForEach(key, subst(provider, from, to), subst(instr, from, to))
             case EnumDecl(name, fields, values, modifier) => EnumDecl(name.replaceAllLiterally(from, to), fields, values.map(v => EnumValue(v.name.replaceAllLiterally(from, to), v.fields.map(subst(_, from, to)))), modifier)
             case VariableDecl(name, _type, modifier, op, expr) => VariableDecl(name.map(_.replaceAllLiterally(from, to)), _type, modifier, op, subst(expr, from, to))
-            case JSONFile(name, json) => JSONFile(name.replaceAllLiterally(from, to), subst(json, from, to))
+            case JSONFile(name, json, mod) => JSONFile(name.replaceAllLiterally(from, to), subst(json, from, to), mod)
 
             case InstructionList(list) => InstructionList(list.map(subst(_, from, to)))
             case InstructionBlock(list) => InstructionBlock(list.map(subst(_, from, to)))
@@ -200,7 +200,7 @@ object Utils{
             case WhileLoop(cond, instr) => WhileLoop(subst(cond, from, to), subst(instr, from, to))
             case DoWhileLoop(cond, instr) => DoWhileLoop(subst(cond, from, to), subst(instr, from, to))
 
-            case At(expr, block) => At(subst(expr, from, to), subst(block, from, to))
+            case Execute(typ, expr, block) => Execute(typ, expr.map(subst(_, from, to)), subst(block, from, to))
             case With(expr, isAt, cond, block) => With(subst(expr, from, to), subst(isAt, from, to), subst(cond, from, to), subst(block, from, to))
 
             case Switch(cond, cases, cv) => Switch(subst(cond, from, to), cases.map(x => SwitchCase(subst(x.expr, from, to), subst(x.instr, from, to))), cv)
@@ -293,9 +293,9 @@ object Utils{
             case Return(value) => Return(subst(value, from, to))
             case WhileLoop(cond, instr) => WhileLoop(subst(cond, from, to), subst(instr, from, to))
             case DoWhileLoop(cond, instr) => DoWhileLoop(subst(cond, from, to), subst(instr, from, to))
-            case JSONFile(name, json) => instr
+            case JSONFile(name, json, mod) => instr
 
-            case At(expr, block) => At(subst(expr, from, to), subst(block, from, to))
+            case Execute(typ, expr, block) => Execute(typ, expr.map(subst(_, from, to)), subst(block, from, to))
             case With(expr, isAt, cond, block) => With(subst(expr, from, to), subst(isAt, from, to), subst(cond, from, to), subst(block, from, to))
 
             case Switch(cond, cases, cv) => Switch(subst(cond, from, to), cases.map(x => SwitchCase(subst(x.expr, from, to), subst(x.instr, from, to))), cv)
@@ -332,9 +332,9 @@ object Utils{
             case Return(value) => instr
             case WhileLoop(cond, instr) => WhileLoop(cond, rmFunctions(instr))
             case DoWhileLoop(cond, instr) => DoWhileLoop(cond, rmFunctions(instr))
-            case JSONFile(name, json) => instr
+            case JSONFile(name, json, mod) => instr
 
-            case At(expr, block) => At(expr, rmFunctions(block))
+            case Execute(typ, expr, block) => Execute(typ, expr, rmFunctions(block))
             case With(expr, isAt, cond, block) => With(expr, isAt, cond, rmFunctions(block))
 
             case Switch(cond, cases, cv) => Switch(cond, cases.map(x => SwitchCase(x.expr, rmFunctions(x.instr))), cv)
@@ -351,6 +351,14 @@ object Utils{
             case Right(vari) => Right(vari)
     }
 
+    def getFreeVar(instr: Instruction): Set[Identifier]= {
+        instr match
+            case VariableDecl(name, _type, modifier, op, expr) => name.map(Identifier.fromString(_)).toSet
+            case InstructionList(list) => list.flatMap(getFreeVar(_)).toSet
+            case InstructionBlock(list) => list.flatMap(getFreeVar(_)).toSet
+            case _ => Set()
+    }
+
     def fix(instr: Instruction)(implicit context: Context, ignore: Set[Identifier]): Instruction = {
         instr match
             case Package(name, block) => Package(name, fix(block))
@@ -365,8 +373,14 @@ object Utils{
             case ForEach(key, provider, instr) => ForEach(key, fix(provider), fix(instr))
             case Import(lib, value, alias) => instr
 
-            case InstructionList(list) => InstructionList(list.map(fix(_)))
-            case InstructionBlock(list) => InstructionBlock(list.map(fix(_)))
+            case InstructionList(list) => {
+                val set2 = getFreeVar(instr) ++ ignore
+                InstructionList(list.map(fix(_)(context, set2)))
+            }
+            case InstructionBlock(list) => {
+                val set2 = getFreeVar(instr) ++ ignore
+                InstructionList(list.map(fix(_)(context, set2)))
+            }
 
             case TemplateDecl(name, block, modifier, parent) => TemplateDecl(name, fix(block), modifier, parent)
             case TemplateUse(iden, name, instr) => TemplateUse(iden, name, fix(instr))
@@ -391,9 +405,9 @@ object Utils{
             case Return(value) => Return(fix(value))
             case WhileLoop(cond, instr) => WhileLoop(fix(cond), fix(instr))
             case DoWhileLoop(cond, instr) => DoWhileLoop(fix(cond), fix(instr))
-            case JSONFile(name, json) => instr
+            case JSONFile(name, json, mod) => instr
 
-            case At(expr, block) => At(fix(expr), fix(block))
+            case Execute(typ, expr, block) => Execute(typ, expr.map(fix(_)), fix(block))
             case With(expr, isAt, cond, block) => With(fix(expr), fix(isAt), fix(cond), fix(block))
 
             case Switch(cond, cases, cv) => Switch(fix(cond), cases.map(x => SwitchCase(fix(x.expr), fix(x.instr))), cv)
@@ -877,7 +891,7 @@ object Utils{
             case _ => throw new Exception(f"Unknown generator: $provider")
     }
     def getSelector(expr: Expression)(implicit context: Context): (List[String],Selector) = {
-        expr match
+        Utils.simplify(expr) match
             case VariableValue(name, sel) => {
                 context.tryGetClass(name) match
                     case None => getSelector(context.resolveVariable(expr))

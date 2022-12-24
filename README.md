@@ -8,19 +8,17 @@ Here are some notion used in this ReadMe:
 `value*` repeated value (usually splitted by a commat)
 
 # How to use
-java -jar <file>
-## compile arguments
-- help: Show the list of available command
-- new: Create a new project in the current directory
-- build: Compile & Generate the packs
-
-## new arguments
--p <path>: path where to place the project
-
--n <top level name>: Namespace name for the datapack
+Use the following command in a cmd prompt or a terminal to open the compiler:
+`java -jar <file>`
+## Command
+Once the compiler is open you will have access to the following command.
+- `help`: Show the list of available command
+- `new`: Create a new project in the current directory
+- `build <path_to/build.slconf>`: Compile & Generate the packs. By default, `build java` build a Java Datapack & `build bedrock` build a bedrock Behaviorpack
 
 ## build arguments
-java -jar build <path_to/build.slconf>
+An alternative is to use the following command:
+`java -jar <jarfile> build <path_to/build.slconf>`
 
 # Feature
 ## Variables
@@ -403,6 +401,16 @@ jsonfile advancements.name{
     <json content>
 }
 ```
+### Attributes
+Attributes can be added to jsonfile to specify thing to the compiler.
+```
+[java_rp=true] jsonfile models.block.stone{
+
+}
+```
+Here is a list of used attributes by the compiler:
+- `java_rp`: (bool) Add the file to the Java Resources Pack
+- `bedrock_rp`: (bool) Add the file to the Bedrock Resources Pack
 
 ## Predicate (JAVA Only)
 Predicate can be defined like function but with a json body.

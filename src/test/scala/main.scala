@@ -11,6 +11,8 @@ import scala.collection.mutable
 import java.io.BufferedInputStream
 import java.time.temporal.ChronoUnit
 import java.io.PrintStream
+import sl.files.ConfigFiles
+import sl.files.FileUtils
 
 class ListFunSuite extends AnyFlatSpec with should.Matchers with BeforeAndAfterAll {
     var server: Process = null
@@ -21,7 +23,7 @@ class ListFunSuite extends AnyFlatSpec with should.Matchers with BeforeAndAfterA
     var output: PrintStream = null
 
     val testFiles: List[(String, Int)] = List()
-    val compileTests: List[String] = List("comparaison.sl", "math.sl", "enum.sl")
+    val compileTests: List[String] = FileUtils.getListOfFiles("./src/main/resources/libraries").filterNot(_.contains("__init__.sl")) ::: FileUtils.getListOfFiles("./src/test/resources/").filterNot(_.contains("__init__.sl"))
 
 
     override def beforeAll() = {
@@ -86,7 +88,7 @@ class ListFunSuite extends AnyFlatSpec with should.Matchers with BeforeAndAfterA
     compileTests.foreach(f => {
         deleteDirectory(new File("./test_env/world/datapacks/test"))
         f should "compile" in {
-            sl.Main.main(Array("compile", "-i", "./src/test/resources/"+f, "-o", "./test_env/world/datapacks/test/"))
+            sl.Main.main(Array("compile", "-i", f, "-o", "./test_env/world/datapacks/test/"))
         }
     })
 

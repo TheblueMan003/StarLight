@@ -3,10 +3,7 @@ package cmd.sound
 """
 Play the sound `sound` to `selector` with `volume` and `pitch` on channel `loc`
 """
-def lazy play(entity $selector mcobject $sound, int $volume, int $pitch, mcobject $loc){
-    require $pitch <= 2 "pitch must be in [0,2]"
-    require $pitch >= 0 "pitch must be in [0,2]"
-    require $volume >= 0 "volume must be in [0,+inf["
+def lazy play(entity $selector, mcobject $sound, int $volume, int $pitch, mcobject $loc){
     if (Compiler.isJava()){
         /playsound $sound $loc $selector ~ ~ ~ $volume pitch
     }

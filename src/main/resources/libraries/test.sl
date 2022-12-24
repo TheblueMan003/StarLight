@@ -1,7 +1,7 @@
 package test
 
 import standard
-from utils.crocess import Process
+from utils.process import Process
 
 template Test extends Process{
     int time

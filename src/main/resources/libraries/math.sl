@@ -1,6 +1,5 @@
 package math
 
-
 val pi = 3.1415
 val e = 2.718
 

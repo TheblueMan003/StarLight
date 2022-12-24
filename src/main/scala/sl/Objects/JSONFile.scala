@@ -9,5 +9,9 @@ class JSONFile(context: Context, _name: String, _modifier: Modifier, _json: JSON
 
     def exists(): Boolean = true
     def getContent(): List[String] = List(json.getString()(Context.getNew("")))
-    def getName(): String = Settings.target.getJsonPath(name)
+    def getName(): String = if isDatapack() then Settings.target.getJsonPath(name) else Settings.target.getRPJsonPath(name)
+
+    def isDatapack(): Boolean = !modifiers.hasAttributes("bedrock_rp")(context) && !modifiers.hasAttributes("java_rp")(context)
+    def isBedrockRP(): Boolean = modifiers.hasAttributes("bedrock_rp")(context)
+    def isJavaRP(): Boolean = modifiers.hasAttributes("java_rp")(context)
 }

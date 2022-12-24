@@ -142,6 +142,7 @@ class ConcreteFunction(context: Context, name: String, arguments: List[Argument]
     def compile():Unit={
         val suf = sl.Compiler.compile(body)(context.push(name, this))
         content = content ::: suf
+        wasCompiled = true
     }
 
     def addMuxCleanUp(cnt: List[String]): Unit = {
@@ -176,7 +177,7 @@ class ConcreteFunction(context: Context, name: String, arguments: List[Argument]
 class BlockFunction(context: Context, name: String, arguments: List[Argument], var body: List[String]) extends Function(context, name, arguments, VoidType, Modifier.newPrivate()){
     def call(args2: List[Expression], ret: Variable = null, op: String = "=")(implicit ctx: Context): List[String] = {
         argMap(args2).flatMap(p => p._1.assign("=", p._2)) :::
-            List("function " + fullName.replaceAllLiterally(".","/"))
+            List("function " + Settings.target.getFunctionName(fullName))
     }
 
     def exists(): Boolean = true

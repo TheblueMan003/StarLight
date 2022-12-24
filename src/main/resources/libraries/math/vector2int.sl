@@ -51,7 +51,7 @@ struct Vector2Int{
     """
     Compute the scalar product with other
     """
-    def scalarProd(Vector2Int other):int{
+    int scalarProd(Vector2Int other){
         int output = 0
         output += this.x * this.x
         output += this.y * this.y

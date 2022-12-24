@@ -70,8 +70,8 @@ if (Compiler.isBedrock()){
         /tag @e[tag=!object.__tagged] add object.__tagged
         /summon $name
         with(@e[tag=!object.__tagged]){
-            /tag add @s $tag
-            /tag add @s object.__tagged
+            /tag @s add $tag
+            /tag @s add object.__tagged
             fct()
         }
     }

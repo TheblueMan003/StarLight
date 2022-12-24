@@ -1,5 +1,7 @@
 package sl
 
+import sl.files.FileUtils
+
 object ConfigLoader{
     val newProjectPath = List(
         "java_resourcepack/assets/minecraft/textures/block",
@@ -33,6 +35,7 @@ object ConfigLoader{
             if (splitted.length == 2){
                 (splitted(0), splitted(1)) match{
                     case ("name", name)                => Settings.outputName = name
+                    case ("namespace", name)           => Settings.name = name
                     case ("target", "bedrock")         => Settings.target = MCBedrock
                     case ("target", "java")            => Settings.target = MCJava
                     case ("scoreboard.variable", name) => Settings.variableScoreboard = name
@@ -76,6 +79,7 @@ object ConfigLoader{
     def get(target: String, name: String):List[String] = {
         List(
             f"name=$name",
+            f"namespace=${name.toLowerCase().replaceAllLiterally("[^a-zA-Z0-9]", "_")}",
             f"target=$target",
             f"scoreboard.variable=${Settings.variableScoreboard}",
             f"scoreboard.value=${Settings.valueScoreboard}",
@@ -126,7 +130,7 @@ object ConfigLoader{
         val content = List(
             f"version=${engine(Settings.version)}"
         )
-        Main.safeWriteFile(path+"project.slproject", content)
+        FileUtils.safeWriteFile(path+"project.slproject", content)
     }
 
     def engine(lst: List[Int]):String={

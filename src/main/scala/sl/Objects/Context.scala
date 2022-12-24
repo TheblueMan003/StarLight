@@ -15,7 +15,7 @@ object Context{
         new Context(name)
     }
 }
-class Context(name: String, val parent: Context = null, _root: Context = null) {
+class Context(val name: String, val parent: Context = null, _root: Context = null) {
     private lazy val path: String = if (parent == null){name}else{parent.path+"."+name}
     
     private val variables = mutable.Map[String, Variable]()
@@ -462,6 +462,7 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
         )
     }
     def addFunction(name: String, function: Function): Function = synchronized{
+
         if (!functions.contains(name)){
             functions.addOne(name, List())
         }
@@ -578,7 +579,7 @@ class Context(name: String, val parent: Context = null, _root: Context = null) {
         if (ret.length >= 1) return Some(ret.head)
         return None
     }
-    def addPredicate(predicate: Predicate): Predicate = synchronized{
+    def addPredicate(name: String, predicate: Predicate): Predicate = synchronized{
         if (!predicates.contains(name)){
             predicates.addOne(name, List())
         }

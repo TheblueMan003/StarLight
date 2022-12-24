@@ -110,13 +110,19 @@ case class InstructionList(val list: List[Instruction]) extends Instruction {
 case class InstructionBlock(val list: List[Instruction]) extends Instruction {
   override def toString() = f"{${list}}"
 }
-case class At(val expr: Expression, val block: Instruction) extends Instruction {
-  override def toString() = f"at $expr $block"
+trait ExecuteType
+case object AtType extends ExecuteType
+case object FacingType extends ExecuteType
+case object RotatedType extends ExecuteType
+case object AlignType extends ExecuteType
+
+case class Execute(val typ: ExecuteType, val exprs: List[Expression], val block: Instruction) extends Instruction {
+  override def toString() = f"$typ $exprs $block"
 }
 case class With(val expr: Expression, val isat: Expression, val cond: Expression, val block: Instruction) extends Instruction {
   override def toString() = f"with($expr, $isat, $cond) $block"
 }
 
-case class JSONFile(val name: String, val json: JSONElement) extends Instruction {
+case class JSONFile(val name: String, val json: JSONElement, val modifier: Modifier) extends Instruction {
   override def toString() = f"jsonfile $name"
 }

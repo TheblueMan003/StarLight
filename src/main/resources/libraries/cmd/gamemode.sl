@@ -1,6 +1,6 @@
 package cmd.gamemode
 
-predicate isAventure(){
+predicate isAdventure(){
     "condition": "minecraft:entity_properties",
     "entity": "this",
     "predicate": {
@@ -44,7 +44,7 @@ if (Compiler.isBedrock()){
     """
     return true if the gamemode of the current entity is `adventure`
     """
-    def lazy bool isAventure(){
+    def lazy bool isAdventure(){
         return @s[gamemode=adventure]
     }
     """
@@ -64,6 +64,28 @@ if (Compiler.isBedrock()){
     """
     def lazy bool isSpectator(){
         return @s[gamemode=spectator]
+    }
+}
+
+
+enum Gamemode{
+    Survival,
+    Creative,
+    Adventure,
+    Spectator
+}
+def Gamemode get(){
+    if (isSurvival()){
+        return Gamemode.Survival
+    }
+    if (isCreative()){
+        return Gamemode.Creative
+    }
+    if (isAdventure()){
+        return Gamemode.Adventure
+    }
+    if (isSpectator()){
+        return Gamemode.Spectator
     }
 }
 

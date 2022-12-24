@@ -3,6 +3,7 @@ package sl
 import objects.{Context, ConcreteFunction, LazyFunction, Struct, Class, Template, Enum, Modifier, Variable}
 import objects.types.VoidType
 import sl.Compilation.DefaultFunction
+import objects.ObjectNotFoundException
 
 object ContextBuilder{
     def build(name: String, inst: Instruction):Context = {
@@ -77,7 +78,11 @@ object ContextBuilder{
             }
             case Import(lib, value, alias) => {
                 if (context.importFile(lib)){
-                    val libC = Utils.getLib(lib).get
+                    val libp = Utils.getLib(lib)
+                    if (libp.isEmpty){
+                        throw new ObjectNotFoundException(f"Cannot find package: $lib")
+                    }
+                    val libC = libp.get
                     buildRec(libC)(context.root)
                     Compiler.compile(libC, true)(context.root)
                 }

@@ -19,7 +19,6 @@ struct LCG{
     int next(){
         s *= 1103515245
         s += 12345
-        s %= 2147483648
         return s
     }
 
@@ -29,7 +28,6 @@ struct LCG{
     int nextInt(){
         s *= 1103515245
         s += 12345
-        s %= 2147483648
         return s
     }
 
@@ -50,7 +48,6 @@ struct LCG{
     float nextFloat(){
         s *= 1103515245
         s += 12345
-        s %= 2147483648
         float t
         t = s
         return t
@@ -60,12 +57,9 @@ struct LCG{
     Return the current seed
     """
     int seed(){
-        int a = s
-        a /= 65536
-        a %= 16384
-        return a
+        return s
     }
 }
 
-package .
-random.lgc.LCG lcg = new random.lgc.LCG(0)
+package _
+random.lcg.LCG lcg = new random.lcg.LCG(0)

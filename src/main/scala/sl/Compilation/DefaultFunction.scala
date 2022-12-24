@@ -59,14 +59,78 @@ object DefaultFunction{
                 (args: List[Expression],ctx: Context) => {
                     args match{
                         case VariableValue(vari, sel)::Nil => {
-                            ctx.parent.addVariable(ctx.getVariable(vari))
+                            ctx.parent.addVariable(ctx.name, ctx.getVariable(vari))
                             (List(), NullValue)
                         }
                         case LinkedVariableValue(vari, sel)::Nil =>{
-                            ctx.parent.addVariable(vari)
+                            ctx.parent.addVariable(ctx.name, vari)
                             (List(), NullValue)
                         }
                         case other => throw new Exception(f"Illegal Arguments $other for pushUpward")
+                    }
+                }
+            ))
+        ctx.addFunction("sqrt", CompilerFunction(ctx, "sqrt", 
+                List(Argument("v", FloatType, None)),
+                FloatType,
+                Modifier.newPublic(),
+                (args: List[Expression],ctx: Context) => {
+                    args match{
+                        case FloatValue(v)::Nil => {
+                            (List(), FloatValue(math.sqrt(v)))
+                        }
+                        case IntValue(v)::Nil =>{
+                            (List(), FloatValue(math.sqrt(v)))
+                        }
+                        case other => throw new Exception(f"Illegal Arguments $other for sqrt")
+                    }
+                }
+            ))
+        ctx.addFunction("sin", CompilerFunction(ctx, "sin", 
+                List(Argument("v", FloatType, None)),
+                FloatType,
+                Modifier.newPublic(),
+                (args: List[Expression],ctx: Context) => {
+                    args match{
+                        case FloatValue(v)::Nil => {
+                            (List(), FloatValue(math.sin(v)))
+                        }
+                        case IntValue(v)::Nil =>{
+                            (List(), FloatValue(math.sin(v)))
+                        }
+                        case other => throw new Exception(f"Illegal Arguments $other for sin")
+                    }
+                }
+            ))
+        ctx.addFunction("cos", CompilerFunction(ctx, "cos", 
+                List(Argument("v", FloatType, None)),
+                FloatType,
+                Modifier.newPublic(),
+                (args: List[Expression],ctx: Context) => {
+                    args match{
+                        case FloatValue(v)::Nil => {
+                            (List(), FloatValue(math.cos(v)))
+                        }
+                        case IntValue(v)::Nil =>{
+                            (List(), FloatValue(math.cos(v)))
+                        }
+                        case other => throw new Exception(f"Illegal Arguments $other for cos")
+                    }
+                }
+            ))
+        ctx.addFunction("tan", CompilerFunction(ctx, "tan", 
+                List(Argument("v", FloatType, None)),
+                FloatType,
+                Modifier.newPublic(),
+                (args: List[Expression],ctx: Context) => {
+                    args match{
+                        case FloatValue(v)::Nil => {
+                            (List(), FloatValue(math.tan(v)))
+                        }
+                        case IntValue(v)::Nil =>{
+                            (List(), FloatValue(math.tan(v)))
+                        }
+                        case other => throw new Exception(f"Illegal Arguments $other for tan")
                     }
                 }
             ))

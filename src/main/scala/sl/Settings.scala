@@ -47,6 +47,7 @@ trait Target{
     def getPredicatePath(path: String): String
     def getFunctionName(path: String): String
     def getJsonPath(path: String): String
+    def getRPJsonPath(path: String): String
     def getExtraFiles(context: Context): List[(String, List[String])]
 }
 case object MCJava extends Target{
@@ -61,6 +62,9 @@ case object MCJava extends Target{
     }
     def getJsonPath(path: String): String = {
         "/data/" + path.replaceAllLiterally(".","/")+ ".json"
+    }
+    def getRPJsonPath(path: String): String = {
+        "/assets/minecraft/" + path.replaceAllLiterally(".","/")+ ".json"
     }
     def getExtraFiles(context: Context): List[(String, List[String])] = {
         val ticks = context.getAllFunction()
@@ -115,6 +119,9 @@ case object MCBedrock extends Target{
     }
     def getJsonPath(path: String): String = {
         "/" + path.replaceAllLiterally(".","/") + ".json"
+    }
+    def getRPJsonPath(path: String): String = {
+        "/" + path.replaceAllLiterally(".","/")+ ".json"
     }
     def getExtraFiles(context: Context): List[(String, List[String])] = {
         val ticks = context.getAllFunction()

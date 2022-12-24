@@ -60,7 +60,7 @@ struct Vector3Int{
     """
     Compute the scalar product with other
     """
-    def scalarProd(Vector3Int other):int{
+    def int scalarProd(Vector3Int other){
         int output = 0
         output += this.x * other.x
         output += this.y * other.y

@@ -46,7 +46,7 @@ struct Vector2{
         this.y -= y
     }
     
-    def scalarProd(Vector2 other):float{
+    float scalarProd(Vector2 other){
         float output = 0
         output += this.x * this.x
         output += this.y * this.y

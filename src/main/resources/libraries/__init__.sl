@@ -14,6 +14,10 @@ def @tick __playertick__(){
     }
 }
 
+def lazy aligned(void=>void fct){
+    align("xyz")at(~0.5 ~ ~0.5)fct()
+}
+
 int __totalRefCount
 
 class object{

@@ -88,16 +88,50 @@ object Execute{
         val (prefix, selector) = Utils.getSelector(ass.expr)
         prefix:::apply(selector.getString())
     }
-    def atInstr(ass: At)(implicit context: Context):List[String] = {
-        def apply(selector: String)={
-            makeExecute(f" at $selector", Compiler.compile(ass.block))
-        }
-
-        Utils.simplify(ass.expr) match
-            case PositionValue(value) => makeExecute(f" positioned $value", Compiler.compile(ass.block))
-            case _ => {
-                val (prefix, selector) = Utils.getSelector(ass.expr)
-                prefix:::apply(selector.getString())
+    def executeInstr(exec: Execute)(implicit context: Context):List[String] = {
+        exec.typ match
+            case AtType => {
+                Utils.simplify(exec.exprs.head) match
+                    case PositionValue(value) => makeExecute(f" positioned $value", Compiler.compile(exec.block))
+                    case _ => {
+                        val (prefix, selector) = Utils.getSelector(exec.exprs.head)
+                        prefix:::makeExecute(f" at ${selector.getString()}", Compiler.compile(exec.block))
+                    }
+            }
+            case RotatedType => {
+                if (exec.exprs.length > 1){
+                    val a = Utils.simplify(exec.exprs(0))
+                    val b = Utils.simplify(exec.exprs(1))
+                    makeExecute(f" rotated ${a.getFloatValue()} ${b.getFloatValue()}", Compiler.compile(exec.block))
+                }
+                else{
+                    val (prefix, selector) = Utils.getSelector(exec.exprs.head)
+                    prefix:::makeExecute(f" rotated as ${selector.getString()}", Compiler.compile(exec.block))
+                }
+            }
+            case FacingType => {
+                if (exec.exprs.length > 1){
+                    val (prefix, selector) = Utils.getSelector(exec.exprs.head)
+                    val anchor = 
+                        Utils.simplify(exec.exprs(1)) match{
+                            case StringValue("eyes") => "eyes"
+                            case StringValue("feet") => "feet"
+                            case other => throw new Exception(f"Illegal argument: $other for facing")
+                        }
+                    prefix:::makeExecute(f" facing entity ${selector.getString()} ${anchor}", Compiler.compile(exec.block))
+                }
+                else{
+                    Utils.simplify(exec.exprs.head) match
+                        case PositionValue(value) => makeExecute(f" facing $value", Compiler.compile(exec.block))
+                        case _ => {
+                            val (prefix, selector) = Utils.getSelector(exec.exprs.head)
+                            prefix:::makeExecute(f" facing entity ${selector.getString()} eyes", Compiler.compile(exec.block))
+                        }
+                }
+            }
+            case AlignType => {
+                val a = Utils.simplify(exec.exprs.head)
+                makeExecute(f" align ${a}", Compiler.compile(exec.block))
             }
     }
 
@@ -242,12 +276,12 @@ object Execute{
 
             // Comparable Value (class/struct)
             case BinaryOperation(">" | "<" | ">=" | "<=", LinkedVariableValue(left, sel), right)
-                if left.getType().isComparaisonSupported() => 
+                if left.getType().isComparaisonSupported() && !left.getType().isDirectComparable() => 
                     val op = expr.asInstanceOf[BinaryOperation].op
                     getIfCase(FunctionCallValue(VariableValue(left.fullName + "." + Utils.getOpFunctionName(op)), List(right)))
 
             case BinaryOperation(">" | "<" | ">=" | "<=", left, LinkedVariableValue(right, sel)) 
-                if right.getType().isComparaisonSupported() => 
+                if right.getType().isComparaisonSupported() && !right.getType().isDirectComparable()=> 
                     val op = expr.asInstanceOf[BinaryOperation].op
                     getIfCase(FunctionCallValue(VariableValue(right.fullName + "." + Utils.getOpFunctionName(Utils.invertOperator(op))), List(left)))
 
@@ -265,12 +299,12 @@ object Execute{
 
             // Error Cases
             case BinaryOperation(">" | "<" | ">=" | "<=" | "==" | "!=", LinkedVariableValue(left, sel), right) 
-                if left.getType().isEqualitySupported() && left.getType().isComparaisonSupported() => 
+                if !left.getType().isEqualitySupported() && !left.getType().isComparaisonSupported() => 
                     val op = expr.asInstanceOf[BinaryOperation].op
                     throw new Exception(f"Operation $op not supported for $left and $right")
             
             case BinaryOperation(">" | "<" | ">=" | "<=" | "==" | "!=", left, LinkedVariableValue(right, sel)) 
-                if right.getType().isEqualitySupported() && right.getType().isComparaisonSupported() => 
+                if !right.getType().isEqualitySupported() && !right.getType().isComparaisonSupported() => 
                     val op = expr.asInstanceOf[BinaryOperation].op
                     throw new Exception(f"Operation $op not supported for $left and $right")
 
