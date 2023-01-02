@@ -6,7 +6,7 @@ import objects.Modifier
 object DocMaker{
     def makeIndex(files: List[String])={
         "# List of Libraries\n\n"+
-        files.map(f => f"[$f](libraries\\$f.md)").mkString("\n\n")
+        files.map(f => f"[$f](libraries/$f.html)").mkString("\n\n")
     }
     /**
      * Traverse the instruction tree and generate the html documentation from modifiers and comments
