@@ -88,6 +88,22 @@ minecraft:brown_terracotta;stained_hardened_clay;12
 minecraft:green_terracotta;stained_hardened_clay;13
 minecraft:red_terracotta;stained_hardened_clay;14
 minecraft:black_terracotta;stained_hardened_clay;15
+minecraft:white_concrete;concrete;0
+minecraft:orange_concrete;concrete;1
+minecraft:magenta_concrete;concrete;2
+minecraft:light_blue_concrete;concrete;3
+minecraft:yellow_concrete;concrete;4
+minecraft:lime_concrete;concrete;5
+minecraft:pink_concrete;concrete;6
+minecraft:gray_concrete;concrete;7
+minecraft:light_gray_concrete;concrete;8
+minecraft:cyan_concrete;concrete;9
+minecraft:purple_concrete;concrete;10
+minecraft:blue_concrete;concrete;11
+minecraft:brown_concrete;concrete;12
+minecraft:green_concrete;concrete;13
+minecraft:red_concrete;concrete;14
+minecraft:black_concrete;concrete;15
 minecraft:white_wool;wool;0
 minecraft:orange_wool;wool;1
 minecraft:magenta_wool;wool;2
@@ -104,3 +120,4 @@ minecraft:brown_wool;wool;12
 minecraft:green_wool;wool;13
 minecraft:red_wool;wool;14
 minecraft:black_wool;wool;15
+minecraft:light;light_block;-1

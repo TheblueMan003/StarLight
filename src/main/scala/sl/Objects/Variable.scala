@@ -720,7 +720,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 	 */
 	def assignJson(op: String, value: Expression)(implicit context: Context, selector: Selector = Selector.self): List[String] = {
 		if (Settings.target == MCBedrock){
-			throw new Exception("Dynamic Json Variable Not Supported in Bedrock")
+			throw new Exception(f"Dynamic Json Variable Not Supported in Bedrock ($fullName)")
 		}
 		if (modifiers.isEntity){
 			throw new Exception("Not Supported")

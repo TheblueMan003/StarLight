@@ -110,7 +110,7 @@ object Parser extends StandardTokenParsers{
 
   def predicate:Parser[Instruction] = doc ~ (modifier <~ "predicate") ~ identLazy ~ arguments ~ json ^^ {case doc ~ mod ~ name ~ args ~ json => PredicateDecl(name, args, json, mod.withDoc(doc))}
   def arrayAssign:Parser[Instruction] = (identLazy2 <~ "[") ~ (rep1sep(exprNoTuple, ",") <~ "]") ~ assignmentOp ~ expr ^^ { case a ~ i ~ o ~ e => ArrayAssigment(Left(a), i, o, e) }
-  def foreach: Parser[Instruction] = (("foreach" ~ opt("(") ~> ident <~ "in") ~ exprNoTuple <~ opt(")")) ~ program ^^ { case v ~ e ~ i => ForEach(v, e, i) }
+  def foreach: Parser[Instruction] = (("foreach" ~ opt("(") ~> ident <~ "in") ~ exprNoTuple <~ opt(")")) ~ instruction ^^ { case v ~ e ~ i => ForEach(v, e, i) }
   def packageInstr: Parser[Instruction] = "package" ~> identLazy2 ~ program ^^ (p => Package(p._1, p._2))
   def classDecl: Parser[Instruction] = doc ~ (modifier <~ "class") ~ identLazy ~ opt("extends" ~> ident2) ~ opt("with" ~> namespacedName2) ~ block ^^ { case doc ~ mod ~ iden ~ par ~ entity ~ block => ClassDecl(iden, block, mod.withDoc(doc), par, entity) }
   def structDecl: Parser[Instruction] = doc ~ (modifier <~ "struct") ~ identLazy ~ opt("extends" ~> ident2) ~ block ^^ { case doc ~ mod ~ iden ~ par ~ block => StructDecl(iden, block, mod.withDoc(doc), par) }
@@ -219,9 +219,12 @@ object Parser extends StandardTokenParsers{
   def frontCoordinateHere: Parser[String] = "^" ^^^ "^"
   def frontCoordinate: Parser[String] = frontCoordinateNumber | frontCoordinateHere
 
+  def relPositionCase1: Parser[String] = relCoordinate2 ~ validCordNumber1 ~ relCoordinate ^^ {case x ~ y ~ z => f"$x $y $z"}
+  def relPositionCase2: Parser[String] = relCoordinate ~ relCoordinate2 ~ validCordNumber1 ^^ {case x ~ y ~ z => f"$x $y $z"}
+
   def frontPosition: Parser[String] = frontCoordinate ~ frontCoordinate ~ frontCoordinate ^^ {case x ~ y ~ z => f"$x $y $z"}
   def relPosition: Parser[String] = relCoordinate ~ relCoordinate ~ relCoordinate ^^ {case x ~ y ~ z => f"$x $y $z"}
-  def position: Parser[PositionValue] = (frontPosition | relPosition) ^^ {case a => PositionValue(a)}
+  def position: Parser[PositionValue] = (frontPosition | relPosition | relPositionCase1 | relPositionCase2) ^^ {case a => PositionValue(a)}
 
   def exprBottom: Parser[Expression] = 
     floatValue ^^ (p => FloatValue(p))

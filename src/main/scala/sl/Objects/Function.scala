@@ -125,6 +125,15 @@ class ConcreteFunction(context: Context, name: String, arguments: List[Argument]
     if (needCompiling()) {
         context.addFunctionToCompile(this)
     }
+
+    override def generateArgument()(implicit ctx: Context): Unit = {
+        arguments.foreach(a => {
+            if (a.name.contains("$")){
+                throw new Exception(f"Illegal Arguement Name: ${a.name} in $fullName. Missing lazy key word?")
+            }
+        })
+        super.generateArgument()
+    }
     
     def call(args2: List[Expression], ret: Variable = null, op: String = "=")(implicit ctx: Context): List[String] = {
         markAsUsed()

@@ -400,7 +400,8 @@ case class LambdaType(val nb: Int) extends Type{
     override def allowAdditionSimplification(): Boolean = false
     override def getDistance(other: Type)(implicit context: Context): Int = {
         other match
-            case FuncType(sources2, output2) if sources2.length == nb => 0
+            case LambdaType(nb) => 0
+            case FuncType(sources2, output2) => 0
             case MCObjectType => 10
             case AnyType => 1000
             case _ => outOfBound
@@ -408,6 +409,7 @@ case class LambdaType(val nb: Int) extends Type{
     override def isSubtypeOf(other: Type)(implicit context: Context): Boolean = {
         other match
             case LambdaType(nb2) => nb2 == nb
+            case FuncType(sources, output) => true
             case AnyType => true
             case MCObjectType => true
             case _ => false
@@ -424,6 +426,7 @@ case class FuncType(sources: List[Type], output: Type) extends Type{
     override def getDistance(other: Type)(implicit context: Context): Int = {
         other match
             case FuncType(sources2, output2) if sources2.length == sources.length => sources.zip(sources2).map((a,b)=>b.getDistance(a)).sum + output.getDistance(output2)
+            case LambdaType(nb) => 0
             case MCObjectType => 10
             case AnyType => 1000
             case _ => outOfBound
@@ -431,6 +434,7 @@ case class FuncType(sources: List[Type], output: Type) extends Type{
     override def isSubtypeOf(other: Type)(implicit context: Context): Boolean = {
         other match
             case FuncType(s,o) => sources.size == s.size && s.zip(sources).forall((a,b)=>a.isSubtypeOf(b)) && output.isSubtypeOf(o)
+            case LambdaType(nb) => true
             case AnyType => true
             case MCObjectType => true
             case _ => false

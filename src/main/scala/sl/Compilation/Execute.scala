@@ -607,7 +607,7 @@ case class IFValueCase(val value: Expression) extends IFCase{
                 f"if score ${left.getSelector()(sel1)} $mcop ${right.getSelector()(sel2)}"
             }
             case BinaryOperation("!=", LinkedVariableValue(left, sel1), LinkedVariableValue(right, sel2))=> {
-                f"if score ${left.getSelector()(sel1)} = ${left.getSelector()(sel2)}"
+                f"unless score ${left.getSelector()(sel1)} = ${left.getSelector()(sel2)}"
             }
 
 

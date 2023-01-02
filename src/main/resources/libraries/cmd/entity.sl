@@ -66,7 +66,16 @@ if (Compiler.isJava()){
     }
 }
 if (Compiler.isBedrock()){
-    private lazy void _summon(mcobject $name, string $tag, void=>void fct = null){
+    private lazy void _summon(mcobject $name, string $tag, string $skin, void=>void fct){
+        /tag @e[tag=!object.__tagged] add object.__tagged
+        /summon $name ~ ~ ~ $skin
+        with(@e[tag=!object.__tagged]){
+            /tag @s add $tag
+            /tag @s add object.__tagged
+            fct()
+        }
+    }
+    private lazy void _summon(mcobject $name, string $tag, void=>void fct){
         /tag @e[tag=!object.__tagged] add object.__tagged
         /summon $name
         with(@e[tag=!object.__tagged]){
@@ -78,6 +87,20 @@ if (Compiler.isBedrock()){
     private lazy void _summon(mcobject $name){
         /summon $name
     }
+    private lazy void _summon(mcobject $name, string $skin){
+        /summon $name ~ ~ ~ $skin
+    }
+    lazy entity summon(mcobject name, string skin, void=>void fct){
+        if (Compiler.variableExist(_ret)){
+            lazy string tag = Compiler.getVariableTag(_ret)
+            _summon(name, tag, skin, fct)
+        }
+        else{
+            entity tmp
+            lazy string tag = Compiler.getVariableTag(tmp)
+            _summon(name, tag, skin, fct)
+        }
+    }
     lazy entity summon(mcobject name, void=>void fct){
         if (Compiler.variableExist(_ret)){
             lazy string tag = Compiler.getVariableTag(_ret)
@@ -87,6 +110,15 @@ if (Compiler.isBedrock()){
             entity tmp
             lazy string tag = Compiler.getVariableTag(tmp)
             _summon(name, tag, fct)
+        }
+    }
+    lazy entity summon(mcobject name, string skin){
+        if (Compiler.variableExist(_ret)){
+            lazy string tag = Compiler.getVariableTag(_ret)
+            _summon(name, tag, skin, null)
+        }
+        else{
+            _summon(name, skin)
         }
     }
     lazy entity summon(mcobject name){

@@ -32,13 +32,9 @@ object Main{
       try{
         args(0) match
           case "doc" => {
-            if (args.length < 2) then {
-              Reporter.error(f"Expected 2 argument got: ${args.length-1}")
-            }
-            else{
-              makedoc(args(1)+".slconf", args(2))
-              Reporter.ok("Documentation Completed!")
-            }
+            val libraries: List[String] = FileUtils.getListOfFiles("./src/main/resources/libraries").filterNot(_.contains("__init__.sl"))
+            libraries.foreach(f => makeDocumentation(f.dropRight(3).replaceAllLiterally("./src/main/resources/libraries/",""), List(f)))
+            Reporter.ok("Documentation Completed!")
           }
           case "build" => {
             if (args.length < 1) then {
@@ -95,19 +91,6 @@ object Main{
       compile(List("./src"), Settings.bedrock_behaviorpack_output)
     }
     ConfigLoader.saveProject()
-  }
-  def makedoc(args: String, prefix: String): Unit = {
-    ConfigLoader.load(args)
-    ConfigLoader.loadProject()
-    Settings.version=List(Settings.version(0), Settings.version(1), Settings.version(2)+1)
-    val context = if (Settings.target == MCJava){
-      compile(List("./src"), List())
-    }
-    else if (Settings.target == MCBedrock){
-      compile(List("./src"), List())
-    }else null
-    ConfigLoader.saveProject()
-    FileUtils.safeWriteFile(prefix+".html", List(DocMaker.make(context, prefix)))
   }
   def compile(args: Array[String]): Unit = {
     if (hasArg(args, "-bedrock")) Settings.target= MCBedrock
@@ -194,5 +177,15 @@ object Main{
         }
     }
     lst
+  }
+
+  def makeDocumentation(name: String, inputs: List[String])={
+    var files = FileUtils.getFiles(inputs)
+
+    var tokenized = files.par.map((f, c) => Parser.parse(f, c)).toList
+
+    if (tokenized.contains(None)) throw new Exception("Failled to Parse")
+
+    FileUtils.safeWriteFile(f"./docs/libraries/${name}.md", List(DocMaker.make2(InstructionList(tokenized.map(_.get)))))
   }
 }

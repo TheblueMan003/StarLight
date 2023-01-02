@@ -1,42 +1,44 @@
 package cmd.gamemode
 
-predicate isAdventure(){
-    "condition": "minecraft:entity_properties",
-    "entity": "this",
-    "predicate": {
-        "type_specific": {
-            "type": "player",
-            "gamemode": "adventure"
+if (Compiler.isJava()){
+    predicate isAdventure(){
+        "condition": "minecraft:entity_properties",
+        "entity": "this",
+        "predicate": {
+            "type_specific": {
+                "type": "player",
+                "gamemode": "adventure"
+            }
         }
     }
-}
-predicate isSurvival(){
-    "condition": "minecraft:entity_properties",
-    "entity": "this",
-    "predicate": {
-        "type_specific": {
-            "type": "player",
-            "gamemode": "survival"
+    predicate isSurvival(){
+        "condition": "minecraft:entity_properties",
+        "entity": "this",
+        "predicate": {
+            "type_specific": {
+                "type": "player",
+                "gamemode": "survival"
+            }
         }
     }
-}
-predicate isCreative(){
-    "condition": "minecraft:entity_properties",
-    "entity": "this",
-    "predicate": {
-        "type_specific": {
-            "type": "player",
-            "gamemode": "creative"
+    predicate isCreative(){
+        "condition": "minecraft:entity_properties",
+        "entity": "this",
+        "predicate": {
+            "type_specific": {
+                "type": "player",
+                "gamemode": "creative"
+            }
         }
     }
-}
-predicate isSpectator(){
-    "condition": "minecraft:entity_properties",
-    "entity": "this",
-    "predicate": {
-        "type_specific": {
-            "type": "player",
-            "gamemode": "spectator"
+    predicate isSpectator(){
+        "condition": "minecraft:entity_properties",
+        "entity": "this",
+        "predicate": {
+            "type_specific": {
+                "type": "player",
+                "gamemode": "spectator"
+            }
         }
     }
 }

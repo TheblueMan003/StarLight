@@ -34,7 +34,7 @@ object Print{
             case PositionValue(value) => throw new Exception("Cannot use position inside rawjson")
             case TagValue(value) => throw new Exception("Cannot use tag inside rawjson")
             case StringValue(value) => 
-                val reg = "[a-zA-Z0-9\\.]+".r
+                val reg = "[a-zA-Z0-9_\\.]+".r
                 reg.findFirstMatchIn(value) match
                     case Some(v) if v.matched == value => {
                         (List(), List(PrintTranslate(f"$value", RawJsonValue(List()), col, mod)))
@@ -192,7 +192,7 @@ case class PrintTranslate(val key: String, val rjv: RawJsonValue, val color: Pri
     def toJava()(implicit ctx: Context): String = {
         val RawJsonValue(lst) = rjv
         if (lst.size > 0){
-            f"{\"translate\":\"${key}\", \"with\":\"${rjv.getString()}\"}"
+            f"{\"translate\":\"${key}\", \"with\":${rjv.getString()}}"
         }
         else{
             f"{\"translate\":\"${key}\"}"
@@ -201,7 +201,7 @@ case class PrintTranslate(val key: String, val rjv: RawJsonValue, val color: Pri
     def toBedrock()(implicit ctx: Context): String = {
         val RawJsonValue(lst) = rjv
         if (lst.size > 0){
-            f"{\"translate\":\"${key}\", \"with\":\"${rjv.getString()}\"}"
+            f"{\"translate\":\"${key}\", \"with\":${rjv.getString()}}"
         }
         else{
             f"{\"translate\":\"${key}\"}"

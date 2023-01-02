@@ -1,5 +1,9 @@
 package game.room
 
+import standard
+
+int t_running, t_total
+
 if (Compiler.isJava){
     import mc.entity.nbt as nbt
 
@@ -19,12 +23,51 @@ enum Color{
     white, red, orange, yellow, green, aqua, blue, purple
 }
 
-
+"""
+Room detection init
+"""
 def [tag.order=-100] @tick room_detection_init(){
     @game.room.init()
 }
+
+"""
+Room detection end
+"""
 def [tag.order=100] @tick room_detection_end(){
     @game.room.end()
+}
+
+"""
+Show the list of active room
+"""
+def @test.after show(){
+    standard.print(("===[ Running Room ]===","green"))
+    int running = 0
+    int off = 0
+    int unknown = 0
+    int total = 0
+    
+    forgenerate($i, @room.count){
+        t_running = 0
+        t_total = 0
+        $i()
+        if (t_running == 1){
+            standard.print((" [ON] $i","green"))
+            running++
+        }
+        else if (t_running == 0){
+            standard.print((" [OFF] $i","red"))
+            off++
+        }
+        else{
+            standard.print((" [??] $i","yellow"))
+            unknown++
+        }
+        total++
+    }
+    standard.print(("Stats: ","white"),(running,"green"),("/"),(total,"green"),(" Running","green"),(" - "),
+                    (off,"red"),("/"),(total,"red"),(" Off","red"),(" - "),
+                    (unknown,"yellow"),("/"),(total,"yellow"),(" Unknown","yellow"),(" - "))
 }
 
 template Room{
@@ -72,19 +115,40 @@ template Room{
         display = true
         color = yellow
     }
+    """
+    Set the color to display in creative
+    """
     def setColor(Color c){
         color = c
     }
+    """
+    Call back when a player enter the room.
+    """
     def onEnter(){
     }
+    """
+    Call back when a player stays in the room.
+    """
     def onStay(){
     }
+    """
+    Call back when the room get activated. A player enter the room while nobody is in it.
+    """
     def onActivate(){
     }
-    def onDisactivate(){
+    """
+    Call back when the room get desactivated. All the players left the room.
+    """
+    def onDesactivate(){
     }
+    """
+    Call back when the room contains at least one player.
+    """
     def main(){
     }
+    """
+    Call back when a player exit the room.
+    """
     def onExit(){
     }
     def private ticking __main__(){
@@ -93,7 +157,7 @@ template Room{
         }
     }
     
-    def particule(){
+    def private particule(){
         if (Compiler.isJava){
             switch(color){
                 Color.red -> ./particle minecraft:dust 1 0 0 1 ~ ~ ~ 0 0 0 0 1
@@ -191,7 +255,7 @@ template Room{
             counting = false
         }
     }
-    def lazy bool check(){
+    def private lazy bool check(){
         if (Compiler.isJava){
             return x >= sx && x < ex && y >= sy && y < ey && z >= sz && z < ez
         }
@@ -199,7 +263,7 @@ template Room{
             return @s[x=sx,dx=ex,y=sy,dy=ey,z=sz,dz=ez]
         }
     }
-    def [Compile.order=100] @game.room.tick main(){
+    def [Compile.order=100] @game.room.tick __main_player__(){
         if (check()){
             if (counting){
                 nbPlayer++
@@ -231,12 +295,22 @@ template Room{
             if (!counting){
                 nbPlayer--
                 if (nbPlayer == 0){
-                    onDisactivate()
+                    onDesactivate()
                 }
                 if (nbPlayer < 0){
                     nbPlayer = 0
                 }
             }
+        }
+    }
+
+    """
+    Count the number of active room
+    """
+    def @room.count __count__(){
+        t_total += 1
+        if (nbPlayer > 0){
+            t_running += 1
         }
     }
 }

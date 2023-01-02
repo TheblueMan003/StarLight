@@ -19,7 +19,7 @@ def lazy setMainHand(mcobject item, int count = 1){
         setSlot("weapon.mainhand", item, count)
     }
     if (Compiler.isBedrock){
-        lazy mcobject itemb = Compiler.getBedrockBlock(item)
+        lazy mcobject itemb = Compiler.getBedrockBlockName(item)
         lazy int itemd = Compiler.getBedrockBlockID(item)
         setSlot("slot.weapon.mainhand", 0, itemb, count, itemd)
     }
@@ -33,7 +33,7 @@ def lazy setOffHand(mcobject item, int count = 1){
         setSlot("weapon.offhand", item, count)
     }
     if (Compiler.isBedrock){
-        lazy mcobject itemb = Compiler.getBedrockBlock(item)
+        lazy mcobject itemb = Compiler.getBedrockBlockName(item)
         lazy int itemd = Compiler.getBedrockBlockID(item)
         setSlot("slot.weapon.offhand", 0, itemb, count, itemd)
     }
@@ -45,7 +45,7 @@ def private lazy universalJavaSet(string slot, int slotID, mcobject item, int co
 }
 
 def private lazy universalBedrockSet(string slot, int slotID, mcobject item, int count = 1){
-    lazy mcobject itemb = Compiler.getBedrockBlock(item)
+    lazy mcobject itemb = Compiler.getBedrockBlockName(item)
     lazy int itemd = Compiler.getBedrockBlockID(item)
     setSlot(slot, slotID, itemb, count, itemd)
 }
@@ -178,7 +178,7 @@ predicate isHoldingItem(mcobject item, int count, string data){
     }
 }
 
-predicate isHoldingItem(mcobject item, int count = 1){
+predicate isHoldingItem(mcobject item, int count){
     "condition": "minecraft:entity_properties",
     "entity": "this",
     "predicate": {
@@ -191,9 +191,21 @@ predicate isHoldingItem(mcobject item, int count = 1){
     }
 }
 
+predicate isHoldingItem(mcobject item){
+    "condition": "minecraft:entity_properties",
+    "entity": "this",
+    "predicate": {
+        "equipment": {
+            "mainhand": {
+                "items":[ item ]
+            }
+        }
+    }
+}
+
 
 if (Compiler.isBedrock){
     def lazy bool isHoldingItem(mcobject item, int count = 1){
-        //return @s[hasitem={item=item,quantity=count,location=slot.weapon.mainhand,slot=0}]
+        return @s[hasitem={item=item,quantity=count,location=slot.weapon.mainhand,slot=0}]
     }
 }

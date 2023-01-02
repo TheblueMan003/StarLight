@@ -4,48 +4,57 @@ import objects.Context
 import objects.Modifier
 
 object DocMaker{
-    def make(context: Context, prefix: String): String={
-        val template = Utils.getResources("docs/template.html")
-        val fct = context.getAllFunction().filter(_.fullName.contains(prefix))
-        val nav = fct.map(fct => NavBarMaker.h2(fct.name,fct.name)).reduceOption(_ +"\n"+ _).getOrElse("")
-        val content = fct.map(fct => ContentMaker.article(fct.name,
-            ContentMaker.h2(fct.name)+
-            ContentMaker.p(fct.modifiers.doc)+
-            ContentMaker.arguments(fct.arguments.map(a => a.typ.toString()+" " + a.name).reduceOption(_+"<br/>"+_).getOrElse(""))
-        )).reduceOption(_ +"\n"+ _).getOrElse("")
+    /**
+     * Traverse the instruction tree and generate the html documentation from modifiers and comments
+     */
+    def make2(instr: Instruction):String = {
+        instr match
+            case i: InstructionBlock => i.list.map(make2).reduceOption(_ +"\n"+ _).getOrElse("")
+            case If(cond, ifBlock, elze) => make2(ifBlock) + elze.flatMap(g => make2(g.ifBlock))
+            case Package(name, block) => make2(block)
+            case FunctionDecl(name, block, typ, args, modifier) => 
+                ContentMaker.h2(name)+
+                args.map(a => "- "+a.typ.toString()+" " + a.name).reduceOption(_+"\n"+_).getOrElse("")+"\n"+
+                ContentMaker.p(modifier.doc)
 
-        template.replace("$title", prefix)
-                .replace("$navbar", nav)
-                .replace("$content", content)
-    }
-}
-
-object NavBarMaker{
-    def h1(text: String, section: String)={
-        f"""<li class="nav-item section-title"><a class="nav-link scrollto active" href="#${section}"><span class="theme-icon-holder me-2"><i class="fas fa-map-signs"></i></span>${text}</a></li>"""
-    }
-    def h2(text: String, section: String)={
-        f"""<li class="nav-item"><a class="nav-link scrollto" href="#${section}">${text}</a></li>"""
+            case StructDecl(name, block, modifier, parent) => 
+                    ContentMaker.h1(name)+
+                    ContentMaker.p(modifier.doc)
+                + make2(block)
+            case ClassDecl(name, block, modifier, parent, entity) => 
+                    ContentMaker.h1(name)+
+                    ContentMaker.p(modifier.doc)
+                 + make2(block)
+            case TemplateDecl(name, block, modifier, parent) => 
+                    ContentMaker.h1(name)+
+                    ContentMaker.p(modifier.doc)
+                 + make2(block)
+            case ForEach(key, provider, instr) => make2(instr)
+            case ForGenerate(key, provider, instr) => make2(instr)
+            case WhileLoop(cond, block) => make2(block)
+            case Execute(typ, exprs, block) => make2(block)
+            case InstructionList(list) => list.map(make2).reduceOption(_ +"\n"+ _).getOrElse("")
+            case JSONFile(name, json, modifier) => 
+                ContentMaker.h2(name)+
+                ContentMaker.p(modifier.doc)
+            case PredicateDecl(name, args, block, modifier) => 
+                ContentMaker.h2(name)+
+                ContentMaker.p(modifier.doc)
+            case With(expr, isat, cond, block) => make2(block)
+            case _ => ""
     }
 }
 
 object ContentMaker{
-    def h1(text: String, lastupdate: String)={
-        f"""<h1 class="docs-heading">${text} <span class="docs-time">Last updated: ${lastupdate}</span></h1>"""
+    def h1(text: String)={
+        f"""# ${text.trim()}\n"""
     }
 
     def h2(text: String)={
-        f"""<h2 class="section-heading">${text}</h2>"""
+        f"""## ${text.trim()}\n"""
     }
 
     def p(text: String)={
-        f"""<section class="docs-intro"><p>${text}</p></section>"""
-    }
-
-    def article(section: String, content: String)={
-        f"""<article class="docs-article" id="${section}">$content</article>"""
-    }
-    def arguments(content: String)={
-        f"""<div class="alert alert-secondary" role="alert">$content</div>"""
+        text.trim()
     }
 }

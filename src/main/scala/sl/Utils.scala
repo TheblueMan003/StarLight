@@ -248,6 +248,8 @@ object Utils{
             case JsonBoolean(value) => JsonBoolean(value)
             case JsonInt(value) => JsonInt(value)
             case JsonFloat(value) => JsonFloat(value)
+            case JsonIdentifier(value) => JsonIdentifier(value.replaceAllLiterally(from, to))
+            case JsonCall(value, args) => JsonCall(value.replaceAllLiterally(from, to), args.map(subst(_, from, to)))
         } 
     }
 
@@ -679,6 +681,12 @@ object Utils{
             case JsonArray(content1) => {
                 elm2 match
                     case JsonArray(content2) => JsonArray(content1 ::: content2)
+                    case JsonString(value) => JsonArray(content1 ::: List(JsonString(value)))
+                    case JsonInt(value) => JsonArray(content1 ::: List(JsonInt(value)))
+                    case JsonFloat(value) => JsonArray(content1 ::: List(JsonFloat(value)))
+                    case JsonDictionary(value) => JsonArray(content1 ::: List(JsonDictionary(value)))
+                    case JsonIdentifier(value) => JsonArray(content1 ::: List(JsonIdentifier(value)))
+                    case JsonCall(value, arg) => JsonArray(content1 ::: List(elm2))
                     case _ => throw new Exception(f"Json Element doesn't match ${elm1} vs ${elm2}")
             }
             case JsonDictionary(content1) => {
@@ -726,7 +734,10 @@ object Utils{
                     }
                     case MCBedrock => {
                         val fct = context.getFunction(value, args, VoidType)
-                        if (fct._1.modifiers.isLazy){
+                        if (fct._1 == null){
+                            JsonArray(List())
+                        }
+                        else if (fct._1.modifiers.isLazy){
                             var vari = context.getFreshVariable(fct._1.getType())
                             vari.modifiers.isLazy = true
                             val call = context.getFunction(value, args, VoidType).call(vari)
@@ -736,10 +747,10 @@ object Utils{
                                 case IntValue(value) => JsonInt(value)
                                 case FloatValue(value) => JsonFloat(value)
                                 case BoolValue(value) => JsonBoolean(value)
-                                case v => throw new Exception(f"Cannot cast $v to json")
+                                case v => throw new Exception(f"Cannot cast $v (from variable: ${vari.fullName}) to json")
                         }
                         else{
-                            JsonArray(fct.call().map(JsonString(_)))
+                            JsonArray(fct.call().map(v => JsonString(f"/$v")))
                         }
                     }
             }

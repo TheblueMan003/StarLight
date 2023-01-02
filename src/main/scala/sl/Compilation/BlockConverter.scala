@@ -5,10 +5,10 @@ import sl.Utils
 object BlockConverter{
     val blockMap = loadBlockMap()
     def getBlockName(name: String)={
-        blockMap.getOrElse(name, (name, 0))._1
+        blockMap.getOrElse(name, (name, -1))._1
     }
     def getBlockID(name: String)={
-        blockMap.getOrElse(name, (name, 0))._2
+        blockMap.getOrElse(name, (name, -1))._2
     }
     def loadBlockMap()={
         val line = Utils.getConfig("blockmap.csv")

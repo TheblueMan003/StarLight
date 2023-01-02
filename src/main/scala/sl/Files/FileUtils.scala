@@ -3,6 +3,7 @@ package sl.files
 import java.io.File
 import java.io.PrintWriter
 import sl.Utils
+import javax.sound.sampled.AudioSystem
 
 object FileUtils{
     def deleteDirectory(dir: String): Boolean = deleteDirectory(new File(dir))
@@ -62,5 +63,15 @@ object FileUtils{
         val out = new PrintWriter(file, "UTF-8")
         content.foreach(out.println(_))
         out.close()
+    }
+
+    /*
+    * Return the duration of the audio file in seconds
+    */
+    def getAudioFileDuration(file: File):Double={
+        val audioInputStream = AudioSystem.getAudioInputStream(file)
+        val format = audioInputStream.getFormat()
+        val frames = audioInputStream.getFrameLength()
+        return (frames+0.0) / format.getFrameRate()
     }
 }

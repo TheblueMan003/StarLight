@@ -305,3 +305,142 @@ float smoothLerp(float a0, float a1, float w){
     }
     return value
 }
+
+"""
+Compute the sinus of the angle in degrees with a taylor series
+"""
+float sin(float angle){
+    float angleRad = angle * pi / 180
+    float res = 0
+    float sign = 1
+    float fact = 1
+    float pow = 1
+    for(int i = 0; i < 10; i++){
+        res += sign * pow / fact
+        sign *= -1
+        fact *= (2*i+2) * (2*i+3)
+        pow *= angleRad * angleRad
+    }
+    return res
+}
+
+"""
+Compute the cossinus of the angle in degrees with a taylor series
+"""
+float cos(float angle){
+    float angleRad = angle * pi / 180
+    float res = 0
+    float sign = 1
+    float fact = 1
+    float pow = 1
+    for(int i = 0; i < 10; i++){
+        res += sign * pow / fact
+        sign *= -1
+        fact *= (2*i+1) * (2*i+2)
+        pow *= angleRad * angleRad
+    }
+    return res
+}
+
+"""
+Compute the tangente of the angle in degrees with a taylor series
+"""
+float tan(float angle){
+    return(sin(angle)/cos(angle))
+}
+
+"""
+Compute the arcsinus of the angle in degrees with a taylor series
+"""
+float asin(float angle){
+    float res = 0
+    float sign = 1
+    float fact = 1
+    float pow = 1
+    for(int i = 0; i < 10; i++){
+        res += sign * pow / fact
+        sign *= -1
+        fact *= (2*i+1) * (2*i+2)
+        pow *= angle * angle
+    }
+    return res
+}
+
+"""
+Compute the arccossinus of the angle in degrees with a taylor series
+"""
+float acos(float angle){
+    return(90 - asin(angle))
+}
+
+"""
+Compute the arctangente of the angle in degrees with a taylor series
+"""
+float atan(float angle){
+    return(90 - acos(angle))
+}
+
+"""
+Compute the arctangente of the angle in degrees with a taylor series
+"""
+float atan2(float y, float x){
+    return(atan(y/x))
+}
+
+"""
+Compute the square root of the value with a taylor series
+"""
+float sqrt2(float value){
+    float res = 0
+    float sign = 1
+    float fact = 1
+    float pow = 1
+    for(int i = 0; i < 10; i++){
+        res += sign * pow / fact
+        sign *= -1
+        fact *= (2*i+1) * (2*i+2)
+        pow *= value
+    }
+    return res
+}
+
+"""
+Compute the log of x with a taylor series
+"""
+float log(float x){
+    float res = 0
+    float sign = 1
+    float fact = 1
+    float pow = 1
+    for(int i = 0; i < 10; i++){
+        res += sign * pow / fact
+        sign *= -1
+        fact *= (2*i+1) * (2*i+2)
+        pow *= x
+    }
+    return res
+}
+
+"""
+Compute the exp of x with a taylor series
+"""
+float exp(float x){
+    float res = 0
+    float sign = 1
+    float fact = 1
+    float pow = 1
+    for(int i = 0; i < 10; i++){
+        res += sign * pow / fact
+        sign *= -1
+        fact *= (2*i+1) * (2*i+2)
+        pow *= x
+    }
+    return res
+}
+
+"""
+Compute the pow of x with a taylor series
+"""
+float pow(float x, float y){
+    return(exp(y * log(x)))
+}

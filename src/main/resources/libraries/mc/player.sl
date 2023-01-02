@@ -1,16 +1,8 @@
 package mc.player
 
 if (Compiler.isBedrock){
-    json animations = {
-        "mycrossbow": "controller.animation.mycrossbow",
-        "cloudbuster": "controller.animation.cloudbuster",
-        "switchbird": "controller.animation.switchbird"
-    }
-    json animate = [
-        "mycrossbow",
-        "cloudbuster",
-        "switchbird"
-    ]
+    lazy json animations = {}
+    lazy json animate = []
     def [Compile.order=99999] build(){
         jsonfile entities.player{
             "format_version": "1.16.0",

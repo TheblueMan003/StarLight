@@ -6,7 +6,7 @@ import objects.Identifier
 import sl.*
 
 object Selector{
-    private val bedrockElement = List("x", "y", "z", "dx", "dy", "dz", "r", "rm", "scores", "tag", "name", "type", "familly", "rx", "rxm", "ry", "rym", "l", "lm", "m", "c")
+    private val bedrockElement = List("x", "y", "z", "dx", "dy", "dz", "r", "rm", "scores", "tag", "name", "type", "family", "rx", "rxm", "ry", "rym", "l", "lm", "m", "c", "hasitem")
     private val javaElement = List("x", "y", "z", "dx", "dy", "dz", "distance", "scores", "tag", "team", "name", "type", "predicate", "x_rotation‌", "y_rotation‌", "level", "gamemode", "advancements‌", "limit", "sort", "nbt")
 
     def parse(prefix: String, filters: List[(String, SelectorFilterValue)]): Selector = {

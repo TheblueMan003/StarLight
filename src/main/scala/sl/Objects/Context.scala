@@ -405,9 +405,13 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
                     if (vari.modifiers.isLazy){
                         vari.lazyValue match
                             case LambdaValue(args2, instr) => {
-                                (getFreshLambda(args2, args.map(Utils.typeof(_)(this)), output, instr, true), args)
+                                (getFreshLambda(args2, args.map(Utils.typeof(_)(this)), output, instr, false), args)
                             }
                             case VariableValue(name, sel) => getFunction(name, args, output, concrete)
+                            case LinkedVariableValue(vari, selector) => {
+                                val typ = vari.getType().asInstanceOf[FuncType]
+                                (getFunctionMux(typ.sources, typ.output)(this), LinkedVariableValue(vari)::args)
+                            }
                             case NullValue => (null, args)
                             case other => throw new Exception(f"Illegal call of ${other} with $args")
                     }

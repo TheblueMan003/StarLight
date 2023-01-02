@@ -2,10 +2,73 @@ package mc.item
 
 import mc.player
 
+import standard
+
+def private lazy createItem(int $name, json _name, json _category, json _component){
+    jsonfile items.$name{
+        "format_version": "1.16.100",
+        "minecraft:item": {
+            "description": {
+                "identifier": _name,
+                "category": _category
+            },
+            "components":_component
+        }
+    }
+}
+def private lazy createAnimationController(int $name, void=>void onClick, void=>void whileClick, void=>void onRelease){
+    jsonfile animation_controllers.$name{
+            "format_version": "1.10.0",
+            "animation_controllers": {
+                "controller.animation.$this": {
+                    "initial_state": "default",
+                    "states": {
+                        "default": {
+                            "transitions": [
+                                {
+                                    "clickstart": "(query.is_using_item) && (query.get_equipped_item_name == '$name')"
+                                }
+                            ]
+                        },
+                        "clickstart": {
+                            "on_entry": onClick(),
+                            "transitions": [
+                                {
+                                    "clickhold": "true"
+                                }
+                            ]
+                        },
+                        "clickhold": {
+                            "on_entry": whileClick(),
+                            "transitions": [
+                                {
+                                    "clickrelease": "(!query.is_using_item) || (query.get_equipped_item_name != '$name')",
+                                    "clickhold": "true"
+                                }
+                            ]
+                        },
+                        "clickrelease": {
+                            "on_entry": onRelease(),
+                            "transitions": [
+                                {
+                                    "default": "true"
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        }
+}
+
 template Item{
-    private lazy string _name = "custom:item"
+    private lazy string _namespace = "sl"
+    private lazy string _name = Compiler.getContextName()
     private lazy string _category = "Items"
     private lazy json _component = {}
+    private lazy void=>void _onClick = null
+    private lazy void=>void _whileClick = null
+    private lazy void=>void _onRelease = null
     
     def lazy setName(string name){
         _name = name
@@ -38,43 +101,18 @@ template Item{
         _component += {"minecraft:max_damage": value}
     }
 
+    def lazy onClick(void=>void fct){
+        _onClick = fct
+    }
+    def lazy whileClick(void=>void fct){
+        _whileClick = fct
+    }
+    def lazy onRelease(void=>void fct){
+        _onRelease = fct
+    }
+
     def [Compile.order=1000] build(){
-        jsonfile items.this{
-            "format_version": "1.16.100",
-            "minecraft:item": {
-                "description": {
-                    "identifier": _name,
-                    "category": _category
-                },
-                "components":_component
-            }
-        }
-        jsonfile animation_controllers.this{
-            "format_version": "1.10.0",
-            "animation_controllers": {
-                "controller.animation.$this": {
-                    "initial_state": "default",
-                    "states": {
-                        "default": {
-                            "transitions": [
-                                {
-                                    "clickitem": "(query.is_using_item) && (query.get_equipped_item_name == 'cloudbuster')"
-                                }
-                            ]
-                        },
-                        "clickitem": {
-                            "on_entry": [
-                                "/function item/$this/shoot"
-                            ],
-                            "transitions": [
-                                {
-                                    "default": "(!query.is_using_item) || (query.get_equipped_item_name != 'cloudbuster')"
-                                }
-                            ]
-                        }
-                    }
-                }
-            }
-        }
+        createItem(_name, _name, _category, _component)
+        createAnimationController(_name, _onClick, _whileClick, _onRelease)
     }
 }

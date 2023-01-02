@@ -66,6 +66,10 @@ object DefaultFunction{
                             ctx.parent.addVariable(ctx.name, vari)
                             (List(), NullValue)
                         }
+                        case StringValue(vari)::Nil => {
+                            ctx.parent.addVariable(ctx.name, ctx.getVariable(vari))
+                            (List(), NullValue)
+                        }
                         case other => throw new Exception(f"Illegal Arguments $other for pushUpward")
                     }
                 }
@@ -81,6 +85,28 @@ object DefaultFunction{
                         }
                         case IntValue(v)::Nil =>{
                             (List(), FloatValue(math.sqrt(v)))
+                        }
+                        case other => throw new Exception(f"Illegal Arguments $other for sqrt")
+                    }
+                }
+            ))
+        ctx.addFunction("pow", CompilerFunction(ctx, "sqrt", 
+                List(Argument("x", FloatType, None), Argument("y", FloatType, None)),
+                FloatType,
+                Modifier.newPublic(),
+                (args: List[Expression],ctx: Context) => {
+                    args match{
+                        case FloatValue(x)::FloatValue(y)::Nil => {
+                            (List(), FloatValue(math.pow(x,y)))
+                        }
+                        case FloatValue(x)::IntValue(y)::Nil => {
+                            (List(), FloatValue(math.pow(x,y)))
+                        }
+                        case IntValue(x)::FloatValue(y)::Nil => {
+                            (List(), FloatValue(math.pow(x,y)))
+                        }
+                        case IntValue(x)::IntValue(y)::Nil => {
+                            (List(), FloatValue(math.pow(x,y)))
                         }
                         case other => throw new Exception(f"Illegal Arguments $other for sqrt")
                     }
@@ -171,6 +197,19 @@ object DefaultFunction{
                         (List(), NamespacedName(sv.getIntValue().toString))
                     }
                     case other => throw new Exception(f"Illegal Arguments $other for getSelector")
+                }
+            }
+        ))
+        ctx.addFunction("getContextName", CompilerFunction(ctx, "getContextName", 
+            List(),
+            StringType,
+            Modifier.newPublic(),
+            (args: List[Expression],ctx: Context) => {
+                args match{
+                    case Nil => {
+                        (List(), StringValue(ctx.name))
+                    }
+                    case other => throw new Exception(f"Illegal Arguments $other for getContextName")
                 }
             }
         ))
@@ -269,6 +308,9 @@ object DefaultFunction{
                     case NamespacedName(block) :: Nil => {
                         (List(), NamespacedName(block))
                     }
+                    case StringValue(block) :: Nil => {
+                        (List(), NamespacedName(block))
+                    }
                     case other => throw new Exception(f"Illegal Arguments $other for getJavaBlock")
                 }
             }
@@ -283,6 +325,9 @@ object DefaultFunction{
                     case NamespacedName(block) :: Nil => {
                         (List(), NamespacedName(BlockConverter.getBlockName(block)))
                     }
+                    case StringValue(block) :: Nil => {
+                        (List(), NamespacedName(BlockConverter.getBlockName(block)))
+                    }
                     case other => throw new Exception(f"Illegal Arguments $other for getBedrockBlockName")
                 }
             }
@@ -295,6 +340,9 @@ object DefaultFunction{
             (args: List[Expression],ctx: Context) => {
                 args match{
                     case NamespacedName(block) :: Nil => {
+                        (List(), IntValue(BlockConverter.getBlockID(block)))
+                    }
+                    case StringValue(block) :: Nil => {
                         (List(), IntValue(BlockConverter.getBlockID(block)))
                     }
                     case other => throw new Exception(f"Illegal Arguments $other for getBedrockBlockID")
