@@ -1,57 +1,57 @@
-## predicate cmd.gamemode.isAdventure
+## predicate isAdventure
 
 
-## predicate cmd.gamemode.isSurvival
+## predicate isSurvival
 
 
-## predicate cmd.gamemode.isCreative
+## predicate isCreative
 
 
-## predicate cmd.gamemode.isSpectator
+## predicate isSpectator
 
 
-## lazy bool cmd.gamemode.isAdventure()
+## lazy bool isAdventure()
 return true if the gamemode of the current entity is `adventure`
 
-## lazy bool cmd.gamemode.isSurvival()
+## lazy bool isSurvival()
 return true if the gamemode of the current entity is `survival`
 
-## lazy bool cmd.gamemode.isCreative()
+## lazy bool isCreative()
 return true if the gamemode of the current entity is `creative`
 
-## lazy bool cmd.gamemode.isSpectator()
+## lazy bool isSpectator()
 return true if the gamemode of the current entity is `spectator`
 
-## Gamemode? cmd.gamemode.get()
+## Gamemode? get()
 
 
-## lazy void cmd.gamemode.adventure(entity $e)
+## lazy void adventure(entity $e)
 - entity $e
 
 Set the gamemode to `adventure` for entity `e`
 
-## lazy void cmd.gamemode.survival(entity $e)
+## lazy void survival(entity $e)
 - entity $e
 
 Set the gamemode to `survival` for entity `e`
 
-## lazy void cmd.gamemode.creative(entity $e)
+## lazy void creative(entity $e)
 - entity $e
 
 Set the gamemode to `creative` for entity `e`
 
-## lazy void cmd.gamemode.spectator(entity $e)
+## lazy void spectator(entity $e)
 - entity $e
 
 Set the gamemode to `spectator` for entity `e`
 
-## lazy void cmd.gamemode.set(mcobject $gamemode, entity $e)
+## lazy void set(mcobject $gamemode, entity $e)
 - mcobject $gamemode
 - entity $e
 
 Set the gamemode to `gamemode` for entity `e`
 
-## lazy void cmd.gamemode.set(int gamemode, entity $e)
+## lazy void set(int gamemode, entity $e)
 - int gamemode
 - entity $e
 

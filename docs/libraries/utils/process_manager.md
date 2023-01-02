@@ -1,10 +1,10 @@
-## @test.after void utils.process_manager.show()
+## @test.after void show()
 Show the list of processes
 
-## void utils.process_manager.stopAll()
+## void stopAll()
 Stop all the active processes
 
-## int utils.process_manager.count()
+## int count()
 Return the number of currently active processes
 
 

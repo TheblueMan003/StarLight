@@ -1,27 +1,27 @@
-## private @playertick void cmd.title.main()
+## private @playertick void main()
 
 
-## void cmd.title.reset()
+## void reset()
 Reset the priorities for the actionbar
 
-## lazy void cmd.title.show(rawjson $text)
+## lazy void show(rawjson $text)
 - rawjson $text
 
 Show text in the title
 
-## lazy void cmd.title.showSubtitle(rawjson $text)
+## lazy void showSubtitle(rawjson $text)
 - rawjson $text
 
 Show text in the subtitle
 
-## lazy void cmd.title.show(int priority, int time, rawjson text)
+## lazy void show(int priority, int time, rawjson text)
 - int priority
 - int time
 - rawjson text
 
 Show text in the title with priority `priority` and time `time`
 
-## lazy void cmd.title.use(int priority, int time)
+## lazy void use(int priority, int time)
 - int priority
 - int time
 

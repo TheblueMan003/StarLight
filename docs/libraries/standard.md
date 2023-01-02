@@ -1,17 +1,17 @@
-## lazy void standard.print(rawjson $text)
+## lazy void print(rawjson $text)
 - rawjson $text
 
 
 
-## lazy void standard.debug(rawjson text)
+## lazy void debug(rawjson text)
 - rawjson text
 
 
 
-## (int,int,int) standard.version()
+## (int,int,int) version()
 
 
-## void _.printVersion()
+## void printVersion()
 
 
 

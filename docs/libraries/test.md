@@ -1,22 +1,22 @@
-# template test.Test
+# template Test
 
 
-## void test.onStart()
+## void onStart()
 
 
-## void test.main()
+## void main()
 
 
-## void test.onStop()
+## void onStop()
 
 
-## lazy int test.getDuration()
+## lazy int getDuration()
 
 
-## void test.run()
+## void run()
 
 
-## bool test.getResult()
+## bool getResult()
 
 
 

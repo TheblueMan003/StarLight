@@ -4,6 +4,10 @@ import objects.Context
 import objects.Modifier
 
 object DocMaker{
+    def makeIndex(files: List[String])={
+        "# List of Libraries\n\n"+
+        files.map(f => f"[$f](libraries\\$f.md)").mkString("\n\n")
+    }
     /**
      * Traverse the instruction tree and generate the html documentation from modifiers and comments
      */
@@ -13,20 +17,20 @@ object DocMaker{
             case If(cond, ifBlock, elze) => make2(ifBlock) + elze.flatMap(g => make2(g.ifBlock)).mkString("")
             case Package(name, block) => make2(block)(name)
             case FunctionDecl(name, block, typ, args, modifier) => 
-                ContentMaker.h2(modifier.schema() +" "+typ.toString()+ " "+packag+"."+name+"("+args.map(a => a.typ.toString()+" "+a.name).mkString(", ")+")")+
+                ContentMaker.h2(modifier.schema() +" "+typ.toString()+ " "+name+"("+args.map(a => a.typ.toString()+" "+a.name).mkString(", ")+")")+
                 args.map(a => "- "+a.typ.toString()+" " + a.name).mkString("\n")+(if (args.length>0)then "\n\n" else "")+
                 ContentMaker.p(modifier.doc)+"\n\n"
 
             case StructDecl(name, block, modifier, parent) => 
-                    ContentMaker.h1(modifier.schema()+" struct "+packag+"."+name)+
+                    ContentMaker.h1(modifier.schema()+" struct "+name)+
                     ContentMaker.p(modifier.doc)+"\n\n"
                 + make2(block)+"\n\n"
             case ClassDecl(name, block, modifier, parent, entity) => 
-                    ContentMaker.h1(modifier.schema()+" class "+packag+"."+name)+
+                    ContentMaker.h1(modifier.schema()+" class "+name)+
                     ContentMaker.p(modifier.doc)+"\n\n"
                  + make2(block)+"\n\n"
             case TemplateDecl(name, block, modifier, parent) => 
-                    ContentMaker.h1(modifier.schema()+" template "+packag+"."+name)+
+                    ContentMaker.h1(modifier.schema()+" template "+name)+
                     ContentMaker.p(modifier.doc)+"\n\n"
                  + make2(block)+"\n\n"
             case ForEach(key, provider, instr) => make2(instr)
@@ -35,10 +39,10 @@ object DocMaker{
             case Execute(typ, exprs, block) => make2(block)
             case InstructionList(list) => list.map(make2).reduceOption(_ + _).getOrElse("")
             case JSONFile(name, json, modifier) => 
-                ContentMaker.h2(modifier.schema()+" jsonfile "+packag+"."+name)+
+                ContentMaker.h2(modifier.schema()+" jsonfile "+name)+
                 ContentMaker.p(modifier.doc)+"\n\n"
             case PredicateDecl(name, args, block, modifier) => 
-                ContentMaker.h2(modifier.schema()+" predicate "+packag+"."+name)+
+                ContentMaker.h2(modifier.schema()+" predicate "+name)+
                 ContentMaker.p(modifier.doc)+"\n\n"
             case With(expr, isat, cond, block) => make2(block)
             case _ => ""

@@ -1,7 +1,7 @@
-## jsonfile mc.pointer.entities.marker
+## jsonfile entities.marker
 
 
-## lazy entity mc.pointer.newPointer()
+## lazy entity newPointer()
 
 
 

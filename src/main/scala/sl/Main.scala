@@ -34,6 +34,8 @@ object Main{
           case "doc" => {
             val libraries: List[String] = FileUtils.getListOfFiles("./src/main/resources/libraries").filterNot(_.contains("__init__.sl"))
             libraries.foreach(f => makeDocumentation(f.dropRight(3).replaceAllLiterally("\\","/").replaceAllLiterally("./src/main/resources/libraries/",""), List(f)))
+            val names = libraries.map(f => f.dropRight(3).replaceAllLiterally("\\","/").replaceAllLiterally("./src/main/resources/libraries/",""))
+            FileUtils.safeWriteFile("docs/index.md", List(DocMaker.makeIndex(names)))
             Reporter.ok("Documentation Completed!")
           }
           case "build" => {

@@ -1,4 +1,4 @@
-## [Compile.order=99999] void mc.player.build()
+## [Compile.order=99999] void build()
 
 
 

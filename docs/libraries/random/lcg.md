@@ -1,27 +1,27 @@
-# struct random.lcg.LCG
+# struct LCG
 Struct for Linear Congruent GeneratorUse the value from glibc (https://en.wikipedia.org/wiki/Glibc)
 
-## lazy void random.lcg.__init__(int init_seed)
+## lazy void __init__(int init_seed)
 - int init_seed
 
 Constructor
 
-## int random.lcg.next()
+## int next()
 Return a new random number
 
-## int random.lcg.nextInt()
+## int nextInt()
 Return a new random number
 
-## int random.lcg.range(int min, int max)
+## int range(int min, int max)
 - int min
 - int max
 
 Return a new random number between min and max
 
-## float random.lcg.nextFloat()
+## float nextFloat()
 Return a new random float number
 
-## int random.lcg.seed()
+## int seed()
 Return the current seed
 
 

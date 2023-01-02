@@ -1,16 +1,16 @@
-# struct game.timer.Timer
+# struct Timer
 
 
-## lazy void game.timer.__init__()
+## lazy void __init__()
 
 
-## lazy void game.timer.__init__(int d1, int d2)
+## lazy void __init__(int d1, int d2)
 - int d1
 - int d2
 
 
 
-## lazy void game.timer.__init__(int c1, int c2, int c3, int c4)
+## lazy void __init__(int c1, int c2, int c3, int c4)
 - int c1
 - int c2
 - int c3
@@ -18,83 +18,83 @@
 
 
 
-## void game.timer.resetTime()
+## void resetTime()
 
 
-## void game.timer.start()
+## void start()
 
 
-## void game.timer.pause()
+## void pause()
 
 
-## void game.timer.continue()
+## void continue()
 
 
-## void game.timer.stop()
+## void stop()
 
 
-## int game.timer.getTime()
+## int getTime()
 
 
-## int game.timer.getMilisec()
+## int getMilisec()
 
 
-## void game.timer.setLevel(int l)
+## void setLevel(int l)
 - int l
 
 
 
-## void game.timer.setMaxLevel(int l)
+## void setMaxLevel(int l)
 - int l
 
 
 
-## void game.timer.addDeath()
+## void addDeath()
 
 
-## void game.timer.addKill()
+## void addKill()
 
 
-## void game.timer.reset()
+## void reset()
 
 
-## void game.timer.forceDeath(bool d)
+## void forceDeath(bool d)
 - bool d
 
 
 
-## void game.timer.forceKill(bool d)
+## void forceKill(bool d)
 - bool d
 
 
 
-## void game.timer.forceCheat(bool d)
+## void forceCheat(bool d)
 - bool d
 
 
 
-## void game.timer.forceLevel(bool d)
+## void forceLevel(bool d)
 - bool d
 
 
 
-## void game.timer.setGlobal(bool g)
+## void setGlobal(bool g)
 - bool g
 
 
 
-## void game.timer.setDisplay(bool d)
+## void setDisplay(bool d)
 - bool d
 
 
 
-## private void game.timer.__display__()
+## private void __display__()
 
 
-## int game.timer.getTotalTick()
+## int getTotalTick()
 
 
-## void game.timer.tick()
+## void tick()
 
 
 

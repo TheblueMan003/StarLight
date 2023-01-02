@@ -1,53 +1,53 @@
-## lazy void mc.entity.swap(entity $a, entity $b)
+## lazy void swap(entity $a, entity $b)
 - entity $a
 - entity $b
 
 
 
-## lazy void mc.entity.despawn(entity $a)
+## lazy void despawn(entity $a)
 - entity $a
 
 
 
-## predicate mc.entity.onFire
+## predicate onFire
 
 
-## predicate mc.entity.isSneaking
+## predicate isSneaking
 
 
-## predicate mc.entity.isSprinting
+## predicate isSprinting
 
 
-## predicate mc.entity.isSwimming
+## predicate isSwimming
 
 
-## predicate mc.entity.isBaby
+## predicate isBaby
 
 
-## lazy bool mc.entity.onGround()
+## lazy bool onGround()
 
 
-## bool mc.entity.onGround()
+## bool onGround()
 
 
-## predicate mc.entity.overworld
+## predicate overworld
 
 
-## predicate mc.entity.the_end
+## predicate the_end
 
 
-## predicate mc.entity.nether
+## predicate nether
 
 
-## predicate mc.entity.dimension
+## predicate dimension
 
 
-## lazy void mc.entity.angerAngaist(entity $e)
+## lazy void angerAngaist(entity $e)
 - entity $e
 
 
 
-## lazy void mc.entity.angerAngaist(entity e1, entity e2)
+## lazy void angerAngaist(entity e1, entity e2)
 - entity e1
 - entity e2
 
