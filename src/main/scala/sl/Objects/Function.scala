@@ -55,6 +55,10 @@ abstract class Function(context: Context, name: String, val arguments: List[Argu
         fullName + "(" +arguments.map(_.typ.toString()).foldRight("")(_ +","+_) +")"
     }
 
+    def schema() = {
+        modifiers.schema() + typ.toString() +" "+ fullName + "(" +arguments.map(a => a.typ.toString()+" "+a.name).foldRight("")(_ +","+_) +")"
+    }
+
     def hasRawJsonArg(): Boolean = {
         if arguments.length == 0 then false else
         arguments.last.typ match

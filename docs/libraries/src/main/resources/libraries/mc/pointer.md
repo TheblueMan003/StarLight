@@ -1,6 +1,0 @@
-
-## entities.marker
-List()
-## newPointer
-
-

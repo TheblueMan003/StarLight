@@ -33,7 +33,7 @@ object Main{
         args(0) match
           case "doc" => {
             val libraries: List[String] = FileUtils.getListOfFiles("./src/main/resources/libraries").filterNot(_.contains("__init__.sl"))
-            libraries.foreach(f => makeDocumentation(f.dropRight(3).replaceAllLiterally("./src/main/resources/libraries/",""), List(f)))
+            libraries.foreach(f => makeDocumentation(f.dropRight(3).replaceAllLiterally("\\","/").replaceAllLiterally("./src/main/resources/libraries/",""), List(f)))
             Reporter.ok("Documentation Completed!")
           }
           case "build" => {

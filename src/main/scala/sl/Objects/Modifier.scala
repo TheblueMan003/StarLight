@@ -70,6 +70,26 @@ class Modifier(){
         
         this
     }
+
+    def schema()={
+        var ret = protection match
+            case Protection.Public => "public"
+            case Protection.Protected => ""
+            case Protection.Private => "private"
+        if isAbstract then ret += " abstract"
+        if isVirtual then ret += " virtual"
+        if isOverride then ret += " override"
+        if isLazy then ret += " lazy"
+        if isEntity then ret += " entity"
+        if isConst then ret += " const"
+        if isTicking then ret += " ticking"
+        if isLoading then ret += " loading"
+        if isStatic then ret += " static"
+        if isHelper then ret+=" helper"
+        if tags.length > 0 then ret += " "+tags.mkString(" ")
+        if attributes.size > 0 then ret += " ["+attributes.map(a => s"${a._1}=${a._2}").mkString(",")+"]"
+        ret
+    }
 }
 
 trait Protection
