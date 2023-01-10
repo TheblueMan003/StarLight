@@ -1,79 +1,99 @@
 # List of Libraries
 
-[cmd/effect](libraries\cmd/effect.md)
+[cmd/effect](libraries/cmd/effect/index.html)
 
-[cmd/worldborder](libraries\cmd/worldborder.md)
+[cmd/worldborder](libraries/cmd/worldborder/index.html)
 
-[cmd/schedule](libraries\cmd/schedule.md)
+[cmd/schedule](libraries/cmd/schedule/index.html)
 
-[cmd/bossbar](libraries\cmd/bossbar.md)
+[cmd/bossbar](libraries/cmd/bossbar/index.html)
 
-[cmd/actionbar](libraries\cmd/actionbar.md)
+[cmd/actionbar](libraries/cmd/actionbar/index.html)
 
-[cmd/sound](libraries\cmd/sound.md)
+[cmd/sound](libraries/cmd/sound/index.html)
 
-[cmd/particle](libraries\cmd/particle.md)
+[cmd/particle](libraries/cmd/particle/index.html)
 
-[cmd/team](libraries\cmd/team.md)
+[cmd/team](libraries/cmd/team/index.html)
 
-[cmd/title](libraries\cmd/title.md)
+[cmd/title](libraries/cmd/title/index.html)
 
-[cmd/gamemode](libraries\cmd/gamemode.md)
+[cmd/gamemode](libraries/cmd/gamemode/index.html)
 
-[cmd/block](libraries\cmd/block.md)
+[cmd/block](libraries/cmd/block/index.html)
 
-[cmd/entity](libraries\cmd/entity.md)
+[cmd/entity](libraries/cmd/entity/index.html)
 
-[cmd/tp](libraries\cmd/tp.md)
+[cmd/tp](libraries/cmd/tp/index.html)
 
-[standard/int](libraries\standard/int.md)
+[cmd/time](libraries/cmd/time/index.html)
 
-[utils/process](libraries\utils/process.md)
+[cmd/structure](libraries/cmd/structure/index.html)
 
-[utils/process_manager](libraries\utils/process_manager.md)
+[cmd/score](libraries/cmd/score/index.html)
 
-[utils/cprocess](libraries\utils/cprocess.md)
+[standard/int](libraries/standard/int/index.html)
 
-[mc/entity/nbt](libraries\mc/entity/nbt.md)
+[standard/float](libraries/standard/float/index.html)
 
-[mc/entity](libraries\mc/entity.md)
+[standard/long](libraries/standard/long/index.html)
 
-[mc/inventory](libraries\mc/inventory.md)
+[utils/process](libraries/utils/process/index.html)
 
-[mc/item](libraries\mc/item.md)
+[utils/process_manager](libraries/utils/process_manager/index.html)
 
-[mc/player](libraries\mc/player.md)
+[utils/cprocess](libraries/utils/cprocess/index.html)
 
-[mc/pointer](libraries\mc/pointer.md)
+[mc/entity/nbt](libraries/mc/entity/nbt/index.html)
 
-[random/lcg](libraries\random/lcg.md)
+[mc/java/explosion](libraries/mc/java/explosion/index.html)
 
-[math/time](libraries\math/time.md)
+[mc/java/nbt](libraries/mc/java/nbt/index.html)
 
-[math/vector3](libraries\math/vector3.md)
+[mc/java/font](libraries/mc/java/font/index.html)
 
-[math/vector2](libraries\math/vector2.md)
+[mc/entity](libraries/mc/entity/index.html)
 
-[math/vector3int](libraries\math/vector3int.md)
+[mc/inventory](libraries/mc/inventory/index.html)
 
-[math/vector2int](libraries\math/vector2int.md)
+[mc/item](libraries/mc/item/index.html)
 
-[math/raycast](libraries\math/raycast.md)
+[mc/player](libraries/mc/player/index.html)
 
-[game/score](libraries\game/score.md)
+[mc/pointer](libraries/mc/pointer/index.html)
 
-[game/timer](libraries\game/timer.md)
+[random/lcg](libraries/random/lcg/index.html)
 
-[game/countdown](libraries\game/countdown.md)
+[random/perlin](libraries/random/perlin/index.html)
 
-[game/room](libraries\game/room.md)
+[math/time](libraries/math/time/index.html)
 
-[animation/cutscene](libraries\animation/cutscene.md)
+[math/vector3](libraries/math/vector3/index.html)
 
-[math](libraries\math.md)
+[math/vector2](libraries/math/vector2/index.html)
 
-[standard](libraries\standard.md)
+[math/vector3int](libraries/math/vector3int/index.html)
 
-[random](libraries\random.md)
+[math/vector2int](libraries/math/vector2int/index.html)
 
-[test](libraries\test.md)
+[math/raycast](libraries/math/raycast/index.html)
+
+[game/parkour/snake](libraries/game/parkour/snake/index.html)
+
+[game/score](libraries/game/score/index.html)
+
+[game/timer](libraries/game/timer/index.html)
+
+[game/countdown](libraries/game/countdown/index.html)
+
+[game/room](libraries/game/room/index.html)
+
+[animation/cutscene](libraries/animation/cutscene/index.html)
+
+[math](libraries/math/index.html)
+
+[standard](libraries/standard/index.html)
+
+[random](libraries/random/index.html)
+
+[test](libraries/test/index.html)

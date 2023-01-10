@@ -1,176 +1,115 @@
-## lazy void create(mcobject $name, rawjson $text)
-- mcobject $name
-- rawjson $text
+## ` lazy void create(mcobject $name, rawjson $text)`
 
 
-
-## lazy void setPrefix(mcobject $name, rawjson $text)
-- mcobject $name
-- rawjson $text
+## ` lazy void setPrefix(mcobject $name, rawjson $text)`
 
 
-
-## lazy void setColor(mcobject $name, mcobject $color)
-- mcobject $name
-- mcobject $color
+## ` lazy void setColor(mcobject $name, mcobject $color)`
 
 
-
-## lazy void seeFriendlyInvisibles(mcobject $name, bool $value)
-- mcobject $name
-- bool $value
+## ` lazy void seeFriendlyInvisibles(mcobject $name, bool $value)`
 
 
-
-## lazy void hideFriendlyInvisibles(mcobject $name)
-- mcobject $name
+## ` lazy void hideFriendlyInvisibles(mcobject $name)`
 
 
-
-## lazy void disableCollision(mcobject $name)
-- mcobject $name
+## ` lazy void disableCollision(mcobject $name)`
 
 
-
-## lazy void collisionOther(mcobject $name)
-- mcobject $name
+## ` lazy void collisionOther(mcobject $name)`
 
 
-
-## lazy void collisionOwn(mcobject $name)
-- mcobject $name
+## ` lazy void collisionOwn(mcobject $name)`
 
 
-
-## lazy void enableCollision(mcobject $name)
-- mcobject $name
+## ` lazy void enableCollision(mcobject $name)`
 
 
-
-## lazy void setName(mcobject $name, rawjson $text)
-- mcobject $name
-- rawjson $text
+## ` lazy void setName(mcobject $name, rawjson $text)`
 
 
-
-## lazy void friendlyFire(mcobject $name, bool $value)
-- mcobject $name
-- bool $value
+## ` lazy void friendlyFire(mcobject $name, bool $value)`
 
 
-
-## lazy void join(mcobject $name, entity $sel)
-- mcobject $name
-- entity $sel
+## ` lazy void join(mcobject $name, entity $sel)`
 
 
-
-## lazy void join(mcobject $name)
-- mcobject $name
+## ` lazy void join(mcobject $name)`
 
 
-
-## lazy void leave(entity $sel)
-- entity $sel
+## ` lazy void leave(entity $sel)`
 
 
-
-## lazy void empty(mcobject $name)
-- mcobject $name
+## ` lazy void empty(mcobject $name)`
 
 
-
-## lazy void delete(mcobject $name)
-- mcobject $name
-
+## ` lazy void delete(mcobject $name)`
 
 
 # struct Team
 
 
-## lazy void __init__(rawjson text)
-- rawjson text
+## ` lazy void __init__(rawjson text)`
 
 
-
-## lazy void setPrefix(rawjson text)
-- rawjson text
+## ` lazy void setPrefix(rawjson text)`
 
 
-
-## lazy void setSuffix(rawjson text)
-- rawjson text
+## ` lazy void setSuffix(rawjson text)`
 
 
-
-## lazy void setColor(mcobject color)
-- mcobject color
+## ` lazy void setColor(mcobject color)`
 
 
-
-## lazy void seeFriendlyInvisibles(bool value)
-- bool value
+## ` lazy void seeFriendlyInvisibles(bool value)`
 
 
-
-## lazy void hideFriendlyInvisibles()
-
-
-## lazy void disableCollision()
+## ` lazy void hideFriendlyInvisibles()`
 
 
-## lazy void collisionOther()
+## ` lazy void disableCollision()`
 
 
-## lazy void collisionOwn()
+## ` lazy void collisionOther()`
 
 
-## lazy void enableCollision()
+## ` lazy void collisionOwn()`
 
 
-## lazy void setName(json text)
-- json text
+## ` lazy void enableCollision()`
 
 
-
-## lazy void friendlyFire(bool value)
-- bool value
+## ` lazy void setName(json text)`
 
 
-
-## lazy void join(entity sel)
-- entity sel
+## ` lazy void friendlyFire(bool value)`
 
 
-
-## lazy void join()
-
-
-## lazy void forcejoin()
+## ` lazy void join(entity sel)`
 
 
-## lazy void __add__(entity sel)
-- entity sel
+## ` lazy void join()`
 
 
-
-## lazy void leave(entity sel)
-- entity sel
+## ` lazy void forcejoin()`
 
 
-
-## lazy void leave()
-
-
-## lazy void __sub__(entity sel)
-- entity sel
+## ` lazy void __add__(entity sel)`
 
 
+## ` lazy void leave(entity sel)`
 
-## lazy void empty()
+
+## ` lazy void leave()`
 
 
-## lazy void delete()
+## ` lazy void __sub__(entity sel)`
+
+
+## ` lazy void empty()`
+
+
+## ` lazy void delete()`
 
 
 

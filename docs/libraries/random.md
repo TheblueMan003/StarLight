@@ -1,21 +1,13 @@
-## lazy int range(int x, int y)
-- int x
-- int y
-
+## ` lazy int range(int x, int y)`
 Return a random number between `x` (included) and `y` (excluded)
 
-## lazy int range(int x, int y)
-- int x
-- int y
-
+## ` lazy int range(int x, int y)`
 Return a random number between `x` (included) and `y` (excluded)
 
-## lazy int range(int x)
-- int x
-
+## ` lazy int range(int x)`
 Return a random number between 0 and `x` (excluded)
 
-## lazy int next()
+## ` lazy int next()`
 Return a random number between `x` (included) and `y` (excluded)
 
 

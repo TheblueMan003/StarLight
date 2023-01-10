@@ -1,17 +1,13 @@
-## lazy void print(rawjson $text)
-- rawjson $text
+## ` lazy void print(rawjson $text)`
 
 
-
-## lazy void debug(rawjson text)
-- rawjson text
+## ` lazy void debug(rawjson text)`
 
 
+## ` (int,int,int) version()`
 
-## (int,int,int) version()
 
-
-## void printVersion()
+## ` void printVersion()`
 
 
 

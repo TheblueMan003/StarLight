@@ -1,22 +1,22 @@
 # template Test
 
 
-## void onStart()
+## ` void onStart()`
 
 
-## void main()
+## ` void main()`
 
 
-## void onStop()
+## ` void onStop()`
 
 
-## lazy int getDuration()
+## ` lazy int getDuration()`
 
 
-## void run()
+## ` void run()`
 
 
-## bool getResult()
+## ` bool getResult()`
 
 
 

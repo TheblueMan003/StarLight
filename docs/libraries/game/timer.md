@@ -1,100 +1,73 @@
 # struct Timer
 
 
-## lazy void __init__()
+## ` lazy void __init__()`
 
 
-## lazy void __init__(int d1, int d2)
-- int d1
-- int d2
+## ` lazy void __init__(int d1, int d2)`
 
 
-
-## lazy void __init__(int c1, int c2, int c3, int c4)
-- int c1
-- int c2
-- int c3
-- int c4
+## ` lazy void __init__(int c1, int c2, int c3, int c4)`
 
 
-
-## void resetTime()
-
-
-## void start()
+## ` void resetTime()`
 
 
-## void pause()
+## ` void start()`
 
 
-## void continue()
+## ` void pause()`
 
 
-## void stop()
+## ` void continue()`
 
 
-## int getTime()
+## ` void stop()`
 
 
-## int getMilisec()
+## ` int getTime()`
 
 
-## void setLevel(int l)
-- int l
+## ` int getMilisec()`
 
 
-
-## void setMaxLevel(int l)
-- int l
+## ` void setLevel(int l)`
 
 
-
-## void addDeath()
-
-
-## void addKill()
+## ` void setMaxLevel(int l)`
 
 
-## void reset()
+## ` void addDeath()`
 
 
-## void forceDeath(bool d)
-- bool d
+## ` void addKill()`
 
 
-
-## void forceKill(bool d)
-- bool d
+## ` void reset()`
 
 
-
-## void forceCheat(bool d)
-- bool d
+## ` void forceDeath(bool d)`
 
 
-
-## void forceLevel(bool d)
-- bool d
+## ` void forceKill(bool d)`
 
 
-
-## void setGlobal(bool g)
-- bool g
+## ` void forceCheat(bool d)`
 
 
-
-## void setDisplay(bool d)
-- bool d
+## ` void forceLevel(bool d)`
 
 
-
-## private void __display__()
-
-
-## int getTotalTick()
+## ` void setGlobal(bool g)`
 
 
-## void tick()
+## ` void setDisplay(bool d)`
+
+
+## ` int getTotalTick()`
+
+
+## ` void tick()`
 
 
 

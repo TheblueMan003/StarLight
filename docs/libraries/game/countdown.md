@@ -1,76 +1,58 @@
 # struct Countdown
 
 
-## void __init__(int h, int m, int s, int t)
-- int h
-- int m
-- int s
-- int t
+## ` void __init__(int h, int m, int s, int t)`
 
 
-
-## void onEnd(void=>void event)
-- void=>void event
+## ` void onEnd(void=>void event)`
 
 
-
-## void start()
-
-
-## void pause()
+## ` void start()`
 
 
-## void continue()
+## ` void pause()`
 
 
-## void stop()
+## ` void continue()`
 
 
-## int getMilisec()
+## ` void stop()`
 
 
-## void setLevel(int l)
-- int l
+## ` int getMilisec()`
 
 
-
-## void setMaxLevel(int l)
-- int l
+## ` void setLevel(int l)`
 
 
-
-## void addDeath()
-
-
-## void addKill()
+## ` void setMaxLevel(int l)`
 
 
-## void reset()
+## ` void addDeath()`
 
 
-## void showDeath()
+## ` void addKill()`
 
 
-## void showKill()
+## ` void reset()`
 
 
-## void showLevel()
+## ` void showDeath()`
 
 
-## void setGlobal(bool g)
-- bool g
+## ` void showKill()`
 
 
-
-## void setDisplay(bool d)
-- bool d
+## ` void showLevel()`
 
 
+## ` void setGlobal(bool g)`
 
-## private void __display__()
+
+## ` void setDisplay(bool d)`
 
 
-## void tick()
+## ` void tick()`
 
 
 
