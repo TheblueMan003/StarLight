@@ -136,12 +136,15 @@ def lazy kill(entity $selector = @s){
 	/kill $selector
 }
 
-def lazy despawn(entity $selector = @s){
+def lazy despawn(entity e = @s){
 	if(Compiler.isBedrock()){
-		/event entity $selector to_death
+        def lazy inner(entity $a){
+            /event entity $a to_death
+        }
+		inner(e)
 	}
 	if(Compiler.isJava()){
-		with($selector, true){
+		with(e, true){
 		/tp @s ~ -200 ~
 		}
 	}

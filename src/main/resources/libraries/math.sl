@@ -6,17 +6,7 @@ val e = 2.718
 """
 Return the absolute value of x
 """
-int abs(int x){
-	if(x < 0){
-		x *= -1
-	}
-    return x
-}
-
-"""
-Return the absolute value of x
-"""
-float abs(float x){
+T abs<T>(T x){
 	if(x < 0){
 		x *= -1
 	}
@@ -26,17 +16,7 @@ float abs(float x){
 """
 Return the max between the a and b
 """
-int max(int a, int b){
-	if(a > b){
-		b = a
-	}
-	return b
-}
-
-"""
-Return the max between the a and b
-"""
-float max(float a, float b){
+T max<T>(T a, T b){
 	if(a > b){
 		b = a
 	}
@@ -46,17 +26,7 @@ float max(float a, float b){
 """
 Return the min between the a and b
 """
-int min(int a, int b){
-	if(a < b){
-		b = a
-	}
-	return b
-}
-
-"""
-Return the min between the a and b
-"""
-float min(float a, float b){
+T min<T>(T a, T b){
 	if(a < b){
 		b = a
 	}
@@ -163,28 +133,8 @@ def float pow(float x, int n, float m = 1){
 """
 return x^n
 """
-def int pow(int x, int n, int m = 1){
-    if (n < 0){
-        //exception.invalidArgument("n in math.intPow")
-    }
-    if (n == 0){
-        return(1)
-    }
-    if (n == 1){
-        int ret = x * m
-        return(ret)
-    }
-    if (n > 1){
-        int parity = x % 2
-        
-        if (parity == 1){
-            m *= x
-            n -= 1
-        }
-        n /= 2
-        x*=x
-        return(pow(x, n, m))
-    }
+int pow(int x, int n){
+    return x ^ n
 }
 
 """
@@ -192,21 +142,7 @@ Return sign of the argument
 -1 if value smaller than 0
 1 otherwise
 """
-int sign(float value){
-    if (value >= 0){
-        return(1)
-    }
-    if (value < 0){
-        return(-1)
-    }
-}
-
-"""
-Return sign of the argument
--1 if value smaller than 0
-1 otherwise
-"""
-int sign(int value){
+T sign<T>(T value){
     if (value >= 0){
         return(1)
     }
@@ -247,21 +183,14 @@ float ceil(float value){
 """
 Clamp the value between a and b
 """
-int clamp(int value, int a, int b){
-    return(math.max(math.min(value, a),b))
-}
-
-"""
-Clamp the value between a and b
-"""
-float clamp(float value, float a, float b){
+T clamp<T>(T value, T a, T b){
     return(math.max(math.min(value, a),b))
 }
 
 """
 Return (a,b) if a <= b else return (b,a)
 """
-(int,int) sorted(int a, int b){
+(T,T) sorted<T>(T a, T b){
     if (a > b){
         return(b, a)
     }
@@ -270,16 +199,12 @@ Return (a,b) if a <= b else return (b,a)
     }
 }
 
+
 """
-Return (a,b) if a <= b else return (b,a)
+Return the linear interpolated value of a0 and a1 with coefficient w
 """
-(float,float) sorted(float a, float b){
-    if (a > b){
-        return(b, a)
-    }
-    if (a <= b){
-        return(a, b)
-    }
+lazy float lerp(float a0, float a1, float w){
+    linearLerp(a0, a1, w)
 }
 
 
@@ -319,7 +244,8 @@ float sin(float angle){
         res += sign * pow / fact
         sign *= -1
         fact *= (2*i+2) * (2*i+3)
-        pow *= angleRad * angleRad
+        pow *= angleRad
+        pow *= angleRad
     }
     return res
 }
@@ -337,7 +263,8 @@ float cos(float angle){
         res += sign * pow / fact
         sign *= -1
         fact *= (2*i+1) * (2*i+2)
-        pow *= angleRad * angleRad
+        pow *= angleRad
+        pow *= angleRad
     }
     return res
 }
@@ -361,7 +288,8 @@ float asin(float angle){
         res += sign * pow / fact
         sign *= -1
         fact *= (2*i+1) * (2*i+2)
-        pow *= angle * angle
+        pow *= angle
+        pow *= angle
     }
     return res
 }

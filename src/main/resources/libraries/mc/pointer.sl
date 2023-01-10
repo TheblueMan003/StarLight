@@ -56,6 +56,10 @@ if (Compiler.isBedrock()){
 	}
 }
 
+
+"""
+Creates a new pointer
+"""
 lazy entity newPointer(){
     if (Compiler.isJava()){
         return entity.summon(minecraft:marker)
@@ -63,4 +67,15 @@ lazy entity newPointer(){
     if (Compiler.isBedrock()){
         return entity.summon(sl:marker)
     }
+}
+
+"""
+Runs a function in a with the pointer
+"""
+lazy void run(void=>void func){
+	entity a = newPointer()
+	with(a,true){
+		func()
+		/kill
+	}
 }

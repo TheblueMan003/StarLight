@@ -9,6 +9,7 @@ import sl.LambdaValue
 import sl.VariableValue
 import sl.Compilation.Selector.Selector
 import sl.NullValue
+import sl.Compiler
 
 object Context{
     def getNew(name: String):Context = {
@@ -189,6 +190,11 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
         val r = root
         r.synchronized{
             r.constants.add(value)
+        }
+    }
+    def requestLibrary(lib: String): Unit = {
+        if (importFile(lib)){
+            Compiler.compile(Utils.getLib(lib).get, true)(root)
         }
     }
     def getAllConstant(): List[Int] = {
@@ -387,14 +393,14 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
     def resolveVariable(vari: Expression) = {
 		val VariableValue(name, sel) = vari: @unchecked
 		tryGetProperty(name) match
-			case Some(Property(_, getter, setter, variable)) => FunctionCallValue(LinkedFunctionValue(getter), List(), sel)
+			case Some(Property(_, getter, setter, variable)) => FunctionCallValue(LinkedFunctionValue(getter), List(), List(), sel)
 			case _ => LinkedVariableValue(getVariable(name), sel)
 	}
 
 
 
 
-    def getFunction(identifier: Identifier, args: List[Expression], output: Type, concrete: Boolean = false): (Function, List[Expression]) = {
+    def getFunction(identifier: Identifier, args: List[Expression], typeargs: List[Type], output: Type, concrete: Boolean = false): (Function, List[Expression]) = {
         if (identifier.toString().startsWith("@")){
             (getFunctionTags(identifier), args)
         }
@@ -407,7 +413,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
                             case LambdaValue(args2, instr) => {
                                 (getFreshLambda(args2, args.map(Utils.typeof(_)(this)), output, instr, false), args)
                             }
-                            case VariableValue(name, sel) => getFunction(name, args, output, concrete)
+                            case VariableValue(name, sel) => getFunction(name, args, typeargs, output, concrete)
                             case LinkedVariableValue(vari, selector) => {
                                 val typ = vari.getType().asInstanceOf[FuncType]
                                 (getFunctionMux(typ.sources, typ.output)(this), LinkedVariableValue(vari)::args)
@@ -420,20 +426,32 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
                         (getFunctionMux(typ.sources, typ.output)(this), LinkedVariableValue(vari)::args)
                     }
                 }
-                case _ => (getFunction(identifier, args.map(Utils.typeof(_)(this)), output, concrete), args)
+                case _ => (getFunction(identifier, args.map(Utils.typeof(_)(this)), typeargs, output, concrete), args)
         }
     }
-    def getFunction(identifier: Identifier, args: List[Type], output: Type, concrete: Boolean): Function = {
-        if (identifier.toString().startsWith("@")) return getFunctionTags(identifier)
-        val fcts2 = getElementList(_.functions)(identifier)
-        val fcts = fcts2.filter(f => !fcts2.exists(g => g.overridedFunction == f))
-        if (fcts.size == 0) throw new ObjectNotFoundException(f"Unknown function: $identifier in context: $path")
-        if (fcts.size == 1) return fcts.head
-        val filtered = fcts.filter(fct => args.size >= fct.minArgCount && args.size <= fct.maxArgCount && (fct.isInstanceOf[ConcreteFunction] || !concrete))
-        if (filtered.length == 1) return filtered.head
-        if (filtered.size == 0) throw new ObjectNotFoundException(f"Unknown function: $identifier for args: $args in context: $path")
-        val ret = filtered.sortBy(_.arguments.zip(args).map((a, v)=> v.getDistance(a.typ)(this)).reduceOption(_ + _).getOrElse(0)).head
-        ret
+    def getFunction(identifier: Identifier, args: List[Type], typeargs: List[Type], output: Type, concrete: Boolean): Function = {
+        def inner():Function={
+            if (identifier.toString().startsWith("@")) return getFunctionTags(identifier)
+            val fcts2 = getElementList(_.functions)(identifier)
+            val fcts = fcts2.filter(f => !fcts2.exists(g => g.overridedFunction == f))
+            if (fcts.size == 0) throw new ObjectNotFoundException(f"Unknown function: $identifier in context: $path")
+            if (fcts.size == 1) return fcts.head
+            val filtered = fcts.filter(fct => args.size >= fct.minArgCount && args.size <= fct.maxArgCount && (fct.isInstanceOf[ConcreteFunction] || !concrete))
+            if (filtered.length == 1) return filtered.head
+            if (filtered.size == 0) throw new ObjectNotFoundException(f"Unknown function: $identifier for args: $args in context: $path")
+            val ret = filtered.sortBy(_.arguments.zip(args).map((a, v)=> v.getDistance(a.typ)(this)).reduceOption(_ + _).getOrElse(0)).head
+            ret
+        }
+        val ret = inner()
+        ret match
+            case g: GenericFunction => 
+                if (typeargs.size != g.generics.size){
+                    g.get(Utils.resolveGenerics(g.generics, g.arguments.zip(args))(this))
+                }
+                else{
+                    g.get(typeargs)
+                }
+            case other => other
     }
     def getFunction(identifier: Identifier): Function = {
         if (identifier.toString().startsWith("@")) return getFunctionTags(identifier)
@@ -466,8 +484,8 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
         )
     }
     def addFunction(name: String, function: Function): Function = synchronized{
-
         if (!functions.contains(name)){
+            addName(name)
             functions.addOne(name, List())
         }
         functions(name) = function :: functions(name)
@@ -622,6 +640,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
         tryGetElement(_.typedefs)(identifier)
     }
     def addTypeDef(name: String, typedef: Type): Type = synchronized{
+        addName(name)
         typedefs.addOne(name, typedef)
         typedef
     }
@@ -649,26 +668,26 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
             }
             case FuncType(from, to) => FuncType(from.map(getType(_)), getType(to))
             case TupleType(from) => TupleType(from.map(getType(_)))
-            case IdentifierType(identifier) => {
+            case IdentifierType(identifier, sub) => {
                 val typdef = tryGetTypeDef(identifier)
-                if (typdef.isDefined){
+                if (typdef.isDefined && sub.size == 0){
                     return getType(typdef.get)
                 }
 
 
                 val clazz = tryGetClass(identifier)
                 if (clazz.isDefined){
-                    return ClassType(clazz.get)
+                    return ClassType(clazz.get, sub.map(getType(_)))
                 }
 
 
                 val struct = tryGetStruct(identifier)
                 if (struct.isDefined){
-                    return StructType(struct.get)
+                    return StructType(struct.get, sub.map(getType(_)))
                 }
 
                 val enm = tryGetEnum(identifier)
-                if (enm.isDefined){
+                if (enm.isDefined && sub.size == 0){
                     return EnumType(enm.get)
                 }
 

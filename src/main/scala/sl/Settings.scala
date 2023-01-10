@@ -77,7 +77,7 @@ case object MCJava extends Target{
         val loads = context.getAllFunction()
                         .filter(_.modifiers.isLoading)
                         .map(f => getFunctionName(f.fullName))
-                        .appended(f"${context.root.getPath()}:__init__")
+                        .prepended(f"${context.root.getPath()}:__init__")
                         .map(Utils.stringify(_))
                         .reduceOption(_ +","+_)
                         .getOrElse("")
@@ -98,11 +98,11 @@ case object MCJava extends Target{
     }
 
     def getPackMeta()=
-        """
+        f"""
         {
             "pack": {
-                "pack_format": 10,
-                "description": "Made with Project Star Light"
+                "pack_format": ${Settings.java_datapack_version.version},
+                "description": ${Utils.stringify(Settings.java_datapack_version.description)}
             }
         }
         """
@@ -154,7 +154,7 @@ case object MCBedrock extends Target{
         "name": "${Settings.outputName}",
         "uuid": "${getUUID(Settings.outputName)}",
         "version": [${Settings.version(0)}, ${Settings.version(1)}, ${Settings.version(2)}],
-        "min_engine_version": [1, 19, 50]
+        "min_engine_version": [${Settings.bedrock_behaviorpack_version.min_engine_version(0)}, ${Settings.bedrock_behaviorpack_version.min_engine_version(1)}, ${Settings.bedrock_behaviorpack_version.min_engine_version(2)}]
     },
     "modules": [
         {

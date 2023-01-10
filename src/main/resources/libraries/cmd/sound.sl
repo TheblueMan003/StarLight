@@ -5,7 +5,7 @@ Play the sound `sound` to `selector` with `volume` and `pitch` on channel `loc`
 """
 def lazy play(entity $selector, mcobject $sound, int $volume, int $pitch, mcobject $loc){
     if (Compiler.isJava()){
-        /playsound $sound $loc $selector ~ ~ ~ $volume pitch
+        /playsound $sound $loc $selector ~ ~ ~ $volume $pitch
     }
     else{
         /playsound $sound $selector ~ ~ ~ $volume $pitch

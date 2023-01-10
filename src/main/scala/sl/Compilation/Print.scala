@@ -63,12 +63,12 @@ object Print{
             }
             case LambdaValue(args, instr) => throw new Exception("Cannot transform lambda to rawjson")
             case RawJsonValue(value) => (List(), value)
-            case FunctionCallValue(name, args, sel) => {
+            case FunctionCallValue(name, args, typeargs, sel) => {
                 val (p1, vari) = Utils.simplifyToVariable(expr)
                 val (p2, print) = toRawJson(vari)
                 (p1:::p2, print)
             }
-            case ConstructorCall(name, args) => {
+            case ConstructorCall(name, args, generics) => {
                 val (p1, vari) = Utils.simplifyToVariable(expr)
                 val (p2, print) = toRawJson(vari)
                 (p1:::p2, print)
@@ -133,6 +133,11 @@ trait Printable{
             case MCBedrock => toBedrock()
             case MCJava => toJava()
     }
+    def getLength()(implicit ctx: Context): Int
+    def sub(size: Int)(implicit ctx: Context): Printable
+}
+object Printable{
+    val empty = new PrintString("", Namecolor("white"), TextModdifier(false, false, false, false, false))
 }
 trait PrintColor{
     def toBedrock()(implicit ctx: Context): String
@@ -172,6 +177,12 @@ case class PrintString(val text: String, val color: PrintColor, val modifier: Te
         f"{\"text\": \"$text\", ${modifier.toJava()}, ${color.toJava()}}"
     def toBedrock()(implicit ctx: Context): String =
         f"{\"text\":\"§r${modifier.toBedrock()}§${color.toBedrock()}$text\"}"
+    def getLength()(implicit ctx: Context): Int = text.length
+    def sub(size: Int)(implicit ctx: Context): Printable = {
+        if (size <= 0) Printable.empty
+        else if (size >= text.length) this
+        else PrintString(text.substring(0, size), color, modifier)
+    }
 }
 case class PrintVariable(val vari: Variable, val selector: Selector, val color: PrintColor, val modifier: TextModdifier) extends Printable{
     def toJava()(implicit ctx: Context): String = 
@@ -179,6 +190,9 @@ case class PrintVariable(val vari: Variable, val selector: Selector, val color: 
     def toBedrock()(implicit ctx: Context): String = {
         f"{\"score\": { \"name\": \"${vari.getSelectorName()(selector)}\", \"objective\": \"${vari.getSelectorObjective()(selector)}\"}}"
     }
+    def getLength()(implicit ctx: Context): Int = 1
+    def sub(size: Int)(implicit ctx: Context): Printable = 
+        if (size >= 1) this else PrintString("", color, modifier)
 }
 case class PrintSelector(val selector: Selector, val color: PrintColor, val modifier: TextModdifier) extends Printable{
     def toJava()(implicit ctx: Context): String = 
@@ -186,6 +200,9 @@ case class PrintSelector(val selector: Selector, val color: PrintColor, val modi
     def toBedrock()(implicit ctx: Context): String = {
         f"{\"selector\":\"${selector.getString()}\"}"
     }
+    def getLength()(implicit ctx: Context): Int = 1
+    def sub(size: Int)(implicit ctx: Context): Printable = 
+        if (size >= 1) this else PrintString("", color, modifier)
 }
 
 case class PrintTranslate(val key: String, val rjv: RawJsonValue, val color: PrintColor, val modifier: TextModdifier) extends Printable{
@@ -207,4 +224,7 @@ case class PrintTranslate(val key: String, val rjv: RawJsonValue, val color: Pri
             f"{\"translate\":\"${key}\"}"
         }
     }
+    def getLength()(implicit ctx: Context): Int = 1
+    def sub(size: Int)(implicit ctx: Context): Printable = 
+        if (size >= 1) this else PrintString("", color, modifier)
 }

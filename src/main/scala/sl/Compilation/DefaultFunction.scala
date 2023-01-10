@@ -5,6 +5,9 @@ import objects.types.*
 import objects.*
 import sl.*
 import java.util.Random
+import sys.process._
+import java.nio.file.Files
+import java.nio.file.Paths
 
 object DefaultFunction{
     def get()(implicit context: Context) = {
@@ -90,7 +93,7 @@ object DefaultFunction{
                     }
                 }
             ))
-        ctx.addFunction("pow", CompilerFunction(ctx, "sqrt", 
+        ctx.addFunction("pow", CompilerFunction(ctx, "pow", 
                 List(Argument("x", FloatType, None), Argument("y", FloatType, None)),
                 FloatType,
                 Modifier.newPublic(),
@@ -108,7 +111,20 @@ object DefaultFunction{
                         case IntValue(x)::IntValue(y)::Nil => {
                             (List(), FloatValue(math.pow(x,y)))
                         }
-                        case other => throw new Exception(f"Illegal Arguments $other for sqrt")
+                        case other => throw new Exception(f"Illegal Arguments $other for pow")
+                    }
+                }
+            ))
+        ctx.addFunction("powInt", CompilerFunction(ctx, "powInt", 
+                List(Argument("x", FloatType, None), Argument("y", FloatType, None)),
+                FloatType,
+                Modifier.newPublic(),
+                (args: List[Expression],ctx: Context) => {
+                    args match{
+                        case IntValue(x)::IntValue(y)::Nil => {
+                            (List(), IntValue(math.pow(x,y).toInt))
+                        }
+                        case other => throw new Exception(f"Illegal Arguments $other for powInt")
                     }
                 }
             ))
@@ -388,5 +404,60 @@ object DefaultFunction{
                     }
                 ))
         }
+    }
+    def getFile()(implicit context: Context)={
+        val ctx = context.root.push("File")
+        ctx.addFunction("exists", CompilerFunction(ctx, "exists", 
+            List(Argument("file", StringType, None)),
+            BoolType,
+            Modifier.newPublic(),
+            (args: List[Expression],ctx: Context) => {
+                args match{
+                    case StringValue(file) :: Nil => {
+                        (List(), BoolValue(java.io.File(file).exists()))
+                    }
+                    case other => throw new Exception(f"Illegal Arguments $other for exists")
+                }
+            }
+        ))
+        ctx.addFunction("isDirectory", CompilerFunction(ctx, "isDirectory", 
+            List(Argument("file", StringType, None)),
+            BoolType,
+            Modifier.newPublic(),
+            (args: List[Expression],ctx: Context) => {
+                args match{
+                    case StringValue(file) :: Nil => {
+                        (List(), BoolValue(java.io.File(file).isDirectory()))
+                    }
+                    case other => throw new Exception(f"Illegal Arguments $other for isDirectory")
+                }
+            }
+        ))
+        ctx.addFunction("isFile", CompilerFunction(ctx, "isFile", 
+            List(Argument("file", StringType, None)),
+            BoolType,
+            Modifier.newPublic(),
+            (args: List[Expression],ctx: Context) => {
+                args match{
+                    case StringValue(file) :: Nil => {
+                        (List(), BoolValue(java.io.File(file).isFile()))
+                    }
+                    case other => throw new Exception(f"Illegal Arguments $other for isFile")
+                }
+            }
+        ))
+        ctx.addFunction("run", CompilerFunction(ctx, "run", 
+            List(Argument("file", StringType, None)),
+            StringType,
+            Modifier.newPublic(),
+            (args: List[Expression],ctx: Context) => {
+                args match{
+                    case StringValue(file) :: Nil => {
+                        (List(), StringValue(Process(file).!!))
+                    }
+                    case other => throw new Exception(f"Illegal Arguments $other for run")
+                }
+            }
+        ))
     }
 }

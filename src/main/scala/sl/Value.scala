@@ -6,8 +6,9 @@ import objects.Variable
 import sl.Compilation.Selector.Selector
 import objects.Context
 import objects.types.*
-import sl.Compilation.Printable
+import sl.Compilation.*
 import objects.Function
+import sl.Compilation.Printable
 
 sealed abstract class Expression extends Positional{
     def hasIntValue(): Boolean
@@ -90,6 +91,35 @@ case class RawJsonValue(val value: List[Printable]) extends Expression with Smal
         Settings.target match
             case MCBedrock => f"{\"rawtext\" : [$json1]}"
             case MCJava => f"[$json1]"
+    }
+    def length()(implicit ctx: Context): Int = {
+        value.map(v => v.getLength()).sum
+    }
+    def substring(end: Int)(implicit ctx: Context):RawJsonValue = {
+        RawJsonValue(
+            value.map(v => (v.getLength(), v))
+                .scanLeft((end, Printable.empty: Printable))((a, b) => (a._1 - b._1, b._2.sub(a._1)))
+                .map(v => v._2)
+            )
+    }
+    def padLeft(finalSize: Int)(implicit ctx: Context): RawJsonValue = {
+        val length = this.length()
+        if length >= finalSize then this
+        else RawJsonValue(value ::: List(new PrintString(" " * (finalSize - length), Namecolor("white"), TextModdifier(false, false, false, false, false))))
+    }
+    def padRight(finalSize: Int)(implicit ctx: Context): RawJsonValue = {
+        val length = this.length()
+        if length >= finalSize then this
+        else RawJsonValue(List(new PrintString(" " * (finalSize - length), Namecolor("white"), TextModdifier(false, false, false, false, false))) ::: value)
+    }
+    def padCenter(finalSize: Int)(implicit ctx: Context): RawJsonValue = {
+        val length = this.length()
+        if length >= finalSize then this
+        else {
+            val left = (finalSize - length) / 2
+            val right = finalSize - length - left
+            RawJsonValue(List(new PrintString(" " * left, Namecolor("white"), TextModdifier(false, false, false, false, false))) ::: value ::: List(new PrintString(" " * right, Namecolor("white"), TextModdifier(false, false, false, false, false))))
+        }
     }
 }
 case class NamespacedName(val value: String) extends Expression with SmallValue{
@@ -193,7 +223,7 @@ case class LambdaValue(val args: List[String], val instr: Instruction) extends E
     }
 }
 
-case class FunctionCallValue(val name: Expression, val args: List[Expression], val selector: Selector = Selector.self) extends Expression with SmallValue{
+case class FunctionCallValue(val name: Expression, val args: List[Expression], val typeargs: List[Type], val selector: Selector = Selector.self) extends Expression with SmallValue{
     override def toString() = f"${name}()"
     override def getIntValue(): Int = ???
     override def hasIntValue(): Boolean = false
@@ -202,7 +232,7 @@ case class FunctionCallValue(val name: Expression, val args: List[Expression], v
     override def getString()(implicit context: Context): String = throw new Exception(f"Function call cannot be transformed to string: $name()")
 }
 
-case class ConstructorCall(val name: Identifier, val args: List[Expression]) extends Expression{
+case class ConstructorCall(val name: Identifier, val args: List[Expression], val typeArg: List[Type]) extends Expression{
     override def toString() = f"${name}()"
     override def getIntValue(): Int = ???
     override def hasIntValue(): Boolean = false
@@ -303,7 +333,7 @@ case class JsonIdentifier(val value: String) extends JSONElement{
         Utils.stringify(value)
     }
 }
-case class JsonCall(val value: String, val args: List[Expression]) extends JSONElement{
+case class JsonCall(val value: String, val args: List[Expression], val typeargs: List[Type]) extends JSONElement{
     def getString()(implicit context: Context): String = {
         Utils.stringify(value)
     }

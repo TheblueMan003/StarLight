@@ -2,6 +2,9 @@ package mc.entity
 
 import standard.int as int
 
+"""
+Swap the position of the entity $a and $b
+"""
 def lazy swap(entity $a, entity $b){
 	if (Compiler.isBedrock()){
 		with($a, true){
@@ -25,12 +28,18 @@ def lazy swap(entity $a, entity $b){
 	}
 }
 
-def lazy despawn(entity $a = @s){
+"""
+Despawn the entity e without killing it
+"""
+def lazy despawn(entity e = @s){
 	if(Compiler.isBedrock()){
-		/event entity $a to_death
+        def lazy inner(entity $a){
+            /event entity $a to_death
+        }
+		inner(e)
 	}
 	if(Compiler.isJava()){
-		with($a, true){
+		with(e, true){
 		/tp @s ~ -200 ~
 		}
 	}
@@ -87,18 +96,24 @@ predicate isBaby(){
 }
 
 if (Compiler.isJava()){
+    """
+    Return true if the entity is on the ground
+    """
 	lazy bool onGround(){
 		return @s[nbt={OnGround:true}]
 	}
 }
 if (Compiler.isBedrock()){
+    """
+    Return true if the entity is on the ground
+    """
 	bool onGround(){
-		/*if (!block(~ ~-0.1 ~ air)){
+		if (!block(~ ~-0.1 ~, minecraft:air)){
 			return true
 		}
 		else{
 			return false
-		}*/
+		}
 	}
 }
 
@@ -130,6 +145,9 @@ predicate dimension(string dimension){
     }
 }
 
+"""
+Anger the entity @s against e
+"""
 def lazy angerAngaist(entity $e){
     at(@s){
         /summon snowball ~ ~3 ~ {Tags:["trg"],HasBeenShot:1,LeftOwner:1}
@@ -140,8 +158,44 @@ def lazy angerAngaist(entity $e){
     }
 }
 
+"""
+Anger the entity e1 against e2
+"""
 def lazy angerAngaist(entity e1, entity e2){
     with(e1){
         angerAngaist(e2)
     }
+}
+
+"""
+Count the number of entity in e
+"""
+lazy int count(entity e){
+    int c = 0
+    with(e){
+        c++
+    }
+    return c
+}
+
+"""
+Count the number of entity in e that match the predicate
+"""
+lazy int count(entity e, bool p){
+    int c = 0
+    with(e,true,p){
+        c++
+    }
+    return c
+}
+
+"""
+Count the number of entity in e that match the predicate
+"""
+lazy int count(entity e, void=>bool p){
+    int c = 0
+    with(e,true,p()){
+        c++
+    }
+    return c
 }

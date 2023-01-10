@@ -23,19 +23,19 @@ object ContextBuilder{
 
     private def buildRec(inst: Instruction)(implicit context: Context):Unit = {
         inst match{
-            case StructDecl(name, block, modifier, parent) => {
+            case StructDecl(name, generics, block, modifier, parent) => {
                 val parentStruct = parent match
                     case None => null
                     case Some(p) => context.getStruct(p)
                 
-                context.addStruct(new Struct(context, name, modifier, block, parentStruct))
+                context.addStruct(new Struct(context, name, generics, modifier, block, parentStruct))
             }
-            case ClassDecl(name, block, modifier, parent, entity) => {
+            case ClassDecl(name, generics, block, modifier, parent, entity) => {
                 val parentClass = parent match
                     case None => if name != "object" then context.getClass("object") else null
                     case Some(p) => context.getClass(p)
                 
-                context.addClass(new Class(context, name, modifier, block, parentClass, entity.getOrElse(null))).generate()
+                context.addClass(new Class(context, name, generics, modifier, block, parentClass, entity)).generate()
             }
             case EnumDecl(name, fields, values, modifier) => {
                 val enm = context.addEnum(new Enum(context, name, modifier, fields))

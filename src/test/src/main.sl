@@ -1,4 +1,7 @@
 package a
-import cmd.tp as tp
 
-tp.absoluteX(20)
+import math
+
+void test(){
+    int a = math.abs(5)
+}

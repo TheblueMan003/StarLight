@@ -484,6 +484,20 @@ struct vector4 extends vector3{
 }
 ```
 
+### Generics 
+Struct can also accept type parameters with the following syntax:
+```
+struct Struct<T>{
+    T vari
+
+    def __init__(T value){
+        vari = value
+    }
+}
+
+Struct<int> example = new Struct<int>(0)
+```
+
 ## Classes
 Classes can be define with the following syntax:
 ```
@@ -491,6 +505,33 @@ class cow{
     int health
 }
 ```
+
+Class also support operator overloading with the same syntax as structs.
+
+### Generics 
+Class can also accept type parameters with the following syntax:
+```
+class Class<T>{
+    T vari
+
+    def __init__(T value){
+        vari = value
+    }
+}
+
+Class<int> example = new Class<int>(0)
+```
+
+### Entity for the class
+Class use an entity, to store data. By default it use a marker entity but you can change it with the following syntax:
+```
+class Cow with minecraft:cow for mcjava with minecraft:pig for mcbedrock{
+    def __init__(){
+
+    }
+}
+```
+
 
 ## Templates
 Templates are ways of having static class with inherritance.
@@ -540,6 +581,16 @@ Will be the same as
 int b = 0
 ```
 Every call for function that are not mark as inline is done in a sub context meaning that variable inside it won't be usable after the call.
+
+### Generic Functions
+Function can also support type parameters with the following syntax:
+```
+T function<T>(T a){
+    return a
+}
+int a = function(0)
+```
+where T is the type parameters.
 
 ### "Lazy IF"
 When a if statement is compiled, the expression inside it is simplified. If the result value is always true then the condition will disapear from the output code and all the else statement with it. 

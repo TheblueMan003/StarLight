@@ -1,5 +1,7 @@
 package cmd.tp
 
+import mc.pointer as pointer
+
 """
 Teleport `selector` to `pos`
 """
@@ -183,6 +185,109 @@ def private tpAxisMinus(float x, int axis){
         if(x % pow == 0){
             tpAxis(0-pow, axis)
             x-=pow
+        }
+    }
+}
+
+
+"""
+Get the x position of the current entity
+"""
+int getX(){
+    pointer.run(){
+        int x = 0
+        if (@s[x=0,dx=2147483647]){
+            foreach(i in 0..31){
+                at(@s){
+                    lazy var pow2 = Compiler.pow(2, 31-i)
+                    lazy var pow = pow2/1000
+                    if (@s[x=i,dx=2147483647]){
+                        x+=pow
+                        tpAxis(-pow, 0)
+                    }
+                }
+            }
+        }
+        if (@s[x=-2147483648,dx=2147483647]){
+            foreach(i in 0..31){
+                at(@s){
+                    lazy var pow2 = Compiler.pow(2, 31-i)
+                    lazy var pow = pow2/1000
+                    lazy var j = -i
+                    if (@s[x=j,dx=2147483647]){
+                        x-=pow
+                        tpAxis(pow, 0)
+                    }
+                }
+            }
+        }
+    }
+}
+
+"""
+Get the y position of the current entity
+"""
+int getY(){
+    pointer.run(){
+        int y = 0
+        if (@s[y=0,dy=2147483647]){
+            foreach(i in 0..31){
+                at(@s){
+                    lazy var pow2 = Compiler.pow(2, 31-i)
+                    lazy var pow = pow2/1000
+                    if (@s[y=i,dy=2147483647]){
+                        y+=pow
+                        tpAxis(-pow, 1)
+                    }
+                }
+            }
+        }
+        if (@s[y=-2147483648,dy=2147483647]){
+            foreach(i in 0..31){
+                at(@s){
+                    lazy var pow2 = Compiler.pow(2, 31-i)
+                    lazy var pow = pow2/1000
+                    lazy var j = -i
+                    if (@s[y=j,dy=2147483647]){
+                        y-=pow
+                        tpAxis(pow, 1)
+                    }
+                }
+            }
+        }
+    }
+}
+
+"""
+Get the z position of the current entity
+"""
+int getZ(){
+    pointer.run(){
+        int z = 0
+        if (@s[z=0,dz=2147483647]){
+            foreach(i in 0..31){
+                at(@s){
+                    lazy var pow2 = Compiler.pow(2, 31-i)
+                    lazy var pow = pow2/1000
+                    if (@s[z=i,dz=2147483647]){
+                        z+=pow
+                        tpAxis(-pow, 2)
+                    }
+                }
+            }
+        }
+        if (@s[z=-2147483648,dz=2147483647]){
+            foreach(i in 0..31){
+                at(@s){
+                    lazy var pow2 = Compiler.pow(2, 31-i)
+                    lazy var pow = pow2/1000
+                    lazy var j = -i
+                    if (@s[z=j,dz=2147483647]){
+                        z-=pow
+                        tpAxis(pow, 2)
+                    }
+                }
+            }
         }
     }
 }

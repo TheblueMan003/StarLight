@@ -362,3 +362,43 @@ class CompilerFunction(context: Context, name: String, arguments: List[Argument]
 
     override def canBeCallAtCompileTime: Boolean = true
 }
+
+class GenericFunction(context: Context, name: String, arguments: List[Argument], val generics: List[String], val typ: Type, _modifier: Modifier, val body: Instruction) extends Function(context, name, arguments, typ, _modifier){
+    var implemented = mutable.Map[List[Type], Function]() 
+
+    override def exists()= false
+
+    override def getContent(): List[String] = List()
+    override def getName(): String = name
+
+    def call(args2: List[Expression], ret: Variable = null, op: String = "=")(implicit ctx: Context): List[String] = {
+        throw new Exception("Generic function can't be called")
+    }
+
+    override def generateArgument()(implicit ctx: Context): Unit = {}
+
+    override def canBeCallAtCompileTime: Boolean = false
+
+    def get(typevars: List[Type]) ={
+        if (generics.length == 0){
+            this
+        }else{
+            generateForTypes(typevars)
+            implemented(typevars)
+        }
+    }
+
+    def generateForTypes(typevars: List[Type])={
+        if (!implemented.contains(typevars)){
+            if (typevars.size != generics.size) throw new Exception("Wrong number of type variables")
+            
+            val hash = scala.util.hashing.MurmurHash3.stringHash(typevars.mkString(","))
+            val ctx = context.push(name+"--"+hash, this)
+            generics.zip(typevars).foreach(pair => ctx.addTypeDef(pair._1, pair._2))
+            
+            Compiler.compile(FunctionDecl("impl", body, typ, arguments, List(), modifiers))(ctx)
+            val fct = ctx.getFunction("impl")
+            implemented(typevars) = fct
+        }
+    }
+}

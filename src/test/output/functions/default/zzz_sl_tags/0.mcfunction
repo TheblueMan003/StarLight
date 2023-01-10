@@ -1,1 +1,0 @@
-function default/__playertick__

@@ -2,9 +2,11 @@ package objects
 
 import objects.*
 import sl.Settings
-import sl.Expression
+import sl.*
 import sl.Utils
 import sl.MCJava
+import sl.MCBedrock
+import objects.types.BoolType
 
 trait TagType{
     def path(fullName: String):String
@@ -20,4 +22,22 @@ class Tag(context: Context, _name: String, _modifier: Modifier, _content: List[E
     def getContent(): List[String] = List("""{"values":[""" + content.map(v => Utils.stringify(v.getString()(Context.getNew("")))).reduceOption(_ + ", "+ _).getOrElse("") +"]}")
     def getName(): String = Settings.target.getJsonPath(typ.path(fullName))
     def getTag(): String = "#"+Settings.target.getFunctionName(fullName)
+
+    val testFunction = if (Settings.target == MCBedrock){
+        val sub = context.push(name)
+        val mod = Modifier.newPublic()
+        mod.attributes = mod.attributes + (("compile.order", IntValue(999999)))
+        val body = Parser.parse(f"""
+        _ret = false
+        foreach(block in $name)
+            if (block(block))_ret = true
+        """)
+        val fct = ConcreteFunction(sub, "test", List(), BoolType, mod, body, true)
+        sub.addFunction("test", fct)
+        fct.generateArgument()(context)
+        fct
+    }
+    else{
+        null
+    }
 }

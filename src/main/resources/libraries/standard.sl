@@ -6,7 +6,7 @@ def lazy print(rawjson $text){
 
 def lazy debug(rawjson text){
     if (Compiler.isDebug()){
-        lazy rawjson prefix = (("[DEBUG]", purple),(" "))
+        lazy rawjson prefix = (("[DEBUG]", "purple"),(" "))
         prefix += text
         standard.print(prefix)
     }

@@ -122,8 +122,8 @@ object IntType extends Type{
     override def getName()(implicit context: Context): String = "int"
     override def isDirectComparable(): Boolean = true
     override def isDirectEqualitable(): Boolean = true
-    override def isComparaisonSupported(): Boolean = true
-    override def isEqualitySupported(): Boolean = true
+    override def isComparaisonSupported(): Boolean = false
+    override def isEqualitySupported(): Boolean = false
 }
 object FloatType extends Type{
     override def toString(): String = "float"
@@ -145,8 +145,8 @@ object FloatType extends Type{
     override def getName()(implicit context: Context): String = "float"
     override def isDirectComparable(): Boolean = true
     override def isDirectEqualitable(): Boolean = true
-    override def isComparaisonSupported(): Boolean = true
-    override def isEqualitySupported(): Boolean = true
+    override def isComparaisonSupported(): Boolean = false
+    override def isEqualitySupported(): Boolean = false
 }
 object StringType extends Type{
     override def toString(): String = "string"
@@ -269,8 +269,8 @@ object BoolType extends Type{
     override def getName()(implicit context: Context): String = "Boolean"
     override def isDirectComparable(): Boolean = true
     override def isDirectEqualitable(): Boolean = true
-    override def isComparaisonSupported(): Boolean = true
-    override def isEqualitySupported(): Boolean = true
+    override def isComparaisonSupported(): Boolean = false
+    override def isEqualitySupported(): Boolean = false
 }
 object VoidType extends Type{
     override def toString(): String = "void"
@@ -370,7 +370,7 @@ case class TupleType(sub: List[Type]) extends Type{
     override def isDirectComparable(): Boolean = false
     override def isDirectEqualitable(): Boolean = true
     override def isComparaisonSupported(): Boolean = false
-    override def isEqualitySupported(): Boolean = true
+    override def isEqualitySupported(): Boolean = false
 }
 case class ArrayType(inner: Type, size: Expression) extends Type{
     override def toString(): String = f"$inner[$size]"
@@ -443,14 +443,14 @@ case class FuncType(sources: List[Type], output: Type) extends Type{
     override def isDirectComparable(): Boolean = false
     override def isDirectEqualitable(): Boolean = true
     override def isComparaisonSupported(): Boolean = false
-    override def isEqualitySupported(): Boolean = true
+    override def isEqualitySupported(): Boolean = false
 }
-case class IdentifierType(name: String) extends Type{
+case class IdentifierType(name: String, sub: List[Type]) extends Type{
     override def toString(): String = f"$name?"
     override def allowAdditionSimplification(): Boolean = false
     override def getDistance(other: Type)(implicit context: Context): Int = {
         other match
-            case IdentifierType(sub2) => getDistance(context.getType(other))
+            case IdentifierType(name2, sub2) => getDistance(context.getType(other))
             case MCObjectType => 10
             case AnyType => 1000
             case _ => outOfBound
@@ -467,20 +467,20 @@ case class IdentifierType(name: String) extends Type{
     override def isComparaisonSupported(): Boolean = false
     override def isEqualitySupported(): Boolean = false
 }
-case class StructType(struct: Struct) extends Type{
+case class StructType(struct: Struct, sub: List[Type]) extends Type{
     override def toString(): String = struct.fullName
     override def allowAdditionSimplification(): Boolean = false
     override def getDistance(other: Type)(implicit context: Context): Int = {
         other match
-            case IdentifierType(sub2) => getDistance(context.getType(other))
-            case StructType(sub2) if sub2 == struct => 0
+            case IdentifierType(name2, sub2) => getDistance(context.getType(other))
+            case StructType(struct2, sub2) if struct2 == struct && sub2 == sub => 0
             case MCObjectType => 1000
             case AnyType => 2000
             case _ => outOfBound
     }
     override def isSubtypeOf(other: Type)(implicit context: Context): Boolean = {
         other match
-            case StructType(str) => struct.hasParent(str)
+            case StructType(str, sub2) => struct.hasParent(str) && sub2 == sub
             case AnyType => true
             case MCObjectType => true
             case _ => false
@@ -491,20 +491,20 @@ case class StructType(struct: Struct) extends Type{
     override def isComparaisonSupported(): Boolean = true
     override def isEqualitySupported(): Boolean = true
 }
-case class ClassType(clazz: Class) extends Type{
+case class ClassType(clazz: Class, sub: List[Type]) extends Type{
     override def toString(): String = clazz.fullName
     override def allowAdditionSimplification(): Boolean = false
     override def getDistance(other: Type)(implicit context: Context): Int = {
         other match
-            case IdentifierType(sub2) => getDistance(context.getType(other))
-            case ClassType(sub2) if sub2 == clazz => 0
+            case IdentifierType(name2, sub2) => getDistance(context.getType(other))
+            case ClassType(clazz2, sub2) if clazz2 == clazz  && sub == sub2 => 0
             case MCObjectType => 1000
             case AnyType => 10000
             case _ => outOfBound
     }
     override def isSubtypeOf(other: Type)(implicit context: Context): Boolean = {
         other match
-            case ClassType(clz) => clazz.hasParent(clz)
+            case ClassType(clz, sub2) => clazz.hasParent(clz) && sub == sub2
             case AnyType => true
             case MCObjectType => true
             case _ => false
@@ -538,7 +538,7 @@ case class EnumType(enm: objects.Enum) extends Type{
     override def isDirectComparable(): Boolean = true
     override def isDirectEqualitable(): Boolean = true
     override def isComparaisonSupported(): Boolean = true
-    override def isEqualitySupported(): Boolean = true
+    override def isEqualitySupported(): Boolean = false
 }
 case class RangeType(sub: Type) extends Type{
     override def toString(): String = f"range<$sub>"

@@ -209,3 +209,81 @@ if (Compiler.isBedrock){
         return @s[hasitem={item=item,quantity=count,location=slot.weapon.mainhand,slot=0}]
     }
 }
+
+"""
+Clear the current entity's inventory
+"""
+def lazy clear(){
+    /clear @s
+}
+
+"""
+Clear the current entity's inventory of `item`
+"""
+def lazy clear(mcobject $item){
+    /clear @s $item
+}
+
+"""
+Clear the current entity's inventory of `item` with `count`
+"""
+def lazy clear(mcobject $item, int $count){
+    /clear @s $item $count
+}
+
+"""
+Clear the current entity's inventory and return the number of items cleared
+"""
+lazy int clearCount(){
+    if (Compiler.isJava()){
+        Compiler.cmdstore(_ret){
+            clear()
+        }
+    }
+    if (Compiler.isBedrock()){
+        int count = 0
+        while(@s[hasitem={quantity=1..}]){
+            clear(item, 1)
+            count += 1
+        }
+        return count
+    }
+}
+
+"""
+Clear the current entity's inventory of `item` and return the number of items cleared
+"""
+lazy int clearCount(mcobject item){
+    if (Compiler.isJava()){
+        Compiler.cmdstore(_ret){
+            clear(item)
+        }
+    }
+    if (Compiler.isBedrock()){
+        int count = 0
+        while(@s[hasitem={item=item,quantity=1..}]){
+            clear(item, 1)
+            count += 1
+        }
+        return count
+    }
+}
+
+"""
+Clear the current entity's inventory of `item` with a max of `count` and return the number of items cleared
+"""
+lazy int clearCount(mcobject item, int count){
+    if (Compiler.isJava()){
+        Compiler.cmdstore(_ret){
+            clear(item, count)
+        }
+    }
+    if (Compiler.isBedrock()){
+        int c = 0
+        while(@s[hasitem={item=item,quantity=1..}] && c < count){
+            clear(item, 1)
+            c += 1
+        }
+        return c
+    }
+}

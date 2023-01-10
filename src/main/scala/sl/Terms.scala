@@ -18,10 +18,10 @@ case class Package(val name: String, val block: Instruction) extends Instruction
   override def toString() = f"package ${name} {${block}}"
 }
 
-case class StructDecl(val name: String, val block: Instruction, val modifier: Modifier, val parent: Option[String]) extends Instruction {
+case class StructDecl(val name: String, val generics: List[String], val block: Instruction, val modifier: Modifier, val parent: Option[String]) extends Instruction {
   override def toString() = f"struct ${name} ${block}"
 }
-case class ClassDecl(val name: String, val block: Instruction, val modifier: Modifier, val parent: Option[String], val entity: Option[NamespacedName]) extends Instruction {
+case class ClassDecl(val name: String, val generics: List[String], val block: Instruction, val modifier: Modifier, val parent: Option[String], val entity: Map[String, Expression]) extends Instruction {
   override def toString() = f"struct ${name} ${block}"
 }
 case class EnumDecl(val name: String, val fields: List[EnumField], val values: List[EnumValue], val modifier: Modifier) extends Instruction {
@@ -31,7 +31,7 @@ case class PredicateDecl(val name: String, val args: List[Argument], val block: 
   override def toString() = f"predicate ${name} (${args}) $block"
 }
 
-case class FunctionDecl(val name: String, val block: Instruction, val typ: Type, val args: List[Argument], val modifier: Modifier) extends Instruction {
+case class FunctionDecl(val name: String, val block: Instruction, val typ: Type, val args: List[Argument], val typeArgs: List[String], val modifier: Modifier) extends Instruction {
   override def toString() = f"def ${name} ${block}"
 }
 case class TemplateDecl(val name: String, val block: Instruction, val modifier: Modifier, val parent: Option[String]) extends Instruction {
@@ -66,7 +66,7 @@ case class CMD(val value: String) extends Instruction{
   override def toString() = f"/$value"
 }
 
-case class FunctionCall(val name: Identifier, val args: List[Expression]) extends Instruction {
+case class FunctionCall(val name: Identifier, val args: List[Expression], val typeargs: List[Type]) extends Instruction {
   override def toString() = f"${name}()"
 }
 case class TemplateUse(val template: Identifier, val name: String, val block: Instruction) extends Instruction {

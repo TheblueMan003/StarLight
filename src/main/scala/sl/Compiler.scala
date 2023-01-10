@@ -1,6 +1,6 @@
 package sl
 
-import objects.{Context, ConcreteFunction, LazyFunction, Modifier, Struct, Class, Template, Variable, Enum, EnumField, Predicate, Property}
+import objects.{Context, ConcreteFunction, GenericFunction, LazyFunction, Modifier, Struct, Class, Template, Variable, Enum, EnumField, Predicate, Property}
 import objects.Identifier
 import objects.types.{VoidType, TupleType, IdentifierType, ArrayType}
 import sl.Compilation.Execute
@@ -36,43 +36,51 @@ object Compiler{
     def compile(instruction: Instruction, firstPass: Boolean = false)(implicit context: Context):List[String]={   
         try{
             instruction match{
-                case FunctionDecl(name, block, typ2, args, modifier) =>{
+                case FunctionDecl(name, block, typ2, args, typevars, modifier) =>{
                     val fname = context.getFunctionWorkingName(name)
-                    val typ = context.getType(typ2)
-                    if (Settings.target == MCBedrock && modifier.isLoading){
-                        modifier.tags.addOne("@__loading__")
-                    }
-                    if (!modifier.isLazy){
-                        val func = new ConcreteFunction(context, fname, args, context.getType(typ), modifier, block, firstPass)
-                        func.overridedFunction = if modifier.isOverride then context.getFunction(Identifier.fromString(name), args.map(_.typ), typ, false) else null
+                    if (typevars.length > 0){
+                        val func = new GenericFunction(context, fname, args, typevars, typ2, modifier, block)
+                        func.overridedFunction = if modifier.isOverride then context.getFunction(Identifier.fromString(name), args.map(_.typ), List(), typ2, false) else null
                         context.addFunction(name, func)
-                        func.generateArgument()(context)
                     }
                     else{
-                        val func = new LazyFunction(context, fname, args, context.getType(typ), modifier, Utils.fix(block)(context, args.map(a => Identifier.fromString(a.name)).toSet))
-                        func.overridedFunction = if modifier.isOverride then context.getFunction(Identifier.fromString(name), args.map(_.typ), typ, false) else null
-                        context.addFunction(name, func)
-                        func.generateArgument()(context)
+                        val typ = context.getType(typ2)
+
+                        if (Settings.target == MCBedrock && modifier.isLoading){
+                            modifier.tags.addOne("@__loading__")
+                        }
+                        if (!modifier.isLazy){
+                            val func = new ConcreteFunction(context, fname, args, context.getType(typ), modifier, block, firstPass)
+                            func.overridedFunction = if modifier.isOverride then context.getFunction(Identifier.fromString(name), args.map(_.typ), List(), typ, false) else null
+                            context.addFunction(name, func)
+                            func.generateArgument()(context)
+                        }
+                        else{
+                            val func = new LazyFunction(context, fname, args, context.getType(typ), modifier, Utils.fix(block)(context, args.map(a => Identifier.fromString(a.name)).toSet))
+                            func.overridedFunction = if modifier.isOverride then context.getFunction(Identifier.fromString(name), args.map(_.typ), List(), typ, false) else null
+                            context.addFunction(name, func)
+                            func.generateArgument()(context)
+                        }
                     }
                     List()
                 }
-                case StructDecl(name, block, modifier, parent) => {
+                case StructDecl(name, generics, block, modifier, parent) => {
                     if (!firstPass){
                         val parentStruct = parent match
                             case None => null
                             case Some(p) => context.getStruct(p)
                         
-                        context.addStruct(new Struct(context, name, modifier, block, parentStruct))
+                        context.addStruct(new Struct(context, name, generics, modifier, block, parentStruct))
                     }
                     List()
                 }
-                case ClassDecl(name, block, modifier, parent, entity) => {
+                case ClassDecl(name, generics, block, modifier, parent, entity) => {
                     if (!firstPass){
                         val parentClass = parent match
                             case None => if name != "object" then context.getClass("object") else null
                             case Some(p) => context.getClass(p)
                         
-                        context.addClass(new Class(context, name, modifier, block, parentClass, entity.getOrElse(null))).generate()
+                        context.addClass(new Class(context, name, generics, modifier, block, parentClass, entity)).generate()
                     }
                     List()
                 }
@@ -126,8 +134,8 @@ object Compiler{
                     }).toList
                 }
                 case VariableDecl(names, typ, modifier, op, expr) => {
-                    if (typ == IdentifierType("val") || typ == IdentifierType("var")){
-                        if (typ == IdentifierType("val")) modifier.isConst = true
+                    if (typ == IdentifierType("val", List()) || typ == IdentifierType("var", List())){
+                        if (typ == IdentifierType("val", List())) modifier.isConst = true
                         Utils.simplify(expr) match
                             case TupleValue(values) if values.size == names.size => {
                                 names.zip(values.map(Utils.typeof(_))).map((name, typ2) => {
@@ -226,10 +234,10 @@ object Compiler{
                 case ArrayAssigment(name, index, op, value) => {
                     def call()={
                         if (op == "="){
-                            compile(FunctionCall(name.path()+"."+"set", index ::: List(value)))
+                            compile(FunctionCall(name.path()+"."+"set", index ::: List(value), List()))
                         }
                         else{
-                            compile(FunctionCall(name.path()+"."+"set", index:::List(BinaryOperation("+", FunctionCallValue(VariableValue(name.path()+"."+"get"), index), value))))
+                            compile(FunctionCall(name.path()+"."+"set", index:::List(BinaryOperation("+", FunctionCallValue(VariableValue(name.path()+"."+"get"), index, List()), value)), List()))
                         }
                     }
                     def indexed(index: Int)={
@@ -277,8 +285,8 @@ object Compiler{
                 case InstructionBlock(block) => {
                     block.flatMap(inst => compile(inst, firstPass))
                 }
-                case FunctionCall(name, args) => {
-                    context.getFunction(name, args, VoidType).call()
+                case FunctionCall(name, args, typeargs) => {
+                    context.getFunction(name, args, typeargs, VoidType).call()
                 }
                 case LinkedFunctionCall(name, args, ret) => {
                     (name, args).call(ret)

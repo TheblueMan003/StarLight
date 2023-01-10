@@ -9,7 +9,7 @@ import sl.Expression
 import sl.Utils
 import sl.Settings
 
-class Predicate(context: Context, name: String, val arguments: List[Argument], _modifier: Modifier, val block: JSONElement) extends CObject(context, name, _modifier) with Typed(IdentifierType(context.getPath()+"."+name)){
+class Predicate(context: Context, name: String, val arguments: List[Argument], _modifier: Modifier, val block: JSONElement) extends CObject(context, name, _modifier){
     val minArgCount = getMinArgCount(arguments)
 
     private val predicates = mutable.Map[List[Expression], String]()

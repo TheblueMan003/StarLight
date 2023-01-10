@@ -54,10 +54,17 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 		}
 
 		typ match
-			case StructType(struct) => {
+			case StructType(struct, sub) => {
 				val ctx = context.push(name, this)
 				ctx.inherit(struct.context)
 				ctx.push("this", ctx)
+
+				if (struct.generics.size != sub.size){
+					throw new Exception(f"Struct ${struct.name} has ${struct.generics.size} generics, but ${sub.size} were given")
+				}
+
+				struct.generics.zip(sub).foreach((name, typee) => ctx.addTypeDef(name, typee))
+
 				val block = Utils.subst(struct.getBlock(), "$this", fullName)
 				if (isStructFunctionArgument && context.getCurrentVariable().getType() == getType()){
 					sl.Compiler.compile(Utils.rmFunctions(block))(ctx)
@@ -67,8 +74,8 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 				}
 				tupleVari.foreach(vari => vari.modifiers = vari.modifiers.combine(modifiers))
 			}
-			case ClassType(clazz) => {
-				clazz.generateForVariable(this)
+			case ClassType(clazz, sub) => {
+				clazz.generateForVariable(this, sub)
 			}
 			case ArrayType(inner, size) => {
 				size match
@@ -102,18 +109,18 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 		wasAssigned = true
 		if (modifiers.isLazy){
 			getType() match{
-				case StructType(struct) => {
+				case StructType(struct, sub) => {
 					value match
 						case VariableValue(name, sel) => {
 							val vari = context.getVariable(name)
-							if (vari.getType() == StructType(struct)){
+							if (vari.getType() == StructType(struct, sub)){
 								tupleVari.zip(vari.tupleVari).map((a,v) => a.assign(op, LinkedVariableValue(v, sel)))
 							}
 							else{
 								throw new Exception(f"Lazy assignment of $vari not supported for struct")
 							}
 						}
-						case LinkedVariableValue(vari, sel) if vari.getType() == StructType(struct) => {
+						case LinkedVariableValue(vari, sel) if vari.getType() == StructType(struct, sub) => {
 							tupleVari.zip(vari.tupleVari).map((a,v) => a.assign(op, LinkedVariableValue(v, sel)))
 						}
 						case a => throw new Exception(f"Lazy assignment of $a not supported for struct")
@@ -151,9 +158,9 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 				}
 				case other => {
 					value match{
-						case FunctionCallValue(VariableValue(name, sel), args, _) => 
+						case FunctionCallValue(VariableValue(name, sel), args, typeargs, _) => 
 							try{
-								val res = context.getFunction(name, args, getType(), false)
+								val res = context.getFunction(name, args, typeargs, getType(), false)
 								if (res._1.canBeCallAtCompileTime){
 									return res.call(this, op)
 								}
@@ -207,8 +214,8 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 									case TupleType(sub) => assignTuple(op, value)	
 									case JsonType => assignJson(op, value)									
 									case FuncType(source, out) => assignFunc(op, value)
-									case StructType(struct) => assignStruct(op, value)
-									case ClassType(clazz) => assignClass(op, value)
+									case StructType(struct, sub) => assignStruct(op, value)
+									case ClassType(clazz, sub) => assignClass(op, value)
 									case ArrayType(innter, size) => assignArray(op, value)
 									case EntityType => assignEntity(op, value)
 									case EnumType(enm) => assignEnum(op, value)
@@ -298,6 +305,19 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 						context.requestConstant(value)
 						List(f"scoreboard players operation ${getSelector()} ${op} c${value} ${Settings.constScoreboard}")
 					}
+					case "&=" => {
+						context.requestLibrary("standard.int")
+						handleFunctionCall("=", VariableValue("standard.int.bitwiseAnd"), List(LinkedVariableValue(this, selector), IntValue(value)), List(), Selector.self)
+					}
+					case "|=" => {
+						context.requestLibrary("standard.int")
+						handleFunctionCall("=", VariableValue("standard.int.bitwiseOr"), List(LinkedVariableValue(this, selector), IntValue(value)), List(), Selector.self)
+					}
+					case "^=" => {
+						context.requestLibrary("standard.int")
+						handleFunctionCall("=", VariableValue("standard.int.pow"), List(LinkedVariableValue(this, selector), IntValue(value)), List(), Selector.self)
+					}
+					case other => throw new Exception(f"Cannot assign use op: $other with int")
 				}
 			}
 			case EnumIntValue(value) => assignInt(op, IntValue(value))
@@ -306,23 +326,23 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 			case FloatValue(value) => assignInt(op, IntValue(value.toInt))
 			case VariableValue(name, sel) => assignInt(op, context.resolveVariable(value))
 			case LinkedVariableValue(vari, sel) => assignIntLinkedVariable(op, vari, sel)
-			case FunctionCallValue(name, args, selector) => handleFunctionCall(op, name, args, selector)
+			case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 			case ArrayGetValue(name, index) => handleArrayGetValue(op, name, index)
 			case bin: BinaryOperation => assignBinaryOperator(op, bin)
 			case _ => throw new Exception(f"Unknown cast to int $value")
 	}
 
-	def handleFunctionCall(op: String, name: Expression, args: List[Expression], sel: Selector)(implicit context: Context, selector: Selector = Selector.self):List[String] = {
+	def handleFunctionCall(op: String, name: Expression, args: List[Expression], typeargs: List[Type], sel: Selector)(implicit context: Context, selector: Selector = Selector.self):List[String] = {
 		if (sel != Selector.self && modifiers.isEntity){
-			val (pref,vari) = Utils.simplifyToVariable(FunctionCallValue(name, args, sel))
+			val (pref,vari) = Utils.simplifyToVariable(FunctionCallValue(name, args, typeargs, sel))
 			pref ::: assign(op, vari)
 		}
 		else if (sel != Selector.self){
-			Compiler.compile(With(SelectorValue(sel), BoolValue(true), BoolValue(true), VariableAssigment(List((Right(this),selector)), op, FunctionCallValue(name, args, Selector.self))))
+			Compiler.compile(With(SelectorValue(sel), BoolValue(true), BoolValue(true), VariableAssigment(List((Right(this),selector)), op, FunctionCallValue(name, args, List(), Selector.self))))
 		}
 		else{
 			name match
-				case VariableValue(iden, sel) => context.getFunction(iden, args, getType()).call(this, op)
+				case VariableValue(iden, sel) => context.getFunction(iden, args, typeargs, getType()).call(this, op)
 				case LinkedFunctionValue(fct) => (fct, args).call(this, op)
 				case other =>{
 					val (t, v) = Utils.simplifyToVariable(other)
@@ -346,9 +366,9 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 								if (i >= size || i < 0) then throw new Exception(f"Index out of Bound for array $name: $i not in 0..$size")
 								assign(op, LinkedVariableValue(vari.tupleVari(i)))
 							}
-							case _ => assign(op, FunctionCallValue(VariableValue(vari.fullName+".get"), index))
+							case _ => assign(op, FunctionCallValue(VariableValue(vari.fullName+".get"), index, List()))
 					}
-					case other => assign(op, FunctionCallValue(VariableValue(vari.fullName+".__get__"), index))
+					case other => assign(op, FunctionCallValue(VariableValue(vari.fullName+".__get__"), index, List()))
 			}
 		}
 		)
@@ -373,7 +393,24 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					}
 				}
 			}
-			case other if other.isSubtypeOf(getType()) => List(f"scoreboard players operation ${getSelector()} ${op} ${vari.getSelector()(oselector)}")
+			case other if other.isSubtypeOf(getType()) => 
+				op match{
+					case "=" | "+=" | "-=" | "*=" | "/=" | "%=" => 
+						List(f"scoreboard players operation ${getSelector()} ${op} ${vari.getSelector()(oselector)}")
+					case "&=" => {
+						context.requestLibrary("standard.int")
+						handleFunctionCall("=", VariableValue("standard.int.bitwiseAnd"), List(LinkedVariableValue(this, selector), LinkedVariableValue(vari, oselector)), List(), Selector.self)
+					}
+					case "|=" => {
+						context.requestLibrary("standard.int")
+						handleFunctionCall("=", VariableValue("standard.int.bitwiseOr"), List(LinkedVariableValue(this, selector), LinkedVariableValue(vari, oselector)), List(), Selector.self)
+					}
+					case "^=" => {
+						context.requestLibrary("standard.int")
+						handleFunctionCall("=", VariableValue("standard.int.pow"), List(LinkedVariableValue(this, selector), LinkedVariableValue(vari, oselector)), List(), Selector.self)
+					}
+					case other => throw new Exception(f"Cannot use $other with $fullName & ${vari.fullName}")
+				}
 			case FuncType(sources, output) => List(f"scoreboard players operation ${getSelector()} ${op} ${vari.getSelector()(oselector)}")
 			case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()}")
 		}
@@ -430,6 +467,11 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 						context.requestConstant(fvalue)
 						List(f"scoreboard players operation ${getSelector()} %%= c${fvalue} ${Settings.constScoreboard}")
 					}
+					case "^=" => {
+						context.requestLibrary("standard.float")
+						handleFunctionCall("=", VariableValue("standard.float.pow"), List(LinkedVariableValue(this, selector), FloatValue(value)), List(), Selector.self)
+					}
+					case other => throw new Exception(f"Cannot use $other with $fullName")
 				}
 			}
 			case DefaultValue => List(f"scoreboard players set ${getSelector()} 0")
@@ -443,12 +485,17 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 						context.requestConstant(fvalue)
 						List(f"scoreboard players operation ${getSelector()} $op ${value} ${Settings.constScoreboard}")
 					}
+					case "^=" => {
+						context.requestLibrary("standard.float")
+						handleFunctionCall("=", VariableValue("standard.float.pow"), List(LinkedVariableValue(this, selector), FloatValue(value)), List(), Selector.self)
+					}
+					case other => throw new Exception(f"Cannot use $other with $fullName")
 				}
 			}
 			case BoolValue(value) => assignFloat(op, IntValue(if value then 1 else 0))
 			case VariableValue(name, sel) => assignFloat(op, context.resolveVariable(value))
 			case LinkedVariableValue(vari, sel) => assignFloatLinkedVariable(op, vari, sel)
-			case FunctionCallValue(name, args, selector) => handleFunctionCall(op, name, args, selector)
+			case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 			case ArrayGetValue(name, index) => handleArrayGetValue(op, name, index)
 			case bin: BinaryOperation => assignBinaryOperator(op, bin)
 			case _ => throw new Exception(f"Unknown cast to float $value")
@@ -481,7 +528,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					}
 					case EntityType => f"scoreboard players set ${getSelector()} 0"::Compiler.compile(If(value, VariableAssigment(List((Right(this), selector)), "=", BoolValue(true)), List()))
 					case other => throw new Exception(f"Cannot assign $value of type $other to $fullName of type ${getType()}")
-			case FunctionCallValue(name, args, selector) => handleFunctionCall(op, name, args, selector)
+			case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 			case ArrayGetValue(name, index) => handleArrayGetValue(op, name, index)
 			case bin: BinaryOperation => assignBinaryOperator(op, bin)
 			case SelectorValue(sel) => f"scoreboard players set ${getSelector()} 0"::Compiler.compile(If(value, VariableAssigment(List((Right(this), selector)), "=", BoolValue(true)), List()))
@@ -508,6 +555,11 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					case "%=" => {
 						List(f"scoreboard players operation ${getSelector()} %%= ${vari.getSelector()(sel)}")
 					}
+					case "^=" => {
+						context.requestLibrary("standard.float")
+						handleFunctionCall(op, VariableValue("standard.float.pow"), List(LinkedVariableValue(this, selector), LinkedVariableValue(vari, sel)), List(), selector)
+					}
+					case other => throw new Exception(f"Unknown operator $other")
 				}
 			}
 			case IntType => {
@@ -520,6 +572,10 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					case "*=" | "/=" => {
 						List(f"scoreboard players operation ${getSelector()} $op ${vari.getSelector()(sel)}")
 					}
+					case "^=" => {
+						context.requestLibrary("standard.float")
+						handleFunctionCall("=", VariableValue("standard.float.pow"), List(LinkedVariableValue(this, selector), LinkedVariableValue(vari, sel)), List(), selector)
+					}
 					case other => {
 						val tmp = context.getFreshId()
 						context.requestConstant(Settings.floatPrec)
@@ -530,7 +586,10 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					}
 				}
 			}
-			case a if a.isSubtypeOf(getType()) => List(f"scoreboard players operation ${getSelector()} ${op} ${vari.getSelector()(sel)}")
+			case a if a.isSubtypeOf(getType()) => 
+				op match
+					case "=" | "+=" | "-=" | "*=" | "/=" | "%=" => List(f"scoreboard players operation ${getSelector()} ${op} ${vari.getSelector()(sel)}")
+					case otherOp => throw new Exception(f"Cannot assign ${vari.fullName} of type ${vari.getType()} to $fullName of type ${getType()} with operator $otherOp")
 			case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()}")
 		}
 	}
@@ -548,7 +607,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 				}
 			}
 			case VariableValue(vari, sel) => assign(op, context.resolveVariable(expr))
-			case FunctionCallValue(fct, args, selector) => handleFunctionCall(op, fct, args, selector)
+			case FunctionCallValue(fct, args, typeargs, selector) => handleFunctionCall(op, fct, args, typeargs, selector)
 			case ArrayGetValue(name, index) => handleArrayGetValue(op, name, index)
 			case v => tupleVari.flatMap(t => t.assign(op, v))
 	}
@@ -567,7 +626,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 				}
 			}
 			case VariableValue(vari, sel) => assign(op, context.resolveVariable(expr))
-			case FunctionCallValue(fct, args, selector) => handleFunctionCall(op, fct, args, selector)
+			case FunctionCallValue(fct, args, typeargs, selector) => handleFunctionCall(op, fct, args, typeargs, selector)
 			case ArrayGetValue(name, index) => handleArrayGetValue(op, name, index)
 			case v => tupleVari.flatMap(t => t.assign(op, v))
 	}
@@ -583,7 +642,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					case Some(value) => List(f"scoreboard players operation ${getSelector()} = ${value.getSelector()(sel)}")
 					case None =>{
 						val typ = getType().asInstanceOf[FuncType]
-						val fct = context.getFunction(name, typ.sources, typ.output, true).asInstanceOf[ConcreteFunction]
+						val fct = context.getFunction(name, typ.sources, List(), typ.output, true).asInstanceOf[ConcreteFunction]
 						fct.markAsUsed()
 						context.addFunctionToMux(typ.sources, typ.output, fct)
 						List(f"scoreboard players set ${getSelector()} ${fct.getMuxID()}")
@@ -604,7 +663,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 			}
 			case NullValue => List(f"scoreboard players set ${getSelector()} 0")
 			case DefaultValue => List(f"scoreboard players set ${getSelector()} 0")
-			case FunctionCallValue(name, args, selector) => handleFunctionCall(op, name, args, selector)
+			case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 			case ArrayGetValue(name, index) => handleArrayGetValue(op, name, index)
 			case TupleValue(value) => tupleVari.zip(value).flatMap((t, v) => t.assign(op, v))
 			case _ => throw new Exception("Unsupported Operation")
@@ -652,7 +711,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 						List(f"tag ${value.getString()} add $tagName")
 					}
 					case bin: BinaryOperation => assignBinaryOperator(op, bin)
-					case FunctionCallValue(name, args, selector) => handleFunctionCall(op, name, args, selector)
+					case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 					case _ => throw new Exception(f"No cast from ${expr} to entity")
 			}
 			case "+=" | "&=" => {
@@ -682,7 +741,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					}
 					case NullValue => List()
 					case bin: BinaryOperation => assignBinaryOperator(op, bin)
-					case FunctionCallValue(name, args, selector) => handleFunctionCall(op, name, args, selector)
+					case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 					case _ => throw new Exception(f"No cast from ${expr} to entity")
 			}
 			case "-=" | "/=" => {
@@ -708,7 +767,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					}
 					case NullValue => List()
 					case bin: BinaryOperation => assignBinaryOperator(op, bin)
-					case FunctionCallValue(name, args, selector) => handleFunctionCall(op, name, args, selector)
+					case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 					case _ => throw new Exception(f"No cast from ${expr} to entity")
 			}
 			case _ => throw new Exception(f"Illegal operation with ${name}: $op")
@@ -764,7 +823,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 						}
 						case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()}")
 					}
-				case FunctionCallValue(name, args, selector) => handleFunctionCall(op, name, args, selector)
+				case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 				case ArrayGetValue(name, index) => handleArrayGetValue(op, name, index)
 				case bin: BinaryOperation => assignBinaryOperator(op, bin)
 				case _ => throw new Exception(f"Unknown cast to json $value")
@@ -784,16 +843,16 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 							tupleVari.zip(vari.tupleVari).flatMap((a,v) => a.assign(op, LinkedVariableValue(v, sel)))
 						}
 						else{
-							context.getFunction(this.name + ".__set__", List(value), getType(), false).call()
+							context.getFunction(this.name + ".__set__", List(value), List(), getType(), false).call()
 						}
 					}
 					case VariableValue(name, sel) => assignStruct(op, context.resolveVariable(value))
-					case ConstructorCall(name2, args) => {
-						context.getType(IdentifierType(name2.toString())) match
-							case ClassType(clazz) => context.getFunction(this.name + ".__set__", List(value), getType(), false).call()
-							case typ@StructType(struct) => {
+					case ConstructorCall(name2, args, typevars) => {
+						context.getType(IdentifierType(name2.toString(), typevars)) match
+							case ClassType(clazz, sub) => context.getFunction(this.name + ".__set__", List(value), List(), getType(), false).call()
+							case typ@StructType(struct, sub) => {
 								if (typ == getType()){
-									context.getFunction(name + ".__init__", args, getType(), false).call()
+									context.getFunction(name + ".__init__", args, List(), getType(), false).call()
 								}
 								else{
 									val vari = context.getFreshVariable(typ)
@@ -803,13 +862,13 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 							}
 							case other => throw new Exception(f"Cannot constructor call $other")
 					}
-					case _ => context.getFunction(name + ".__set__", List(value), getType(), false).call()
+					case _ => context.getFunction(name + ".__set__", List(value), List(), getType(), false).call()
 			}
-			case op => context.getFunction(name + "." + Utils.getOpFunctionName(op),  List(value), getType(), false).call()
+			case op => context.getFunction(name + "." + Utils.getOpFunctionName(op),  List(value), List(), getType(), false).call()
 	}
 
-	def deref()(implicit context: Context) = context.getFunction(this.name + ".__remRef", List[Expression](), getType(), false).call()
-	def addref()(implicit context: Context)= context.getFunction(this.name + ".__addRef", List[Expression](), getType(), false).call()
+	def deref()(implicit context: Context) = context.getFunction(this.name + ".__remRef", List[Expression](), List(), getType(), false).call()
+	def addref()(implicit context: Context)= context.getFunction(this.name + ".__addRef", List[Expression](), List(), getType(), false).call()
 
 	/**
 	 * Assign a value to the struct variable
@@ -824,20 +883,21 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 							deref() ::: List(f"scoreboard players operation ${getSelector()} ${op} ${vari.getSelector()(sel)}") ::: addref()
 						}
 						else{
-							context.getFunction(this.name + ".__set__", List(value), getType(), false).call()
+							context.getFunction(this.name + ".__set__", List(value), List(), getType(), false).call()
 						}
 					}
 					case VariableValue(name, sel) => assignClass(op, context.resolveVariable(value))
-					case ConstructorCall(name2, args) => {
-						context.getType(IdentifierType(name2.toString())) match
-							case StructType(struct) => throw new Exception("Cannot call struct constructor for class")
-							case typ@ClassType(clazz) => {
-								if (typ == getType()){
+					case ConstructorCall(name2, args, typevars) => {
+						context.getType(IdentifierType(name2.toString(), typevars)) match
+							case StructType(struct, sub) => throw new Exception("Cannot call struct constructor for class")
+							case typ@ClassType(clazz2, sub) => {
+								val clazz = clazz2.get(typevars)
+								if (typ == getType() && typevars == sub){
 									val entity = clazz.getEntity()
 									val initarg = List(StringValue(clazz.fullName))::: (if entity != null then List(entity) else List())
 									deref()
-									::: assign("=", FunctionCallValue(VariableValue("object.__initInstance"), initarg))
-									::: context.getFunction(name + ".__init__", args, getType(), false).call()
+									::: assign("=", FunctionCallValue(VariableValue("object.__initInstance"), initarg, List()))
+									::: context.getFunction(name + ".__init__", args, List(), getType(), false).call()
 								}
 								else{
 									val vari = context.getFreshVariable(typ)
@@ -852,9 +912,9 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					case LinkedVariableValue(vari, sel) if vari.name == "__totalRefCount" => {
 						List(f"scoreboard players operation ${getSelector()} ${op} ${vari.getSelector()(sel)}")
 					}
-					case FunctionCallValue(name, args, selector) => handleFunctionCall(op, name, args, selector)
+					case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 					case ArrayGetValue(name, index) => handleArrayGetValue(op, name, index)
-					case _ => context.getFunction(name + ".__set__", List(value), getType(), false).call()
+					case _ => context.getFunction(name + ".__set__", List(value), List(), getType(), false).call()
 			}
 			case _ => assignStruct(op, value)
 	}
@@ -883,8 +943,8 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 			case BinaryOperation(op, left, right) => isPresentIn(left) || isPresentIn(right)
 			case UnaryOperation(op, left) => isPresentIn(left)
 			case TupleValue(values) => values.exists(isPresentIn(_))
-			case FunctionCallValue(name, args, selector) => args.exists(isPresentIn(_)) || isPresentIn(name)
-			case ConstructorCall(name, args) => args.exists(isPresentIn(_))
+			case FunctionCallValue(name, args, typeargs, selector) => args.exists(isPresentIn(_)) || isPresentIn(name)
+			case ConstructorCall(name, args, typevars) => args.exists(isPresentIn(_))
 			case RangeValue(min, max) => isPresentIn(min) || isPresentIn(max)
 		}
 
@@ -950,7 +1010,7 @@ class PropertySetVariable(context: Context, getter: Function, setter: Function, 
 		}
 		else{
 			if (variable == null){
-				val set = BinaryOperation(op.replace("=",""), FunctionCallValue(LinkedFunctionValue(getter), List()), value)
+				val set = BinaryOperation(op.replace("=",""), FunctionCallValue(LinkedFunctionValue(getter), List(), List()), value)
 				assign("=", set)
 			}
 			else{

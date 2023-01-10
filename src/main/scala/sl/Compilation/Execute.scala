@@ -278,25 +278,39 @@ object Execute{
             case BinaryOperation(">" | "<" | ">=" | "<=", LinkedVariableValue(left, sel), right)
                 if left.getType().isComparaisonSupported() && !left.getType().isDirectComparable() => 
                     val op = expr.asInstanceOf[BinaryOperation].op
-                    getIfCase(FunctionCallValue(VariableValue(left.fullName + "." + Utils.getOpFunctionName(op)), List(right)))
+                    getIfCase(FunctionCallValue(VariableValue(left.fullName + "." + Utils.getOpFunctionName(op)), List(right), List()))
 
             case BinaryOperation(">" | "<" | ">=" | "<=", left, LinkedVariableValue(right, sel)) 
                 if right.getType().isComparaisonSupported() && !right.getType().isDirectComparable()=> 
                     val op = expr.asInstanceOf[BinaryOperation].op
-                    getIfCase(FunctionCallValue(VariableValue(right.fullName + "." + Utils.getOpFunctionName(Utils.invertOperator(op))), List(left)))
+                    getIfCase(FunctionCallValue(VariableValue(right.fullName + "." + Utils.getOpFunctionName(Utils.invertOperator(op))), List(left), List()))
 
 
             // Directly Equilable Value (int, float, bool, function, etc...)
             case BinaryOperation("==" | "!=", LinkedVariableValue(left, sel), right) 
                 if left.getType().isEqualitySupported() => 
                     val op = expr.asInstanceOf[BinaryOperation].op
-                    getIfCase(FunctionCallValue(VariableValue(left.fullName + "." + Utils.getOpFunctionName(op)), List(right)))
+                    getIfCase(FunctionCallValue(VariableValue(left.fullName + "." + Utils.getOpFunctionName(op)), List(right), List()))
             
             case BinaryOperation("==" | "!=", left, LinkedVariableValue(right, sel)) 
                 if right.getType().isEqualitySupported() => 
                     val op = expr.asInstanceOf[BinaryOperation].op
-                    getIfCase(FunctionCallValue(VariableValue(right.fullName + "." + Utils.getOpFunctionName(op)), List(left)))
+                    getIfCase(FunctionCallValue(VariableValue(right.fullName + "." + Utils.getOpFunctionName(op)), List(left), List()))
 
+            case BinaryOperation(">" | "<" | ">=" | "<=" | "==" | "!=", LinkedVariableValue(left, sel), right2)
+                if (left.getType().isDirectComparable() || left.getType().isComparaisonSupported() || left.getType().isEqualitySupported()) =>
+                    val op = expr.asInstanceOf[BinaryOperation].op
+                    val (p1, right) = Utils.simplifyToVariable(right2)
+                    val (p, c) = getIfCase(BinaryOperation(op, LinkedVariableValue(left, sel), right))
+                    (p1:::p,c)
+            
+            case BinaryOperation(">" | "<" | ">=" | "<=" | "==" | "!=", left2, LinkedVariableValue(right, sel))
+                if (right.getType().isDirectComparable() || right.getType().isComparaisonSupported() || right.getType().isEqualitySupported()) =>
+                    val op = expr.asInstanceOf[BinaryOperation].op
+                    val (p1, left) = Utils.simplifyToVariable(left2)
+                    val (p, c) = getIfCase(BinaryOperation(op, left, LinkedVariableValue(right, sel)))
+                    (p1:::p,c)
+            
             // Error Cases
             case BinaryOperation(">" | "<" | ">=" | "<=" | "==" | "!=", LinkedVariableValue(left, sel), right) 
                 if !left.getType().isEqualitySupported() && !left.getType().isComparaisonSupported() => 
@@ -392,10 +406,10 @@ object Execute{
                 val v = Utils.simplifyToVariable(expr)
                 (v._1, List(IFValueCase(v._2)))
             }
-            case FunctionCallValue(name, args, sel) if Settings.metaVariable.exists(_._1 == name.toString()) => {
+            case FunctionCallValue(name, args, typeargs, sel) if Settings.metaVariable.exists(_._1 == name.toString()) => {
                 if Settings.metaVariable.find(_._1 == name.toString()).get._2() then (List(), List(IFTrue)) else (List(), List(IFFalse))
             }
-            case FunctionCallValue(name, args, sel) if name.toString() == "Compiler.isVariable" => {
+            case FunctionCallValue(name, args, typeargs, sel) if name.toString() == "Compiler.isVariable" => {
                 val check = args.forall(arg =>
                     arg match
                         case VariableValue(name, sel) => true
@@ -404,34 +418,44 @@ object Execute{
                     )
                 if check then (List(), List(IFTrue)) else (List(), List(IFFalse))
             }
-            case FunctionCallValue(name, args, sel) if name.toString() == "block" && args.length > 0 => {
+            case FunctionCallValue(name, args, typeargs, sel) if name.toString() == "block" && args.length > 0 => {
                 if (Settings.target == MCJava){
                     args.map(Utils.simplify(_)) match
                         case PositionValue(pos)::NamespacedName(block)::Nil => (List(), List(IFBlock(pos+" "+block)))
                         case NamespacedName(block)::Nil => (List(), List(IFBlock("~ ~ ~ "+block)))
-                        case PositionValue(pos)::TagValue(block)::Nil => (List(), List(IFBlock(pos+" "+context.getBlockTag(block))))
-                        case TagValue(block)::Nil => (List(), List(IFBlock("~ ~ ~ "+context.getBlockTag(block))))
+                        case PositionValue(pos)::TagValue(block)::Nil => (List(), List(IFBlock(pos+" "+context.getBlockTag(block).getTag())))
+                        case TagValue(block)::Nil => (List(), List(IFBlock("~ ~ ~ "+context.getBlockTag(block).getTag())))
                         case other => throw new Exception(f"Invalid argument to block: $other")
                 }
                 else if (Settings.target == MCBedrock){
                     args.map(Utils.simplify(_)) match
                         case PositionValue(pos)::NamespacedName(block)::Nil => (List(), List(IFBlock(pos+" "+BlockConverter.getBlockName(block)+" "+BlockConverter.getBlockID(block))))
                         case NamespacedName(block)::Nil => (List(), List(IFBlock("~ ~ ~ "+BlockConverter.getBlockName(block)+" "+BlockConverter.getBlockID(block))))
-                        case PositionValue(pos)::TagValue(block)::Nil => ???
-                        case TagValue(block)::Nil => ???
+                        case PositionValue(pos)::TagValue(block)::Nil => {
+                            val tag = context.getBlockTag(block)
+                            val prev = makeExecute(" positioned "+pos,tag.testFunction.call(List(), null, "="))
+                            val (p, c) = getIfCase(LinkedVariableValue(tag.testFunction.returnVariable))
+                            (prev ::: p, c)
+                        }
+                        case TagValue(block)::Nil => {
+                            val tag = context.getBlockTag(block)
+                            val prev = tag.testFunction.call(List(), null, "=")
+                            val (p, c) = getIfCase(LinkedVariableValue(tag.testFunction.returnVariable))
+                            (prev ::: p, c)
+                        }
                         case other => throw new Exception(f"Invalid argument to block: $other")
                 }
                 else {
                     throw new Exception(f"unsupported if block for target: ${Settings.target}")
                 }
             }
-            case FunctionCallValue(name, args, sel) if name.toString() == "blocks" && args.length > 0 => {
+            case FunctionCallValue(name, args, typeargs, sel) if name.toString() == "blocks" && args.length > 0 => {
                 args.map(Utils.simplify(_)) match
                     case PositionValue(pos1)::PositionValue(pos2)::PositionValue(pos3)::StringValue(mask)::Nil => (List(), List(IFBlocks(pos1+" "+pos2+" "+pos3+" "+mask)))
                     case PositionValue(pos1)::PositionValue(pos2)::PositionValue(pos3)::Nil => (List(), List(IFBlocks(pos1+" "+pos2+" "+pos3+" all")))
                     case other => throw new Exception(f"Invalid argument to blocks: $other")
             }
-            case FunctionCallValue(VariableValue(name, sel), args, _) => {
+            case FunctionCallValue(VariableValue(name, sel), args, typeargs, _) => {
                 val predicate = context.tryGetPredicate(name, args.map(Utils.typeof(_)))
                 predicate match
                     case None => {
@@ -443,7 +467,7 @@ object Execute{
                         (List(), List(IFPredicate(value.call(args))))
                     }
             }
-            case FunctionCallValue(name, args, sel) => {
+            case FunctionCallValue(name, args, typeargs, sel) => {
                 val (p, v) = Utils.simplifyToLazyVariable(expr)
                 val (p2, c) = getIfCase(v)
                 (p:::p2, c)
@@ -459,7 +483,7 @@ object Execute{
             case TupleValue(values) => throw new Exception("Can't use if with tuple")
             case RawJsonValue(value) => throw new Exception("Can't use if with rawjson")
             case NamespacedName(value) => throw new Exception("Can't use if with mcobject")
-            case ConstructorCall(name, args) => throw new Exception("Can't use if with constructor call")
+            case ConstructorCall(name, args, generics) => throw new Exception("Can't use if with constructor call")
             case PositionValue(value) => throw new Exception("Can't use if with position")
             case TagValue(value) => throw new Exception("Can't use if with tag")
     }
@@ -607,7 +631,7 @@ case class IFValueCase(val value: Expression) extends IFCase{
                 f"if score ${left.getSelector()(sel1)} $mcop ${right.getSelector()(sel2)}"
             }
             case BinaryOperation("!=", LinkedVariableValue(left, sel1), LinkedVariableValue(right, sel2))=> {
-                f"unless score ${left.getSelector()(sel1)} = ${left.getSelector()(sel2)}"
+                f"unless score ${left.getSelector()(sel1)} = ${right.getSelector()(sel2)}"
             }
 
 
