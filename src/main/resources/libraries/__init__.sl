@@ -33,20 +33,39 @@ class object{
             /kill
         }
     }
-    static lazy object __initInstance(mcobject clazz, mcobject $entity = marker){
+    static lazy object __initInstance(mcobject clazz, mcobject entity = marker){
         __totalRefCount++
         if (Compiler.isJava()){
-            /summon $entity ~ ~ ~ {Tags:["__class__","cls_trg"]}
-            with(@e[tag=cls_trg]){
-                object.__ref = __totalRefCount
-                object.__refCount = 1
-                /tag @s remove cls_trg
-                Compiler.addClassTags(clazz)
+            def static lazy summon(mcobject $entity){
+                /summon $entity ~ ~ ~ {Tags:["__class__","cls_trg"]}
+            }
+            lazy string namespaceName = Compiler.getNamespace(entity)
+            if (namespaceName == "blockbench"){
+                /tag @e[tag=!object.__tagged] add object.__tagged
+                Compiler.blockbenchSummon(entity)
+                with(@e[tag=!object.__tagged,type=marker]){
+                    object.__ref = __totalRefCount
+                    object.__refCount = 1
+                    /tag @s add __class__
+                    Compiler.addClassTags(clazz)
+                }
+            }
+            else{
+                summon(entity)
+                with(@e[tag=cls_trg]){
+                    object.__ref = __totalRefCount
+                    object.__refCount = 1
+                    /tag @s remove cls_trg
+                    Compiler.addClassTags(clazz)
+                }
             }
         }
         if (Compiler.isBedrock()){
             /tag @e[tag=!object.__tagged] add object.__tagged
-            /summon $entity
+            def lazy summon(mcobject $entity){
+                /summon $entity
+            }
+            summon(entity)
             with(@e[tag=!object.__tagged]){
                 object.__ref = __totalRefCount
                 object.__refCount = 1

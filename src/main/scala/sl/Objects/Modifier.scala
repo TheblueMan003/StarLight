@@ -16,7 +16,7 @@ object Modifier{
     }
 }
 
-class Modifier(){
+class Modifier() extends Serializable{
     var protection: Protection = Protection.Protected
     var isAbstract = false
     var isVirtual = false
@@ -48,6 +48,9 @@ class Modifier(){
         ret.tags = tags ++ other.tags
         ret.attributes = attributes ++ other.attributes
         ret
+    }
+    def copy()={
+        combine(new Modifier())
     }
 
     def getAttributesString(key: String, default: ()=>String)(implicit context: Context): String = {

@@ -37,10 +37,11 @@ object Compiler{
         try{
             instruction match{
                 case FunctionDecl(name, block, typ2, args, typevars, modifier) =>{
-                    val fname = context.getFunctionWorkingName(name)
+                    var fname = context.getFunctionWorkingName(name)
                     if (typevars.length > 0){
                         val func = new GenericFunction(context, fname, args, typevars, typ2, modifier, block)
                         func.overridedFunction = if modifier.isOverride then context.getFunction(Identifier.fromString(name), args.map(_.typ), List(), typ2, false) else null
+                        func.modifiers.isVirtual |= modifier.isOverride
                         context.addFunction(name, func)
                     }
                     else{
@@ -49,9 +50,11 @@ object Compiler{
                         if (Settings.target == MCBedrock && modifier.isLoading){
                             modifier.tags.addOne("@__loading__")
                         }
+                        val clazz = context.getCurrentClass()
                         if (!modifier.isLazy){
                             val func = new ConcreteFunction(context, fname, args, context.getType(typ), modifier, block, firstPass)
                             func.overridedFunction = if modifier.isOverride then context.getFunction(Identifier.fromString(name), args.map(_.typ), List(), typ, false) else null
+                            func.modifiers.isVirtual |= modifier.isOverride
                             context.addFunction(name, func)
                             func.generateArgument()(context)
                         }

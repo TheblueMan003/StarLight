@@ -7,7 +7,7 @@ import sl.*
 import objects.types.EntityType
 
 
-private val colorMap = Utils.getConfig("color.csv")
+private lazy val colorMap = Utils.getConfig("color.csv")
                             .map(l => l.split(";").toList)
                             .filter(_.size == 3)
                             .map{case a :: b :: c :: Nil => (a, (b,c)); case _ =>throw new Exception("WHAT")}

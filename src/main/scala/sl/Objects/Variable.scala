@@ -514,6 +514,15 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					case "&=" => if value then List() else List(f"scoreboard players set ${getSelector()} 0")
 					case "&&=" => if value then List() else List(f"scoreboard players set ${getSelector()} 0")
 				}
+			case UnaryOperation("!", value) => {
+				op match{
+					case "=" =>
+						assignBool("=", BoolValue(true)) ::: Compiler.compile(If(value, VariableAssigment(List((Right(this), selector)), "=", BoolValue(true)), List()))
+					case other => 
+						val (prev, vari) = Utils.simplifyToVariable(value)
+						prev ::: assignBool(op, vari)
+				}
+			}
 			case DefaultValue => List(f"scoreboard players set 0")
 			case VariableValue(name, sel) => assignBool(op, context.resolveVariable(value))
 			case LinkedVariableValue(vari, sel) => 
@@ -666,6 +675,11 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 			case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 			case ArrayGetValue(name, index) => handleArrayGetValue(op, name, index)
 			case TupleValue(value) => tupleVari.zip(value).flatMap((t, v) => t.assign(op, v))
+			case LinkedFunctionValue(fct: ConcreteFunction) => {
+				fct.markAsUsed()
+				context.addFunctionToMux(fct.arguments.map(_.typ), fct.getType(), fct)
+				List(f"scoreboard players set ${getSelector()} ${fct.getMuxID()}")
+			}
 			case _ => throw new Exception("Unsupported Operation")
 	}
 	def removeEntityTag()(implicit context: Context)={

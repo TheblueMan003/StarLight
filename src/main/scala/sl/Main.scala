@@ -8,6 +8,7 @@ import objects.JSONFile
 import java.time.LocalDateTime
 import java.time.temporal.ChronoUnit
 import sl.files.*
+import sl.files.CacheAST
 
 object Main{
   def main(args: Array[String]): Unit = {
@@ -18,6 +19,7 @@ object Main{
       if (args(0) == "compile"){
         println("compiling project")
         compile(args)
+        FileUtils.deleteDirectory("./bin")
       }
       else{
         mainLoop(args)
@@ -58,6 +60,7 @@ object Main{
             println("exit: Close")
           }
           case "exit" => {
+            FileUtils.deleteDirectory("./bin")
             ended = true
           }
       }
@@ -86,26 +89,33 @@ object Main{
     ConfigLoader.load(args)
     ConfigLoader.loadProject()
     Settings.version=List(Settings.version(0), Settings.version(1), Settings.version(2)+1)
+
+    val libs = FileUtils.getListOfFiles("./lib").map(l => "./lib/"+l+"/src")
+    val respack = if (Settings.target == MCJava)
+                FileUtils.getListOfFiles("./lib").map(l => "./lib/"+l+"/java_resourcepack")
+              else
+                FileUtils.getListOfFiles("./lib").map(l => "./lib/"+l+"/bedrock_resourcepack")
+
     if (Settings.target == MCJava){
-      compile(List("./src"), Settings.java_datapack_output)
+      compile("./src"::libs, "./java_resourcepack"::respack, Settings.java_datapack_output)
     }
     if (Settings.target == MCBedrock){
-      compile(List("./src"), Settings.bedrock_behaviorpack_output)
+      compile("./src"::libs, "./bedrock_resourcepack"::respack, Settings.bedrock_behaviorpack_output)
     }
     ConfigLoader.saveProject()
   }
   def compile(args: Array[String]): Unit = {
     if (hasArg(args, "-bedrock")) Settings.target= MCBedrock
-    compile(sourceFromArg(args, "-i"), List(getArg(args, "-o")))
+    compile(sourceFromArg(args, "-i"), List(), List(getArg(args, "-o")))
   }
-  def compile(inputs: List[String], outputs: List[String]): Context = {
+  def compile(inputs: List[String], resourceInput: List[String], outputs: List[String]): Context = {
     val start = LocalDateTime.now()
     var files = FileUtils.getFiles(inputs)
 
-    var tokenized = files.par.map((f, c) => Parser.parse(f, c)).toList
+    var tokenized = files.par.map(f => Parser.parseFromFile(f, ()=>Utils.getFile(f))).toList
 
     if (tokenized.contains(None)) throw new Exception("Failled to Parse")
-    val context = ContextBuilder.build(Settings.name, InstructionList(tokenized.map(_.get)))
+    val context = ContextBuilder.build(Settings.name, InstructionList(tokenized))
     var output = Compiler.compile(context)
 
     val time = ChronoUnit.MILLIS.between(start, LocalDateTime.now())
@@ -123,12 +133,12 @@ object Main{
     if (Settings.target == MCJava){
         Settings.java_resourcepack_output.map(path => 
           if (!path.endsWith("/") && !path.endsWith("\\"))then path + "/" else path
-        ).foreach(f => ResourcePackBuilder.build("java_resourcepack", f, context.getAllJsonFiles().filter(_.isJavaRP())))
+        ).foreach(f => ResourcePackBuilder.build(resourceInput, f, context.getAllJsonFiles().filter(_.isJavaRP())))
     }
     if (Settings.target == MCBedrock){
         Settings.bedrock_resourcepack_output.map(path => 
           if (!path.endsWith("/") && !path.endsWith("\\"))then path + "/" else path
-        ).foreach(f => ResourcePackBuilder.build("bedrock_resourcepack", f, context.getAllJsonFiles().filter(_.isBedrockRP())))
+        ).foreach(f => ResourcePackBuilder.build(resourceInput, f, context.getAllJsonFiles().filter(_.isBedrockRP())))
     }
 
     val time2 = ChronoUnit.MILLIS.between(exportStart, LocalDateTime.now())
@@ -184,7 +194,7 @@ object Main{
   def makeDocumentation(name: String, inputs: List[String])={
     var files = FileUtils.getFiles(inputs)
 
-    var tokenized = files.par.map((f, c) => Parser.parse(f, c)).toList
+    var tokenized = files.par.map(f => Parser.parse(f, Utils.getFile(f))).toList
 
     if (tokenized.contains(None)) throw new Exception("Failled to Parse")
 

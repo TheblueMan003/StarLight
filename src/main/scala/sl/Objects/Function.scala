@@ -110,6 +110,7 @@ abstract class Function(context: Context, name: String, val arguments: List[Argu
     def exists(): Boolean
     def getName(): String
     def getContent(): List[String]
+    def getFunctionType() = FuncType(arguments.map(a => a.typ), typ)
 }
 
 class ConcreteFunction(context: Context, name: String, arguments: List[Argument], typ: Type, _modifier: Modifier, val body: Instruction, topLevel: Boolean) extends Function(context, name, arguments, typ, _modifier){

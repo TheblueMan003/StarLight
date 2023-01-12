@@ -6,8 +6,11 @@ import sl.*
 import sl.Compilation.Selector.Selector
 import scala.collection.mutable
 
-class Class(context: Context, name: String, generics: List[String], _modifier: Modifier, val block: Instruction, val parent: Class, val entities: Map[String, Expression]) extends CObject(context, name, _modifier){
+class Class(context: Context, name: String, val generics: List[String], _modifier: Modifier, val block: Instruction, val parent: Class, val entities: Map[String, Expression]) extends CObject(context, name, _modifier){
     var implemented = mutable.Map[List[Type], Class]()
+    var virutalFunction: List[(String, Function)] = List()
+    var virutalFunctionVariable: List[Variable] = List()
+    var virutalFunctionBase: List[Function] = List()
 
     def get(typevars: List[Type]) ={
         if (generics.length == 0){
@@ -52,6 +55,32 @@ class Class(context: Context, name: String, generics: List[String], _modifier: M
                 vari.setter.generateArgument()(ctx)
                 ctx.addFunction(f"__set_${vari.name}", vari.setter)
             )
+
+            getAllFunctions()
+            .filter(!_.modifiers.isStatic)
+            .filter(_.modifiers.isVirtual)
+            .filter(f => !f.modifiers.isOverride)
+            .filter(f => f.context == ctx)
+            .map(fct => {
+                val typ = fct.getFunctionType()
+                val vari = Variable(ctx, f"---${fct.name}", typ, Modifier.newPrivate())
+                ctx.addVariable(vari)
+                vari.generate()(ctx)
+
+                virutalFunctionVariable = vari :: virutalFunctionVariable
+                virutalFunctionBase = fct :: virutalFunctionBase
+                
+                val modifier = fct.modifiers.copy()
+                modifier.isVirtual = false
+                modifier.isOverride = false
+                
+                val fct2 = ConcreteFunction(ctx, f"--${fct.name}", fct.arguments, fct.getType(), modifier,
+                    if (fct.getType() == VoidType) FunctionCall(vari.fullName,fct.arguments.map(arg => VariableValue(arg.name)), List())
+                    else Return(FunctionCallValue(LinkedVariableValue(vari),fct.arguments.map(arg => VariableValue(arg.name)), List(), Selector.self)), false)
+                fct2.generateArgument()(ctx)
+                virutalFunction = (fct.name, fct2) :: virutalFunction
+                ctx.addFunction(f"--${fct.name}", fct2)
+            })
         }
     }
     def generateForVariable(vari: Variable, typevar: List[Type])(implicit ctx2: Context):Unit={
@@ -59,10 +88,15 @@ class Class(context: Context, name: String, generics: List[String], _modifier: M
             val ctx = ctx2.push(vari.name, vari)
             getAllFunctions()
                 .filter(!_.modifiers.isStatic)
+                .filter(!_.modifiers.isVirtual)
                 .map(fct => {
                     val deco = ClassFunction(vari, fct)
                     ctx.addFunction(fct.name, deco)
                 })
+            virutalFunction.map((name, fct) => {
+                val deco = ClassFunction(vari, fct)
+                ctx.addFunction(name, deco)
+            })
             getAllVariables()
                 .filter(!_.modifiers.isStatic)
                 .filter(!_.isFunctionArgument)
@@ -107,6 +141,7 @@ class Class(context: Context, name: String, generics: List[String], _modifier: M
         }
     }
     def addClassTags():List[String] = {
+        virutalFunctionVariable.zip(virutalFunctionBase).flatMap((vari, fct) => vari.assign("=", LinkedFunctionValue(fct))(context.push(name))) :::
         List(f"tag @s add ${getTag()}") ::: (if (parent != null){
             parent.addClassTags()
         }

@@ -22,10 +22,14 @@ object Utils{
     def getLib(path: String): Option[Instruction] = {
         val cpath = path.replace(".","/")
         val ipath = path.replace("/",".").replace("\\",".")
-        Parser.parse(path, Source.fromResource("libraries/"+cpath+".sl").getLines.reduce((x,y) => x + "\n" +y))
+        Some(Parser.parseFromFile("libraries/"+path, ()=>Source.fromResource("libraries/"+cpath+".sl").getLines.reduce((x,y) => x + "\n" +y)))
     }
     def getConfig(path: String): List[String] = {
-        Source.fromResource("configs/"+path).getLines.toList
+        val projectFile = new File("./configs/"+path)
+        if (projectFile.exists())
+            Source.fromFile("./configs/"+path).getLines.toList
+        else
+            Source.fromResource("configs/"+path).getLines.toList
     }
     def getResources(path: String)={
         Source.fromResource(path).getLines.reduce((x,y) => x + "\n" +y)
@@ -595,7 +599,7 @@ object Utils{
                 }
             }
             case ConstructorCall(name, args, generics) => {
-                context.getType(IdentifierType(name.toString(), generics))
+                context.getType(IdentifierType(name.toString(), generics), args)
             }
             case RangeValue(min, max) => RangeType(typeof(min))
             case LinkedVariableValue(vari, sel) => vari.getType()

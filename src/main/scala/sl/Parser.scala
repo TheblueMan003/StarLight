@@ -11,11 +11,12 @@ import sl.Compilation.Selector.*
 import sl.Reporter
 import objects.EnumField
 import objects.EnumValue
+import sl.files.CacheAST
 
 object Parser extends StandardTokenParsers{
   lexical.delimiters ++= List("(", ")", "\\", ".", "..", ":", "=", "->", "{", "}", ",", "*", "[", "]", "/", "+", "-", "*", "/", "\\", "%", "&&", "||", "=>", ";",
                               "+=", "-=", "/=", "*=", "%=", "?=", ":=", "%", "@", "@e", "@a", "@s", "@r", "@p", "~", "^", "<=", "==", ">=", "<", ">", "!=", "%%%", "???", "$",
-                              "!", "!=", "#", "<<", ">>", "&", "<<=", ">>=", "&=", "|=")
+                              "!", "!=", "#", "<<", ">>", "&", "<<=", ">>=", "&=", "|=", "::")
   lexical.reserved   ++= List("true", "false", "if", "then", "else", "return", "switch", "for", "do", "while",
                               "as", "at", "with", "to", "import", "doc", "template", "null", "typedef", "foreach", "in",
                               "def", "package", "struct", "enum", "class", "lazy", "jsonfile", "blocktag",
@@ -97,6 +98,7 @@ object Parser extends StandardTokenParsers{
       | withInstr
       | enumInstr
       | forgenerate
+      | importShortInst
       | importInst
       | fromImportInst
       | templateDesc
@@ -118,6 +120,7 @@ object Parser extends StandardTokenParsers{
   def typedef: Parser[Instruction] = "typedef" ~> types ~ identLazy ^^ { case _1 ~ _2 => TypeDef(_2, _1) }
   def templateUse: Parser[Instruction] = ident2 ~ ident ~ block ^^ {case iden ~ name ~ instr => TemplateUse(iden, name, instr)}
   def templateDesc: Parser[Instruction] = doc ~ (modifier <~ "template") ~ identLazy ~ opt("extends" ~> ident2) ~ instruction ^^ {case doc ~ mod ~ name ~ parent ~ instr => TemplateDecl(name, instr, mod.withDoc(doc), parent)}
+  def importShortInst: Parser[Instruction] = "import"~>ident2 ~ "::" ~ ident2 ~ opt("as" ~> ident2) ^^ {case file ~ _ ~ res ~ alias => Import(file, res, alias.getOrElse(null))}
   def importInst: Parser[Instruction] = "import"~>ident2 ~ opt("as" ~> ident2) ^^ {case file ~ alias => Import(file, null, alias.getOrElse(null))}
   def fromImportInst: Parser[Instruction] = "from"~>ident2 ~ ("import" ~> ident2) ~ opt("as" ~> ident2) ^^ {case file ~ res ~ alias => Import(file, res, alias.getOrElse(null))}
   def forgenerate: Parser[Instruction] = (("forgenerate" ~> "(" ~> identLazy <~ ",") ~ exprNoTuple <~ ")") ~ instruction ^^ (p => ForGenerate(p._1._1, p._1._2, p._2))
@@ -210,7 +213,8 @@ object Parser extends StandardTokenParsers{
   def selectorStr : Parser[String] = (selector ^^ (_.toString()))
 
   def stringLit2: Parser[String] = stringLit ^^ {p => p.replaceAllLiterally("◘", "\\\"")}
-  def blockDataField = ident ~ "=" ~ expr ^^ {case n ~ _ ~ v => n +"="+v }
+  def anyWord = lexical.reserved.foldLeft(ident2){(a, b) => a | b} | ident
+  def blockDataField = anyWord ~ "=" ~ expr ^^ {case n ~ _ ~ v => n +"="+v }
   def blockData = "[" ~> rep1sep(blockDataField, ",") <~ "]" ^^ {case fields => fields.mkString("[", ",", "]")}
   def namespacedName = ident ~ ":" ~ ident2 ~ opt(blockData) ^^ { case a ~ b ~ c ~ d => NamespacedName(a+b+c+d.getOrElse("")) }
   def namespacedName2 = opt(identLazy <~ ":") ~ identLazy2 ^^ { case a ~ c => if a.isEmpty then NamespacedName(c) else NamespacedName(a.get+":"+c)}
@@ -316,7 +320,7 @@ object Parser extends StandardTokenParsers{
                             ((nonRecTypes <~ "[") ~ expr) <~ "]" ^^ (p => ArrayType(p._1, p._2)) |
                             nonRecTypes
 
-  def modifierSub: Parser[String] = ("override" | "lazy" | "scoreboard" | "ticking" | "loading" | "helper" | "static" | "const")
+  def modifierSub: Parser[String] = ("override" | "virtual" |"lazy" | "scoreboard" | "ticking" | "loading" | "helper" | "static" | "const")
   def modifierAttribute: Parser[(String,Expression)] = ident2 ~ "=" ~ exprNoTuple ^^ {case i ~ _ ~ e => (i, e)}
   def modifierAttributes: Parser[Map[String,Expression]] = opt("[" ~> rep1sep(modifierAttribute,",") <~"]") ^^ {(_.getOrElse(List()).toMap)}
   def modifier: Parser[Modifier] = 
@@ -342,7 +346,7 @@ object Parser extends StandardTokenParsers{
       if subs.contains("helper")    then {mod.isHelper = true}
       if subs.contains("static")    then {mod.isStatic = true}
       if subs.contains("const")     then {mod.isConst = true}
-      
+
       mod
     }
   }
@@ -357,6 +361,16 @@ object Parser extends StandardTokenParsers{
       msg + "\n" + t
   }
 
+  def parseFromFile(f: String, get: ()=>String) : Instruction ={
+    if (CacheAST.contains(f)){
+      CacheAST.get(f)
+    }
+    else{
+      val ast = parse(f, get())
+      CacheAST.add(f, ast.get)
+      ast.get
+    }
+  }
   def parse(file: String, args: String): Option[Instruction] = {
     val tokens = new lexical.Scanner(Preparser.parse(file, args))
     phrase(program)(tokens) match {

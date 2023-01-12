@@ -14,15 +14,20 @@ object FileUtils{
         }
         directoryToBeDeleted.delete()
     }
-    def getFiles(paths: List[String]): List[(String, String)] = {
-        paths.flatMap(path => getListOfFiles(path)).map(p => (p, Utils.getFile(p)))
+    def listSubdir(dir: String):List[String] = listSubdir(File(dir))
+    def listSubdir(dir: File):List[String] = {
+        if (!dir.exists || !dir.isDirectory) return List()
+        dir.listFiles().filter(_.isDirectory()).map(_.getName()).toList
+    }
+    def getFiles(paths: List[String]): List[String] = {
+        paths.flatMap(path => getListOfFiles(path))
     }
     def getListOfFiles(dir: String):List[String] = {
         val d = new File(dir)
         if (d.exists && d.isDirectory) {
             d.listFiles.filter(_.isDirectory()).flatMap(f => getListOfFiles(f.getPath())).toList:::
             d.listFiles.filter(_.isFile).map(_.getPath()).toList
-        } else if (d.isFile()) {
+        } else if (d.exists && d.isFile()) {
             List[String](d.getPath())
         }
         else{

@@ -70,6 +70,18 @@ lazy entity newPointer(){
 }
 
 """
+Creates a new pointer
+"""
+lazy entity newPointer(void=>void func){
+    entity a = newPointer()
+	with(a,true){
+		func()
+	}
+	return a
+}
+
+
+"""
 Runs a function in a with the pointer
 """
 lazy void run(void=>void func){

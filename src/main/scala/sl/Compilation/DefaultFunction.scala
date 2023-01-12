@@ -366,7 +366,99 @@ object DefaultFunction{
             }
         ))
 
+
+        ctx.addFunction("getJavaSound", CompilerFunction(ctx, "getJavaSound", 
+            List(Argument("sound", MCObjectType, None)),
+            MCObjectType,
+            Modifier.newPublic(),
+            (args: List[Expression],ctx: Context) => {
+                args match{
+                    case NamespacedName(sound) :: Nil => {
+                        (List(), NamespacedName(Sounds.getJava(sound.split(":")(1))))
+                    }
+                    case StringValue(sound) :: Nil => {
+                        if (sound.contains(":")){
+                            (List(), NamespacedName(Sounds.getJava(sound.split(":")(1))))
+                        }
+                        else{
+                            (List(), NamespacedName(Sounds.getJava(sound)))
+                        }
+                    }
+                    case other => throw new Exception(f"Illegal Arguments $other for getJavaSound")
+                }
+            }
+        ))
+
+        ctx.addFunction("getBedrockSound", CompilerFunction(ctx, "getBedrockSound", 
+            List(Argument("sound", MCObjectType, None)),
+            MCObjectType,
+            Modifier.newPublic(),
+            (args: List[Expression],ctx: Context) => {
+                args match{
+                    case NamespacedName(sound) :: Nil => {
+                        (List(), NamespacedName(Sounds.getBedrock(sound.split(":")(1))))
+                    }
+                    case StringValue(sound) :: Nil => {
+                        if (sound.contains(":")){
+                            (List(), NamespacedName(Sounds.getBedrock(sound.split(":")(1))))
+                        }
+                        else{
+                            (List(), NamespacedName(Sounds.getBedrock(sound)))
+                        }
+                    }
+                    case other => throw new Exception(f"Illegal Arguments $other for getBedrock")
+                }
+            }
+        ))
+
+        ctx.addFunction("getNamespace", CompilerFunction(ctx, "getNamespace", 
+            List(Argument("name", MCObjectType, None)),
+            StringType,
+            Modifier.newPublic(),
+            (args: List[Expression],ctx: Context) => {
+                args match{
+                    case NamespacedName(name) :: Nil => {
+                        (List(), StringValue(name.split(":")(0)))
+                    }
+                    case other => throw new Exception(f"Illegal Arguments $other for getNamespace")
+                }
+            }
+        ))
+        ctx.addFunction("getNamespaceName", CompilerFunction(ctx, "getNamespaceName", 
+            List(Argument("name", MCObjectType, None)),
+            StringType,
+            Modifier.newPublic(),
+            (args: List[Expression],ctx: Context) => {
+                args match{
+                    case NamespacedName(name) :: Nil => {
+                        (List(), StringValue(name.split(":")(1)))
+                    }
+                    case other => throw new Exception(f"Illegal Arguments $other for getNamespaceName")
+                }
+            }
+        ))
+
         if (Settings.target == MCJava){
+            ctx.addFunction("blockbenchSummon", CompilerFunction(ctx, "blockbenchSummon", 
+                List(Argument("name", MCObjectType, None)),
+                VoidType,
+                Modifier.newPublic(),
+                (args: List[Expression],ctx: Context) => {
+                    args match{
+                        case NamespacedName(name) :: Nil => {
+                            val e = name.split(":")(1)
+                            val splitted = e.split("\\.")
+                            if (splitted.length == 1){
+                                (List(f"function ${splitted(0)}:summon/default"), (NullValue))
+                            }
+                            else{
+                                (List(f"function ${splitted(0)}:summon/${splitted(1)}"), (NullValue))
+                            }
+                        }
+                        case other => throw new Exception(f"Illegal Arguments $other for blockbenchSummon")
+                    }
+                }
+            ))
             ctx.addFunction("cmdstore", CompilerFunction(ctx, "cmdstore", 
                     List(Argument("vari", MCObjectType, None), Argument("cmd", FuncType(List(), VoidType), None)),
                     VoidType,

@@ -3,7 +3,7 @@ package sl.Compilation
 import sl.Utils
 
 object BlockConverter{
-    val blockMap = loadBlockMap()
+    lazy val blockMap = loadBlockMap()
     def getBlockName(name: String)={
         blockMap.getOrElse(name, (name, -1))._1
     }

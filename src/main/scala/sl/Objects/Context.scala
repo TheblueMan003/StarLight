@@ -439,7 +439,15 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
             val filtered = fcts.filter(fct => args.size >= fct.minArgCount && args.size <= fct.maxArgCount && (fct.isInstanceOf[ConcreteFunction] || !concrete))
             if (filtered.length == 1) return filtered.head
             if (filtered.size == 0) throw new ObjectNotFoundException(f"Unknown function: $identifier for args: $args in context: $path")
-            val ret = filtered.sortBy(_.arguments.zip(args).map((a, v)=> v.getDistance(a.typ)(this)).reduceOption(_ + _).getOrElse(0)).head
+            val ret = filtered.map(f => (f.arguments.zip(args).map((a, v)=> v.getDistance(a.typ)(this)).reduceOption(_ + _).getOrElse(0), f))
+                              .groupBy(_._1)
+                              .toList
+                              .sortBy(_._1)
+                              .head._2
+                              .map(_._2)
+                              .sortBy(f => -f.fullName.length)
+                              .head
+
             ret
         }
         val ret = inner()
@@ -510,7 +518,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
     def addFunctionToMux(source: List[Type], output: Type, fct: ConcreteFunction)(implicit context: Context): Unit = {
         val r = muxCtx
         r.synchronized{
-            val key = (source, output)
+            val key = (source.filter(_ != VoidType), output)
             createFunctionMux(source, output, key)
             val mux = muxCtx.mux(key)
             mux.addFunctionToMux(fct)
@@ -518,7 +526,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
     }
     def getFunctionMux(source: List[Type], output: Type)(implicit context: Context):MultiplexFunction = {
         muxCtx.synchronized{
-            val key = (source, output)
+            val key = (source.filter(_ != VoidType), output)
             createFunctionMux(source, output, key)
             muxCtx.mux(key)
         }
@@ -661,7 +669,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
         enm
     }
 
-    def getType(typ: Type): Type = {
+    def getType(typ: Type, constructorArgs: List[Expression] = null): Type = {
         typ match
             case ArrayType(sub, nb) => {
                 ArrayType(getType(sub), Utils.simplify(nb)(this))

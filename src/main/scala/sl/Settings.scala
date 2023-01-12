@@ -61,7 +61,7 @@ case object MCJava extends Target{
         path.replaceAll("([A-Z])","-$1").toLowerCase().replaceAllLiterally(".","/").replaceFirst("/", ":")
     }
     def getJsonPath(path: String): String = {
-        "/data/" + path.replaceAllLiterally(".","/")+ ".json"
+        "/data/" + path.replaceAll("([A-Z])","-$1").toLowerCase().replaceAllLiterally(".","/")+ ".json"
     }
     def getRPJsonPath(path: String): String = {
         "/assets/minecraft/" + path.replaceAllLiterally(".","/")+ ".json"
