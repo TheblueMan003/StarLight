@@ -40,9 +40,16 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 
 	var getter: Function = null
 	var setter: Function = null
+	var wasGenerated = false
 
-	def generate(isStructFunctionArgument: Boolean = false)(implicit context: Context):Unit = {
+	def generate(isStructFunctionArgument: Boolean = false, skipClassCheck: Boolean = false)(implicit context: Context):Unit = {
 		val parent = context.getCurrentVariable()
+		val parentClass = context.getCurrentClass()
+
+		if (parentClass!=null && getType() == parentClass.definingType && !skipClassCheck) return
+
+		wasGenerated = true
+
 		if (parent != null){
 			if (!isFunctionArgument){
 				parent.tupleVari = parent.tupleVari ::: List(this)
@@ -295,6 +302,9 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 	}
 
 
+	def assignForce(vari: Variable)(implicit context: Context, selector: Selector = Selector.self): List[String] = {
+		List(f"scoreboard players operation ${getSelector()} = ${vari.getSelector()}")
+	}
 	/**
 	 * Assign a value to the int variable
 	 */
@@ -638,6 +648,12 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					tupleVari.flatMap(t => t.assign(op, expr))
 				}
 			}
+			case ConstructorCall(Identifier(List("standard","array","Array")), List(IntValue(n)), typeArg) if op == "=" && List(sub) == typeArg && n == size => {
+				tupleVari.flatMap(t => t.assign("=", DefaultValue))
+			}
+			case ConstructorCall(Identifier(List("standard","array","Array")), List(), typeArg) if op == "=" && List(sub) == typeArg => {
+				tupleVari.flatMap(t => t.assign("=", DefaultValue))
+			}
 			case VariableValue(vari, sel) => assign(op, context.resolveVariable(expr))
 			case FunctionCallValue(fct, args, typeargs, selector) => handleFunctionCall(op, fct, args, typeargs, selector)
 			case ArrayGetValue(name, index) => handleArrayGetValue(op, name, index)
@@ -881,9 +897,14 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 							case other => throw new Exception(f"Cannot constructor call $other")
 					}
 					case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
+					case BinaryOperation(op, left, right) => assignBinaryOperator("=", BinaryOperation(op, left, right))
 					case _ => context.getFunction(name + ".__set__", List(value), List(), getType(), false).call()
 			}
-			case op => context.getFunction(name + "." + Utils.getOpFunctionName(op),  List(value), List(), getType(), false).call()
+			case op => 
+				value match
+					case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
+					case BinaryOperation(op2, left, right) => assignBinaryOperator(op, BinaryOperation(op2, left, right))
+					case _ => context.getFunction(name + "." + Utils.getOpFunctionName(op),  List(value), List(), getType(), false).call()
 	}
 
 	def deref()(implicit context: Context) = context.getFunction(this.name + ".__remRef", List[Expression](), List(), getType(), false).call()
@@ -910,8 +931,8 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 						context.getType(IdentifierType(name2.toString(), typevars)) match
 							case StructType(struct, sub) => throw new Exception("Cannot call struct constructor for class")
 							case typ@ClassType(clazz2, sub) => {
-								val clazz = clazz2.get(typevars)
-								if (typ == getType() && typevars == sub){
+								val clazz = clazz2.get(sub)
+								if (typ == getType() && typevars.map(context.getType(_)) == sub){
 									val entity = clazz.getEntity()
 									val initarg = List(StringValue(clazz.fullName))::: (if entity != null then List(entity) else List())
 									deref()
@@ -933,6 +954,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					}
 					case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 					case ArrayGetValue(name, index) => handleArrayGetValue(op, name, index)
+					case BinaryOperation(op, left, right) => assignBinaryOperator("=", BinaryOperation(op, left, right))
 					case _ => context.getFunction(name + ".__set__", List(value), List(), getType(), false).call()
 			}
 			case _ => assignStruct(op, value)

@@ -18,6 +18,7 @@ object Context{
 }
 class Context(val name: String, val parent: Context = null, _root: Context = null) {
     private lazy val path: String = if (parent == null){name}else{parent.path+"."+name}
+    lazy val fullPath = Identifier.fromString(path)
     
     private val variables = mutable.Map[String, Variable]()
     private val properties = mutable.Map[String, Property]()
@@ -194,7 +195,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
     }
     def requestLibrary(lib: String): Unit = {
         if (importFile(lib)){
-            Compiler.compile(Utils.getLib(lib).get, true)(root)
+            Compiler.compile(Utils.getLib(lib).get, false)(root)
         }
     }
     def getAllConstant(): List[Int] = {
@@ -290,6 +291,17 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
 
     def inherit(context: Context) = {
         inheritted = context
+    }
+    def isInheriting(context: Context):Boolean = {
+        if (inheritted == context){
+            true
+        }
+        else if (inheritted != null){
+            inheritted.isInheriting(context)
+        }
+        else{
+            false
+        }
     }
 
     def getContext(identifier: Identifier): Context = {
@@ -492,6 +504,15 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
             }
         )
     }
+    def addFunction(name: Identifier, function: Function): Function = {
+        if (name.isSingleton()){
+            addFunction(name.toString(), function)
+        }
+        else{
+            val tail = name.drop()
+            addFunction(tail, function)
+        }
+    }
     def addFunction(name: String, function: Function): Function = synchronized{
         if (!functions.contains(name)){
             addName(name)
@@ -672,6 +693,10 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
 
     def getType(typ: Type, constructorArgs: List[Expression] = null): Type = {
         typ match
+            case ArrayType(inner, null) => {
+                requestLibrary("standard.array")
+                getType(IdentifierType("standard.array.Array", List(inner)))
+            }
             case ArrayType(sub, nb) => {
                 ArrayType(getType(sub), Utils.simplify(nb)(this))
             }
@@ -680,6 +705,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
             case IdentifierType(identifier, sub) => {
                 val typdef = tryGetTypeDef(identifier)
                 if (typdef.isDefined && sub.size == 0){
+                    if (typdef.get == typ) throw new Exception(f"Recursive typedef: $identifier in context: $path")
                     return getType(typdef.get)
                 }
 

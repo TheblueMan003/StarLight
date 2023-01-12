@@ -24,7 +24,7 @@ object Parser extends StandardTokenParsers{
                               "ticking", "loading", "predicate", "extends", "new", "const", "static", "virtual", "abstract", "override")
 
 
-  def block: Parser[Instruction] = "{" ~> repsep(instruction, opt(";")) <~ "}" ^^ (p => InstructionBlock(p))
+  def block: Parser[Instruction] = "{" ~> rep(instruction <~ opt(";")) <~ "}" ^^ (p => InstructionBlock(p))
   def assignmentOp: Parser[String] = ("=" | "+=" | "-=" | "*=" | "/=" | ":=" | "%=" | "^=" | "|=" | "&=" | "<<=" | ">>=")
 
   def ident2: Parser[String] = rep1sep(ident, ".") ^^ { p => p.reduce(_ + "." + _) }
@@ -248,6 +248,7 @@ object Parser extends StandardTokenParsers{
     | "#" ~> ident2 ^^ (TagValue(_))
     | namespacedName
     | stringLit2 ^^ (StringValue(_))
+    | "new" ~> nonRecTypes ~ ("[" ~> repsep(exprNoTuple, ",") <~ "]") ^^ { case t ~ a => ConstructorCall("standard.array.Array", a, List(t)) }
     | "new" ~> identLazy2 ~ typeVariables ~ ("(" ~> repsep(exprNoTuple, ",") <~ ")") ~ block ^^ { case f ~ t ~ a ~ b => ConstructorCall(f, a ::: List(LambdaValue(List(), b)), t) }
     | "new" ~> identLazy2 ~ typeVariables ~ ("(" ~> repsep(exprNoTuple, ",") <~ ")") ^^ { case f ~ t ~ a => ConstructorCall(f, a, t) }
     | identLazy2 ~ typeVariables ~ ("(" ~> repsep(exprNoTuple, ",") <~ ")") ~ block ^^ { case f ~ t ~ a ~ b => FunctionCallValue(VariableValue(f), a ::: List(LambdaValue(List(), b)), t) }
@@ -318,6 +319,7 @@ object Parser extends StandardTokenParsers{
   def types: Parser[Type] = ("(" ~> repsep(nonRecTypes, ",") <~ ")"<~ "=>") ~ types ^^ (p => FuncType(p._1, p._2)) |
                             (nonRecTypes <~ "=>") ~ types ^^ (p => FuncType(List(p._1), p._2)) |
                             ((nonRecTypes <~ "[") ~ expr) <~ "]" ^^ (p => ArrayType(p._1, p._2)) |
+                            ((nonRecTypes <~ "[" ~ "]")) ^^ (p => ArrayType(p, null)) |
                             nonRecTypes
 
   def modifierSub: Parser[String] = ("override" | "virtual" |"lazy" | "scoreboard" | "ticking" | "loading" | "helper" | "static" | "const")
@@ -353,7 +355,7 @@ object Parser extends StandardTokenParsers{
 
   def doc: Parser[Option[String]] = opt("???"~>stringLit<~"???")
 
-  def program: Parser[Instruction] = repsep(instruction, opt(";")) ^^ (InstructionList(_))
+  def program: Parser[Instruction] = rep(instruction <~ opt(";")) ^^ (InstructionList(_))
 
   /** Print an error message, together with the position where it occured. */
   case class TypeError(t: Instruction, msg: String) extends Exception(msg) {

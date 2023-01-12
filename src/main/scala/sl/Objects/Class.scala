@@ -11,8 +11,10 @@ class Class(context: Context, name: String, val generics: List[String], _modifie
     var virutalFunction: List[(String, Function)] = List()
     var virutalFunctionVariable: List[Variable] = List()
     var virutalFunctionBase: List[Function] = List()
+    var definingType = ClassType(this, List())
 
-    def get(typevars: List[Type]) ={
+    def get(typevars2: List[Type]) ={
+        val typevars = typevars2.map(context.push(name).getType(_))
         if (generics.length == 0){
             this
         }else{
@@ -26,10 +28,13 @@ class Class(context: Context, name: String, val generics: List[String], _modifie
             if (typevars.size != generics.size) throw new Exception("Wrong number of type variables")
             val hash = scala.util.hashing.MurmurHash3.stringHash(typevars.mkString(","))
             val ctx = context.push(name+"--"+hash)
-            generics.zip(typevars).foreach(pair => ctx.addTypeDef(pair._1, pair._2))
+            generics.zip(typevars).foreach(pair => {
+                ctx.addTypeDef(pair._1, pair._2)
+            })
             val cls = ctx.addClass(new Class(ctx, "impl", List(), modifiers, block, parent, entities))
-            cls.generate()
+            cls.definingType = ClassType(this, typevars)
             implemented(typevars) = cls
+            cls.generate()
         }
     }
 
@@ -40,13 +45,19 @@ class Class(context: Context, name: String, val generics: List[String], _modifie
             if (parent != null){
                 ctx.inherit(parent.context.push(parent.name))
             }
+
             Compiler.compile(block)(ctx)
             
             val mod = new Modifier()
             mod.isEntity = true
             ctx.getAllVariable().filter(!_.isFunctionArgument).foreach(vari => vari.modifiers = vari.modifiers.combine(mod))
 
-            getAllVariables().filter(!_.isFunctionArgument).filter(!_.modifiers.isStatic).filter(_.getter == null).foreach(vari => 
+            getAllVariables()
+            .filter(!_.isFunctionArgument)
+            .filter(!_.modifiers.isStatic)
+            .filter(_.getter == null)
+            .filter(_.modifiers.protection == Protection.Public)
+            .foreach(vari => 
                 vari.getter = ConcreteFunction(ctx, f"__get_${vari.name}", List(), vari.getType(), vari.modifiers, Return(LinkedVariableValue(vari)), false)
                 vari.getter.generateArgument()(ctx)
                 ctx.addFunction(f"__get_${vari.name}", vari.getter)
@@ -81,6 +92,8 @@ class Class(context: Context, name: String, val generics: List[String], _modifie
                 virutalFunction = (fct.name, fct2) :: virutalFunction
                 ctx.addFunction(f"--${fct.name}", fct2)
             })
+
+            getAllVariables().filter(!_.wasGenerated).map(_.generate(false, true)(ctx))
         }
     }
     def generateForVariable(vari: Variable, typevar: List[Type])(implicit ctx2: Context):Unit={
@@ -89,6 +102,8 @@ class Class(context: Context, name: String, val generics: List[String], _modifie
             getAllFunctions()
                 .filter(!_.modifiers.isStatic)
                 .filter(!_.modifiers.isVirtual)
+                .filter(isNotClassFunction)
+                .filter(f => f.context == context.push(name) || context.push(name).isInheriting(f.context))
                 .map(fct => {
                     val deco = ClassFunction(vari, fct)
                     ctx.addFunction(fct.name, deco)
@@ -100,6 +115,9 @@ class Class(context: Context, name: String, val generics: List[String], _modifie
             getAllVariables()
                 .filter(!_.modifiers.isStatic)
                 .filter(!_.isFunctionArgument)
+                .filter(_.modifiers.protection == Protection.Public)
+                .filter(_.getter != null)
+                .filter(_.setter != null)
                 .map(vari => {
                     val getter = ClassFunction(vari, vari.getter)
                     ctx.addFunction(vari.getter.name, getter)
@@ -149,7 +167,7 @@ class Class(context: Context, name: String, val generics: List[String], _modifie
             Nil
         })
     }
-    def getTag()=f"#class.$fullName"
+    def getTag()=f"--class.$fullName"
 
     def getEntity(): Expression = {
         if (entities != null){
@@ -172,5 +190,10 @@ class Class(context: Context, name: String, val generics: List[String], _modifie
         else{
             null
         }
+    }
+    def isNotClassFunction(f: Function) = {
+        f match
+            case a: ClassFunction => false
+            case _ => true
     }
 }

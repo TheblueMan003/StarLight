@@ -123,6 +123,6 @@ Vector3Int getPosition(){
 
 package _
 
-def lazy __at__(math.vector3.Vector3Int v, void=>void fct){
+def lazy __at__(math.vector3int.Vector3Int v, void=>void fct){
     __at__(v.x, v.y, v.z, fct)
 }

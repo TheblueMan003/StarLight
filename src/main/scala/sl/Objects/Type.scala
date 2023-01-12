@@ -492,7 +492,7 @@ case class StructType(struct: Struct, sub: List[Type]) extends Type{
     override def isEqualitySupported(): Boolean = true
 }
 case class ClassType(clazz: Class, sub: List[Type]) extends Type{
-    override def toString(): String = clazz.fullName
+    override def toString(): String = clazz.fullName + sub.mkString("<", ",", ">")
     override def allowAdditionSimplification(): Boolean = false
     override def getDistance(other: Type)(implicit context: Context): Int = {
         other match

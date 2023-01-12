@@ -561,7 +561,7 @@ object Utils{
             case ArrayGetValue(name, index) => {
                 typeof(name) match
                     case ArrayType(inner, size) => inner
-                    case other => throw new Exception(f"Illegal access of $other")
+                    case other => throw new Exception(f"Illegal array access of $name of type $other")
             }
             case LinkedFunctionValue(fct) => FuncType(fct.arguments.map(_.typ), fct.getType())
             case DefaultValue => throw new Exception(f"default value has no type")

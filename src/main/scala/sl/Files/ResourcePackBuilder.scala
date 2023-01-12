@@ -26,7 +26,9 @@ object ResourcePackBuilder{
     def makeRPFolder(sources: List[String], target: String, jsonFiles: List[objects.JSONFile])={
         FileUtils.deleteDirectory(target)
         sources.flatMap(source => getListOfRPFiles(source, "").map(f => (source, f)))
-        .groupBy(_._2).map((k,v) => v.sortBy(_._1.length()).head)
+        .groupBy(_._2)
+        .toList
+        .map((k,v) => v.sortBy(_._1.length()).head)
         .map((source, file) =>{
             val copied = Paths.get(target+file);
             val originalPath = Paths.get(source+"/"+file)
@@ -45,7 +47,9 @@ object ResourcePackBuilder{
 
         // Copy Files
         sources.flatMap(source => getListOfRPFiles(source, "").map(f => (source, f)))
-        .groupBy(_._2).map((k,v) => v.sortBy(_._1.length()).head)
+        .groupBy(_._2)
+        .toList
+        .map((k,v) => v.sortBy(_._1.length()).head)
         .map((source, name) =>{
             zip.putNextEntry(new ZipEntry(name))
             val in = new BufferedInputStream(new FileInputStream(source+"/"+name), Buffer)

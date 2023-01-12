@@ -1,1 +1,1 @@
-function default:utils/process_manager/show
+function default:__playertick__

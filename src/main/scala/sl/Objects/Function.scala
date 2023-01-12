@@ -324,21 +324,31 @@ class ClassFunction(variable: Variable, function: Function) extends Function(fun
     def call(args2: List[Expression], ret: Variable = null, op: String = "=")(implicit ctx: Context): List[String] = {
         val selector = SelectorValue(JavaSelector("@e", List(("tag", SelectorIdentifier("__class__")))))
 
-        def callNoEntity(ret: Variable = null) = {
+        def callNoEntity(comp: Variable, ret: Variable = null) = {
             Compiler.compile(With(
                 selector, 
                 BoolValue(true), 
-                BinaryOperation("==", LinkedVariableValue(variable), LinkedVariableValue(ctx.root.push("object").getVariable("__ref"))),
+                BinaryOperation("==", LinkedVariableValue(comp), LinkedVariableValue(ctx.root.push("object").getVariable("__ref"))),
                 LinkedFunctionCall(function, args2, ret)
                 ))
         }
 
-        if (ret == null || !ret.modifiers.isEntity){
-            callNoEntity(ret)
+        var pre = List[String]()
+        val comp = if (variable.modifiers.isEntity){
+            val vari = ctx.getFreshVariable(IntType)
+            pre = vari.assignForce(variable)
+            vari
+        }
+        else{
+            variable
+        }
+
+        if ((ret == null || !ret.modifiers.isEntity)){
+            pre:::callNoEntity(comp, ret)
         }
         else{
             val vari = ctx.getFreshVariable(function.getType())
-            callNoEntity(vari) ::: ret.assign(op, LinkedVariableValue(vari))
+            pre:::callNoEntity(comp, vari) ::: ret.assign(op, LinkedVariableValue(vari))
         }
     }
 }

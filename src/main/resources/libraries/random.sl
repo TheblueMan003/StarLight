@@ -9,7 +9,7 @@ if (Compiler.isBedrock){
     }
 }
 if (Compiler.isJava){
-    import mc.entity.nbt as nbt
+    import mc.java.nbt as nbt
     
     """
     Return a random number between `x` (included) and `y` (excluded)

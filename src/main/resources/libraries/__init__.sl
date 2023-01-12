@@ -45,7 +45,7 @@ class object{
             /kill
         }
     }
-    static lazy object __initInstance(mcobject clazz, mcobject entity = marker){
+    static lazy object __initInstance(mcobject clazz, mcobject entity = minecraft:marker){
         __totalRefCount++
         if (Compiler.isJava()){
             def static lazy summon(mcobject $entity){

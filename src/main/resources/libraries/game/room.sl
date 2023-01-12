@@ -5,7 +5,7 @@ import standard
 int t_running, t_total
 
 if (Compiler.isJava){
-    import mc.entity.nbt as nbt
+    import mc.java.nbt as nbt
 
     int x, y, z
 
