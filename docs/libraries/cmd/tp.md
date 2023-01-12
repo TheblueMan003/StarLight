@@ -43,13 +43,13 @@ Rotate the current entity of `x`, `y` relativly to the current rotation
 ## ` void rotateAbsolute(float x, float y)`
 Rotate the current entity of `x`, `y`
 
-## ` int getX()`
+## ` float getX()`
 Get the x position of the current entity
 
-## ` int getY()`
+## ` float getY()`
 Get the y position of the current entity
 
-## ` int getZ()`
+## ` float getZ()`
 Get the z position of the current entity
 
 

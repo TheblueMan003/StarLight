@@ -10,6 +10,9 @@
 ## ` lazy void __set__(float other)`
 
 
+## ` lazy void __set__(Vector3? other)`
+
+
 ## ` lazy void __add__(Vector3? other)`
 
 
@@ -49,6 +52,12 @@ Compute the scalar product with other
 ## ` lazy void __div__(float x, float y, float z)`
 
 
+
+
+## ` Vector3? getPosition()`
+
+
+## ` lazy void __at__(math.vector3.Vector3? v, void=>void fct)`
 
 
 

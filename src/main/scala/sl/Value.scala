@@ -233,7 +233,7 @@ case class FunctionCallValue(val name: Expression, val args: List[Expression], v
 }
 
 case class ConstructorCall(val name: Identifier, val args: List[Expression], val typeArg: List[Type]) extends Expression{
-    override def toString() = f"${name}()"
+    override def toString() = f"new ${name}()"
     override def getIntValue(): Int = ???
     override def hasIntValue(): Boolean = false
     override def hasFloatValue(): Boolean = false

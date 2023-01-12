@@ -1,2 +1,2 @@
-function default:zzz_sl_block/3
-execute unless score default.a.adas.enabled tbms.var matches 0 run schedule function default:zzz_sl_block/2 1t append
+scoreboard players set default.a.test.0.0.0._2 tbms.var 1
+tag @a[tag=default.a.test.0.0.p] remove default.a.test.0.0.p

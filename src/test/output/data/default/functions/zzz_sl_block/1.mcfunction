@@ -1,5 +1,4 @@
-function default:a/adas/on-stop
-scoreboard players set default.a.adas.enabled tbms.var 0
-scoreboard players operation default.zzz_sl_mux.void___to___void.__fct__ tbms.var = default.a.adas.callback tbms.var
-function default:zzz_sl_mux/void___to___void
-scoreboard players set default.a.adas.callback tbms.var 0
+scoreboard players operation default.cmd.tp.absolute.x tbms.var = default.a.test.vec.x tbms.var
+scoreboard players operation default.cmd.tp.absolute.y tbms.var = default.a.test.vec.y tbms.var
+scoreboard players operation default.cmd.tp.absolute.z tbms.var = default.a.test.vec.z tbms.var
+function default:cmd/tp/absolute

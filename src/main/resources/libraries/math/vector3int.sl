@@ -116,3 +116,13 @@ struct Vector3Int{
         return(tmp1)
     }
 }
+Vector3Int getPosition(){
+    import cmd.tp as tp
+    return(new Vector3Int(tp.getX(), tp.getY(), tp.getZ()))
+}
+
+package _
+
+def lazy __at__(math.vector3.Vector3Int v, void=>void fct){
+    __at__(v.x, v.y, v.z, fct)
+}

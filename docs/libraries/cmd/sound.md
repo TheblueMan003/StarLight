@@ -1,4 +1,4 @@
-## ` lazy void play(entity $selector, mcobject $sound, int $volume, int $pitch, mcobject $loc)`
+## ` lazy void play(entity $selector, mcobject sound, int $volume, int $pitch, mcobject $loc)`
 Play the sound `sound` to `selector` with `volume` and `pitch` on channel `loc`
 
 ## ` lazy void play(mcobject sound, float volume, float pitch)`

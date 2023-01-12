@@ -117,13 +117,17 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 								tupleVari.zip(vari.tupleVari).map((a,v) => a.assign(op, LinkedVariableValue(v, sel)))
 							}
 							else{
-								throw new Exception(f"Lazy assignment of $vari not supported for struct")
+								val (prev, LinkedVariableValue(vari, sel))=Utils.simplifyToVariable(value)
+								prev:::tupleVari.zip(vari.tupleVari).map((a,v) => a.assign(op, LinkedVariableValue(v, sel)))
 							}
 						}
 						case LinkedVariableValue(vari, sel) if vari.getType() == StructType(struct, sub) => {
 							tupleVari.zip(vari.tupleVari).map((a,v) => a.assign(op, LinkedVariableValue(v, sel)))
 						}
-						case a => throw new Exception(f"Lazy assignment of $a not supported for struct")
+						case a => {
+							val (prev, LinkedVariableValue(vari, sel))=Utils.simplifyToVariable(value)
+							prev:::tupleVari.zip(vari.tupleVari).map((a,v) => a.assign(op, LinkedVariableValue(v, sel)))
+						}
 				}
 				case RawJsonType => {
 					Utils.typeof(value) match
@@ -498,7 +502,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 			case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 			case ArrayGetValue(name, index) => handleArrayGetValue(op, name, index)
 			case bin: BinaryOperation => assignBinaryOperator(op, bin)
-			case _ => throw new Exception(f"Unknown cast to float $value")
+			case _ => throw new Exception(f"Unknown cast to float for $fullName and value $value")
 	}
 
 	/**
@@ -876,6 +880,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 							}
 							case other => throw new Exception(f"Cannot constructor call $other")
 					}
+					case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 					case _ => context.getFunction(name + ".__set__", List(value), List(), getType(), false).call()
 			}
 			case op => context.getFunction(name + "." + Utils.getOpFunctionName(op),  List(value), List(), getType(), false).call()

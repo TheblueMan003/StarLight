@@ -18,6 +18,18 @@ def lazy aligned(void=>void fct){
     align("xyz")at(~0.5 ~ ~0.5)fct()
 }
 
+def lazy __at__(float x, float y, float z, void=>void fct){
+    import mc.pointer as pointer
+    import cmd.tp as tp
+
+    entity p = pointer.newPointer(){
+        tp.absolute(x, y, z)
+    }
+    at(p){
+        fct()
+    }
+}
+
 int __totalRefCount
 
 class object{

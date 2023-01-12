@@ -93,9 +93,16 @@ object Execute{
             case AtType => {
                 Utils.simplify(exec.exprs.head) match
                     case PositionValue(value) => makeExecute(f" positioned $value", Compiler.compile(exec.block))
-                    case _ => {
+                    case SelectorValue(value) => {
                         val (prefix, selector) = Utils.getSelector(exec.exprs.head)
                         prefix:::makeExecute(f" at ${selector.getString()}", Compiler.compile(exec.block))
+                    }
+                    case LinkedVariableValue(vari, selector) if vari.getType() == EntityType => {
+                        val (prefix, selector) = Utils.getSelector(exec.exprs.head)
+                        prefix:::makeExecute(f" at ${selector.getString()}", Compiler.compile(exec.block))
+                    }
+                    case other => {
+                        Compiler.compile(FunctionCall("__at__", exec.exprs ::: List(LinkedFunctionValue(context.getFreshBlock(Compiler.compile(exec.block)))), List()))
                     }
             }
             case RotatedType => {

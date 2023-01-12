@@ -89,7 +89,7 @@ object Parser extends StandardTokenParsers{
       | block
       | switch | whileLoop | doWhileLoop | forLoop | jsonFile
       | "as" ~"("~> exprNoTuple ~")"~ instruction ^^ {case e ~ _ ~ i => With(e, BoolValue(false), BoolValue(true), i)}
-      | "at" ~"(" ~> exprNoTuple ~ ")"~ instruction ^^ {case e ~ _ ~ i => Execute(AtType, List(e), i)}
+      | "at" ~"(" ~> repsep(exprNoTuple, ",") ~ ")"~ instruction ^^ {case e ~ _ ~ i => Execute(AtType, e, i)}
       | rotated1
       | rotated2
       | facing1

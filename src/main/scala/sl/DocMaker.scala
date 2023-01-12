@@ -6,6 +6,7 @@ import objects.Protection.Private
 
 object DocMaker{
     def makeIndex(files: List[String])={
+        Utils.getFile("README.md")+
         "# List of Libraries\n\n"+
         files.map(f => f"[$f](libraries/$f/index.html)").mkString("\n\n")
     }

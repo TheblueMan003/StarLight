@@ -419,6 +419,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
                                 (getFunctionMux(typ.sources, typ.output)(this), LinkedVariableValue(vari)::args)
                             }
                             case NullValue => (null, args)
+                            case LinkedFunctionValue(fct) => (fct, args)
                             case other => throw new Exception(f"Illegal call of ${other} with $args")
                     }
                     else{

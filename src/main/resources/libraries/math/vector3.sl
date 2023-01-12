@@ -24,6 +24,11 @@ struct Vector3{
         this.y = other
         this.z = other
     }
+    def lazy __set__(Vector3 other){
+        this.x = other.x
+        this.y = other.y
+        this.z = other.z
+    }
     
     def lazy __add__(Vector3 other){
         this.x += other.x
@@ -117,4 +122,15 @@ struct Vector3{
         this.y /= y
         this.z /= z
     }
+}
+
+Vector3 getPosition(){
+    import cmd.tp as tp
+    return(new Vector3(tp.getX(), tp.getY(), tp.getZ()))
+}
+
+package _
+
+def lazy __at__(math.vector3.Vector3 v, void=>void fct){
+    __at__(v.x, v.y, v.z, fct)
 }

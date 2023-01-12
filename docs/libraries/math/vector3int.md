@@ -51,4 +51,10 @@ Return the magnitude of the vector
 
 
 
+## ` Vector3Int? getPosition()`
+
+
+## ` lazy void __at__(math.vector3.Vector3Int? v, void=>void fct)`
+
+
 
