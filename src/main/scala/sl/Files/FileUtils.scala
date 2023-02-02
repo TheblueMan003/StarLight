@@ -14,6 +14,10 @@ object FileUtils{
         }
         directoryToBeDeleted.delete()
     }
+    def deleteFile(file: String): Boolean = deleteFile(new File(file))
+    def deleteFile(file: File):Boolean= {
+        file.delete()
+    }
     def listSubdir(dir: String):List[String] = listSubdir(File(dir))
     def listSubdir(dir: File):List[String] = {
         if (!dir.exists || !dir.isDirectory) return List()
@@ -78,5 +82,21 @@ object FileUtils{
         val format = audioInputStream.getFormat()
         val frames = audioInputStream.getFrameLength()
         return (frames+0.0) / format.getFrameRate()
+    }
+
+    def copyFromResourcesToFolder(resource: String, target: String):Unit={
+        val file = new File(target)
+        if (!file.exists()){
+            val in = getClass().getResourceAsStream("/" + resource)
+            val out = new java.io.FileOutputStream(file)
+            val buffer = new Array[Byte](1024)
+            var read = in.read(buffer)
+            while (read != -1) {
+                out.write(buffer, 0, read)
+                read = in.read(buffer)
+            }
+            in.close()
+            out.close()
+        }
     }
 }

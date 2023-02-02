@@ -4,18 +4,20 @@ import objects.{Context, ConcreteFunction, LazyFunction, Struct, Class, Template
 import objects.types.VoidType
 import sl.Compilation.DefaultFunction
 import objects.ObjectNotFoundException
+import objects.Identifier
 
 object ContextBuilder{
+    val defaultLib = List("__init__")
     def build(name: String, inst: Instruction):Context = {
         val context = Context.getNew(name)
-        val extra = Utils.getLib("__init__").get
+        val extra = defaultLib.map(Utils.getLib(_).get)
 
         DefaultFunction.get()(context)
 
-        buildRec(extra)(context)
+        extra.foreach(a => buildRec(a)(context))
         buildRec(inst)(context)
 
-        Compiler.compile(extra, true)(context)
+        extra.foreach(a => Compiler.compile(a, true)(context))
         Compiler.compile(inst, true)(context)
 
         context
@@ -35,11 +37,10 @@ object ContextBuilder{
                     case None => if name != "object" then context.getClass("object") else null
                     case Some(p) => context.getClass(p)
                 
-                context.addClass(new Class(context, name, generics, modifier, block, parentClass, entity)).generate()
+                context.addClass(new Class(context, name, generics, modifier, block, parentClass, entity))
             }
             case EnumDecl(name, fields, values, modifier) => {
                 val enm = context.addEnum(new Enum(context, name, modifier, fields))
-                enm.addValues(values)
                 List()
             }
             case TemplateDecl(name, block, modifier, parent) => {
@@ -92,9 +93,13 @@ object ContextBuilder{
                         context.addObjectFrom(value, if alias == null then value else alias, context.root.push(lib))
                     }catch{case _ =>{}}
                 }
-                else if (alias != null){
-                    context.push(alias, context.getContext(lib))
-                }
+                else{
+                        val last = Identifier.fromString(lib).values.last
+                        context.hasObject(lib+"."+last) match
+                            case true => context.addObjectFrom(last, if alias == null then last else alias, context.root.push(lib))
+                            case false if alias!=null => context.push(alias, context.getContext(lib))
+                            case false => {}
+                    }
             }
             case _ => {
             }

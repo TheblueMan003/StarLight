@@ -1,4 +1,4 @@
-package game.timer
+package game.Timer
 
 import cmd.actionbar as actionbar
 

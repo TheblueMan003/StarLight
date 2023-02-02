@@ -1,6 +1,6 @@
-package animation.cutscene
+package animation.Cutscene
 
-import utils.process as pr
+import utils.Process
 import mc.pointer as pointer
 import cmd.entity as entity
 import cmd.gamemode as gm

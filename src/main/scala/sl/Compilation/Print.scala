@@ -61,6 +61,11 @@ object Print{
                         case other => (List(), List(PrintVariable(vari, sel, col, mod)))
                 }
             }
+            case dot: DotValue => {
+                val (p1, vari) = Utils.simplifyToVariable(expr)
+                val (p2, print) = toRawJson(vari)
+                (p1:::p2, print)
+            }
             case LambdaValue(args, instr) => throw new Exception("Cannot transform lambda to rawjson")
             case RawJsonValue(value) => (List(), value)
             case FunctionCallValue(name, args, typeargs, sel) => {

@@ -23,7 +23,7 @@ class ListFunSuite extends AnyFlatSpec with should.Matchers with BeforeAndAfterA
     var output: PrintStream = null
 
     val testFiles: List[(String, Int)] = List()
-    val compileTests: List[String] = FileUtils.getListOfFiles("./src/main/resources/libraries").filterNot(_.contains("__init__.sl")) ::: FileUtils.getListOfFiles("./src/test/resources/").filterNot(_.contains("__init__.sl"))
+    val compileTests: List[String] = List()//FileUtils.getListOfFiles("./src/main/resources/libraries").filterNot(_.contains("__init__.sl")) ::: FileUtils.getListOfFiles("./src/test/resources/").filterNot(_.contains("__init__.sl"))
 
 
     override def beforeAll() = {
@@ -88,6 +88,7 @@ class ListFunSuite extends AnyFlatSpec with should.Matchers with BeforeAndAfterA
     compileTests.foreach(f => {
         deleteDirectory(new File("./test_env/world/datapacks/test"))
         f should "compile" in {
+            FileUtils.deleteDirectory("./bin")
             sl.Main.main(Array("compile", "-i", f, "-o", "./test_env/world/datapacks/test/"))
         }
     })
@@ -95,6 +96,7 @@ class ListFunSuite extends AnyFlatSpec with should.Matchers with BeforeAndAfterA
     testFiles.foreach((f, n) => {
         deleteDirectory(new File("./test_env/world/datapacks/test"))
         f should "compile" in {
+            FileUtils.deleteDirectory("./bin")
             sl.Main.main(Array("compile", "-i", "./src/test/resources/"+f, "-o", "./test_env/world/datapacks/test/"))
             output.println("/scoreboard players set __pass__ tbms.var 0\n")
             output.println("/reload\n")

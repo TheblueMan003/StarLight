@@ -55,10 +55,10 @@ case class ForEach(val key: Identifier, val provider: Expression, val instr: Ins
 case class VariableDecl(val name: List[String], val _type: Type, val modifier: Modifier, val op: String, val expr: Expression) extends Instruction {
   override def toString() = f"${_type} ${name}"
 }
-case class VariableAssigment(val name: List[(Either[Identifier, Variable], Selector)], val op: String, val expr: Expression) extends Instruction {
+case class VariableAssigment(val name: List[(Either[Identifier, Variable], Selector)], val op: String, val expr: Expression) extends Instruction{
   override def toString() = f"${name} ${op} ${expr}"
 }
-case class ArrayAssigment(val name: Either[Identifier, Variable], val index: List[Expression], val op: String, val expr: Expression) extends Instruction {
+case class ArrayAssigment(val name: Either[Identifier, Variable], val index: List[Expression], val op: String, val expr: Expression) extends Instruction{
   override def toString() = f"${name}[$index] ${op} ${expr}"
 }
 
@@ -102,6 +102,12 @@ case class WhileLoop(val cond: Expression, val block: Instruction) extends Instr
 }
 case class DoWhileLoop(val cond: Expression, val block: Instruction) extends Instruction {
   override def toString() = f"do$block while($cond)"
+}
+case class Throw(val expr: Expression) extends Instruction {
+  override def toString() = f"throw($expr)"
+}
+case class Try(val block: Instruction, val except: Instruction, val finallyBlock: Instruction) extends Instruction {
+  override def toString() = f"try$block catch $except finally$finallyBlock"
 }
 
 case class InstructionList(val list: List[Instruction]) extends Instruction {

@@ -425,7 +425,7 @@ case class FuncType(sources: List[Type], output: Type) extends Type{
     override def allowAdditionSimplification(): Boolean = false
     override def getDistance(other: Type)(implicit context: Context): Int = {
         other match
-            case FuncType(sources2, output2) if sources2.length == sources.length => sources.zip(sources2).map((a,b)=>b.getDistance(a)).sum + output.getDistance(output2)
+            case FuncType(sources2, output2) if sources2.filter(_ != VoidType).length == sources.filter(_ != VoidType).length => sources.filter(_ != VoidType).zip(sources2.filter(_ != VoidType)).map((a,b)=>b.getDistance(a)).sum + output.getDistance(output2)
             case LambdaType(nb) => 0
             case MCObjectType => 10
             case AnyType => 1000
@@ -433,7 +433,7 @@ case class FuncType(sources: List[Type], output: Type) extends Type{
     }
     override def isSubtypeOf(other: Type)(implicit context: Context): Boolean = {
         other match
-            case FuncType(s,o) => sources.size == s.size && s.zip(sources).forall((a,b)=>a.isSubtypeOf(b)) && output.isSubtypeOf(o)
+            case FuncType(s,o) => sources.filter(_ != VoidType).size == s.filter(_ != VoidType).size && s.filter(_ != VoidType).zip(sources.filter(_ != VoidType)).forall((a,b)=>a.isSubtypeOf(b)) && output.isSubtypeOf(o)
             case LambdaType(nb) => true
             case AnyType => true
             case MCObjectType => true

@@ -1,7 +1,7 @@
 package test
 
 import standard
-from utils.process import Process
+import utils.Process
 
 template Test extends Process{
     int time
@@ -32,5 +32,6 @@ template Test extends Process{
     def run(){
     }
     def bool getResult(){
+        return false
     }
 }

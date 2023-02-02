@@ -1,4 +1,4 @@
-package random.lcg
+package random.LCG
 
 """
 Struct for Linear Congruent Generator
@@ -62,4 +62,4 @@ struct LCG{
 }
 
 package _
-random.lcg.LCG lcg = new random.lcg.LCG(0)
+random.LCG.LCG lcg = new random.LCG.LCG(0)

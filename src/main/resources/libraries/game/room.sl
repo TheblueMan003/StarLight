@@ -1,4 +1,4 @@
-package game.room
+package game.Room
 
 import standard
 
@@ -255,7 +255,7 @@ template Room{
             counting = false
         }
     }
-    def private lazy bool check(){
+    [noReturnCheck=true] private lazy bool check(){
         if (Compiler.isJava){
             return x >= sx && x < ex && y >= sy && y < ey && z >= sz && z < ez
         }

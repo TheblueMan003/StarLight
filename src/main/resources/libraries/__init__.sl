@@ -21,12 +21,17 @@ def lazy aligned(void=>void fct){
 def lazy __at__(float x, float y, float z, void=>void fct){
     import mc.pointer as pointer
     import cmd.tp as tp
-
+    int px = x
+    int py = y
+    int pz = z
     entity p = pointer.newPointer(){
-        tp.absolute(x, y, z)
+        tp.absolute(px, py, pz)
     }
     at(p){
         fct()
+    }
+    with(p){
+        /kill @s
     }
 }
 
@@ -39,9 +44,12 @@ class object{
     def __addRef(){
         __refCount++
     }
+    def __destroy__(){
+    }
     def __remRef(){
         __refCount--
         if (__refCount <= 0){
+            __destroy__()
             /kill
         }
     }

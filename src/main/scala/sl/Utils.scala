@@ -9,6 +9,7 @@ import scala.collection.parallel.CollectionConverters._
 import sl.Compilation.Selector.*
 import java.io.File
 import sys.process._
+import scala.collection.immutable.LazyList.cons
 
 object Utils{
     def getFile(path: String): String = {
@@ -37,7 +38,7 @@ object Utils{
     def stringify(string: String): String = {
         f"\"${string.replaceAllLiterally("\\\\", "\\\\").replaceAllLiterally("\"", "\\\"")}\""
     }
-    def substReturn(instr: Instruction, to: Variable): Instruction = {
+    def substReturn(instr: Instruction, to: Variable)(implicit isFullReturn: Boolean): Instruction = {
         instr match
             case Package(name, block) => Package(name, substReturn(block, to))
             case StructDecl(name, generics, block, modifier, parent) => StructDecl(name, generics, substReturn(block, to), modifier, parent)
@@ -51,6 +52,8 @@ object Utils{
             case VariableDecl(name, _type, modifier, op, expr) => instr
             case JSONFile(name, json, mod) => instr
             case Import(lib, value, alias) => instr
+            case Throw(expr) => instr
+            case Try(block, catchBlock, finallyBlock) => Try(substReturn(block, to), substReturn(catchBlock, to), substReturn(finallyBlock, to))
             
             case InstructionList(list) => InstructionList(list.map(substReturn(_, to)))
             case InstructionBlock(list) => InstructionBlock(list.map(substReturn(_, to)))
@@ -66,7 +69,16 @@ object Utils{
             case ArrayAssigment(name, index, op, value) => instr
             case LinkedFunctionCall(name, args, vari) => instr
             case VariableAssigment(name, op, expr) => instr
-            case Return(value) => VariableAssigment(List((Left(to.fullName), Selector.self)), "=", value)
+            case Return(value) => 
+                if (isFullReturn){
+                    VariableAssigment(List((Left(to.fullName), Selector.self)), "=", value)
+                }
+                else{
+                    InstructionList(List(
+                        VariableAssigment(List((Left("__hasFunctionReturned__"), Selector.self)), "=", BoolValue(true)),
+                        VariableAssigment(List((Left(to.fullName), Selector.self)), "=", value)
+                    ))
+                }
             case WhileLoop(cond, instr) => WhileLoop(cond, substReturn(instr, to))
             case DoWhileLoop(cond, instr) => DoWhileLoop(cond, substReturn(instr, to))
 
@@ -89,6 +101,8 @@ object Utils{
             case ForGenerate(key, provider, instr) => ForGenerate(key, subst(provider, from, to), subst(instr, from, to))
             case ForEach(key, provider, instr) => ForEach(key, subst(provider, from, to), subst(instr, from, to))
             case EnumDecl(name, fields, values, modifier) => EnumDecl(name, fields, values.map(v => EnumValue(v.name, v.fields.map(subst(_, from, to)))), modifier)
+            case Throw(expr) => Throw(subst(expr, from, to))
+            case Try(block, catchBlock, finallyBlock) => Try(subst(block, from, to), subst(catchBlock, from, to), subst(finallyBlock, from, to))
             case JSONFile(name, json, mod) => instr
             case Import(lib, value, alias) => instr
             
@@ -141,6 +155,7 @@ object Utils{
             case TagValue(value) => instr
             case DefaultValue => DefaultValue
             case NullValue => NullValue
+            case DotValue(left, right) => DotValue(subst(left, from, to), subst(right, from, to))
             case ArrayGetValue(name, index) => ArrayGetValue(subst(name, from, to), index.map(subst(_, from, to)))
             case VariableValue(name, sel) => VariableValue(name.replaceAllLiterally(from, to), sel)
             case BinaryOperation(op, left, right) => BinaryOperation(op, subst(left, from, to), subst(right, from, to))
@@ -184,6 +199,9 @@ object Utils{
             case VariableDecl(name, _type, modifier, op, expr) => VariableDecl(name.map(_.replaceAllLiterally(from, to)), _type, modifier, op, subst(expr, from, to))
             case JSONFile(name, json, mod) => JSONFile(name.replaceAllLiterally(from, to), subst(json, from, to), mod)
 
+            case Throw(expr) => Throw(subst(expr, from, to))
+            case Try(instr, catchBlock, finallyBlock) => Try(subst(instr, from, to), subst(catchBlock, from, to), subst(finallyBlock, from, to))
+
             case InstructionList(list) => InstructionList(list.map(subst(_, from, to)))
             case InstructionBlock(list) => InstructionBlock(list.map(subst(_, from, to)))
 
@@ -225,6 +243,7 @@ object Utils{
             case StringValue(value) => StringValue(value.replaceAllLiterally(from, to))
             case PositionValue(value) => PositionValue(value.replaceAllLiterally(from, to))
             case TagValue(value) => TagValue(value.replaceAllLiterally(from, to))
+            case DotValue(left, right) => DotValue(subst(left, from, to), subst(right, from, to))
             case RawJsonValue(value) => instr
             case EnumIntValue(value) => instr
             case LinkedFunctionValue(fct) => instr
@@ -278,6 +297,8 @@ object Utils{
             case ForEach(key, provider, instr) => ForEach(key, subst(provider, from, to), subst(instr, from, to))
             case EnumDecl(name, fields, values, modifier) => EnumDecl(name, fields, values.map(v => EnumValue(v.name, v.fields.map(subst(_, from, to)))), modifier)
             case VariableDecl(name, _type, modifier, op, expr) => VariableDecl(name, _type, modifier, op, subst(expr, from, to))
+            case Throw(expr) => Throw(subst(expr, from, to))
+            case Try(instr, catchBlock, finallyBlock) => Try(subst(instr, from, to), subst(catchBlock, from, to), subst(finallyBlock, from, to))
 
             case InstructionList(list) => InstructionList(list.map(subst(_, from, to)))
             case InstructionBlock(list) => InstructionBlock(list.map(subst(_, from, to)))
@@ -339,6 +360,10 @@ object Utils{
             case WhileLoop(cond, instr) => WhileLoop(cond, rmFunctions(instr))
             case DoWhileLoop(cond, instr) => DoWhileLoop(cond, rmFunctions(instr))
             case JSONFile(name, json, mod) => instr
+
+            case Throw(expr) => instr
+            case Try(block, except, finallyBlock) => Try(rmFunctions(block), rmFunctions(except), rmFunctions(finallyBlock))
+
 
             case Execute(typ, expr, block) => Execute(typ, expr, rmFunctions(block))
             case With(expr, isAt, cond, block) => With(expr, isAt, cond, rmFunctions(block))
@@ -413,6 +438,9 @@ object Utils{
             case DoWhileLoop(cond, instr) => DoWhileLoop(fix(cond), fix(instr))
             case JSONFile(name, json, mod) => instr
 
+            case Throw(expr) => Throw(fix(expr))
+            case Try(block, catches, finalBlock) => Try(fix(block), fix(catches), fix(finalBlock))
+
             case Execute(typ, expr, block) => Execute(typ, expr.map(fix(_)), fix(block))
             case With(expr, isAt, cond, block) => With(fix(expr), fix(isAt), fix(cond), fix(block))
 
@@ -446,6 +474,7 @@ object Utils{
             case DefaultValue => DefaultValue
             case NullValue => NullValue
             case PositionValue(value) => instr
+            case DotValue(left, right) => DotValue(fix(left), fix(right))
             case JsonValue(content) => JsonValue(fix(content))
             case ArrayGetValue(name, index) => ArrayGetValue(fix(name), index.map(fix(_)))
             case VariableValue(name, sel) => if ignore.contains(name) then instr else
@@ -507,6 +536,7 @@ object Utils{
             case ArrayGetValue(name, index) => ArrayGetValue(subst(name, from, to), index.map(subst(_, from, to)))
             case DefaultValue => DefaultValue
             case NullValue => NullValue
+            case DotValue(left, right) => DotValue(subst(left, from, to), subst(right, from, to))
             case VariableValue(name, sel) => if name.toString() == from then to else instr
             case BinaryOperation(op, left, right) => BinaryOperation(op, subst(left, from, to), subst(right, from, to))
             case UnaryOperation(op, left) => UnaryOperation(op, subst(left, from, to))
@@ -519,10 +549,42 @@ object Utils{
     }
 
 
+    def unpackDotValue(dot: DotValue)(implicit context: Context): (List[String], Expression) = {
+        dot match
+            case DotValue(left, VariableValue(v, sel)) => {
+                val (list, vari) = simplifyToVariable(left)
+                (list, VariableValue(vari.vari.fullName+"."+v.toString(), sel))
+            }
+            case DotValue(left, FunctionCallValue(v, args, typeargs, sel)) => {
+                val (list, vari) = simplifyToVariable(left)
+                (list, FunctionCallValue(VariableValue(vari.vari.fullName+"."+v.toString()), args, typeargs, sel))
+            }
+            case DotValue(left, ArrayGetValue(VariableValue(v, sel), index)) => {
+                val (list, vari) = simplifyToVariable(left)
+                (list, ArrayGetValue(VariableValue(vari.vari.fullName+"."+v.toString(), sel), index))
+            }
+            case DotValue(left, ArrayGetValue(FunctionCallValue(v, args, typeargs, sel), index)) => {
+                val (list, vari) = simplifyToVariable(left)
+                (list, ArrayGetValue(FunctionCallValue(VariableValue(vari.vari.fullName+"."+v.toString()), args, typeargs, sel), index))
+            }
+            case DotValue(left, right) => throw new Exception(f"Cannot unpack $dot")
+
+    }
     def simplifyToVariable(expr: Expression)(implicit context: Context): (List[String], LinkedVariableValue) = {
         expr match
             case VariableValue(name, sel) => simplifyToVariable(context.resolveVariable(expr))
             case LinkedVariableValue(name, sel) => (List(), LinkedVariableValue(name, sel))
+            case instr @ VariableAssigment(name, op, expr) => {
+                val prev = Compiler.compile(instr)
+                name match{
+                    case (Left(vari), sel) :: Nil => (prev,LinkedVariableValue(context.getVariable(vari), sel))
+                    case (Right(vari), sel) :: Nil => (prev,LinkedVariableValue(vari, sel))
+                    case lst => {
+                        val vari = context.getFreshVariable(typeof(expr))
+                        (prev ::: vari.assign("=", expr), LinkedVariableValue(vari))
+                    }
+                }
+            }
             case other => {
                 val vari = context.getFreshVariable(typeof(other))
                 (vari.assign("=", other), LinkedVariableValue(vari))
@@ -558,6 +620,10 @@ object Utils{
             case NamespacedName(value) => MCObjectType
             case PositionValue(value) => MCPositionType
             case TagValue(value) => MCObjectType
+            case dot : DotValue => {
+                val (list, vari) = unpackDotValue(dot)
+                typeof(vari)
+            }
             case ArrayGetValue(name, index) => {
                 typeof(name) match
                     case ArrayType(inner, size) => inner
@@ -607,6 +673,7 @@ object Utils{
 
     def combineType(op: String, t1: Type, t2: Type, expr: Expression): Type = {
         op match{
+            case "not in" => EntityType
             case "in" => BoolType
             case "==" | "<=" | "<" | ">" | ">=" => BoolType
             case "+" | "-" | "*" | "/" | "%" | "^" => {
@@ -744,7 +811,7 @@ object Utils{
             case IntValue(value) => JsonInt(value)
             case FloatValue(value) => JsonFloat(value)
             case BoolValue(value) => JsonBoolean(value)
-            case v => throw new Exception(f"Cannot cast $v to json")
+            case v => throw new Exception(f"Cannot cast value: $v of type ${typeof(v)} to json")
     }
 
     def compileJson(elm: JSONElement)(implicit context: Context): JSONElement = {
@@ -805,6 +872,7 @@ object Utils{
                                 case BoolValue(value) => JsonBoolean(value)
                                 case StringValue(value) => JsonString(value)
                                 case JsonValue(content) => compileJson(content)
+                                case FunctionCallValue(name, args, typeargs, selector) => compileJson(JsonCall(name.getString(), args, typeargs))
                                 case other => throw new Exception(f"Cannot put not $other in json") 
                         }
                         else{
@@ -812,7 +880,7 @@ object Utils{
                         }
                     }
                     case None => {
-                        throw new Exception(f"No value for $value")
+                        throw new Exception(f"No value for $value in ${context.fullPath}")
                     }
             }
             case JsonFloat(value) => elm
@@ -1082,7 +1150,16 @@ object Utils{
             case TupleValue(values) => ???
             case SelectorValue(value) => (List(), value)
                 
-        
+            case BinaryOperation("in", left, right) => 
+                val (p1, s1) = getSelector(left)
+                val (p2, s2) = getSelector(right)
+                (p1 ::: p2, s1.merge(s2))
+            
+            case BinaryOperation("not in", left, right) => 
+                val (p1, s1) = getSelector(left)
+                val (p2, s2) = getSelector(right)
+                (p1 ::: p2, s1.merge(s2.invert()))
+            
             case BinaryOperation(op, left, right) => 
                 val (prefix, vari) = Utils.simplifyToVariable(expr)
                 val (p2, s) = getSelector(vari)

@@ -224,6 +224,11 @@ object Execute{
                     (List(), List(IFValueCase(expr)))
                 }
             }
+            case dot: DotValue => {
+                val (prev1, rest) = Utils.unpackDotValue(dot)
+                val (prev2, c) = getIfCase(rest)
+                (prev1:::prev2, c)
+            }
             case BinaryOperation(op, VariableValue(left, sel), right) =>
                 getIfCase(BinaryOperation(op, context.resolveVariable(VariableValue(left, sel)), right))
             case BinaryOperation(op, left, VariableValue(right, sel)) =>
@@ -329,8 +334,18 @@ object Execute{
                     val op = expr.asInstanceOf[BinaryOperation].op
                     throw new Exception(f"Operation $op not supported for $left and $right")
 
-            
-
+            case BinaryOperation(">" | "<" | ">=" | "<=" | "==" | "!=", left: FunctionCallValue, right)=> {
+                val op = expr.asInstanceOf[BinaryOperation].op
+                val (prev, vari) = Utils.simplifyToVariable(left)
+                val (p2, c) = getIfCase(BinaryOperation(op, vari, right))
+                (prev:::p2, c)
+            }
+            case BinaryOperation(">" | "<" | ">=" | "<=" | "==" | "!=", left, right: FunctionCallValue)=> {
+                val op = expr.asInstanceOf[BinaryOperation].op
+                val (prev, vari) = Utils.simplifyToVariable(right)
+                val (p2, c) = getIfCase(BinaryOperation(op, left, vari))
+                (prev:::p2, c)
+            }
             case BinaryOperation(">" | "<" | ">=" | "<=" | "==" | "!=", left, right)=> {
                 val op = expr.asInstanceOf[BinaryOperation].op
                 val ll = Utils.simplifyToVariable(left)
@@ -394,6 +409,14 @@ object Execute{
                                                     makeExecute(getListCase(right._2), vari.assign("|=", BoolValue(true))))
                             (vari.assign("=", BoolValue(true)) ::: left._1 ::: exec1 ::: exec2, List(IFValueCase(LinkedVariableValue(vari))))
                         }
+                    }
+                    case "not in" => {
+                        val (p, s) = Utils.getSelector(expr)
+                        (p, List(IFValueCase(SelectorValue(s))))
+                    }
+                    case "in" => {
+                        val (p, s) = Utils.getSelector(expr)
+                        (p, List(IFValueCase(SelectorValue(s))))
                     }
                     case _ => {
                         val v = Utils.simplifyToVariable(expr)

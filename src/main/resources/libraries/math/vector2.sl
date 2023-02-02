@@ -1,4 +1,4 @@
-package math.vector2
+package math.Vector2
 
 import math
 
@@ -44,6 +44,13 @@ struct Vector2{
     def lazy __sub__(float x, float y){
         this.x -= x
         this.y -= y
+    }
+
+    def lazy bool __eq__(Vector2 other){
+        return(this.x == other.x && this.y == other.y)
+    }
+    def lazy bool __ne__(Vector2 other){
+        return(this.x != other.x || this.y != other.y)
     }
     
     float scalarProd(Vector2 other){

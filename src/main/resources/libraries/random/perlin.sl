@@ -1,6 +1,6 @@
 package random.perlin
 
-from random.lcg import LCG
+import random.LCG
 from math import lerp
 
 struct Perlin2D{

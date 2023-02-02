@@ -33,11 +33,11 @@ object DefaultFunction{
                     args match{
                         case VariableValue(vari, sel)::Nil => {
                             ctx.tryGetVariable(vari) match{
-                                case Some(v) => (List(), BoolValue(true))
+                                case Some(v) => (List(), BoolValue(v.getType() != VoidType))
                                 case a => (List(), BoolValue(false))
                             }
                         }
-                        case LinkedVariableValue(vari, sel)::Nil => (List(), BoolValue(true))
+                        case LinkedVariableValue(vari, sel)::Nil => (List(), BoolValue(vari.getType() != VoidType))
                         case other => throw new Exception(f"Illegal Arguments $other for variableExist")
                     }
                 }
@@ -437,7 +437,55 @@ object DefaultFunction{
                 }
             }
         ))
-
+        ctx.addFunction("getClassName", CompilerFunction(ctx, "getClassName", 
+            List(),
+            StringType,
+            Modifier.newPublic(),
+            (args: List[Expression],ctx: Context) => {
+                args match{
+                    case Nil => {
+                        val clazz = ctx.getCurrentClass()
+                        clazz match
+                            case c => (List(), StringValue(c.fullName))
+                            case null => throw new Exception("Not in a class")
+                    }
+                    case other => throw new Exception(f"Illegal Arguments $other for getNamespaceName")
+                }
+            }
+        ))
+        ctx.addFunction("insert", CompilerFunction(ctx, "insert", 
+                List(Argument("name", MCObjectType, None), Argument("vari", MCObjectType, None), Argument("cmd", FuncType(List(), VoidType), None)),
+                VoidType,
+                Modifier.newPublic(),
+                (args: List[Expression],ctx: Context) => {
+                    args match{
+                        case VariableValue(name, sel1):: s ::LambdaValue(arg, instr)::Nil => {
+                            val ret = Compiler.compile(Utils.subst(instr, name.toString(), s.getString()))(ctx)
+                            (ret, NullValue)
+                        }
+                        case other => throw new Exception(f"Illegal Arguments $other for cmdstore")
+                    }
+                }
+            ))
+        ctx.addFunction("makeUnique", CompilerFunction(ctx, "makeUnique", 
+                List(Argument("entity", EntityType, None)),
+                VoidType,
+                Modifier.newPublic(),
+                (args: List[Expression],ctx: Context) => {
+                    args match{
+                        case SelectorValue(sel)::Nil => {
+                            (List(), SelectorValue(sel.makeUnique()))
+                        }
+                        case LinkedVariableValue(vari, sel)::Nil => {
+                            (List(), SelectorValue(vari.getEntityVariableSelector().makeUnique()))
+                        }
+                        case VariableValue(vari, sel)::Nil => {
+                            (List(), SelectorValue(ctx.getVariable(vari).getEntityVariableSelector().makeUnique()))
+                        }
+                        case other => throw new Exception(f"Illegal Arguments $other for cmdstore")
+                    }
+                }
+            ))
         if (Settings.target == MCJava){
             ctx.addFunction("blockbenchSummon", CompilerFunction(ctx, "blockbenchSummon", 
                 List(Argument("name", MCObjectType, None)),
@@ -466,11 +514,11 @@ object DefaultFunction{
                     (args: List[Expression],ctx: Context) => {
                         args match{
                             case LinkedVariableValue(vari, sel)::LambdaValue(arg, instr)::Nil => {
-                                val ret = Compiler.compile(instr)
+                                val ret = Compiler.compile(instr)(ctx)
                                 (ret.take(ret.length - 1) ::: List(f"execute store result score ${vari.getSelector()(sel)} run "+ret.last), NullValue)
                             }
                             case VariableValue(vari, sel)::LambdaValue(arg, instr)::Nil => {
-                                val ret = Compiler.compile(instr)
+                                val ret = Compiler.compile(instr)(ctx)
                                 (ret.take(ret.length - 1) ::: List(f"execute store result score ${ctx.getVariable(vari).getSelector()(sel)} run "+ret.last), NullValue)
                             }
                             case other => throw new Exception(f"Illegal Arguments $other for cmdstore")
@@ -551,5 +599,19 @@ object DefaultFunction{
                 }
             }
         ))
+    }
+
+    def getInt(ctx: Context, name: String, getter: ()=>Int)={
+        CompilerFunction(ctx, name, 
+                List(),
+                BoolType,
+                Modifier.newPublic(),
+                (args: List[Expression],ctx: Context) => {
+                    args match{
+                        case Nil => (List(), IntValue(getter()))
+                        case other => throw new Exception(f"Illegal Arguments $other for $name")
+                    }
+                }
+            )
     }
 }

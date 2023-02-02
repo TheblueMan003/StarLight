@@ -31,7 +31,13 @@ forgenerate($name, (absorption, unluck, bad_omen, blindness, conduit_power, dolp
             /effect @s $name $duration $power $particle
         }
     }
-
+}
+forgenerate($name, (absorption, unluck, bad_omen, blindness, conduit_power, dolphins_grace, 
+                fire_resistance, glowing, haste, health_boost, hero_of_the_village,
+                hunger, instant_damage, instant_health, invisibility, jump_boost, levitation,
+                luck, mining_fatigue, nausea, night_vision, poison, regeneration, resistance,
+                saturation, slow_falling, slowness, speed, strength, water_breathing, weakness,
+                wither, darkness)){
     """
     Clear effect `$name` for `ent`
     """

@@ -54,11 +54,11 @@ int pow(int x, int n, int m = 1){
     if (n == 0){
         return(1)
     }
-    if (n == 1){
+    else if (n == 1){
         int ret = x * m
         return(ret)
     }
-    if (n > 1){
+    else{
         int parity = x % 2
         
         if (parity == 1){

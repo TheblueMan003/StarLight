@@ -234,7 +234,7 @@ def lazy clear(mcobject $item, int $count){
 """
 Clear the current entity's inventory and return the number of items cleared
 """
-lazy int clearCount(){
+[noReturnCheck=true] lazy int clearCount(){
     if (Compiler.isJava()){
         Compiler.cmdstore(_ret){
             clear()
@@ -253,7 +253,7 @@ lazy int clearCount(){
 """
 Clear the current entity's inventory of `item` and return the number of items cleared
 """
-lazy int clearCount(mcobject item){
+[noReturnCheck=true] lazy int clearCount(mcobject item){
     if (Compiler.isJava()){
         Compiler.cmdstore(_ret){
             clear(item)
@@ -272,7 +272,7 @@ lazy int clearCount(mcobject item){
 """
 Clear the current entity's inventory of `item` with a max of `count` and return the number of items cleared
 """
-lazy int clearCount(mcobject item, int count){
+[noReturnCheck=true] lazy int clearCount(mcobject item, int count){
     if (Compiler.isJava()){
         Compiler.cmdstore(_ret){
             clear(item, count)

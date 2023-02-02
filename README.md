@@ -106,8 +106,10 @@ Attributes can be added to function to specify thing to the compiler.
 [criterion="minecraft.used:minecraft.carrot_on_a_stick"] scoreboard int a
 ```
 Here is a list of used attributes by the compiler:
-- `criterion`: Use to specify the criterion when other than dummy. (JAVA Only)
-- `name`: Use to force the name of the variable
+- `criterion`: specify the criterion when other than dummy. (JAVA Only)
+- `name`: force the name of the variable
+- `versionSpecific`: Append the version to the name of the variable
+- `tag`: force the tag use by the variable (for variable of type entity)
 
 
 ## Default Types

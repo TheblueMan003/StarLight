@@ -1,4 +1,4 @@
-package math.vector2int
+package math.Vector2Int
 
 import math
 
@@ -46,6 +46,13 @@ struct Vector2Int{
     def lazy __sub__(int x, int y){
         this.x -= x
         this.y -= y
+    }
+
+    def lazy bool __eq__(Vector2Int other){
+        return(this.x == other.x && this.y == other.y)
+    }
+    def lazy bool __ne__(Vector2Int other){
+        return(this.x != other.x || this.y != other.y)
     }
     
     """

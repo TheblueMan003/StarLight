@@ -12,14 +12,15 @@ import sl.Reporter
 import objects.EnumField
 import objects.EnumValue
 import sl.files.CacheAST
+import objects.Variable
 
 object Parser extends StandardTokenParsers{
   lexical.delimiters ++= List("(", ")", "\\", ".", "..", ":", "=", "->", "{", "}", ",", "*", "[", "]", "/", "+", "-", "*", "/", "\\", "%", "&&", "||", "=>", ";",
                               "+=", "-=", "/=", "*=", "%=", "?=", ":=", "%", "@", "@e", "@a", "@s", "@r", "@p", "~", "^", "<=", "==", ">=", "<", ">", "!=", "%%%", "???", "$",
                               "!", "!=", "#", "<<", ">>", "&", "<<=", ">>=", "&=", "|=", "::")
   lexical.reserved   ++= List("true", "false", "if", "then", "else", "return", "switch", "for", "do", "while",
-                              "as", "at", "with", "to", "import", "doc", "template", "null", "typedef", "foreach", "in",
-                              "def", "package", "struct", "enum", "class", "lazy", "jsonfile", "blocktag",
+                              "as", "at", "with", "to", "import", "doc", "template", "null", "typedef", "foreach", "in", "not",
+                              "def", "package", "struct", "enum", "class", "lazy", "jsonfile", "blocktag", "throw", "try", "catch", "finally",
                               "public", "protected", "private", "scoreboard", "forgenerate", "from", "rotated", "facing", "align",
                               "ticking", "loading", "predicate", "extends", "new", "const", "static", "virtual", "abstract", "override")
 
@@ -77,6 +78,7 @@ object Parser extends StandardTokenParsers{
       | packageInstr
       | structDecl
       | classDecl
+      | caseClassDecl
       | identLazy2 <~ ("+" ~ "+") ^^ (p => VariableAssigment(List((Left(p), Selector.self)), "+=", IntValue(1)))
       | identLazy2 <~ ("-" ~ "-") ^^ (p => VariableAssigment(List((Left(p), Selector.self)), "-=", IntValue(1)))
       | templateUse
@@ -106,8 +108,12 @@ object Parser extends StandardTokenParsers{
       | foreach
       | predicate
       | blocktag
+      | throwError
+      | tryCatchFinalyBlock
 
   def anyKeyword: Parser[String] = lexical.reserved.map(f => f ^^ (p => p)).reduce(_ | _)
+  def throwError: Parser[Instruction] = "throw"~exprNoTuple ^^ {case _ ~ e => Throw(e)}
+  def tryCatchFinalyBlock: Parser[Instruction] = "try"~>block~opt("catch"~>block)~opt("finally"~>block) ^^ {case b ~ c ~ f => Try(b, c.getOrElse(InstructionList(List())), f.getOrElse(InstructionList(List())))}
 
   def predicate:Parser[Instruction] = doc ~ (modifier <~ "predicate") ~ identLazy ~ arguments ~ json ^^ {case doc ~ mod ~ name ~ args ~ json => PredicateDecl(name, args, json, mod.withDoc(doc))}
   def arrayAssign:Parser[Instruction] = (identLazy2 <~ "[") ~ (rep1sep(exprNoTuple, ",") <~ "]") ~ assignmentOp ~ expr ^^ { case a ~ i ~ o ~ e => ArrayAssigment(Left(a), i, o, e) }
@@ -115,6 +121,14 @@ object Parser extends StandardTokenParsers{
   def packageInstr: Parser[Instruction] = "package" ~> identLazy2 ~ program ^^ (p => Package(p._1, p._2))
   def classDecl: Parser[Instruction] = doc ~ (modifier <~ "class") ~ identLazy ~ typeArgument ~ opt("extends" ~> ident2) ~ rep("with" ~> namespacedName ~ "for" ~ ident) ~ block ^^ 
   { case doc ~ mod ~ iden ~ typeargs ~ par ~ entity ~ block => ClassDecl(iden, typeargs, block, mod.withDoc(doc), par, entity.map{ case e ~ _ ~ n => (n, e)}.toMap) }
+  def caseClassDecl: Parser[Instruction] = doc ~ (modifier <~ "class") ~ identLazy ~ typeArgument ~ arguments ~ opt("extends" ~> ident2) ~ rep("with" ~> namespacedName ~ "for" ~ ident) ~ block ^^ {
+    case doc ~ mod ~ iden ~ typeargs ~ arguments ~ par ~ entity ~ block => 
+      val fieldsDecl = arguments.map{ case Argument(n, t, _) => VariableDecl(List(n), t, Modifier.newPublic(), null, null) }
+      val fields = arguments.map{ case Argument(n, t, _) => (Left[Identifier, Variable](Identifier.fromString(f"this.$n")), Selector.self) }
+      val argu = TupleValue(arguments.map{ case Argument(n, t, _) => (VariableValue(n)) })
+      val constructor = FunctionDecl("__init__", VariableAssigment(fields, "=", argu), VoidType, arguments, List(), Modifier.newPublic())
+      ClassDecl(iden, typeargs, InstructionList(fieldsDecl ::: List(constructor, block)), mod.withDoc(doc), par, entity.map{ case e ~ _ ~ n => (n, e)}.toMap)
+  }
   def structDecl: Parser[Instruction] = doc ~ (modifier <~ "struct") ~ identLazy ~ typeArgument ~ opt("extends" ~> ident2) ~ block ^^ 
   { case doc ~ mod ~ iden ~ typeargs ~ par ~ block => StructDecl(iden, typeargs, block, mod.withDoc(doc), par) }
   def typedef: Parser[Instruction] = "typedef" ~> types ~ identLazy ^^ { case _1 ~ _2 => TypeDef(_2, _1) }
@@ -156,7 +170,7 @@ object Parser extends StandardTokenParsers{
       VariableAssigment(identifiers.map((i,s) => (Left(i), s)), p._1._2, p._2)
     })
 
-  def varDeclaration: Parser[Instruction] = (doc ~ modifier ~ types ~ rep1sep(identLazy, ",") ~ opt("=" ~> expr)) ^^ {
+  def varDeclaration: Parser[Instruction] = (doc ~ modifier ~ types ~ rep1sep(identLazy, ",") ~ opt(assignmentOp ~ expr)) ^^ {
     case doc ~ mod1 ~ typ ~ names ~ expr => {
       val mod = mod1.withDoc(doc)
       val identifiers = names.map(Identifier.fromString(_))
@@ -164,7 +178,7 @@ object Parser extends StandardTokenParsers{
         VariableDecl(names, typ, mod, ":=", DefaultValue)
       }
       else if (!expr.isEmpty){
-        VariableDecl(names, typ, mod, "=", expr.get)
+        VariableDecl(names, typ, mod, expr.get._1, expr.get._2)
       }
       else{
         VariableDecl(names, typ, mod, null, null)
@@ -266,7 +280,8 @@ object Parser extends StandardTokenParsers{
   def typeVariables = opt(typeVariablesForce) ^^ {case Some(a) => a;case None => List()}
   def typeArgument = opt("<" ~ repsep(ident,",") ~ ">") ^^ {case Some(_ ~ a ~ _) => a;case None => List()}
 
-  def exprRange: Parser[Expression] = exprBottom ~ opt(".."~>exprBottom) ^^ { case e ~ None => e; case e1 ~ Some(e2) => RangeValue(e1, e2)}
+  def exprDot: Parser[Expression] = rep1sep(exprBottom, ".") ^^ { case e if e.size == 1 => e.head; case e => e.tail.foldLeft(e.head)((p, n) => DotValue(p, n))}
+  def exprRange: Parser[Expression] = exprDot ~ opt(".."~>exprDot) ^^ { case e ~ None => e; case e1 ~ Some(e2) => RangeValue(e1, e2)}
   def exprArray: Parser[Expression] = exprRange ~ rep("[" ~> rep1sep(expr, ",") <~ "]") ^^ {case e ~ g => g.foldLeft(e)((e, i) => ArrayGetValue(e, i))}
   def exprPow: Parser[Expression] = exprArray ~ rep("^" ~> exprPow) ^^ {unpack("^", _)}
   def exprMod: Parser[Expression] = exprPow ~ rep("%" ~> exprMod) ^^ {unpack("%", _)}
@@ -275,7 +290,8 @@ object Parser extends StandardTokenParsers{
   def exprSub: Parser[Expression] = exprMult ~ rep("-" ~> exprSub) ^^ {unpack("-", _)}
   def exprAdd: Parser[Expression] = exprSub ~ rep("+" ~> exprAdd) ^^ {unpack("+", _)}
   def exprComp: Parser[Expression] = exprAdd ~ rep(comparator ~ exprComp) ^^ {unpack(_)}
-  def exprIn: Parser[Expression] = exprComp ~ rep("in" ~> exprIn) ^^ {unpack("in", _)}
+  def exprNotIn: Parser[Expression] = exprComp ~ rep("not" ~> "in" ~> exprNotIn) ^^ {unpack("not in", _)}
+  def exprIn: Parser[Expression] = exprNotIn ~ rep("in" ~> exprIn) ^^ {unpack("in", _)}
   def exprShiftRight: Parser[Expression] = exprIn ~ rep(">>" ~> exprShiftRight) ^^ {unpack(">>", _)}
   def exprShiftLeft: Parser[Expression] = exprShiftRight ~ rep("<<" ~> exprShiftLeft) ^^ {unpack("<<", _)}
   def exprBitwiseAnd: Parser[Expression] = exprShiftLeft ~ rep("&" ~> exprBitwiseAnd) ^^ {unpack("&", _)}
@@ -378,7 +394,7 @@ object Parser extends StandardTokenParsers{
     phrase(program)(tokens) match {
       case Success(trees, _) =>
         Reporter.ok(f"Parsed: $file")
-        Some(trees)
+        Some(StaticAnalyser.check(trees))
       case e =>
         println(f"Error in file '${file}'': ${e}")
         None
@@ -388,7 +404,7 @@ object Parser extends StandardTokenParsers{
     val tokens = new lexical.Scanner(Preparser.parse("",string))
     phrase(program)(tokens) match {
       case Success(trees, _) =>
-        trees
+        StaticAnalyser.check(trees)
       case e =>
         println(f"Error in file '${string}'': ${e}")
         null

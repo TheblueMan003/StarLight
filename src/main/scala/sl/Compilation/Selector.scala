@@ -43,7 +43,29 @@ trait Selector{
     }
 
     def add(name: String, s: SelectorFilterValue):Selector
+
+    def merge(s: Selector): Selector
+
+    def invert(): Selector
+
+    protected def mergePrefix(prefix1: String, prefix2: String): String = {
+        prefix1 match{
+            case "@s" => "@s"
+            case "@p" => "@p"
+            case "@r" => "@r"
+            case "@a" => {
+                prefix2 match{
+                    case "@s" => "@s"
+                    case "@p" => "@p"
+                    case "@r" => "@r"
+                    case _ => "@a"
+                }
+            }
+            case "@e" => prefix2
+        }
+    }
 }
+val EmptySelector = JavaSelector("@s", List(("tag", SelectorIdentifier("sl_empty"))))
 
 case class BedrockSelector(val prefix: String, val filters: List[(String, SelectorFilterValue)]) extends Selector{
     override def getString()(implicit context: Context): String = {
@@ -113,7 +135,7 @@ case class BedrockSelector(val prefix: String, val filters: List[(String, Select
         }
     }
 
-    override def makeUnique(): Selector = ???
+    override def makeUnique(): Selector = BedrockSelector(prefix, ("c",SelectorNumber(1))::filters.filter((k,v) => k != "c"))
     override def isPlayer: Boolean = 
         prefix match{
             case "@p" => true
@@ -123,6 +145,28 @@ case class BedrockSelector(val prefix: String, val filters: List[(String, Select
     override def toString(): String = getString()(Context.getNew("default"))
     def add(name: String, s: SelectorFilterValue):Selector = {
         BedrockSelector(prefix, (name -> s)::filters)
+    }
+    def merge(s: Selector): Selector = {
+        s match{
+            case BedrockSelector(prefix2, filters2) => 
+                BedrockSelector(mergePrefix(prefix, prefix2), filters ++ filters2)
+            case jsel @ JavaSelector(prefix2, filters2) => 
+                val bedrock = filters2.flatMap((k,v)=>(jsel.filterToBedrock(k, v, filters2)))
+                BedrockSelector(mergePrefix(prefix, prefix2), filters ++ bedrock)
+        }
+    }
+    def invert(): Selector = {
+        if (filters.length == 0){
+            EmptySelector
+        }
+        else{
+            val newFilter = filters.map{ case (s, v) => 
+                v match
+                    case SelectorInvert(v2) => (s, v2)
+                    case _ => (s, SelectorInvert(v))
+            }
+            BedrockSelector(prefix, newFilter)
+        }
     }
 }
 case class JavaSelector(val prefix: String, val filters: List[(String, SelectorFilterValue)]) extends Selector{
@@ -188,7 +232,7 @@ case class JavaSelector(val prefix: String, val filters: List[(String, SelectorF
         }
     }
 
-    override def makeUnique(): Selector = ???
+    override def makeUnique(): Selector = BedrockSelector(prefix, ("limit",SelectorNumber(1))::filters.filter((k,v) => k != "limit"))
     override def isPlayer: Boolean = 
         prefix match{
             case "@p" => true
@@ -199,6 +243,28 @@ case class JavaSelector(val prefix: String, val filters: List[(String, SelectorF
     override def toString(): String = getString()(Context.getNew("default"))
     def add(name: String, s: SelectorFilterValue):Selector = {
         JavaSelector(prefix, (name -> s)::filters)
+    }
+    def merge(s: Selector): Selector = {
+        s match{
+            case JavaSelector(prefix2, filters2) => 
+                JavaSelector(mergePrefix(prefix, prefix2), filters ++ filters2)
+            case bsel @ BedrockSelector(prefix2, filters2) => 
+                val bedrock = filters2.flatMap((k,v)=>(bsel.filterToJava(k, v, filters2)))
+                BedrockSelector(mergePrefix(prefix, prefix2), filters ++ bedrock)
+        }
+    }
+    def invert(): Selector = {
+        if (filters.length == 0){
+            EmptySelector
+        }
+        else{
+            val newFilter = filters.map{ case (s, v) => 
+                v match
+                    case SelectorInvert(v2) => (s, v2)
+                    case _ => (s, SelectorInvert(v))
+            }
+            BedrockSelector(prefix, newFilter)
+        }
     }
 }
 

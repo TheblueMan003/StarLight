@@ -42,7 +42,7 @@ if (Compiler.isJava()){
     """
     Gets the current time in ticks.
     """
-    lazy int get(){
+    [noReturnCheck=true] lazy int get(){
         Compiler.cmdstore(_ret){
             /time query gametime
         }
@@ -51,7 +51,7 @@ if (Compiler.isJava()){
     """
     Gets the current day.
     """
-    lazy int getDay(){
+    [noReturnCheck=true] lazy int getDay(){
         Compiler.cmdstore(_ret){
             /time query day
         }
@@ -60,7 +60,7 @@ if (Compiler.isJava()){
     """
     Gets the current day time.
     """
-    lazy int getDayTime(){
+    [noReturnCheck=true] lazy int getDayTime(){
         Compiler.cmdstore(_ret){
             /time query daytime
         }

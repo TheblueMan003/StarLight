@@ -1,4 +1,4 @@
-package utils.process
+package utils.Process
 
 if (Compiler.isJava){
     import cmd.schedule as schedule

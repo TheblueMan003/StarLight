@@ -2,7 +2,7 @@ package game.parkour.snake
 
 import cmd.entity as entity
 import cmd.block as block
-import utils.cprocess as cprocess
+import utils.CProcess
 
 /*
 enum SnakeBlock{
@@ -363,7 +363,7 @@ def @playertick playerticker(){
     }
 }
 
-cprocess.CProcess main{
+CProcess main{
     def main(){
         headMain()
         tailMain()
@@ -372,7 +372,7 @@ cprocess.CProcess main{
 
 
 scoreboard int SnakeTime = 0
-cprocess.CProcess reload{
+CProcess reload{
     def main(){
         with(@e[tag=limeSnake,type=marker],true){
             SnakeTime ++

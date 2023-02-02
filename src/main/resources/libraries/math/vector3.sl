@@ -1,4 +1,4 @@
-package math.vector3
+package math.Vector3
 
 import math
 
@@ -52,6 +52,13 @@ struct Vector3{
         this.x -= x
         this.y -= y
         this.z -= z
+    }
+
+    def lazy bool __eq__(Vector3 other){
+        return(this.x == other.x && this.y == other.y && this.z == other.z)
+    }
+    def lazy bool __ne__(Vector3 other){
+        return(this.x != other.x || this.y != other.y || this.z != other.z)
     }
 
     """
@@ -123,14 +130,12 @@ struct Vector3{
         this.z /= z
     }
 }
-
 Vector3 getPosition(){
     import cmd.tp as tp
     return(new Vector3(tp.getX(), tp.getY(), tp.getZ()))
 }
-
 package _
 
-def lazy __at__(math.vector3.Vector3 v, void=>void fct){
+def lazy __at__(math.Vector3.Vector3 v, void=>void fct){
     __at__(v.x, v.y, v.z, fct)
 }

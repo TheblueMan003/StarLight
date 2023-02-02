@@ -2,7 +2,7 @@ package objects
 
 import scala.collection.mutable
 import objects.types.*
-import sl.{Settings, Utils, LinkedVariableValue, FunctionCallValue, LinkedFunctionValue, Argument, FloatValue, IntValue}
+import sl.{Settings, Utils, LinkedVariableValue, FunctionCallValue, LinkedFunctionValue, Argument, FloatValue, IntValue, BoolValue}
 import sl.Expression
 import sl.Instruction
 import sl.LambdaValue
@@ -141,7 +141,9 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
     def getFreshVariable(typ: Type): Variable = {
         synchronized{
             varId += 1
-            val vari = Variable(this, "_"+varId.toString(), typ, Modifier.newPrivate())
+            val mod = Modifier.newPrivate()
+            mod.addAtrribute("variable.isTemp", BoolValue(true))
+            val vari = Variable(this, "_"+varId.toString(), typ, mod)
             addVariable(vari)
             vari.generate()(this)
             vari
@@ -616,6 +618,10 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
         addName(clazz.name)
         classes.addOne(clazz.name, clazz)
         clazz
+    }
+
+    def hasObject(identifier: Identifier): Boolean = {
+        tryGetClass(identifier).isDefined || tryGetStruct(identifier).isDefined || tryGetTemplate(identifier).isDefined || tryGetEnum(identifier).isDefined
     }
 
 

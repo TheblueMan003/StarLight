@@ -83,6 +83,10 @@ object Main{
     FileUtils.safeWriteFile(directory+"/java.slconf", ConfigLoader.get("java", name))
     FileUtils.safeWriteFile(directory+"/bedrock.slconf", ConfigLoader.get("bedrock", name))
     FileUtils.safeWriteFile(directory+"/src/main.sl", List("package main", "","def ticking main(){","","}"))
+
+    FileUtils.copyFromResourcesToFolder("icon/64.png", directory+"/java_resourcepack/pack.png")
+    FileUtils.copyFromResourcesToFolder("icon/256.png", directory+"/bedrock_resourcepack/pack_icon.png")
+
     ConfigLoader.saveProject(directory+"/")
   }
   def build(args: String): Unit = {
@@ -91,24 +95,28 @@ object Main{
     Settings.version=List(Settings.version(0), Settings.version(1), Settings.version(2)+1)
 
     val libs = FileUtils.getListOfFiles("./lib").map(l => "./lib/"+l+"/src")
+    val datpack = if (Settings.target == MCJava)
+                FileUtils.getListOfFiles("./lib").map(l => "./lib/"+l+"/java_datapack")
+              else
+                FileUtils.getListOfFiles("./lib").map(l => "./lib/"+l+"/bedrock_datapack")
     val respack = if (Settings.target == MCJava)
                 FileUtils.getListOfFiles("./lib").map(l => "./lib/"+l+"/java_resourcepack")
               else
                 FileUtils.getListOfFiles("./lib").map(l => "./lib/"+l+"/bedrock_resourcepack")
 
     if (Settings.target == MCJava){
-      compile("./src"::libs, "./java_resourcepack"::respack, Settings.java_datapack_output)
+      compile("./src"::libs, "./java_datapack"::datpack, "./java_resourcepack"::respack, Settings.java_datapack_output)
     }
     if (Settings.target == MCBedrock){
-      compile("./src"::libs, "./bedrock_resourcepack"::respack, Settings.bedrock_behaviorpack_output)
+      compile("./src"::libs, "./bedrock_datapack"::datpack, "./bedrock_resourcepack"::respack, Settings.bedrock_behaviorpack_output)
     }
     ConfigLoader.saveProject()
   }
   def compile(args: Array[String]): Unit = {
     if (hasArg(args, "-bedrock")) Settings.target= MCBedrock
-    compile(sourceFromArg(args, "-i"), List(), List(getArg(args, "-o")))
+    compile(sourceFromArg(args, "-i"), List(), List(), List(getArg(args, "-o")))
   }
-  def compile(inputs: List[String], resourceInput: List[String], outputs: List[String]): Context = {
+  def compile(inputs: List[String], dataInput: List[String],resourceInput: List[String], outputs: List[String]): Context = {
     val start = LocalDateTime.now()
     var files = FileUtils.getFiles(inputs)
 
@@ -129,7 +137,7 @@ object Main{
       if (!path.endsWith("/") && !path.endsWith("\\"))then path + "/" else path
     ).toList
 
-    DataPackBuilder.build(outputPath, output)
+    DataPackBuilder.build(dataInput, outputPath, output)
     if (Settings.target == MCJava){
         Settings.java_resourcepack_output.map(path => 
           if (!path.endsWith("/") && !path.endsWith("\\"))then path + "/" else path

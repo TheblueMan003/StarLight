@@ -66,6 +66,11 @@ class Modifier() extends Serializable{
             case other => Utils.simplify(other)(context) == BoolValue(true)
     }
 
+    def addAtrribute(key: String, value: Expression) = {
+        attributes += (key -> value)
+        this
+    }
+
     def withDoc(text: Option[String])={
         text match
             case None => {}

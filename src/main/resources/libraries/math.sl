@@ -1,5 +1,7 @@
 package math
 
+import standard.Exception::InvalidArgumentException
+
 val pi = 3.1415
 val e = 2.718
 
@@ -42,7 +44,7 @@ bool isClose(float x, float y, float maxDiff = 0.01){
     if (diff < maxDiff){
         return true
     }
-    if (diff >= maxDiff){
+    else{
         return false
     }
 }
@@ -52,7 +54,7 @@ return squart root of value
 """
 float sqrt(float value){
     if (value < 0){
-        //exception.invalidArgument("value in math.sqrt")
+        throw new InvalidArgumentException("value can't be negative in sqrt")
     }
     
     def float iterate(float guess){
@@ -93,7 +95,7 @@ return x!
 """
 def int factorial(int x){
     if (x < 0){
-        //exception.invalidArgument("X in math.factorial")
+        throw new InvalidArgumentException("x can't be negative in factorial")
     }
     int res = 1
 
@@ -108,16 +110,16 @@ return x^n
 """
 def float pow(float x, int n, float m = 1){
     if (n < 0){
-        //exception.invalidArgument("n in math.pow")
+        throw new InvalidArgumentException("n can't be negative in pow")
     }
-    if (n == 0){
+    else if (n == 0){
         return(1)
     }
-    if (n == 1){
+    else if (n == 1){
         float ret = x * m
         return(ret)
     }
-    if (n > 1){
+    else{
         int parity = n % 2
         
         if (parity == 1){
@@ -146,7 +148,7 @@ T sign<T>(T value){
     if (value >= 0){
         return(1)
     }
-    if (value < 0){
+    else{
         return(-1)
     }
 }
@@ -194,7 +196,7 @@ Return (a,b) if a <= b else return (b,a)
     if (a > b){
         return(b, a)
     }
-    if (a <= b){
+    else{
         return(a, b)
     }
 }
@@ -204,7 +206,7 @@ Return (a,b) if a <= b else return (b,a)
 Return the linear interpolated value of a0 and a1 with coefficient w
 """
 lazy float lerp(float a0, float a1, float w){
-    linearLerp(a0, a1, w)
+    return linearLerp(a0, a1, w)
 }
 
 

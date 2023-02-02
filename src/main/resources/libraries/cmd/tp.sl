@@ -192,7 +192,7 @@ def private tpAxisMinus(float x, int axis){
 """
 Get the x position of the current entity
 """
-float getX(){
+[noReturnCheck=true] float getX(){
     if(Compiler.isJava){
         float x = 0
         pointer.run(){
@@ -237,7 +237,7 @@ float getX(){
 """
 Get the y position of the current entity
 """
-float getY(){
+[noReturnCheck=true] float getY(){
     if(Compiler.isJava){
         float y = 0
         pointer.run(){
@@ -282,7 +282,7 @@ float getY(){
 """
 Get the z position of the current entity
 """
-float getZ(){
+[noReturnCheck=true] float getZ(){
     if(Compiler.isJava){
         float z = 0
         pointer.run(){

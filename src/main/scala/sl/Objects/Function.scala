@@ -19,6 +19,12 @@ object Function {
             val (prep, json) = Print.toRawJson(sufix)
             prep ::: str._1.call(prefix ::: List(json), ret, op)
         }
+        else if (str._1.hasParamsArg()){
+            val prefix = str._2.take(str._1.arguments.length - 1)
+            val sufix = str._2.drop(str._1.arguments.length - 1)
+            val tuple = TupleValue(sufix)
+            str._1.call(prefix ::: List(tuple), ret, op)
+        }
         else{
             str._1.call(str._2, ret, op)
         }
@@ -63,6 +69,12 @@ abstract class Function(context: Context, name: String, val arguments: List[Argu
         if arguments.length == 0 then false else
         arguments.last.typ match
             case RawJsonType => true
+            case _ => false
+    }
+    def hasParamsArg(): Boolean = {
+        if arguments.length == 0 then false else
+        arguments.last.typ match
+            case ParamsType => true
             case _ => false
     }
 
@@ -219,15 +231,16 @@ class LazyFunction(context: Context, name: String, arguments: List[Argument], ty
 
         if (ret != null) sub.addVariable("_ret", ret)
         if (ret == null){
+            sub.addVariable("_ret", new Variable(sub, "_ret", VoidType, Modifier.newPrivate()))
             sl.Compiler.compile(block)(if modifiers.hasAttributes("inline") then ctx else sub)
         }
         else if (op == "="){
-            block = Utils.substReturn(block, ret)
+            block = Utils.substReturn(block, ret)(!modifiers.hasAttributes("__returnCheck__"))
             sl.Compiler.compile(block)(if modifiers.hasAttributes("inline") then ctx else sub)
         }
         else{
             val vari = ctx.getFreshVariable(getType())
-            block = Utils.substReturn(block, vari)
+            block = Utils.substReturn(block, vari)(!modifiers.hasAttributes("__returnCheck__"))
             sl.Compiler.compile(block)(if modifiers.hasAttributes("inline") then ctx else sub) ::: (if ret == null then List() else ret.assign(op, LinkedVariableValue(vari)))
         }
     }
@@ -235,6 +248,7 @@ class LazyFunction(context: Context, name: String, arguments: List[Argument], ty
         super.generateArgument()
         argumentsVariables.foreach(_.modifiers.isLazy = true)
     }
+    override def canBeCallAtCompileTime = true
 
     def exists(): Boolean = false
     def getContent(): List[String] = List()
@@ -356,6 +370,7 @@ class ClassFunction(variable: Variable, function: Function) extends Function(fun
 
 class CompilerFunction(context: Context, name: String, arguments: List[Argument], typ: Type, _modifier: Modifier, val body: (List[Expression], Context)=>(List[String],Expression)) extends Function(context, name, arguments, typ, _modifier){
     generateArgument()(context.push(name, this))
+    argumentsVariables.foreach(_.modifiers.isLazy = true)
     override def exists()= false
 
     override def getContent(): List[String] = List()

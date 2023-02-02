@@ -53,6 +53,19 @@ Show text in the title with priority `priority` and time `time`
 def lazy show(int priority, int time, rawjson text){
     if (currentPriority <= priority){
         show(text)
+        time(0, time, 0)
+        currentTime = time
+        currentPriority = priority
+    }
+}
+
+"""
+Show text in the title with priority `priority` and time `time`
+"""
+def lazy show(int priority, int start, int time, int end, rawjson text){
+    if (currentPriority <= priority){
+        show(text)
+        time(start, time, end)
         currentTime = time
         currentPriority = priority
     }
@@ -68,4 +81,8 @@ def lazy use(int priority, int time){
     if (currentPriority <= priority){
         currentPriority = priority
     }
+}
+
+def lazy time(int $start, int $middle, int $end){
+    /title @s times $start $middle $end
 }

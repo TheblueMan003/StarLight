@@ -2,9 +2,13 @@ package objects
 
 import sl.*
 import objects.types.{Type, EnumType}
+import objects.types.IntType
+import sl.Compilation.DefaultFunction
 
 class Enum(context: Context, name: String, _modifier: Modifier, val fields: List[EnumField]) extends CObject(context, name, _modifier){
     var values = List[EnumValue]()
+
+    context.push(name).addProperty(Property("length", DefaultFunction.getInt(context, "get", ()=>values.length), null, null))
 
     def addValues(v: List[EnumValue])(implicit context: Context) = {
         // Remove Duplicate
@@ -19,7 +23,7 @@ class Enum(context: Context, name: String, _modifier: Modifier, val fields: List
             }
             x.fields.map(Utils.typeof(_)).zip(fields).foreach((a, b) => {
                 if (!a.isSubtypeOf(b.typ)){
-                    Reporter.warning(f"Unexpected type in enum value ${x.name}. Expected: ${b.typ} got ${a}")
+                    throw new Exception(f"Unexpected type in enum value ${x.name}. Expected: ${b.typ} got ${a}")
                 }
             })
         })

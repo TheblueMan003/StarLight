@@ -30,10 +30,11 @@ object Variable {
 }
 class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) extends CObject(context, name, _modifier) with Typed(typ){
 	var tupleVari: List[Variable] = List()
-	val tagName = fullName
+	val variName = if modifiers.hasAttributes("versionSpecific")(context) then fullName+"_"+Settings.version.mkString("_") else fullName
+	val tagName = modifiers.getAttributesString("tag", ()=>variName)(context)
 	var wasAssigned = false
 	lazy val scoreboard = if modifiers.isEntity then modifiers.getAttributesString("name", ()=>"s"+context.getScoreboardID(this))(context) else ""
-	lazy val inGameName = modifiers.getAttributesString("name", ()=>fullName)(context)
+	lazy val inGameName = modifiers.getAttributesString("name", ()=>variName)(context)
 	lazy val criterion = modifiers.getAttributesString("criterion", ()=>"dummy")(context)
 	var lazyValue: Expression = DefaultValue
 	var isFunctionArgument = false
@@ -113,8 +114,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 
 	def assign(op: String, value: Expression)(implicit context: Context, selector: Selector = Selector.self): List[String] = {
 		if (modifiers.isConst && wasAssigned) throw new Exception(f"Cannot reassign variable $fullName")
-		wasAssigned = true
-		if (modifiers.isLazy){
+		val ret = if (modifiers.isLazy){
 			getType() match{
 				case StructType(struct, sub) => {
 					value match
@@ -181,10 +181,28 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 									lazyValue = value
 									List()
 							}
+						case ArrayGetValue(LinkedVariableValue(vari, sl), index) if vari.modifiers.isLazy => {
+							vari.lazyValue match{
+								case JsonDictionary(map) => {
+									val key = Utils.simplify(index.head)
+									val value = map.get(key.getString())
+									if (value.isDefined){
+										assign(op, JsonValue(value.get))
+										return List()
+									}
+									else{
+										return List()
+									}
+								}
+							}
+						}
+						case ArrayGetValue(a, index) => {
+							val (prev, LinkedVariableValue(vari, sl))=Utils.simplifyToVariable(a)
+							return prev:::assign(op, ArrayGetValue(LinkedVariableValue(vari, sl), index))
+						}
 						case _ => {
 						}
 					}
-
 					val fixed = Utils.fix(value)(context, Set())
 
 					op match{
@@ -212,6 +230,10 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 						case VariableValue(nm, sel) if op == "=" && context.tryGetVariable(nm) == Some(this) && sel == selector =>{
 							List()
 						}
+						case dot: DotValue => {
+							val (lst,upacked) = Utils.unpackDotValue(dot)
+							lst ::: assign(op, upacked)
+						}
 						case _ => {
 							if (isPresentIn(value) && value.isInstanceOf[BinaryOperation]){
 								val tmp = context.getFreshVariable(getType())
@@ -237,6 +259,8 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 				}
 			}
 		}
+		wasAssigned = true
+		ret
 	}
 
 	def checkNull()(implicit selector: Selector = Selector.self) = 
@@ -525,6 +549,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					case "=" => List(f"scoreboard players set ${getSelector()} ${if value then 1 else 0}")
 					case "|=" => if value then List(f"scoreboard players set ${getSelector()} 1") else List()
 					case "||=" => if value then List(f"scoreboard players set ${getSelector()} 1") else List()
+					case "+=" => if value then List(f"scoreboard players set ${getSelector()} 1") else List()
 					case "&=" => if value then List() else List(f"scoreboard players set ${getSelector()} 0")
 					case "&&=" => if value then List() else List(f"scoreboard players set ${getSelector()} 0")
 				}
@@ -547,6 +572,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 							case "&&=" => List(f"scoreboard players operation ${getSelector()} *= ${vari.getSelector()(sel)}")
 							case "|=" => List(f"scoreboard players operation ${getSelector()} += ${vari.getSelector()(sel)}")
 							case "||=" => List(f"scoreboard players operation ${getSelector()} += ${vari.getSelector()(sel)}")
+							case "+=" => List(f"scoreboard players operation ${getSelector()} += ${vari.getSelector()(sel)}")
 							case _ => List(f"scoreboard players operation ${getSelector()} $op ${vari.getSelector()(sel)}")
 					}
 					case EntityType => f"scoreboard players set ${getSelector()} 0"::Compiler.compile(If(value, VariableAssigment(List((Right(this), selector)), "=", BoolValue(true)), List()))
@@ -708,6 +734,17 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 						List(ElseIf(BoolValue(true), CMD(f"tag @e[tag=${tagName}] remove $tagName")))))
 	}
 	def assignEntity(op: String, expr: Expression)(implicit context: Context, selector: Selector = Selector.self):List[String]={
+		expr match{
+			case BinaryOperation("not in", left, right) => {
+				val (p, s) = Utils.getSelector(expr)
+				return p:::assignEntity(op, SelectorValue(s))
+			}
+			case BinaryOperation("in", left, right) => {
+				val (p, s) = Utils.getSelector(expr)
+				return p:::assignEntity(op, SelectorValue(s))
+			}
+			case _ => {}
+		}
 		op match{
 			case "=" => {
 				expr match
@@ -907,8 +944,12 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					case _ => context.getFunction(name + "." + Utils.getOpFunctionName(op),  List(value), List(), getType(), false).call()
 	}
 
-	def deref()(implicit context: Context) = context.getFunction(this.name + ".__remRef", List[Expression](), List(), getType(), false).call()
-	def addref()(implicit context: Context)= context.getFunction(this.name + ".__addRef", List[Expression](), List(), getType(), false).call()
+	def deref()(implicit context: Context) = 
+		if (modifiers.hasAttributes("variable.isTemp")) List() else
+		context.getFunction(this.name + ".__remRef", List[Expression](), List(), getType(), false).call()
+	def addref()(implicit context: Context)= 
+		if (modifiers.hasAttributes("variable.isTemp")) List() else
+		context.getFunction(this.name + ".__addRef", List[Expression](), List(), getType(), false).call()
 
 	/**
 	 * Assign a value to the struct variable
@@ -918,13 +959,8 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 		op match
 			case "=" => {
 				value match
-					case LinkedVariableValue(vari, sel) if vari.getType() == getType() => {
-						if (vari.getType() == getType()){
-							deref() ::: List(f"scoreboard players operation ${getSelector()} ${op} ${vari.getSelector()(sel)}") ::: addref()
-						}
-						else{
-							context.getFunction(this.name + ".__set__", List(value), List(), getType(), false).call()
-						}
+					case LinkedVariableValue(vari, sel) if vari.getType().isSubtypeOf(getType()) => {
+						deref() ::: List(f"scoreboard players operation ${getSelector()} ${op} ${vari.getSelector()(sel)}") ::: addref()
 					}
 					case VariableValue(name, sel) => assignClass(op, context.resolveVariable(value))
 					case ConstructorCall(name2, args, typevars) => {
@@ -975,6 +1011,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 			case NamespacedName(value) => false
 			case LinkedFunctionValue(fct) => false
 			case PositionValue(value) => false
+			case DotValue(left, right) => isPresentIn(left) || isPresentIn(right)
 			case ArrayGetValue(name, index) => isPresentIn(name)
 			case TagValue(value) => false
 			case LambdaValue(args, instr) => false

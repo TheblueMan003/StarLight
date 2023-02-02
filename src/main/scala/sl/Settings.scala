@@ -2,6 +2,7 @@ package sl
 
 import objects.Context
 import java.util.Random
+import objects.types.VoidType
 
 case class PackInfo(var version: Int, var description: String, var min_engine_version: List[Int])
 class SettingsContext(){
@@ -20,8 +21,8 @@ class SettingsContext(){
     var java_datapack_version = PackInfo(10, "Made With StarLight", List(1,19,3))
     var java_resourcepack_version = PackInfo(10, "Made With StarLight", List(1,19,3))
 
-    var bedrock_behaviorpack_version = PackInfo(2, "Made With StarLight", List(1,19,3))
-    var bedrock_resourcepack_version = PackInfo(2, "Made With StarLight", List(1,19,3))
+    var bedrock_behaviorpack_version = PackInfo(2, "Made With StarLight", List(1,19,50))
+    var bedrock_resourcepack_version = PackInfo(2, "Made With StarLight", List(1,19,50))
 
     var java_datapack_output = List("./output/java_datapack")
     var java_resourcepack_output = List("./output/java_resourcepack")
@@ -137,7 +138,7 @@ case object MCBedrock extends Target{
                             f"scoreboard objectives add ${Settings.variableScoreboard} dummy")::: 
                             context.getAllConstant().map(v => f"scoreboard players set c$v ${Settings.constScoreboard} $v"):::
                             context.getAllVariable().filter(_.modifiers.isEntity).map(v => f"scoreboard objectives add ${v.scoreboard} dummy"):::
-                            context.getAllVariable().filter(v => !v.modifiers.isEntity && !v.modifiers.isLazy).map(v => f"scoreboard players set ${v.getSelector()} 0"):::
+                            context.getAllVariable().filter(v => !v.modifiers.isEntity && !v.modifiers.isLazy && v.getType() != VoidType).map(v => f"scoreboard players set ${v.getSelector()} 0"):::
                             List(f"function ${context.root.getPath()}/__load__")
 
         List((f"manifest.json", List(getManifestContent())),

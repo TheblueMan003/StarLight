@@ -76,7 +76,7 @@ enum Gamemode{
     Adventure,
     Spectator
 }
-def Gamemode get(){
+def [noReturnCheck=true] Gamemode get(){
     if (isSurvival()){
         return Gamemode.Survival
     }

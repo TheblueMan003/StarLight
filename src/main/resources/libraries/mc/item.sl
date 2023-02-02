@@ -1,7 +1,7 @@
-package mc.item
+package mc.Item
 
-import mc.player
-
+import mc.player as player
+import mc.bedrock.textures as textures
 import standard
 
 def private lazy createItem(int $name, json _name, json _category, json _component){
@@ -17,10 +17,11 @@ def private lazy createItem(int $name, json _name, json _category, json _compone
     }
 }
 def private lazy createAnimationController(int $name, void=>void onClick, void=>void whileClick, void=>void onRelease){
+    player.addAnimation("controller.animation.$name")
     jsonfile animation_controllers.$name{
             "format_version": "1.10.0",
             "animation_controllers": {
-                "controller.animation.$this": {
+                "controller.animation.$name": {
                     "initial_state": "default",
                     "states": {
                         "default": {
@@ -42,7 +43,9 @@ def private lazy createAnimationController(int $name, void=>void onClick, void=>
                             "on_entry": whileClick(),
                             "transitions": [
                                 {
-                                    "clickrelease": "(!query.is_using_item) || (query.get_equipped_item_name != '$name')",
+                                    "clickrelease": "(!query.is_using_item) || (query.get_equipped_item_name != '$name')"
+                                },
+                                {
                                     "clickhold": "true"
                                 }
                             ]
@@ -73,6 +76,9 @@ template Item{
     def lazy setName(string name){
         _name = name
     }
+    def lazy setNamespace(string name){
+        _namespace = name
+    }
     def lazy setCategory(string name){
         _category = name
     }
@@ -97,22 +103,33 @@ template Item{
             "saturation_modifier": saturation_modifier
         }}
     }
-    def lazy setMaxDamage(int value){
-        _component += {"minecraft:max_damage": value}
+    def lazy setUseDuration(int value){
+        _component += {"minecraft:use_duration": value}
+    }
+    def lazy setIcon(string icon){
+        _component += {"minecraft:icon": {"texture": icon}}
+        textures.add(icon)
+    }
+    def lazy addComponent(json component){
+        _component += component
     }
 
     def lazy onClick(void=>void fct){
         _onClick = fct
+        setFood(0)
     }
     def lazy whileClick(void=>void fct){
         _whileClick = fct
+        setFood(0)
     }
     def lazy onRelease(void=>void fct){
         _onRelease = fct
+        setFood(0)
     }
 
     def [Compile.order=1000] build(){
-        createItem(_name, _name, _category, _component)
+        lazy val namespacedName = _namespace + ":" + _name
+        createItem(_name, namespacedName, _category, _component)
         createAnimationController(_name, _onClick, _whileClick, _onRelease)
     }
 }

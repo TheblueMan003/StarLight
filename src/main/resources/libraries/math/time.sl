@@ -53,37 +53,41 @@ struct Time{
     def lazy __mod__(Time other){
         tick%=other.tick
     }
-    lazy bool __smaller__(int i){
-        if (tick < i){return true}
-        if (tick >= i){return false}
+    lazy bool __lt__(int i){
+        return tick < i
     }
-    lazy bool __smaller__(Time other){
-        if (tick < other.tick){return true}
-        if (tick >= other.tick){return false}
+    lazy bool __lt__(Time other){
+        return (tick < other.tick)
     }
-    lazy bool __smaller_or_equals__(int i){
-        if (tick <= i){return true}
-        if (tick > i){return false}
+    lazy bool __le__(int i){
+        return (tick <= i)
     }
-    lazy bool __smaller_or_equals__(Time other){
-        if (tick <= other.tick){return true}
-        if (tick > other.tick){return false}
+    lazy bool __le__(Time other){
+        return (tick <= other.tick)
     }
-    lazy bool __bigger__(int i){
-        if (tick > i){return true}
-        if (tick <= i){return false}
+    lazy bool __gt__(int i){
+        return (tick > i)
     }
-    lazy bool __bigger__(Time other){
-        if (tick > other.tick){return true}
-        if (tick <= other.tick){return false}
+    lazy bool __gt__(Time other){
+        return (tick > other.tick)
     }
-    lazy bool __bigger_or_equals__(int i){
-        if (tick >= i){return true}
-        if (tick < i){return false}
+    lazy bool __ge__(int i){
+        return (tick >= i)
     }
-    lazy bool __bigger_or_equals__(Time other){
-        if (tick >= other.tick){return true}
-        if (tick < other.tick){return false}
+    lazy bool __ge__(Time other){
+        return (tick >= other.tick)
+    }
+    lazy bool __eq__(int i){
+        return i == tick
+    }
+    lazy bool __eq__(Time other){
+        return other.tick == tick
+    }
+    lazy bool __ne__(int i){
+        return i != tick
+    }
+    lazy bool __ne__(Time other){
+        return other.tick != tick
     }
 
     """

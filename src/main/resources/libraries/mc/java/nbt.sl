@@ -19,15 +19,15 @@ if (Compiler.isJava()){
     }
 
     property x{
-        lazy float get() getNBT(_ret, "Pos[0]", 1000)
+        [noReturnCheck=true]  lazy float get() getNBT(_ret, "Pos[0]", 1000)
         lazy void set(float value) setNBT(value, "Pos[0]", "double", 0.001)
     }
     property y{
-        lazy float get() getNBT(_ret, "Pos[1]", 1000)
+        [noReturnCheck=true] lazy float get() getNBT(_ret, "Pos[1]", 1000)
         lazy void set(float value) setNBT(value, "Pos[1]", "double", 0.001)
     }
     property z{
-        lazy float get() getNBT(_ret, "Pos[2]", 1000)
+        [noReturnCheck=true] lazy float get() getNBT(_ret, "Pos[2]", 1000)
         lazy void set(float value) setNBT(value, "Pos[2]", "double", 0.001)
     }
 }

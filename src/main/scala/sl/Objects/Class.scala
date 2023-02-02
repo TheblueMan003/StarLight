@@ -12,6 +12,7 @@ class Class(context: Context, name: String, val generics: List[String], _modifie
     var virutalFunctionVariable: List[Variable] = List()
     var virutalFunctionBase: List[Function] = List()
     var definingType = ClassType(this, List())
+    private var wasGenerated = false
 
     def get(typevars2: List[Type]) ={
         val typevars = typevars2.map(context.push(name).getType(_))
@@ -38,66 +39,73 @@ class Class(context: Context, name: String, val generics: List[String], _modifie
         }
     }
 
-    def generate()={
-        if (generics.length == 0){
-            val ctx = context.push(name, this)
-            ctx.push("this", ctx)
+    def generate():Unit={
+        if (!wasGenerated){
+            wasGenerated = true
             if (parent != null){
-                ctx.inherit(parent.context.push(parent.name))
+                parent.generate()
             }
+            if (generics.length == 0){
+                val ctx = context.push(name, this)
+                ctx.push("this", ctx)
+                if (parent != null){
+                    ctx.inherit(parent.context.push(parent.name))
+                }
 
-            Compiler.compile(block)(ctx)
-            
-            val mod = new Modifier()
-            mod.isEntity = true
-            ctx.getAllVariable().filter(!_.isFunctionArgument).foreach(vari => vari.modifiers = vari.modifiers.combine(mod))
-
-            getAllVariables()
-            .filter(!_.isFunctionArgument)
-            .filter(!_.modifiers.isStatic)
-            .filter(_.getter == null)
-            .filter(_.modifiers.protection == Protection.Public)
-            .foreach(vari => 
-                vari.getter = ConcreteFunction(ctx, f"__get_${vari.name}", List(), vari.getType(), vari.modifiers, Return(LinkedVariableValue(vari)), false)
-                vari.getter.generateArgument()(ctx)
-                ctx.addFunction(f"__get_${vari.name}", vari.getter)
-
-                vari.setter = ConcreteFunction(ctx, f"__set_${vari.name}", List(new Argument("value", vari.getType(), None)), VoidType, vari.modifiers, VariableAssigment(List((Right(vari), Selector.self)), "=", VariableValue("value")), false)
-                vari.setter.generateArgument()(ctx)
-                ctx.addFunction(f"__set_${vari.name}", vari.setter)
-            )
-
-            getAllFunctions()
-            .filter(!_.modifiers.isStatic)
-            .filter(_.modifiers.isVirtual)
-            .filter(f => !f.modifiers.isOverride)
-            .filter(f => f.context == ctx)
-            .map(fct => {
-                val typ = fct.getFunctionType()
-                val vari = Variable(ctx, f"---${fct.name}", typ, Modifier.newPrivate())
-                ctx.addVariable(vari)
-                vari.generate()(ctx)
-
-                virutalFunctionVariable = vari :: virutalFunctionVariable
-                virutalFunctionBase = fct :: virutalFunctionBase
+                Compiler.compile(block)(ctx)
                 
-                val modifier = fct.modifiers.copy()
-                modifier.isVirtual = false
-                modifier.isOverride = false
-                
-                val fct2 = ConcreteFunction(ctx, f"--${fct.name}", fct.arguments, fct.getType(), modifier,
-                    if (fct.getType() == VoidType) FunctionCall(vari.fullName,fct.arguments.map(arg => VariableValue(arg.name)), List())
-                    else Return(FunctionCallValue(LinkedVariableValue(vari),fct.arguments.map(arg => VariableValue(arg.name)), List(), Selector.self)), false)
-                fct2.generateArgument()(ctx)
-                virutalFunction = (fct.name, fct2) :: virutalFunction
-                ctx.addFunction(f"--${fct.name}", fct2)
-            })
+                val mod = new Modifier()
+                mod.isEntity = true
+                ctx.getAllVariable().filter(!_.isFunctionArgument).foreach(vari => vari.modifiers = vari.modifiers.combine(mod))
 
-            getAllVariables().filter(!_.wasGenerated).map(_.generate(false, true)(ctx))
+                getAllVariables()
+                .filter(!_.isFunctionArgument)
+                .filter(!_.modifiers.isStatic)
+                .filter(_.getter == null)
+                .filter(_.modifiers.protection == Protection.Public)
+                .foreach(vari => 
+                    vari.getter = ConcreteFunction(ctx, f"__get_${vari.name}", List(), vari.getType(), vari.modifiers, Return(LinkedVariableValue(vari)), false)
+                    vari.getter.generateArgument()(ctx)
+                    ctx.addFunction(f"__get_${vari.name}", vari.getter)
+
+                    vari.setter = ConcreteFunction(ctx, f"__set_${vari.name}", List(new Argument("value", vari.getType(), None)), VoidType, vari.modifiers, VariableAssigment(List((Right(vari), Selector.self)), "=", VariableValue("value")), false)
+                    vari.setter.generateArgument()(ctx)
+                    ctx.addFunction(f"__set_${vari.name}", vari.setter)
+                )
+
+                getAllFunctions()
+                .filter(!_.modifiers.isStatic)
+                .filter(_.modifiers.isVirtual)
+                .filter(f => !f.modifiers.isOverride)
+                .filter(f => f.context == ctx)
+                .map(fct => {
+                    val typ = fct.getFunctionType()
+                    val vari = Variable(ctx, f"---${fct.name}", typ, Modifier.newPrivate())
+                    ctx.addVariable(vari)
+                    vari.generate()(ctx)
+
+                    virutalFunctionVariable = vari :: virutalFunctionVariable
+                    virutalFunctionBase = fct :: virutalFunctionBase
+                    
+                    val modifier = fct.modifiers.copy()
+                    modifier.isVirtual = false
+                    modifier.isOverride = false
+                    
+                    val fct2 = ConcreteFunction(ctx, f"--${fct.name}", fct.arguments, fct.getType(), modifier,
+                        if (fct.getType() == VoidType) FunctionCall(vari.fullName,fct.arguments.map(arg => VariableValue(arg.name)), List())
+                        else Return(FunctionCallValue(LinkedVariableValue(vari),fct.arguments.map(arg => VariableValue(arg.name)), List(), Selector.self)), false)
+                    fct2.generateArgument()(ctx)
+                    virutalFunction = (fct.name, fct2) :: virutalFunction
+                    ctx.addFunction(f"--${fct.name}", fct2)
+                })
+
+                getAllVariables().filter(!_.wasGenerated).map(_.generate(false, true)(ctx))
+            }
         }
     }
     def generateForVariable(vari: Variable, typevar: List[Type])(implicit ctx2: Context):Unit={
         if (generics.length == 0){
+            generate()
             val ctx = ctx2.push(vari.name, vari)
             getAllFunctions()
                 .filter(!_.modifiers.isStatic)

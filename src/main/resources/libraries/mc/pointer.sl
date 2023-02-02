@@ -60,7 +60,7 @@ if (Compiler.isBedrock()){
 """
 Creates a new pointer
 """
-lazy entity newPointer(){
+[noReturnCheck=true] lazy entity newPointer(){
     if (Compiler.isJava()){
         return entity.summon(minecraft:marker)
     }

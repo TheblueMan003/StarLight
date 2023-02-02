@@ -3,6 +3,11 @@ package mc.player
 if (Compiler.isBedrock){
     lazy json animations = {}
     lazy json animate = []
+
+    def lazy addAnimation(string name){
+        animations[name] = name
+        animate += [name]
+    }
     def [Compile.order=99999] build(){
         jsonfile entities.player{
             "format_version": "1.16.0",

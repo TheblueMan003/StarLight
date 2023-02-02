@@ -4,7 +4,7 @@ if (Compiler.isBedrock){
     """
     Return a random number between `x` (included) and `y` (excluded)
     """
-    lazy int range(int x, int y){
+    [noReturnCheck=true] lazy int range(int x, int y){
         Compiler.random(_ret, x, y-1)
     }
 }
@@ -14,7 +14,7 @@ if (Compiler.isJava){
     """
     Return a random number between `x` (included) and `y` (excluded)
     """
-    lazy int range(int x, int y){
+    [noReturnCheck=true] lazy int range(int x, int y){
         /summon marker ~ ~ ~ {Tags:["random.trg"]}
         with(@e[tag=random.trg,limit=1]){
             nbt.getNBT(_ret, "UUID[0]", 1)

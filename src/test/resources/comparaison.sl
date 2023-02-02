@@ -138,22 +138,22 @@ def enumComparaison(){
 def classComparaison(){
     class e{
         bool __lt__(int a){
-
+            return true
         }
         bool __le__(int a){
-            
+            return true
         }
         bool __eq__(int a){
-            
+            return true
         }
         bool __gt__(int a){
-            
+            return true
         }
         bool __ge__(int a){
-            
+            return true
         }
         bool __ne__(int a){
-            
+            return true
         }
     }
     e a

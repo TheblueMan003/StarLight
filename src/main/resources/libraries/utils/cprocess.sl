@@ -1,4 +1,4 @@
-package utils.cprocess
+package utils.CProcess
 
 if (Compiler.isJava){
     import cmd.schedule as schedule

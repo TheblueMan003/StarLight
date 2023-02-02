@@ -5,6 +5,7 @@ import objects.Identifier
 import objects.types.{VoidType, TupleType, IdentifierType, ArrayType}
 import sl.Compilation.Execute
 import sl.Compilation.Selector.Selector
+import objects.types.JsonType
 
 object Compiler{
     def compile(context: Context):List[(String, List[String])] = {
@@ -83,7 +84,7 @@ object Compiler{
                             case None => if name != "object" then context.getClass("object") else null
                             case Some(p) => context.getClass(p)
                         
-                        context.addClass(new Class(context, name, generics, modifier, block, parentClass, entity)).generate()
+                        context.addClass(new Class(context, name, generics, modifier, block, parentClass, entity))
                     }
                     List()
                 }
@@ -113,6 +114,9 @@ object Compiler{
                     if (!firstPass){
                         val enm = context.addEnum(new Enum(context, name, modifier, fields.map(x => EnumField(x.name, context.getType(x.typ)))))
                         enm.addValues(values)
+                    }
+                    else{
+                        context.getEnum(name).addValues(values)
                     }
                     List()
                 }
@@ -189,8 +193,12 @@ object Compiler{
                     if (value != null){
                         context.addObjectFrom(value, if alias == null then value else alias, context.root.push(lib))
                     }
-                    else if (alias != null){
-                        context.push(alias, context.getContext(lib))
+                    else{
+                        val last = Identifier.fromString(lib).values.last
+                        context.hasObject(lib+"."+last) match
+                            case true => context.addObjectFrom(last, if alias == null then last else alias, context.root.push(lib))
+                            case false if alias!=null => context.push(alias, context.getContext(lib))
+                            case false => {}
                     }
                     ret
                 }
@@ -247,16 +255,21 @@ object Compiler{
                         compile(VariableAssigment(List((Left(Identifier.fromString(name.path()+"."+index.toString())), Selector.self)), op, value))
                     }
                     if (index.length == 1){
-                        val typ = name match
-                            case Left(value) => Utils.typeof(VariableValue(value))
-                            case Right(value) => Utils.typeof(LinkedVariableValue(value))
-                        
-                        (typ, Utils.simplify(index.head)) match
-                            case (ArrayType(sub, v), IntValue(index)) => indexed(index)
-                            case (ArrayType(sub, v), EnumIntValue(index)) => indexed(index)
-                            case _ =>{
-                                call()
-                            }
+                        val vari = name.get()
+                        val typ = Utils.typeof(LinkedVariableValue(vari))
+
+                        if (vari.modifiers.isLazy && typ == JsonType){
+                            vari.lazyValue = JsonValue(Utils.combineJson(Utils.toJson(vari.lazyValue), JsonDictionary(Map(index.head.getString() -> Utils.toJson(Utils.simplify(value))))))
+                            List()
+                        }
+                        else{
+                            (typ, Utils.simplify(index.head)) match
+                                case (ArrayType(sub, v), IntValue(index)) => indexed(index)
+                                case (ArrayType(sub, v), EnumIntValue(index)) => indexed(index)
+                                case _ =>{
+                                    call()
+                                }
+                        }
                     }
                     else{
                         call()
@@ -264,8 +277,28 @@ object Compiler{
                 }
                 case Return(value) => {
                     context.getCurrentFunction() match
-                        case cf: ConcreteFunction => cf.returnVariable.assign("=", value)
+                        case cf: ConcreteFunction => 
+                            if (cf.modifiers.hasAttributes("__returnCheck__")) then
+                                Compiler.compile(VariableAssigment(List((Left(Identifier.fromString("__hasFunctionReturned__")), Selector.self)), "=", IntValue(1)), firstPass):::
+                                cf.returnVariable.assign("=", value)
+                            else cf.returnVariable.assign("=", value)
                         case _ => throw new Exception(f"Unexpected return at ${instruction.pos}")
+                }
+                case Throw(expr) => {
+                    context.requestLibrary("standard.Exception")
+                    context.getCurrentFunction() match
+                        case cf: ConcreteFunction => 
+                            if (cf.modifiers.hasAttributes("__returnCheck__")) then
+                                Compiler.compile(VariableAssigment(List((Left(Identifier.fromString("__exceptionThrown")), Selector.self)), "=", expr), firstPass):::
+                                Compiler.compile(VariableAssigment(List((Left(Identifier.fromString("__hasFunctionReturned__")), Selector.self)), "=", IntValue(2)), firstPass)
+                            else Compiler.compile(VariableAssigment(List((Left(Identifier.fromString("__exceptionThrown")), Selector.self)), "=", expr), firstPass)
+                        case _ => Compiler.compile(VariableAssigment(List((Left(Identifier.fromString("__exceptionThrown")), Selector.self)), "=", expr), firstPass)
+                }
+                case Try(block, except, finallyBlock) => {
+                    context.requestLibrary("standard.Exception")
+                    compile(block, firstPass) ::: 
+                    compile(If(BinaryOperation("!=",VariableValue("__exceptionThrown"), IntValue(0)), except, List()), firstPass) :::
+                    compile(finallyBlock, firstPass)
                 }
                 case CMD(value) => List(value.replaceAllLiterally("\\\"","\""))
                 case Package(name, block) => {

@@ -10,7 +10,7 @@ import sl.Compilation.*
 import objects.Function
 import sl.Compilation.Printable
 
-sealed abstract class Expression extends Positional{
+trait Expression extends Positional{
     def hasIntValue(): Boolean
     def getIntValue(): Int
     def hasFloatValue(): Boolean
@@ -248,6 +248,14 @@ case class RangeValue(val min: Expression, val max: Expression) extends Expressi
     override def hasFloatValue(): Boolean = false
     override def getFloatValue(): Double = ???
     override def getString()(implicit context: Context): String = f"${min.getString()}..${max.getString()}"
+}
+case class DotValue(val left: Expression, val right: Expression) extends Expression with SmallValue{
+    override def toString(): String = f"$left.$right"
+    override def getIntValue(): Int = ???
+    override def hasIntValue(): Boolean = false
+    override def hasFloatValue(): Boolean = false
+    override def getFloatValue(): Double = ???
+    override def getString()(implicit context: Context): String = f"$left.$right"
 }
 case class SelectorValue(val value: Selector) extends Expression{
     override def toString(): String = value.toString()
