@@ -138,7 +138,7 @@ def lazy setNotched0(mcobject $name){
 struct Bossbar{
     bool visible
     lazy string name = "$this"
-    lazy int id = name.hash()
+    lazy int id = Compiler.hash(name)
 
     """
     Create a bossbar with text `display`

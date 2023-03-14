@@ -14,8 +14,8 @@ if (Compiler.isBedrock()){
 			},
 			"components": {
 				"minecraft:collision_box": {
-					"width": 0.0,
-					"height": 0.0
+					"width": 0.1,
+					"height": 0.1
 				},
 				"minecraft:pushable": {
 					"is_pushable": false,
@@ -88,6 +88,11 @@ lazy void run(void=>void func){
 	entity a = newPointer()
 	with(a,true){
 		func()
-		/kill
+		if (Compiler.isJava()){
+			/kill
+		}
+		if (Compiler.isBedrock()){
+			/event entity @s to_death
+		}
 	}
 }

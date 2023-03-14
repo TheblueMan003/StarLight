@@ -176,6 +176,19 @@ object DefaultFunction{
                     }
                 }
             ))
+        ctx.addFunction("hash", CompilerFunction(ctx, "hash", 
+                List(Argument("v", StringType, None)),
+                IntType,
+                Modifier.newPublic(),
+                (args: List[Expression],ctx: Context) => {
+                    args match{
+                        case StringValue(value)::Nil => {
+                            (List(), IntValue(scala.util.hashing.MurmurHash3.stringHash(value)))
+                        }
+                        case other => throw new Exception(f"Illegal Arguments $other for hash")
+                    }
+                }
+            ))
         ctx.addFunction("getObjective", CompilerFunction(ctx, "getObjective", 
                 List(Argument("vari", MCObjectType, None)),
                 MCObjectType,
@@ -259,6 +272,30 @@ object DefaultFunction{
             }
         ))
 
+        ctx.addFunction("getProjectVersionType", CompilerFunction(ctx, "getProjectVersionType", 
+            List(),
+            StringType,
+            Modifier.newPublic(),
+            (args: List[Expression],ctx: Context) => {
+                args match{
+                    case Nil => {
+                        if (Settings.version(0) == -3){
+                            (List(), StringValue("pre-alpha"))
+                        }else if (Settings.version(0) == -2){
+                            (List(), StringValue("alpha"))
+                        }else if (Settings.version(0) == -1){
+                            (List(), StringValue("beta"))
+                        }else if (Settings.version(0) == -1){
+                            (List(), StringValue("pre-release"))
+                        }else{
+                            (List(), StringValue("release"))
+                        }
+                    }
+                    case other => throw new Exception(f"Illegal Arguments $other for getProjectVersionType")
+                }
+            }
+        ))
+
         ctx.addFunction("getProjectVersionMajor", CompilerFunction(ctx, "getProjectVersionMajor", 
             List(),
             IntType,
@@ -297,6 +334,20 @@ object DefaultFunction{
                         (List(), IntValue(Settings.version(2)))
                     }
                     case other => throw new Exception(f"Illegal Arguments $other for getProjectVersionPatch")
+                }
+            }
+        ))
+
+        ctx.addFunction("getProjectFullName", CompilerFunction(ctx, "getProjectFullName", 
+            List(),
+            StringType,
+            Modifier.newPublic(),
+            (args: List[Expression],ctx: Context) => {
+                args match{
+                    case Nil => {
+                        (List(), StringValue(Settings.outputName))
+                    }
+                    case other => throw new Exception(f"Illegal Arguments $other for getProjectFullName")
                 }
             }
         ))
@@ -449,7 +500,7 @@ object DefaultFunction{
                             case c => (List(), StringValue(c.fullName))
                             case null => throw new Exception("Not in a class")
                     }
-                    case other => throw new Exception(f"Illegal Arguments $other for getNamespaceName")
+                    case other => throw new Exception(f"Illegal Arguments $other for getClassName")
                 }
             }
         ))
@@ -463,13 +514,80 @@ object DefaultFunction{
                             val ret = Compiler.compile(Utils.subst(instr, name.toString(), s.getString()))(ctx)
                             (ret, NullValue)
                         }
-                        case other => throw new Exception(f"Illegal Arguments $other for cmdstore")
+                        case other => throw new Exception(f"Illegal Arguments $other for insert")
+                    }
+                }
+            ))
+        ctx.addFunction("print", CompilerFunction(ctx, "print", 
+                List(Argument("name", MCObjectType, None)),
+                VoidType,
+                Modifier.newPublic(),
+                (args: List[Expression],ctx: Context) => {
+                    Reporter.debug(args)
+                    (List(), NullValue)
+                }
+            ))
+        ctx.addFunction("stringify", CompilerFunction(ctx, "stringify", 
+                List(Argument("value", StringType, None)),
+                StringType,
+                Modifier.newPublic(),
+                (args: List[Expression],ctx: Context) => {
+                    args match{
+                        case StringValue(value)::Nil => {
+                            (List(), StringValue(Utils.stringify(value)))
+                        }
+                        case other => throw new Exception(f"Illegal Arguments $other for stringify")
+                    }
+                }
+            ))
+        ctx.addFunction("replace", CompilerFunction(ctx, "replace", 
+                List(Argument("src", StringType, None), Argument("from", StringType, None), Argument("to", StringType, None)),
+                StringType,
+                Modifier.newPublic(),
+                (args: List[Expression],ctx: Context) => {
+                    args match{
+                        case StringValue(src)::StringValue(from)::StringValue(to)::Nil => {
+                            (List(), StringValue(src.replace(from, to)))
+                        }
+                        case other => throw new Exception(f"Illegal Arguments $other for replace")
+                    }
+                }
+            ))
+        ctx.addFunction("toRadians", CompilerFunction(ctx, "toRadians", 
+                List(Argument("value", FloatType, None)),
+                FloatType,
+                Modifier.newPublic(),
+                (args: List[Expression],ctx: Context) => {
+                    args match{
+                        case FloatValue(src)::Nil => {
+                            (List(), FloatValue(Math.toRadians(src)))
+                        }
+                        case IntValue(src)::Nil => {
+                            (List(), FloatValue(Math.toRadians(src)))
+                        }
+                        case other => throw new Exception(f"Illegal Arguments $other for toRadians")
+                    }
+                }
+            ))
+        ctx.addFunction("toDegrees", CompilerFunction(ctx, "toDegrees", 
+                List(Argument("value", FloatType, None)),
+                FloatType,
+                Modifier.newPublic(),
+                (args: List[Expression],ctx: Context) => {
+                    args match{
+                        case FloatValue(src)::Nil => {
+                            (List(), FloatValue(Math.toDegrees(src)))
+                        }
+                        case IntValue(src)::Nil => {
+                            (List(), FloatValue(Math.toDegrees(src)))
+                        }
+                        case other => throw new Exception(f"Illegal Arguments $other for toDegrees")
                     }
                 }
             ))
         ctx.addFunction("makeUnique", CompilerFunction(ctx, "makeUnique", 
                 List(Argument("entity", EntityType, None)),
-                VoidType,
+                EntityType,
                 Modifier.newPublic(),
                 (args: List[Expression],ctx: Context) => {
                     args match{
@@ -486,6 +604,24 @@ object DefaultFunction{
                     }
                 }
             ))
+        ctx.addFunction("callToArray", CompilerFunction(ctx, "callToArray", 
+            List(Argument("cmd", FuncType(List(), VoidType), None)),
+            VoidType,
+            Modifier.newPublic(),
+            (args: List[Expression],ctx: Context) => {
+                args match{
+                    case LambdaValue(arg, instr)::Nil => {
+                        val ret = Compiler.compile(instr)(ctx)
+                        (List(), JsonValue(JsonArray(ret.map(v => JsonString(v)))))
+                    }
+                    case VariableValue(vari, sel)::Nil => {
+                        val ret = Compiler.compile(FunctionCall(vari, List(), List()))(ctx)
+                        (List(), JsonValue(JsonArray(ret.map(v => JsonString(v)))))
+                    }
+                    case other => throw new Exception(f"Illegal Arguments $other for callToArray")
+                }
+            }
+        ))
         if (Settings.target == MCJava){
             ctx.addFunction("blockbenchSummon", CompilerFunction(ctx, "blockbenchSummon", 
                 List(Argument("name", MCObjectType, None)),

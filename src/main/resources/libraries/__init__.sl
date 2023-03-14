@@ -56,9 +56,6 @@ class object{
     static lazy object __initInstance(mcobject clazz, mcobject entity = minecraft:marker){
         __totalRefCount++
         if (Compiler.isJava()){
-            def static lazy summon(mcobject $entity){
-                /summon $entity ~ ~ ~ {Tags:["__class__","cls_trg"]}
-            }
             lazy string namespaceName = Compiler.getNamespace(entity)
             if (namespaceName == "blockbench"){
                 /tag @e[tag=!object.__tagged] add object.__tagged
@@ -71,7 +68,9 @@ class object{
                 }
             }
             else{
-                summon(entity)
+                Compiler.insert($entity, entity){
+                    /summon $entity ~ ~ ~ {Tags:["__class__","cls_trg"]}
+                }
                 with(@e[tag=cls_trg]){
                     object.__ref = __totalRefCount
                     object.__refCount = 1
@@ -82,10 +81,10 @@ class object{
         }
         if (Compiler.isBedrock()){
             /tag @e[tag=!object.__tagged] add object.__tagged
-            def lazy summon(mcobject $entity){
+            def lazy summon_(mcobject $entity){
                 /summon $entity
             }
-            summon(entity)
+            summon_(entity)
             with(@e[tag=!object.__tagged]){
                 object.__ref = __totalRefCount
                 object.__refCount = 1

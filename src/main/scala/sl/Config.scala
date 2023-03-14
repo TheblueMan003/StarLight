@@ -63,6 +63,8 @@ object ConfigLoader{
                     case ("mc.bedrock.resourcepack.description", value)       => Settings.bedrock_resourcepack_version.description = value
                     case ("mc.bedrock.resourcepack.min_engine_version", value)=> Settings.bedrock_resourcepack_version.min_engine_version = value.split(raw"\.").map(_.toInt).toList
 
+                    case ("obfuscate", value)          => Settings.obfuscate = value == "true"
+
                     case ("folder.block", name)        => Settings.functionFolder = name
                     case ("folder.mux", name)          => Settings.multiplexFolder = name
                     case ("folder.tag", name)          => Settings.tagsFolder = name
@@ -111,6 +113,8 @@ object ConfigLoader{
             f"folder.tag=${Settings.tagsFolder}",
 
             f"tree.size=${Settings.treeSize}",
+
+            f"obfuscate=${Settings.obfuscate}",
 
             f"meta.debug=true",
         )

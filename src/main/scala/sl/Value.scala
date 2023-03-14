@@ -20,6 +20,8 @@ trait Expression extends Positional{
 
 trait SmallValue{
 }
+trait Stringifyable{
+}
 case object DefaultValue extends Expression with SmallValue{
     override def toString(): String = "default"
     override def getIntValue(): Int = ???
@@ -38,7 +40,7 @@ case object NullValue extends Expression with SmallValue{
 
     override def getString()(implicit context: Context): String = "null"
 }
-case class IntValue(val value: Int) extends Expression with SmallValue{
+case class IntValue(val value: Int) extends Expression with SmallValue with Stringifyable{
     override def toString(): String = value.toString()
     override def getIntValue(): Int = value
     override def hasIntValue(): Boolean = true
@@ -56,7 +58,7 @@ case class EnumIntValue(val value: Int) extends Expression with SmallValue{
 
     override def getString()(implicit context: Context): String = f"$value"
 }
-case class FloatValue(val value: Double) extends Expression with SmallValue{
+case class FloatValue(val value: Double) extends Expression with SmallValue with Stringifyable{
     override def toString(): String = value.toString()
     override def getIntValue(): Int = (value * Settings.floatPrec).toInt
     override def hasIntValue(): Boolean = true
@@ -64,7 +66,7 @@ case class FloatValue(val value: Double) extends Expression with SmallValue{
     override def getFloatValue(): Double = value
     override def getString()(implicit context: Context): String = f"$value"
 }
-case class BoolValue(val value: Boolean) extends Expression with SmallValue{
+case class BoolValue(val value: Boolean) extends Expression with SmallValue with Stringifyable{
     override def toString(): String = value.toString()
     override def getIntValue(): Int = if value then 1 else 0
     override def hasIntValue(): Boolean = true
@@ -72,7 +74,7 @@ case class BoolValue(val value: Boolean) extends Expression with SmallValue{
     override def getFloatValue(): Double = ???
     override def getString()(implicit context: Context): String = f"$value"
 }
-case class StringValue(val value: String) extends Expression with SmallValue{
+case class StringValue(val value: String) extends Expression with SmallValue with Stringifyable{
     override def toString(): String = value
     override def getIntValue(): Int = ???
     override def hasIntValue(): Boolean = false
@@ -80,7 +82,7 @@ case class StringValue(val value: String) extends Expression with SmallValue{
     override def getFloatValue(): Double = ???
     override def getString()(implicit context: Context): String = value
 }
-case class RawJsonValue(val value: List[Printable]) extends Expression with SmallValue{
+case class RawJsonValue(val value: List[Printable]) extends Expression with SmallValue with Stringifyable{
     override def toString(): String = value.toString()
     override def getIntValue(): Int = ???
     override def hasIntValue(): Boolean = false
@@ -122,7 +124,7 @@ case class RawJsonValue(val value: List[Printable]) extends Expression with Smal
         }
     }
 }
-case class NamespacedName(val value: String) extends Expression with SmallValue{
+case class NamespacedName(val value: String) extends Expression with SmallValue with Stringifyable{
     override def toString(): String = value
     override def getIntValue(): Int = ???
     override def hasIntValue(): Boolean = false
@@ -334,7 +336,7 @@ case class JsonString(val value: String) extends JSONElement{
     }
 }
 case class JsonIdentifier(val value: String) extends JSONElement{
-    def getString()(implicit context: Context): String = {
+    def getString()(implicit context: Context): String = {        
         Utils.stringify(value)
     }
     def getNbt(): String = {
@@ -347,6 +349,14 @@ case class JsonCall(val value: String, val args: List[Expression], val typeargs:
     }
     def getNbt(): String = {
         Utils.stringify(value)
+    }
+}
+case object JsonNull extends JSONElement{
+    def getString()(implicit context: Context): String = {
+        "null"
+    }
+    def getNbt(): String = {
+        "null"
     }
 }
 case class JsonInt(val value: Int) extends JSONElement{

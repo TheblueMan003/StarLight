@@ -32,6 +32,7 @@ class SettingsContext(){
     var floatPrec = 1000
     var treeSize = 20
     var target: Target = MCJava
+    var obfuscate = false
     var debug = false
     var allFunction = true
 
@@ -50,13 +51,14 @@ trait Target{
     def getJsonPath(path: String): String
     def getRPJsonPath(path: String): String
     def getExtraFiles(context: Context): List[(String, List[String])]
+    def getResourcesExtraFiles(context: Context): List[(String, List[String])]
 }
 case object MCJava extends Target{
     def getFunctionPath(path: String): String = {
         "/data/" + path.replaceAll("([A-Z])","-$1").toLowerCase().replaceAllLiterally(".","/").replaceFirst("/", "/functions/")+ ".mcfunction"
     }
     def getPredicatePath(path: String): String = {
-        "/data/" + path.replaceAll("([A-Z])","-$1").toLowerCase().replaceAllLiterally(".","/").replaceFirst("/", "/predicates/")+ ".mcfunction"
+        "/data/" + path.replaceAll("([A-Z])","-$1").toLowerCase().replaceAllLiterally(".","/").replaceFirst("/", "/predicates/")+ ".json"
     }
     def getFunctionName(path: String): String = {
         path.replaceAll("([A-Z])","-$1").toLowerCase().replaceAllLiterally(".","/").replaceFirst("/", ":")
@@ -107,6 +109,18 @@ case object MCJava extends Target{
             }
         }
         """
+    def getResourcesExtraFiles(context: Context):List[(String, List[String])]= {
+        List((f"pack.mcmeta", List(getResourcePackMeta())))
+    }
+    def getResourcePackMeta()=
+        f"""
+        {
+            "pack": {
+                "pack_format": ${Settings.java_resourcepack_version.version},
+                "description": ${Utils.stringify(Settings.java_resourcepack_version.description)}
+            }
+        }
+        """
 }
 case object MCBedrock extends Target{
     def getFunctionPath(path: String): String = {
@@ -147,8 +161,7 @@ case object MCBedrock extends Target{
     }
 
     def getManifestContent(): String = {
-        f"""
-{
+        f"""{
     "format_version": ${Settings.bedrock_behaviorpack_version.version},
     "header": {
         "description": "${Settings.bedrock_behaviorpack_version.description}",
@@ -162,6 +175,32 @@ case object MCBedrock extends Target{
             "description": "${Settings.bedrock_behaviorpack_version.description}",
             "type": "data",
             "uuid": "${getUUID(Settings.outputName+"_")}",
+            "version": [${Settings.version(0)}, ${Settings.version(1)}, ${Settings.version(2)}]
+        }
+    ]
+}
+        """
+    }
+
+    def getResourcesExtraFiles(context: Context):List[(String, List[String])]= {
+        List((f"manifest.json", List(getResourcesManifestContent())))
+    }
+
+    def getResourcesManifestContent(): String = {
+        f"""{
+    "format_version": ${Settings.bedrock_resourcepack_version.version},
+    "header": {
+        "description": "${Settings.bedrock_resourcepack_version.description}",
+        "name": "${Settings.outputName}",
+        "uuid": "${getUUID(Settings.outputName+"rp")}",
+        "version": [${Settings.version(0)}, ${Settings.version(1)}, ${Settings.version(2)}],
+        "min_engine_version": [${Settings.bedrock_resourcepack_version.min_engine_version(0)}, ${Settings.bedrock_resourcepack_version.min_engine_version(1)}, ${Settings.bedrock_resourcepack_version.min_engine_version(2)}]
+    },
+    "modules": [
+        {
+            "description": "${Settings.bedrock_resourcepack_version.description}",
+            "type": "resources",
+            "uuid": "${getUUID(Settings.outputName+"rp_")}",
             "version": [${Settings.version(0)}, ${Settings.version(1)}, ${Settings.version(2)}]
         }
     ]

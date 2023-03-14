@@ -42,7 +42,7 @@ def relativeX(float x){
 Teleport the currently `x` blocks absolute position on axis x
 """
 def absoluteX(float x){
-    at(@s)./tp @s 0 ~ ~
+    at(@s)./tp @s 0.0 ~ ~
     relativeX(x)
 }
 
@@ -62,7 +62,7 @@ def relativeY(float y){
 Teleport the currently `y` blocks absolute position on axis y
 """
 def absoluteY(float y){
-    at(@s)./tp @s ~ 0 ~
+    at(@s)./tp @s ~ 0.0 ~
     relativeY(y)
 }
 
@@ -82,7 +82,7 @@ def relativeZ(float z){
 Teleport the currently `z` blocks absolute position on axis z
 """
 def absoluteZ(float z){
-    at(@s)./tp @s ~ ~ 0
+    at(@s)./tp @s ~ ~ 0.0
     relativeZ(z)
 }
 
@@ -99,7 +99,7 @@ def relative(float x, float y, float z){
 Teleport the current entity at `x`, `y`, `z`
 """
 def absolute(float x, float y, float z){
-    /tp @s 0 0 0
+    /tp @s 0.0 0.0 0.0
     relativeX(x)
     relativeY(y)
     relativeZ(z)
@@ -193,133 +193,97 @@ def private tpAxisMinus(float x, int axis){
 Get the x position of the current entity
 """
 [noReturnCheck=true] float getX(){
+    float x = 0
     if(Compiler.isJava){
-        float x = 0
         pointer.run(){
             x = nbt.x
         }
-        return x
     }
     if (Compiler.isBedrock()){
-        float x = 0
         pointer.run(){
-            if (@s[x=0,dx=2147483647]){
-                foreach(i in 0..31){
-                    at(@s){
-                        lazy var pow2 = Compiler.pow(2, 31-i)
-                        lazy var pow = pow2/1000
-                        if (@s[x=pow,dx=2147483647]){
-                            x+=pow
-                            lazy float a = -pow
-                            tpAxis(a, 0)
-                        }
-                    }
-                }
+            if (@s[x=-2000000000,dx=2000000000]){
+                x -= 2147483.648
+                tpAxis(2147483.648, 0)
             }
-            if (@s[x=-2147483648,dx=2147483647]){
-                foreach(i in 0..31){
-                    at(@s){
-                        lazy var pow2 = Compiler.pow(2, 31-i)
-                        lazy var pow = pow2/1000
-                        lazy var j = -pow
-                        if (@s[x=j,dx=2147483647]){
-                            x-=pow
-                            tpAxis(pow, 0)
-                        }
+            
+            foreach(i in 0..31){
+                at(@s){
+                    lazy var pow2 = Compiler.pow(2, 31-i)
+                    lazy var pow = pow2/1000
+                    if (@s[x=pow,dx=2000000000]){
+                        x+=pow
+                        lazy float a = -pow
+                        tpAxis(a, 0)
                     }
                 }
             }
         }
-        return x
     }
+    return x
 }
 
 """
 Get the y position of the current entity
 """
 [noReturnCheck=true] float getY(){
+    float y = 0
     if(Compiler.isJava){
-        float y = 0
         pointer.run(){
             y = nbt.y
         }
-        return y
     }
     if (Compiler.isBedrock()){
-        float y = 0
         pointer.run(){
-            if (@s[y=0,dy=2147483647]){
-                foreach(i in 0..31){
-                    at(@s){
-                        lazy var pow2 = Compiler.pow(2, 31-i)
-                        lazy var pow = pow2/1000
-                        if (@s[y=pow,dy=2147483647]){
-                            y+=pow
-                            lazy float a = -pow
-                            tpAxis(a, 1)
-                        }
-                    }
-                }
+            if (@s[y=-2000000000,dy=2000000000]){
+                y -= 2147483.648
+                tpAxis(2147483.648, 1)
             }
-            if (@s[y=-2147483648,dy=2147483647]){
-                foreach(i in 0..31){
-                    at(@s){
-                        lazy var pow2 = Compiler.pow(2, 31-i)
-                        lazy var pow = pow2/1000
-                        lazy var j = -pow
-                        if (@s[y=j,dy=2147483647]){
-                            y-=pow
-                            tpAxis(pow, 1)
-                        }
+            
+            foreach(i in 0..31){
+                at(@s){
+                    lazy var pow2 = Compiler.pow(2, 31-i)
+                    lazy var pow = pow2/1000
+                    if (@s[y=pow,dy=2000000000]){
+                        y+=pow
+                        lazy float a = -pow
+                        tpAxis(a, 1)
                     }
                 }
             }
         }
-        return y
     }
+    return y
 }
 
 """
 Get the z position of the current entity
 """
 [noReturnCheck=true] float getZ(){
+    float z = 0
     if(Compiler.isJava){
-        float z = 0
         pointer.run(){
             z = nbt.z
         }
-        return z
     }
     if (Compiler.isBedrock()){
-        float z = 0
         pointer.run(){
-            if (@s[z=0,dz=2147483647]){
-                foreach(i in 0..31){
-                    at(@s){
-                        lazy var pow2 = Compiler.pow(2, 31-i)
-                        lazy var pow = pow2/1000
-                        if (@s[z=pow,dz=2147483647]){
-                            z+=pow
-                            lazy float a = -pow
-                            tpAxis(a, 2)
-                        }
-                    }
-                }
+            if (@s[z=-2000000000,dz=2000000000]){
+                z -= 2147483.648
+                tpAxis(2147483.648, 2)
             }
-            if (@s[z=-2147483648,dz=2147483647]){
-                foreach(i in 0..31){
-                    at(@s){
-                        lazy var pow2 = Compiler.pow(2, 31-i)
-                        lazy var pow = pow2/1000
-                        lazy var j = -pow
-                        if (@s[z=j,dz=2147483647]){
-                            z-=pow
-                            tpAxis(pow, 2)
-                        }
+            
+            foreach(i in 0..31){
+                at(@s){
+                    lazy var pow2 = Compiler.pow(2, 31-i)
+                    lazy var pow = pow2/1000
+                    if (@s[z=pow,dz=2000000000]){
+                        z+=pow
+                        lazy float a = -pow
+                        tpAxis(a, 2)
                     }
                 }
             }
         }
-        return z
     }
+    return z
 }

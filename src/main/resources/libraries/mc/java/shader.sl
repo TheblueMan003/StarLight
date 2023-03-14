@@ -13,15 +13,16 @@ scoreboard Vector3 Pos
 [criterion="minecraft.custom:minecraft.sneak_time"] scoreboard int SSneak
 entity failled
 entity shader
-def save(){
+private void save(){
     Pos = math.Vector3.getPosition()
 }
-def reload(){
+private void reload(){
     at(Pos){
         /tp @s ~ ~ ~ ~ ~
     }
 }
-def killPlayer(){
+
+private void killPlayer(){
     int hasKeepInventory
     Compiler.cmdstore(hasKeepInventory){
         /gamerule keepInventory
@@ -36,6 +37,10 @@ def killPlayer(){
     if (!hasKeepInventory)./gamerule keepInventory false
     if (!hasImmediateRespawn)./gamerule doImmediateRespawn false
 }
+    
+"""
+Add the creeper shader to the player
+"""
 def creeper(){
     if (SSneak){
         title.show(("warning","red"))
@@ -89,6 +94,9 @@ def creeper(){
     }
 }
 
+"""
+Clear the shader
+"""
 def clear(){
     if (SSneak){
         title.show(("warning","red"))
@@ -142,6 +150,9 @@ def clear(){
     }
 }
 
+"""
+Add the spider shader to the player
+"""
 def spider(){
     if (SSneak){
         title.show(("warning","red"))
@@ -196,6 +207,9 @@ def spider(){
 }
 
 
+"""
+Add the enderman shader to the player
+"""
 def enderman(){
     if (SSneak){
         title.show(("warning","red"))

@@ -53,6 +53,12 @@ object Main{
             newProject(Array())
             Reporter.ok("Project created!")
           }
+          case "clearcache" => {
+            FileUtils.deleteDirectory("./bin")
+            DataPackBuilder.clearCache()
+            ResourcePackBuilder.clearCache()
+            Reporter.ok("Cache cleared!")
+          }
           case "help" => {
             println("build <config_name>: Build the project with the config contains in the file config_name. The .slconf must be omited.")
             println("new: Make a new project")
@@ -141,12 +147,12 @@ object Main{
     if (Settings.target == MCJava){
         Settings.java_resourcepack_output.map(path => 
           if (!path.endsWith("/") && !path.endsWith("\\"))then path + "/" else path
-        ).foreach(f => ResourcePackBuilder.build(resourceInput, f, context.getAllJsonFiles().filter(_.isJavaRP())))
+        ).foreach(f => ResourcePackBuilder.build(resourceInput, f, Settings.target.getResourcesExtraFiles(context) :::context.getAllJsonFiles().filter(_.isJavaRP()).map(f => (f.getName(), f.getContent()))))
     }
     if (Settings.target == MCBedrock){
         Settings.bedrock_resourcepack_output.map(path => 
           if (!path.endsWith("/") && !path.endsWith("\\"))then path + "/" else path
-        ).foreach(f => ResourcePackBuilder.build(resourceInput, f, context.getAllJsonFiles().filter(_.isBedrockRP())))
+        ).foreach(f => ResourcePackBuilder.build(resourceInput, f, Settings.target.getResourcesExtraFiles(context):::context.getAllJsonFiles().filter(_.isBedrockRP()).map(f => (f.getName(), f.getContent()))))
     }
 
     val time2 = ChronoUnit.MILLIS.between(exportStart, LocalDateTime.now())

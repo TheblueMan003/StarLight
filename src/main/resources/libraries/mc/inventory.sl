@@ -6,91 +6,117 @@ if (Compiler.isJava){
     }
 }
 if (Compiler.isBedrock){
-    def private lazy setSlot(string $slot, int $slotid, mcobject $item, int $count = 1, int $id = 0){
-        /replaceitem entity @s $slot $slotid $item $count $id
+    def private lazy setSlot(string $slot, int $slotid, mcobject $item, int $count = 1, int $id = 0, json $nbt = {}){
+        /replaceitem entity @s $slot $slotid $item $count $id $nbt
     }
 }
 
-"""
-Set the current entity's mainhand to `item` with `count`
-"""
-def lazy setMainHand(mcobject item, int count = 1){
-    if (Compiler.isJava){
+if (Compiler.isJava){
+    """
+    Set the current entity's mainhand to `item` with `count`
+    """
+    def lazy setMainHand(mcobject item, int count = 1){
         setSlot("weapon.mainhand", item, count)
     }
-    if (Compiler.isBedrock){
+}
+if (Compiler.isBedrock){
+    """
+    Set the current entity's mainhand to `item` with `count`
+    """
+    def lazy setMainHand(mcobject item, int count = 1, json nbt = {}){
         lazy mcobject itemb = Compiler.getBedrockBlockName(item)
         lazy int itemd = Compiler.getBedrockBlockID(item)
-        setSlot("slot.weapon.mainhand", 0, itemb, count, itemd)
+        setSlot("slot.weapon.mainhand", 0, itemb, count, itemd, nbt)
     }
 }
 
-"""
-Set the current entity's offhand to `item` with `count`
-"""
-def lazy setOffHand(mcobject item, int count = 1){
-    if (Compiler.isJava){
+if (Compiler.isJava){
+    """
+    Set the current entity's offhand to `item` with `count`
+    """
+    def lazy setOffHand(mcobject item, int count = 1){
         setSlot("weapon.offhand", item, count)
     }
-    if (Compiler.isBedrock){
+}
+if (Compiler.isBedrock){
+    """
+    Set the current entity's offhand to `item` with `count`
+    """
+    def lazy setOffHand(mcobject item, int count = 1, json nbt = {}){
         lazy mcobject itemb = Compiler.getBedrockBlockName(item)
         lazy int itemd = Compiler.getBedrockBlockID(item)
-        setSlot("slot.weapon.offhand", 0, itemb, count, itemd)
+        setSlot("slot.weapon.offhand", 0, itemb, count, itemd, nbt)
     }
 }
 
 def private lazy universalJavaSet(string slot, int slotID, mcobject item, int count = 1){
-        lazy string nslot = slot + "." + slotID
-        setSlot(nslot, item, count)
+    lazy string nslot = slot + "." + slotID
+    setSlot(nslot, item, count)
 }
 
-def private lazy universalBedrockSet(string slot, int slotID, mcobject item, int count = 1){
+def private lazy universalBedrockSet(string slot, int slotID, mcobject item, int count = 1, json nbt = {}){
     lazy mcobject itemb = Compiler.getBedrockBlockName(item)
     lazy int itemd = Compiler.getBedrockBlockID(item)
-    setSlot(slot, slotID, itemb, count, itemd)
+    setSlot(slot, slotID, itemb, count, itemd, nbt)
 }
 
-"""
-Set the current entity's hotbar slot `slotID` to `item` with `count`
-"""
-def lazy setHotbar(int slotID, mcobject item, int count = 1){
-    if (Compiler.isJava){
+if (Compiler.isJava){
+    """
+    Set the current entity's hotbar slot `slotID` to `item` with `count`
+    """
+    def lazy setHotbar(int slotID, mcobject item, int count = 1){
         universalJavaSet("hotbar", slotID, item, count)
     }
-    if (Compiler.isBedrock){
-        universalBedrockSet("slot.hotbar", slotID, item, count)
+}
+if (Compiler.isBedrock){
+    """
+    Set the current entity's hotbar slot `slotID` to `item` with `count`
+    """
+    def lazy setHotbar(int slotID, mcobject item, int count = 1, json nbt = {}){
+        universalBedrockSet("slot.hotbar", slotID, item, count, nbt)
     }
 }
 
-"""
-Set the current entity's whole hotbar to `item` with `count`
-"""
-def lazy setHotbar(mcobject item, int count = 1){
-    if (Compiler.isJava){
+if (Compiler.isJava){
+    """
+    Set the current entity's whole hotbar to `item` with `count`
+    """
+    def lazy setHotbar(mcobject item, int count = 1){
         foreach(slotID in 0..8){
             universalJavaSet("hotbar", slotID, item, count)
         }
     }
-    if (Compiler.isBedrock){
+}
+if (Compiler.isBedrock){
+    """
+    Set the current entity's whole hotbar to `item` with `count`
+    """
+    def lazy setHotbar(mcobject item, int count = 1, json nbt = {}){
         foreach(slotID in 0..8){
-            universalBedrockSet("slot.hotbar", slotID, item, count)
+            universalBedrockSet("slot.hotbar", slotID, item, count, nbt)
         }
     }
 }
 
-"""
-Set the multiple slot int current entity's hotbar to `item` with `count`.
-Slot goes from `min` to `max` both included.
-"""
-def lazy setHotbarRange(int min, int max, mcobject item, int count = 1){
-    if (Compiler.isJava){
+if (Compiler.isJava){
+    """
+    Set the multiple slot int current entity's hotbar to `item` with `count`.
+    Slot goes from `min` to `max` both included.
+    """
+    def lazy setHotbarRange(int min, int max, mcobject item, int count = 1){
         foreach(slotID in min..max){
             universalJavaSet("hotbar", slotID, item, count)
         }
     }
-    if (Compiler.isBedrock){
+}
+if (Compiler.isBedrock){
+    """
+    Set the multiple slot int current entity's hotbar to `item` with `count`.
+    Slot goes from `min` to `max` both included.
+    """
+    def lazy setHotbarRange(int min, int max, mcobject item, int count = 1, json nbt = {}){
         foreach(slotID in min..max){
-            universalBedrockSet("slot.hotbar", slotID, item, count)
+            universalBedrockSet("slot.hotbar", slotID, item, count, nbt)
         }
     }
 }
@@ -102,63 +128,91 @@ def lazy clearHotbar(){
     setHotbar(minecraft:air, 1)
 }
 
-"""
-Set the inventory slot `index` of the current entity to `item` with `count`
-"""
-def lazy setInventorySlot(int index, mcobject item, int count = 1){
-    if (Compiler.isJava){
+if (Compiler.isJava){
+    """
+    Set the inventory slot `index` of the current entity to `item` with `count`
+    """
+    def lazy setInventorySlot(int index, mcobject item, int count = 1){
         universalJavaSet("inventory", slotID, item, count)
     }
-    if (Compiler.isBedrock){
-        universalBedrockSet("slot.inventory", slotID, item, count)
+}
+if (Compiler.isBedrock){
+    """
+    Set the inventory slot `index` of the current entity to `item` with `count`
+    """
+    def lazy setInventorySlot(int index, mcobject item, int count = 1, json nbt = {}){
+        universalBedrockSet("slot.inventory", slotID, item, count, nbt)
     }
 }
 
-"""
-Set the current entity's helmet to `item` with `count`
-"""
-def lazy setHelmet(mcobject item, int count = 1){
-    if (Compiler.isJava){
+
+if (Compiler.isJava){
+    """
+    Set the current entity's helmet to `item` with `count`
+    """
+    def lazy setHelmet(mcobject item, int count = 1){
         setSlot("armor.head", item, count)
     }
-    if (Compiler.isBedrock){
-        universalBedrockSet("slot.armor.head", 0, item, count)
+}
+if (Compiler.isBedrock){
+    """
+    Set the current entity's helmet to `item` with `count`
+    """
+    def lazy setHelmet(mcobject item, int count = 1, json nbt = {}){
+        universalBedrockSet("slot.armor.head", 0, item, count, nbt)
     }
 }
 
-"""
-Set the current entity's chestplate to `item` with `count`
-"""
-def lazy setChestplate(mcobject item, int count = 1){
-    if (Compiler.isJava){
+
+if (Compiler.isJava){
+    """
+    Set the current entity's chestplate to `item` with `count`
+    """
+    def lazy setChestplate(mcobject item, int count = 1){
         setSlot("armor.chest", item, count)
     }
-    if (Compiler.isBedrock){
-        universalBedrockSet("slot.armor.chest", 0, item, count)
+}
+if (Compiler.isBedrock){
+    """
+    Set the current entity's chestplate to `item` with `count`
+    """
+    def lazy setChestplate(mcobject item, int count = 1, json nbt = {}){
+        universalBedrockSet("slot.armor.chest", 0, item, count, nbt)
     }
 }
 
-"""
-Set the current entity's leggings to `item` with `count`
-"""
-def lazy setLeggings(mcobject item, int count = 1){
-    if (Compiler.isJava){
+if (Compiler.isJava){
+    """
+    Set the current entity's leggings to `item` with `count`
+    """
+    def lazy setLeggings(mcobject item, int count = 1){
         setSlot("armor.legs", item, count)
     }
-    if (Compiler.isBedrock){
-        universalBedrockSet("slot.armor.legs", 0, item, count)
+}
+if (Compiler.isBedrock){
+    """
+    Set the current entity's leggings to `item` with `count`
+    """
+    def lazy setLeggings(mcobject item, int count = 1, json nbt = {}){
+        universalBedrockSet("slot.armor.legs", 0, item, count, nbt)
     }
 }
 
-"""
-Set the current entity's boots to `item` with `count`
-"""
-def lazy setBoots(mcobject item, int count = 1){
-    if (Compiler.isJava){
+
+if (Compiler.isJava){
+    """
+    Set the current entity's boots to `item` with `count`
+    """
+    def lazy setBoots(mcobject item, int count = 1){
         setSlot("armor.feet", item, count)
     }
-    if (Compiler.isBedrock){
-        universalBedrockSet("slot.armor.feet", 0, item, count)
+}
+if (Compiler.isBedrock){
+    """
+    Set the current entity's boots to `item` with `count`
+    """
+    def lazy setBoots(mcobject item, int count = 1, json nbt = {}){
+        universalBedrockSet("slot.armor.feet", 0, item, count, nbt)
     }
 }
 

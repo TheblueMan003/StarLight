@@ -12,9 +12,7 @@ object Reporter{
         print(f"StarLight${Console.CYAN}>${Console.WHITE} ")
     }
     def debug(value: Object) = {
-        if (debugEnabled){
-            println(f"[${Console.MAGENTA}debug${Console.WHITE}] ${value}")
-        }
+        println(f"[${Console.MAGENTA}debug${Console.WHITE}] ${value}")
     }
     def info(value: String) = {
         println(f"[${Console.CYAN}info${Console.WHITE}] ${value}")

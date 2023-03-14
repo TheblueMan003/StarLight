@@ -175,7 +175,11 @@ object Compiler{
                         }
                     }
                 }
-                case sl.JSONFile(name, json, mod) => {
+                case sl.JSONFile(name, expr, mod) => {
+                    val json = Utils.simplify(expr) match
+                        case JsonValue(json) => json
+                        case other => throw new Exception("JSON file must be a JSON value")
+                    
                     context.addJsonFile(new objects.JSONFile(context, name, mod, Utils.compileJson(json)))
                     List()
                 }
@@ -217,6 +221,7 @@ object Compiler{
 
                         sub.inherit(template.getContext())
                         sub.push("this", sub)
+                        sub.setTemplateUse()
                         compile(Utils.fix(template.getBlock())(template.context, Set()), true)(sub) ::: compile(block, true)(sub)
                     }
                 }
@@ -322,7 +327,11 @@ object Compiler{
                     block.flatMap(inst => compile(inst, firstPass))
                 }
                 case FunctionCall(name, args, typeargs) => {
-                    context.getFunction(name, args, typeargs, VoidType).call()
+                    val (fct,cargs) = context.getFunction(name, args, typeargs, VoidType)
+                    if (fct != null && fct.modifiers.hasAttributes("compileAtCall")){
+                        fct.asInstanceOf[ConcreteFunction].compile()
+                    }
+                    (fct,cargs).call()
                 }
                 case LinkedFunctionCall(name, args, ret) => {
                     (name, args).call(ret)

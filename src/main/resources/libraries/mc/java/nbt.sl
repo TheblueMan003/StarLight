@@ -1,19 +1,33 @@
 package mc.java.nbt
 
 if (Compiler.isJava()){
+    """
+    Get the nbt and store it in ret
+    """
     def lazy getNBT(mcobject ret, mcobject field, float scale){
         lazy mcobject o = Compiler.getObjective(ret)
         lazy mcobject s = Compiler.getSelector(ret)
         getNBT(s, o, field, scale)
     }
+    """
+    Get the nbt and store it in s.o
+    """
     def lazy getNBT(mcobject $s, mcobject $o, mcobject $field, float $scale){
         /execute store result score $s $o run data get entity @s $field $scale
     }
+
+    """
+    Set the nbt from a scoreboard
+    """
     def lazy setNBT(mcobject value, mcobject field, mcobject type, float scale){
         lazy mcobject o = Compiler.getObjective(value)
         lazy mcobject s = Compiler.getSelector(value)
         setNBT(s, o, field, type, scale)
     }
+
+    """
+    Set the nbt from a scoreboard
+    """
     def lazy setNBT(mcobject $s, mcobject $o, mcobject $field, mcobject $type, float $scale){
         /execute store result entity @s $field $type $scale run scoreboard players get $s $o
     }

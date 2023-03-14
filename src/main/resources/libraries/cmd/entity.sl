@@ -419,3 +419,25 @@ def lazy spectate(entity e1, entity e2){
         spectate(e2)
     }
 }
+
+"""
+Return true if at least one entity in e has the scoreboard in score
+"""
+lazy bool exists(entity e, bool test){
+    bool exist = false
+    with(e,true,test){
+        exist = true
+    }
+    return exist
+}
+
+"""
+Return true if all entity in e has the scoreboard in score
+"""
+lazy bool forall(entity e, bool test){
+    bool exist = true
+    with(e,true,!test){
+        exist = false
+    }
+    return exist
+}

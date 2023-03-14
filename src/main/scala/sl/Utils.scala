@@ -420,7 +420,7 @@ object Utils{
             case ElseIf(cond, ifBlock) => ElseIf(fix(cond), fix(ifBlock))
             case If(cond, ifBlock, elseBlock) => If(fix(cond), fix(ifBlock), elseBlock.map(fix(_).asInstanceOf[ElseIf]))
             case CMD(value) => instr
-            case FunctionCall(name, args, typeargs) => if ignore.contains(name) then FunctionCall(name, args.map(fix(_)), typeargs.map(fix(_))) else{ 
+            case FunctionCall(name, args, typeargs) => if ignore.contains(name) || name.toString().startsWith("@") then FunctionCall(name, args.map(fix(_)), typeargs.map(fix(_))) else{ 
                 val argF = args.map(fix(_))
                 try{
                     val fct = context.getFunction(name, argF, typeargs, VoidType)
@@ -480,7 +480,13 @@ object Utils{
             case VariableValue(name, sel) => if ignore.contains(name) then instr else
                 context.tryGetVariable(name) match
                     case Some(vari) => LinkedVariableValue(vari, sel)
-                    case None => VariableValue(name, sel)
+                    case None => 
+                        try{
+                            LinkedFunctionValue(context.getFunction(name))
+                        }
+                        catch{
+                            case _ => VariableValue(name, sel)
+                        }
             case BinaryOperation(op, left, right) => BinaryOperation(op, fix(left), fix(right))
             case UnaryOperation(op, left) => UnaryOperation(op, fix(left))
             case TupleValue(values) => TupleValue(values.map(fix(_)))
@@ -713,6 +719,17 @@ object Utils{
         }
     }
 
+    def jsonToExpr(json: JSONElement)(implicit context: Context): Expression = {
+        json match
+            case JsonInt(value) => IntValue(value)
+            case JsonFloat(value) => FloatValue(value)
+            case JsonBoolean(value) => BoolValue(value)
+            case JsonString(value) => StringValue(value)
+            case JsonNull => NullValue
+            case JsonArray(values) => JsonValue(json)
+            case JsonDictionary(values) => JsonValue(json)
+    }
+
     def simplify(expr: Expression)(implicit context: Context): Expression = {
         expr match
             case BinaryOperation("<" | "<=" | "==" | "!=" | ">=" | ">", left, right) => {
@@ -740,6 +757,8 @@ object Utils{
                     case (FloatValue(a), IntValue(b)) => FloatValue(combine(op, a, b))
                     case (BoolValue(a), BoolValue(b)) => BoolValue(combine(op, a, b))
                     case (StringValue(a), StringValue(b)) => StringValue(combine(op, a, b))
+                    case (StringValue(a), b: Stringifyable) => StringValue(combine(op, a, b.getString()))
+                    case (a: Stringifyable, StringValue(b)) => StringValue(combine(op, a.getString(), b))
                     case (JsonValue(a), JsonValue(b)) => JsonValue(combine(op, a, b))
                     case (JsonValue(a), b) => JsonValue(combine(op, a, toJson(b)))
                     case (a, IntValue(b)) if op == "<<" => BinaryOperation("*", a, IntValue(math.pow(2, b).toInt))
@@ -775,8 +794,8 @@ object Utils{
                 val inner = Utils.simplify(name)
                 val index2 = index.map(Utils.simplify(_))
                 (inner, index2) match
-                    case (JsonValue(JsonArray(content)), List(IntValue(n))) => JsonValue(content(n))
-                    case (JsonValue(JsonDictionary(content)), List(StringValue(n))) => JsonValue(content(n))
+                    case (JsonValue(JsonArray(content)), List(IntValue(n))) => jsonToExpr(content(n))
+                    case (JsonValue(JsonDictionary(content)), List(StringValue(n))) => jsonToExpr(content(n))
                     case (_, _) => ArrayGetValue(inner, index2)
             }
             case RangeValue(min, max) => RangeValue(simplify(min), simplify(max))
@@ -811,6 +830,32 @@ object Utils{
             case IntValue(value) => JsonInt(value)
             case FloatValue(value) => JsonFloat(value)
             case BoolValue(value) => JsonBoolean(value)
+            case NamespacedName(value) => JsonString(value)
+            case FunctionCallValue(VariableValue(name, sel), args, typeargs, selector) => {
+                val fct = context.getFunction(name, args, typeargs, VoidType)
+                if (fct._1.modifiers.isLazy){
+                    var vari = context.getFreshVariable(fct._1.getType())
+                    vari.modifiers.isLazy = true
+                    val call = fct.call(vari)
+                    toJson(vari.lazyValue)
+                }
+                else{
+                    JsonString(fct.call().last)
+                }
+            }
+            case FunctionCallValue(LinkedFunctionValue(fct), args, typeargs, selector) => {
+                if (fct.modifiers.isLazy){
+                    var vari = context.getFreshVariable(fct.getType())
+                    vari.modifiers.isLazy = true
+                    val call = (fct,args).call(vari)
+                    toJson(vari.lazyValue)
+                }
+                else{
+                    JsonString((fct,args).call().last)
+                }
+            }
+            case LinkedFunctionValue(fct) => JsonString(Settings.target.getFunctionName(fct.fullName))
+            
             case v => throw new Exception(f"Cannot cast value: $v of type ${typeof(v)} to json")
     }
 
@@ -857,7 +902,7 @@ object Utils{
                                 case v => throw new Exception(f"Cannot cast $v (from variable: ${vari.fullName}) to json")
                         }
                         else{
-                            JsonArray(fct.call().map(v => JsonString(f"/$v")))
+                            JsonArray(fct.call().map(v => JsonString(v)))
                         }
                     }
             }
@@ -871,9 +916,11 @@ object Utils{
                                 case FloatValue(value) => JsonFloat(value)
                                 case BoolValue(value) => JsonBoolean(value)
                                 case StringValue(value) => JsonString(value)
+                                case NamespacedName(value) => JsonString(value)
                                 case JsonValue(content) => compileJson(content)
                                 case FunctionCallValue(name, args, typeargs, selector) => compileJson(JsonCall(name.getString(), args, typeargs))
-                                case other => throw new Exception(f"Cannot put not $other in json") 
+                                case LinkedFunctionValue(fct) => JsonString(Settings.target.getFunctionName(fct.fullName))
+                                case other => throw new Exception(f"Cannot put not $other of type ${typeof(other)} in json") 
                         }
                         else{
                             throw new Exception(f"Cannot put not lazy variable ${value.fullName} in json")

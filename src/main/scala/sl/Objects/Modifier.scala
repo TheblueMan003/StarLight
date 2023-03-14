@@ -14,6 +14,11 @@ object Modifier{
         mod.protection = Protection.Public
         mod
     }
+    def newProtected()= {
+        val mod = new Modifier()
+        mod.protection = Protection.Protected
+        mod
+    }
 }
 
 class Modifier() extends Serializable{

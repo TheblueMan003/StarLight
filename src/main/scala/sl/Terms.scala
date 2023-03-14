@@ -129,6 +129,6 @@ case class With(val expr: Expression, val isat: Expression, val cond: Expression
   override def toString() = f"with($expr, $isat, $cond) $block"
 }
 
-case class JSONFile(val name: String, val json: JSONElement, val modifier: Modifier) extends Instruction {
+case class JSONFile(val name: String, val json: Expression, val modifier: Modifier) extends Instruction {
   override def toString() = f"jsonfile $name"
 }

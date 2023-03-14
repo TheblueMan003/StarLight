@@ -1,1 +1,1 @@
-function default/zzz_sl_tags/1
+function default/zzz_sl_block/3

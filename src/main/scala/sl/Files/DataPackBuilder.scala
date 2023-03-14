@@ -16,10 +16,20 @@ import java.io.File
 
 object DataPackBuilder{
     var previous = Map[String, List[String]]()
+    def clearCache() = previous = Map[String, List[String]]()
     def build(source: List[String], dirs: List[String], output: List[(String, List[String])]):Unit={
         if (previous.size == 0){
+            Reporter.info("Clearing old Data Packs")
             dirs.foreach(FileUtils.deleteDirectory(_))
         }
+
+        val newSet = dirs.flatMap(dir => output.map((path, content) => (dir + path, content))).toMap
+        previous.filter(x => !newSet.contains(x._1)).foreach(x => {
+            Reporter.debug(f"Removing old file: ${x._1}")
+            FileUtils.deleteFile(x._1)
+        }
+        )
+        
         dirs.foreach(target => {
             Reporter.ok(f"Building Data Pack: $target")
             if (target.endsWith(".zip/")){
@@ -34,8 +44,6 @@ object DataPackBuilder{
             Reporter.ok(f"Resource Data build")
         })
 
-        val newSet = dirs.map(dir => output.map((path, content) => (dir + path, content))).flatten.toMap
-        previous.filter(x => !newSet.contains(x._1)).foreach(x => FileUtils.deleteFile(x._1))
         previous = newSet
     }
 
@@ -52,7 +60,6 @@ object DataPackBuilder{
     }
 
     def makeDPFolder(sources: List[String], target: String, generated: List[(String, List[String])])={
-        FileUtils.deleteDirectory(target)
         sources.flatMap(source => getListOfDPFiles(source, "").map(f => (source, f)))
         .groupBy(_._2)
         .toList

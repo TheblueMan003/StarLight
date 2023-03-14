@@ -35,7 +35,7 @@ abstract class Function(context: Context, name: String, val arguments: List[Argu
     val parentFunction = context.getCurrentFunction()
     val parentVariable = context.getCurrentVariable()
     val parentClass = context.getCurrentClass()
-    override lazy val fullName: String = if (context.isInLazyCall() || parentFunction != null || parentVariable != null) then context.fctCtx.getFreshId()else context.getPath() + "." + name
+    override lazy val fullName: String = if (context.isInLazyCall() || parentFunction != null || parentVariable != null || modifiers.protection==Protection.Private || Settings.obfuscate) then context.fctCtx.getFreshId()else context.getPath() + "." + name
     val minArgCount = getMinArgCount(arguments)
     val maxArgCount = getMaxArgCount(arguments)
     var argumentsVariables: List[Variable] = List()
@@ -166,9 +166,11 @@ class ConcreteFunction(context: Context, name: String, arguments: List[Argument]
     }
 
     def compile():Unit={
-        val suf = sl.Compiler.compile(body)(context.push(name, this))
-        content = content ::: suf
-        wasCompiled = true
+        if (!wasCompiled){
+            val suf = sl.Compiler.compile(body)(context.push(name, this))
+            content = content ::: suf
+            wasCompiled = true
+        }
     }
 
     def addMuxCleanUp(cnt: List[String]): Unit = {
@@ -184,9 +186,6 @@ class ConcreteFunction(context: Context, name: String, arguments: List[Argument]
 
     def needCompiling():Boolean = {
         _needCompiling && !wasCompiled
-    }
-    def markAsCompile(): Unit = {
-        wasCompiled = true
     }
     def markAsUsed():Unit = {
         _needCompiling = true
@@ -260,8 +259,6 @@ class MultiplexFunction(context: Context, name: String, arguments: List[Argument
     override def needCompiling():Boolean = {
         false
     }
-    override def markAsCompile(): Unit = {
-    }
 
     def addFunctionToMux(fct: ConcreteFunction)(implicit context: Context) = {
         if (!functions.contains(fct)){
@@ -289,9 +286,7 @@ class TagFunction(context: Context, name: String, arguments: List[Argument]) ext
     override def needCompiling():Boolean = {
         false
     }
-    override def markAsCompile(): Unit = {
-    }
-
+    
     def addFunction(fct: Function) = {
         if (!functions.contains(fct)){
             functions.addOne(fct)
@@ -341,7 +336,7 @@ class ClassFunction(variable: Variable, function: Function) extends Function(fun
         def callNoEntity(comp: Variable, ret: Variable = null) = {
             Compiler.compile(With(
                 selector, 
-                BoolValue(true), 
+                BoolValue(false), 
                 BinaryOperation("==", LinkedVariableValue(comp), LinkedVariableValue(ctx.root.push("object").getVariable("__ref"))),
                 LinkedFunctionCall(function, args2, ret)
                 ))

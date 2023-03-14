@@ -4,6 +4,14 @@ def lazy print(rawjson $text){
     /tellraw @a $text
 }
 
+def lazy tell(rawjson $text){
+    /tellraw @s $text
+}
+
+def lazy tell(entity $selector,rawjson $text){
+    /tellraw $selector $text
+}
+
 def lazy debug(rawjson text){
     if (Compiler.isDebug()){
         lazy rawjson prefix = (("[DEBUG]", "purple"),(" "))
@@ -21,11 +29,20 @@ def (int,int,int) version(){
 package _
 def printVersion(){
     lazy string name = Compiler.getProjectName()
+    lazy string type = Compiler.getProjectVersionType()
     lazy int major = Compiler.getProjectVersionMajor()
     lazy int minor = Compiler.getProjectVersionMinor()
     lazy int patch = Compiler.getProjectVersionPatch()
-    standard.print("============[",name,"]============")
-    standard.print("Compiled with: Star Light v")
-    standard.print("Project Version: ",major,".",minor,".",patch)
-    standard.print("==================================")
+    if (major < 1){
+        standard.print("============[",name,"]============")
+        standard.print("Compiled with: Star Light v")
+        standard.print("Project Version: ",type," ", 1,".",minor,".",patch)
+        standard.print("==================================")
+    }
+    else{
+        standard.print("============[",name,"]============")
+        standard.print("Compiled with: Star Light v")
+        standard.print("Project Version: ",type," ", major,".",minor,".",patch)
+        standard.print("==================================")
+    }
 }

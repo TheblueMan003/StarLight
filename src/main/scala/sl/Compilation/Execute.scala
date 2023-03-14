@@ -179,7 +179,7 @@ object Execute{
      * Concat List of IFCase to String
      */
     private def getListCase(expr: List[IFCase])(implicit context: Context): String = {
-        expr.filter(_ != IFTrue).filter(_ != IFFalse).map(_.get()).foldLeft("")(_ + " " + _)
+        expr.filter(_ != IFTrue).filter(_ != IFFalse).map(_.get()).filter(_ != "").foldLeft("")(_ + " " + _)
     }
 
 
@@ -701,11 +701,11 @@ case class IFValueCase(val value: Expression) extends IFCase{
             }
 
             case BinaryOperation("in", LinkedVariableValue(left, sel), RangeValue(min, LinkedVariableValue(right, sel2))) if min.hasIntValue()=> {
-                f"if score ${left.getSelector()(sel)} matches ${min.getIntValue()}.. if score ${left.getSelector()(sel)} <= ${right.getSelector()(sel2)} "
+                f"if score ${left.getSelector()(sel)} matches ${min.getIntValue()}.. if score ${left.getSelector()(sel)} <= ${right.getSelector()(sel2)}"
             }
 
             case BinaryOperation("in", LinkedVariableValue(left, sel), RangeValue(LinkedVariableValue(right1, sel1), LinkedVariableValue(right2, sel2))) => {
-                f"if score ${left.getSelector()(sel1)} >= ${right1.getSelector()(sel1)} if score ${left.getSelector()(sel1)} <= ${right2.getSelector()(sel2)} "
+                f"if score ${left.getSelector()(sel1)} >= ${right1.getSelector()(sel1)} if score ${left.getSelector()(sel1)} <= ${right2.getSelector()(sel2)}"
             }
 
             case BinaryOperation("in", LinkedVariableValue(left, sel), value) if value.hasIntValue()=> {

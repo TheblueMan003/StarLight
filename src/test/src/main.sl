@@ -1,9 +1,7 @@
-package main
+package cell
 
-import game
+import mc.inventory.Setup
 
-game.initPlayer(){
-    /say hi
+Setup main{
+    forceChestplate(minecraft:dimaond_chestplate)
 }
-entity lol = @s
-entity test += @s not in lol

@@ -56,8 +56,11 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
 
     private var function: Function = null
     private var variable: Variable = null
+    private var templateUse: String = null
     private var clazz: Class = null
     private var inLazyCall: Boolean = false
+
+    def setTemplateUse() = templateUse = path
 
     def getPath(): String ={
         return path
@@ -103,7 +106,6 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
                 case head :: next => {
                     ret = head
                     r.funcToCompile = next
-                    ret.markAsCompile()
                 }
                 case Nil => {
                     ret = null
@@ -155,6 +157,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
         val ctx = push(name)
         val mod = Modifier.newPrivate()
         mod.isLazy = isLazy
+        mod.addAtrribute("compileAtCall", BoolValue(true))
         val fct = if isLazy then LazyFunction(this, name, args, output, mod, instr) else ConcreteFunction(this, name, args, output, mod, instr, true)
         fct.generateArgument()(this)
         addFunction(name, fct)
@@ -327,6 +330,9 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
     def getCurrentClass(): Class = {
         if clazz == null && parent != null then parent.getCurrentClass() else clazz
     }
+    def getCurrentTemplateUse():String={
+        if templateUse == null && parent != null then parent.getCurrentTemplateUse() else templateUse
+    }
     def setLazyCall()={
         inLazyCall = true
     }
@@ -352,9 +358,9 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
     def tryGetVariable(identifier: Identifier): Option[Variable] = {
         tryGetElement(_.variables)(identifier)
     }
-    def addVariable(variable: Variable): Variable = {
+    def addVariable(variable: Variable, noCheck: Boolean = false): Variable = {
         addName(variable.name)
-        variables.addOne(variable.name, variable)
+        variables(variable.name) = variable
         variable
     }
     def addVariable(name: String, variable: Variable): Variable = {
@@ -416,7 +422,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
 
     def getFunction(identifier: Identifier, args: List[Expression], typeargs: List[Type], output: Type, concrete: Boolean = false): (Function, List[Expression]) = {
         if (identifier.toString().startsWith("@")){
-            (getFunctionTags(identifier), args)
+            (getFunctionTags(mapFunctionTag(identifier)), args)
         }
         else{
             val vari = tryGetVariable(identifier)
@@ -446,7 +452,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
     }
     def getFunction(identifier: Identifier, args: List[Type], typeargs: List[Type], output: Type, concrete: Boolean): Function = {
         def inner():Function={
-            if (identifier.toString().startsWith("@")) return getFunctionTags(identifier)
+            if (identifier.toString().startsWith("@")) return getFunctionTags(mapFunctionTag(identifier))
             val fcts2 = getElementList(_.functions)(identifier)
             val fcts = fcts2.filter(f => !fcts2.exists(g => g.overridedFunction == f))
             if (fcts.size == 0) throw new ObjectNotFoundException(f"Unknown function: $identifier in context: $path")
@@ -483,6 +489,14 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
         if (fcts.size == 1) return fcts.head
         throw new Exception(f"Ambiguity for function: $identifier in context: $path ${fcts.map(_.prototype())}")
     }
+    def mapFunctionTag(tag: Identifier): Identifier = {
+        if (tag.head() == "@templates" && getCurrentTemplateUse() != null) {
+            Identifier(getCurrentTemplateUse() :: tag.drop().values)
+        }
+        else {
+            tag
+        }
+    }
     def getFunctionTags(tag: Identifier, args: List[Argument] = List()) = {
         tagCtx.synchronized{
             if (!tagCtx.functionTags.contains(tag)){
@@ -500,7 +514,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
             case _ => {}
         function.modifiers.tags.foreach(tagStr =>
             val tag = Identifier.fromString(tagStr)
-            val fct = getFunctionTags(tag, function.arguments)
+            val fct = getFunctionTags(function.context.mapFunctionTag(tag), function.arguments)
             fct.synchronized{
                 fct.addFunction(function)
             }
@@ -755,8 +769,9 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
         jsonfiles.addOne(jsonfile.name, jsonfile)
         jsonfile
     }
-    def getAllJsonFiles():List[JSONFile] = {
-        jsonfiles.values.toList ::: child.filter(_._2 != this).map(_._2.getAllJsonFiles()).foldLeft(List[JSONFile]())(_.toList ::: _.toList)
+    def getAllJsonFiles(rec: Int = 0):List[JSONFile] = {
+        if (rec > 100) throw new Exception("Recursion limit reached")
+        jsonfiles.values.toList ::: child.filter(_._2 != this).map(_._2.getAllJsonFiles(rec+1)).foldLeft(List[JSONFile]())(_.toList ::: _.toList)
     }
 
 

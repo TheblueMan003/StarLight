@@ -181,6 +181,10 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 									lazyValue = value
 									List()
 							}
+						case FunctionCallValue(LinkedFunctionValue(fct), args, typeargs, _) => 
+							if (fct.canBeCallAtCompileTime){
+								return (fct,args).call(this, op)
+							}
 						case ArrayGetValue(LinkedVariableValue(vari, sl), index) if vari.modifiers.isLazy => {
 							vari.lazyValue match{
 								case JsonDictionary(map) => {
@@ -674,6 +678,10 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					tupleVari.flatMap(t => t.assign(op, expr))
 				}
 			}
+			case JsonValue(JsonArray(array)) => {
+				if (array.size != tupleVari.size) throw new Exception(f"Cannot assign array of size ${array.size} to array of size ${tupleVari.size}")
+				tupleVari.zip(array).flatMap((t, v) => t.assign(op, Utils.jsonToExpr(v)))
+			}
 			case ConstructorCall(Identifier(List("standard","array","Array")), List(IntValue(n)), typeArg) if op == "=" && List(sub) == typeArg && n == size => {
 				tupleVari.flatMap(t => t.assign("=", DefaultValue))
 			}
@@ -945,10 +953,10 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 	}
 
 	def deref()(implicit context: Context) = 
-		if (modifiers.hasAttributes("variable.isTemp")) List() else
+		if (modifiers.hasAttributes("variable.isTemp") || isFunctionArgument) List() else
 		context.getFunction(this.name + ".__remRef", List[Expression](), List(), getType(), false).call()
 	def addref()(implicit context: Context)= 
-		if (modifiers.hasAttributes("variable.isTemp")) List() else
+		if (modifiers.hasAttributes("variable.isTemp")|| isFunctionArgument) List() else
 		context.getFunction(this.name + ".__addRef", List[Expression](), List(), getType(), false).call()
 
 	/**
@@ -959,7 +967,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 		op match
 			case "=" => {
 				value match
-					case LinkedVariableValue(vari, sel) if vari.getType().isSubtypeOf(getType()) => {
+					case LinkedVariableValue(vari, sel) if vari.getType().isSubtypeOf(getType()) || vari.getType() == getType()=> {
 						deref() ::: List(f"scoreboard players operation ${getSelector()} ${op} ${vari.getSelector()(sel)}") ::: addref()
 					}
 					case VariableValue(name, sel) => assignClass(op, context.resolveVariable(value))
@@ -968,17 +976,24 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 							case StructType(struct, sub) => throw new Exception("Cannot call struct constructor for class")
 							case typ@ClassType(clazz2, sub) => {
 								val clazz = clazz2.get(sub)
-								if (typ == getType() && typevars.map(context.getType(_)) == sub){
-									val entity = clazz.getEntity()
-									val initarg = List(StringValue(clazz.fullName))::: (if entity != null then List(entity) else List())
-									deref()
-									::: assign("=", FunctionCallValue(VariableValue("object.__initInstance"), initarg, List()))
-									::: context.getFunction(name + ".__init__", args, List(), getType(), false).call()
+								if (typ == getType() && typevars.map(context.getType(_)) == sub && !isFunctionArgument){
+									try{
+										val entity = clazz.getEntity()
+										val initarg = List(StringValue(clazz.fullName))::: (if entity != null then List(entity) else List())
+										deref()
+										::: assign("=", FunctionCallValue(VariableValue("object.__initInstance"), initarg, List()))
+										::: context.getFunction(name + ".__init__", args, List(), getType(), false).call()
+									}
+									catch{
+										case e: ObjectNotFoundException =>{
+											val (pre,vari) =  Utils.simplifyToVariable(value)
+											pre ::: assign("=", vari)
+										}
+									}
 								}
 								else{
 									val vari = context.getFreshVariable(typ)
-									vari.assign("=", value)
-									assign("=", LinkedVariableValue(vari))
+									vari.assign("=", value):::assign("=", LinkedVariableValue(vari))
 								}
 							}
 							case other => throw new Exception(f"Cannot constructor call $other")

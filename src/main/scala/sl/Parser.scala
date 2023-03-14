@@ -57,6 +57,7 @@ object Parser extends StandardTokenParsers{
                                     | identLazy2 ^^ { p => JsonIdentifier(p) }
                                     | "true" ^^^ (JsonBoolean(true))
                                     | "false" ^^^ (JsonBoolean(false))
+                                    | "null" ^^^ (JsonNull)
                                     | json
 
   def jsonCall: Parser[JSONElement] = identLazy2 ~ typeVariables ~ ("(" ~> repsep(exprNoTuple, ",") <~ ")") ^^ {case f ~ t ~ a => JsonCall(f, a, t)}
@@ -132,13 +133,13 @@ object Parser extends StandardTokenParsers{
   def structDecl: Parser[Instruction] = doc ~ (modifier <~ "struct") ~ identLazy ~ typeArgument ~ opt("extends" ~> ident2) ~ block ^^ 
   { case doc ~ mod ~ iden ~ typeargs ~ par ~ block => StructDecl(iden, typeargs, block, mod.withDoc(doc), par) }
   def typedef: Parser[Instruction] = "typedef" ~> types ~ identLazy ^^ { case _1 ~ _2 => TypeDef(_2, _1) }
-  def templateUse: Parser[Instruction] = ident2 ~ ident ~ block ^^ {case iden ~ name ~ instr => TemplateUse(iden, name, instr)}
+  def templateUse: Parser[Instruction] = ident2 ~ identLazy ~ block ^^ {case iden ~ name ~ instr => TemplateUse(iden, name, instr)}
   def templateDesc: Parser[Instruction] = doc ~ (modifier <~ "template") ~ identLazy ~ opt("extends" ~> ident2) ~ instruction ^^ {case doc ~ mod ~ name ~ parent ~ instr => TemplateDecl(name, instr, mod.withDoc(doc), parent)}
   def importShortInst: Parser[Instruction] = "import"~>ident2 ~ "::" ~ ident2 ~ opt("as" ~> ident2) ^^ {case file ~ _ ~ res ~ alias => Import(file, res, alias.getOrElse(null))}
   def importInst: Parser[Instruction] = "import"~>ident2 ~ opt("as" ~> ident2) ^^ {case file ~ alias => Import(file, null, alias.getOrElse(null))}
   def fromImportInst: Parser[Instruction] = "from"~>ident2 ~ ("import" ~> ident2) ~ opt("as" ~> ident2) ^^ {case file ~ res ~ alias => Import(file, res, alias.getOrElse(null))}
   def forgenerate: Parser[Instruction] = (("forgenerate" ~> "(" ~> identLazy <~ ",") ~ exprNoTuple <~ ")") ~ instruction ^^ (p => ForGenerate(p._1._1, p._1._2, p._2))
-  def jsonFile: Parser[Instruction] = doc ~ modifier ~ "jsonfile" ~ identLazy2 ~ json ^^ {case d ~ m ~_ ~n~json => JSONFile(n, json, m.withDoc(d))}
+  def jsonFile: Parser[Instruction] = doc ~ modifier ~ "jsonfile" ~ identLazy2 ~ expr ^^ {case d ~ m ~_ ~n~json => JSONFile(n, json, m.withDoc(d))}
   def doWhileLoop: Parser[Instruction] = ("do" ~> instruction <~ "while") ~ ("(" ~> exprNoTuple <~ ")") ^^ (p => DoWhileLoop(p._2, p._1))
   def whileLoop: Parser[Instruction] = ("while" ~> "(" ~> exprNoTuple <~ ")") ~ instruction ^^ (p => WhileLoop(p._1, p._2))
   def forLoop: Parser[Instruction] = ((("for" ~> "(" ~> instruction <~ ";") ~ exprNoTuple <~ ";") ~ instruction <~ ")") ~ instruction ^^ 
@@ -230,7 +231,7 @@ object Parser extends StandardTokenParsers{
   def anyWord = lexical.reserved.foldLeft(ident2){(a, b) => a | b} | ident
   def blockDataField = anyWord ~ "=" ~ expr ^^ {case n ~ _ ~ v => n +"="+v }
   def blockData = "[" ~> rep1sep(blockDataField, ",") <~ "]" ^^ {case fields => fields.mkString("[", ",", "]")}
-  def namespacedName = ident ~ ":" ~ ident2 ~ opt(blockData) ^^ { case a ~ b ~ c ~ d => NamespacedName(a+b+c+d.getOrElse("")) }
+  def namespacedName = ident ~ ":" ~ ident2 ~ opt(blockData) ~ opt(json) ^^ { case a ~ b ~ c ~ d ~ j=> NamespacedName(a+b+c+d.getOrElse("")+j.map(_.getNbt()).getOrElse("")) }
   def namespacedName2 = opt(identLazy <~ ":") ~ identLazy2 ^^ { case a ~ c => if a.isEmpty then NamespacedName(c) else NamespacedName(a.get+":"+c)}
 
   def validCordNumber1: Parser[String] = floatValue^^{_.toString()} | numericLit | identLazyForce

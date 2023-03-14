@@ -52,6 +52,13 @@ class Class(context: Context, name: String, val generics: List[String], _modifie
                     ctx.inherit(parent.context.push(parent.name))
                 }
 
+                {
+                    val mod = Modifier.newProtected()
+                    mod.isLazy = true
+                    val vari = new Variable(ctx, "__MCEntity", MCObjectType, mod)
+                    vari.assign("=", getEntity())(ctx)
+                    ctx.addVariable(vari)
+                }
                 Compiler.compile(block)(ctx)
                 
                 val mod = new Modifier()

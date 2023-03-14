@@ -1,72 +1,28 @@
 package cmd.gamemode
 
-if (Compiler.isJava()){
-    predicate isAdventure(){
-        "condition": "minecraft:entity_properties",
-        "entity": "this",
-        "predicate": {
-            "type_specific": {
-                "type": "player",
-                "gamemode": "adventure"
-            }
-        }
-    }
-    predicate isSurvival(){
-        "condition": "minecraft:entity_properties",
-        "entity": "this",
-        "predicate": {
-            "type_specific": {
-                "type": "player",
-                "gamemode": "survival"
-            }
-        }
-    }
-    predicate isCreative(){
-        "condition": "minecraft:entity_properties",
-        "entity": "this",
-        "predicate": {
-            "type_specific": {
-                "type": "player",
-                "gamemode": "creative"
-            }
-        }
-    }
-    predicate isSpectator(){
-        "condition": "minecraft:entity_properties",
-        "entity": "this",
-        "predicate": {
-            "type_specific": {
-                "type": "player",
-                "gamemode": "spectator"
-            }
-        }
-    }
+"""
+return true if the gamemode of the current entity is `adventure`
+"""
+def lazy bool isAdventure(){
+    return @s[gamemode=adventure]
 }
-if (Compiler.isBedrock()){
-    """
-    return true if the gamemode of the current entity is `adventure`
-    """
-    def lazy bool isAdventure(){
-        return @s[gamemode=adventure]
-    }
-    """
-    return true if the gamemode of the current entity is `survival`
-    """
-    def lazy bool isSurvival(){
-        return @s[gamemode=survival]
-    }
-    """
-    return true if the gamemode of the current entity is `creative`
-    """
-    def lazy bool isCreative(){
-        return @s[gamemode=creative]
-    }
-    """
-    return true if the gamemode of the current entity is `spectator`
-    """
-    def lazy bool isSpectator(){
-        return @s[gamemode=spectator]
-    }
+"""
+return true if the gamemode of the current entity is `survival`
+"""
+def lazy bool isSurvival(){
+    return @s[gamemode=survival]
+}
+"""
+return true if the gamemode of the current entity is `creative`
+"""
+def lazy bool isCreative(){
+    return @s[gamemode=creative]
+}
+"""
+return true if the gamemode of the current entity is `spectator`
+"""
+def lazy bool isSpectator(){
+    return @s[gamemode=spectator]
 }
 
 

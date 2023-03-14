@@ -10,7 +10,9 @@ import java.io.File
 import sl.Reporter
 
 object ResourcePackBuilder{
-    def build(source: List[String], target: String, jsonFiles: List[objects.JSONFile])={
+    var previous = Map[String, List[String]]()
+    def clearCache() = previous = Map[String, List[String]]()
+    def build(source: List[String], target: String, jsonFiles: List[(String, List[String])])={
         Reporter.ok(f"Building Resource Pack: $target")
         if (target.endsWith(".zip/")){
             makeRPZip(source, target.replaceAllLiterally(".zip/",".zip"), jsonFiles)
@@ -23,7 +25,7 @@ object ResourcePackBuilder{
         }
         Reporter.ok(f"Resource Pack build")
     }
-    def makeRPFolder(sources: List[String], target: String, jsonFiles: List[objects.JSONFile])={
+    def makeRPFolder(sources: List[String], target: String, jsonFiles: List[(String, List[String])])={
         FileUtils.deleteDirectory(target)
         sources.flatMap(source => getListOfRPFiles(source, "").map(f => (source, f)))
         .groupBy(_._2)
@@ -35,11 +37,11 @@ object ResourcePackBuilder{
             FileUtils.createFolderForFiles(File(target+file))
             Files.copy(originalPath, copied, StandardCopyOption.REPLACE_EXISTING);
         })
-        jsonFiles.map(file => {
-            FileUtils.safeWriteFile(target+file.getName(), file.getContent())
+        jsonFiles.map((file, content) => {
+            FileUtils.safeWriteFile(target+file, content)
         })
     }
-    def makeRPZip(sources: List[String], target: String, jsonFiles: List[objects.JSONFile])={
+    def makeRPZip(sources: List[String], target: String, jsonFiles: List[(String, List[String])])={
         val Buffer = 2 * 1024
         var data = new Array[Byte](Buffer)
         val zip = new ZipOutputStream(new FileOutputStream(target))
@@ -48,6 +50,7 @@ object ResourcePackBuilder{
         // Copy Files
         sources.flatMap(source => getListOfRPFiles(source, "").map(f => (source, f)))
         .groupBy(_._2)
+        .filterNot(x => jsonFiles.exists(f => f._1 == x._1))
         .toList
         .map((k,v) => v.sortBy(_._1.length()).head)
         .map((source, name) =>{
@@ -63,7 +66,10 @@ object ResourcePackBuilder{
         })
 
         // Add JSON FILES
-        jsonFiles.map(f => (f.getName(), f.getContent())).foreach { (name, content) =>
+        jsonFiles.groupBy(_._1)
+        .toList
+        .map((k,v) => v.sortBy(_._2.length).head)
+        .map(f => (f._1, f._2)).foreach { (name, content) =>
             zip.putNextEntry(new ZipEntry(if name.startsWith("/") then name.drop(1) else name))
             content.foreach(x => writer.println(x))
             writer.flush()
