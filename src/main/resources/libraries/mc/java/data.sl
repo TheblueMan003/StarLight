@@ -10,14 +10,36 @@ def lazy set(json data){
     }
 }
 
+
 """
-Set the data of current entity target to data
+Append the data of current entity to data
+"""
+def lazy append(string $key, json data){
+    lazy val nbt = Compiler.toNBT(data)
+    Compiler.insert($nbt, nbt){
+        /data modify entity @s $key append value $nbt
+    }
+}
+
+"""
+Set the data of target to data
 """
 def lazy set(entity target, json data){
     with(target){
         set(data)
     }
 }
+
+"""
+Append the data of target to data
+"""
+def lazy append(entity target, string key, json data){
+    with(target){
+        append(key, data)
+    }
+}
+
+"""
 
 """
 Set the data of current block to data

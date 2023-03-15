@@ -200,7 +200,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
     }
     def requestLibrary(lib: String): Unit = {
         if (importFile(lib)){
-            Compiler.compile(Utils.getLib(lib).get, false)(root)
+            Compiler.compile(Utils.getLib(lib).get, sl.Meta(false, false))(root)
         }
     }
     def getAllConstant(): List[Int] = {

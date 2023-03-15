@@ -18,7 +18,7 @@ object Parser extends StandardTokenParsers{
   lexical.delimiters ++= List("(", ")", "\\", ".", "..", ":", "=", "->", "{", "}", ",", "*", "[", "]", "/", "+", "-", "*", "/", "\\", "%", "&&", "||", "=>", ";",
                               "+=", "-=", "/=", "*=", "%=", "?=", ":=", "%", "@", "@e", "@a", "@s", "@r", "@p", "~", "^", "<=", "==", ">=", "<", ">", "!=", "%%%", "???", "$",
                               "!", "!=", "#", "<<", ">>", "&", "<<=", ">>=", "&=", "|=", "::")
-  lexical.reserved   ++= List("true", "false", "if", "then", "else", "return", "switch", "for", "do", "while",
+  lexical.reserved   ++= List("true", "false", "if", "then", "else", "return", "switch", "for", "do", "while", "by",
                               "as", "at", "with", "to", "import", "doc", "template", "null", "typedef", "foreach", "in", "not",
                               "def", "package", "struct", "enum", "class", "lazy", "jsonfile", "blocktag", "throw", "try", "catch", "finally",
                               "public", "protected", "private", "scoreboard", "forgenerate", "from", "rotated", "facing", "align",
@@ -282,7 +282,7 @@ object Parser extends StandardTokenParsers{
   def typeArgument = opt("<" ~ repsep(ident,",") ~ ">") ^^ {case Some(_ ~ a ~ _) => a;case None => List()}
 
   def exprDot: Parser[Expression] = rep1sep(exprBottom, ".") ^^ { case e if e.size == 1 => e.head; case e => e.tail.foldLeft(e.head)((p, n) => DotValue(p, n))}
-  def exprRange: Parser[Expression] = exprDot ~ opt(".."~>exprDot) ^^ { case e ~ None => e; case e1 ~ Some(e2) => RangeValue(e1, e2)}
+  def exprRange: Parser[Expression] = exprDot ~ opt(".."~>exprDot ~ opt("by"~>exprDot)) ^^ { case e ~ None => e; case e1 ~ Some(e2 ~ None) => RangeValue(e1, e2, IntValue(1)); case e1 ~ Some(e2 ~ Some(e3)) => RangeValue(e1, e2, e3)}
   def exprArray: Parser[Expression] = exprRange ~ rep("[" ~> rep1sep(expr, ",") <~ "]") ^^ {case e ~ g => g.foldLeft(e)((e, i) => ArrayGetValue(e, i))}
   def exprPow: Parser[Expression] = exprArray ~ rep("^" ~> exprPow) ^^ {unpack("^", _)}
   def exprMod: Parser[Expression] = exprPow ~ rep("%" ~> exprMod) ^^ {unpack("%", _)}

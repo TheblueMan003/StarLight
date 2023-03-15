@@ -1038,7 +1038,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 			case TupleValue(values) => values.exists(isPresentIn(_))
 			case FunctionCallValue(name, args, typeargs, selector) => args.exists(isPresentIn(_)) || isPresentIn(name)
 			case ConstructorCall(name, args, typevars) => args.exists(isPresentIn(_))
-			case RangeValue(min, max) => isPresentIn(min) || isPresentIn(max)
+			case RangeValue(min, max, delta) => isPresentIn(min) || isPresentIn(max) || isPresentIn(delta)
 		}
 
 

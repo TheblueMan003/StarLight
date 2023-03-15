@@ -78,7 +78,7 @@ object Print{
                 val (p2, print) = toRawJson(vari)
                 (p1:::p2, print)
             }
-            case RangeValue(min, max) => (List(), List(PrintString(f"$min..$max", col, mod)))
+            case RangeValue(min, max, delta) => (List(), List(PrintString(f"$min..$max by $delta", col, mod)))
             case SelectorValue(value) => (List(), List(PrintSelector(value, col, mod)))
             case BinaryOperation(op, left, right) => {
                 val (p1, vari) = Utils.simplifyToVariable(expr)

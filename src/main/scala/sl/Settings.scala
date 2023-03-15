@@ -36,6 +36,8 @@ class SettingsContext(){
     var debug = false
     var allFunction = true
 
+    var globalImport: Instruction = InstructionList(List())
+
     var metaVariable = List(
         ("Compiler.isJava", () => target == MCJava),
         ("Compiler.isBedrock", () => target == MCBedrock),
@@ -52,8 +54,13 @@ trait Target{
     def getRPJsonPath(path: String): String
     def getExtraFiles(context: Context): List[(String, List[String])]
     def getResourcesExtraFiles(context: Context): List[(String, List[String])]
+
+    def hasFeature(feature: String): Boolean
 }
 case object MCJava extends Target{
+    val features = List("execute on", "execute positioned over")
+    def hasFeature(feature: String): Boolean = features.exists(x => x == feature)
+
     def getFunctionPath(path: String): String = {
         "/data/" + path.replaceAll("([A-Z])","-$1").toLowerCase().replaceAllLiterally(".","/").replaceFirst("/", "/functions/")+ ".mcfunction"
     }
@@ -123,6 +130,9 @@ case object MCJava extends Target{
         """
 }
 case object MCBedrock extends Target{
+    val features = List()
+    def hasFeature(feature: String): Boolean = features.contains(feature)
+
     def getFunctionPath(path: String): String = {
         "/functions/" + path.replaceAll("([A-Z])","-$1").toLowerCase().replaceAllLiterally(".","/") + ".mcfunction"
     }

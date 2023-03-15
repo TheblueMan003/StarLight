@@ -34,7 +34,7 @@ object Compiler{
             context.getAllPredicates().flatMap(_.getFiles()):::
             Settings.target.getExtraFiles(context)
     }
-    def compile(instruction: Instruction, firstPass: Boolean = false)(implicit context: Context):List[String]={   
+    def compile(instruction: Instruction, meta: Meta = Meta(false, false))(implicit context: Context):List[String]={   
         try{
             instruction match{
                 case FunctionDecl(name, block, typ2, args, typevars, modifier) =>{
@@ -53,7 +53,7 @@ object Compiler{
                         }
                         val clazz = context.getCurrentClass()
                         if (!modifier.isLazy){
-                            val func = new ConcreteFunction(context, fname, args, context.getType(typ), modifier, block, firstPass)
+                            val func = new ConcreteFunction(context, fname, args, context.getType(typ), modifier, block, meta.firstPass)
                             func.overridedFunction = if modifier.isOverride then context.getFunction(Identifier.fromString(name), args.map(_.typ), List(), typ, false) else null
                             func.modifiers.isVirtual |= modifier.isOverride
                             context.addFunction(name, func)
@@ -69,7 +69,7 @@ object Compiler{
                     List()
                 }
                 case StructDecl(name, generics, block, modifier, parent) => {
-                    if (!firstPass){
+                    if (!meta.firstPass){
                         val parentStruct = parent match
                             case None => null
                             case Some(p) => context.getStruct(p)
@@ -79,7 +79,7 @@ object Compiler{
                     List()
                 }
                 case ClassDecl(name, generics, block, modifier, parent, entity) => {
-                    if (!firstPass){
+                    if (!meta.firstPass){
                         val parentClass = parent match
                             case None => if name != "object" then context.getClass("object") else null
                             case Some(p) => context.getClass(p)
@@ -89,7 +89,7 @@ object Compiler{
                     List()
                 }
                 case TemplateDecl(name, block, modifier, parent) => {
-                    if (!firstPass){
+                    if (!meta.firstPass){
                         val parentTemplate = parent match
                             case None => null
                             case Some(p) => context.getTemplate(p)
@@ -105,13 +105,13 @@ object Compiler{
                     List()
                 }
                 case TypeDef(name, typ) => {
-                    if (!firstPass){
+                    if (!meta.firstPass){
                         context.addTypeDef(name, typ)
                     }
                     List()
                 }
                 case EnumDecl(name, fields, values, modifier) => {
-                    if (!firstPass){
+                    if (!meta.firstPass){
                         val enm = context.addEnum(new Enum(context, name, modifier, fields.map(x => EnumField(x.name, context.getType(x.typ)))))
                         enm.addValues(values)
                     }
@@ -123,7 +123,7 @@ object Compiler{
                 case ForGenerate(key, provider, instr) => {
                     val cases = Utils.getForgenerateCases(key, provider)
                     
-                    cases.map(lst => lst.sortBy(0 - _._1.length()).foldLeft(instr)((instr, elm) => Utils.subst(instr, elm._1, elm._2))).flatMap(Compiler.compile(_, firstPass)).toList
+                    cases.map(lst => lst.sortBy(0 - _._1.length()).foldLeft(instr)((instr, elm) => Utils.subst(instr, elm._1, elm._2))).flatMap(Compiler.compile(_, meta)).toList
                 }
                 case ForEach(key, provider, instr) => {
                     val cases = Utils.getForeachCases(key.toString(), provider)
@@ -189,7 +189,7 @@ object Compiler{
                 }
                 case Import(lib, value, alias) => {
                     val ret = if (context.importFile(lib)){
-                        compile(Utils.getLib(lib).get, firstPass)(context.root)
+                        compile(Utils.getLib(lib).get, meta.withLib)(context.root)
                     }
                     else{
                         List()
@@ -210,7 +210,7 @@ object Compiler{
                     if (iden.toString() == "property"){
                         val sub = context.push(name)
 
-                        compile(block, true)(sub)
+                        compile(block, meta.withFirstPass)(sub)
 
                         context.addProperty(Property(name, sub.getFunction("get"), sub.getFunction("set"), null))
                         List()
@@ -222,7 +222,7 @@ object Compiler{
                         sub.inherit(template.getContext())
                         sub.push("this", sub)
                         sub.setTemplateUse()
-                        compile(Utils.fix(template.getBlock())(template.context, Set()), true)(sub) ::: compile(block, true)(sub)
+                        compile(Utils.fix(template.getBlock())(template.context, Set()), meta.withFirstPass)(sub) ::: compile(block, meta.withFirstPass)(sub)
                     }
                 }
 
@@ -284,7 +284,7 @@ object Compiler{
                     context.getCurrentFunction() match
                         case cf: ConcreteFunction => 
                             if (cf.modifiers.hasAttributes("__returnCheck__")) then
-                                Compiler.compile(VariableAssigment(List((Left(Identifier.fromString("__hasFunctionReturned__")), Selector.self)), "=", IntValue(1)), firstPass):::
+                                Compiler.compile(VariableAssigment(List((Left(Identifier.fromString("__hasFunctionReturned__")), Selector.self)), "=", IntValue(1)), meta):::
                                 cf.returnVariable.assign("=", value)
                             else cf.returnVariable.assign("=", value)
                         case _ => throw new Exception(f"Unexpected return at ${instruction.pos}")
@@ -294,21 +294,24 @@ object Compiler{
                     context.getCurrentFunction() match
                         case cf: ConcreteFunction => 
                             if (cf.modifiers.hasAttributes("__returnCheck__")) then
-                                Compiler.compile(VariableAssigment(List((Left(Identifier.fromString("__exceptionThrown")), Selector.self)), "=", expr), firstPass):::
-                                Compiler.compile(VariableAssigment(List((Left(Identifier.fromString("__hasFunctionReturned__")), Selector.self)), "=", IntValue(2)), firstPass)
-                            else Compiler.compile(VariableAssigment(List((Left(Identifier.fromString("__exceptionThrown")), Selector.self)), "=", expr), firstPass)
-                        case _ => Compiler.compile(VariableAssigment(List((Left(Identifier.fromString("__exceptionThrown")), Selector.self)), "=", expr), firstPass)
+                                Compiler.compile(VariableAssigment(List((Left(Identifier.fromString("__exceptionThrown")), Selector.self)), "=", expr), meta):::
+                                Compiler.compile(VariableAssigment(List((Left(Identifier.fromString("__hasFunctionReturned__")), Selector.self)), "=", IntValue(2)), meta)
+                            else Compiler.compile(VariableAssigment(List((Left(Identifier.fromString("__exceptionThrown")), Selector.self)), "=", expr), meta)
+                        case _ => Compiler.compile(VariableAssigment(List((Left(Identifier.fromString("__exceptionThrown")), Selector.self)), "=", expr), meta)
                 }
                 case Try(block, except, finallyBlock) => {
                     context.requestLibrary("standard.Exception")
-                    compile(block, firstPass) ::: 
-                    compile(If(BinaryOperation("!=",VariableValue("__exceptionThrown"), IntValue(0)), except, List()), firstPass) :::
-                    compile(finallyBlock, firstPass)
+                    compile(block, meta) ::: 
+                    compile(If(BinaryOperation("!=",VariableValue("__exceptionThrown"), IntValue(0)), except, List()), meta) :::
+                    compile(finallyBlock, meta)
                 }
                 case CMD(value) => List(value.replaceAllLiterally("\\\"","\""))
                 case Package(name, block) => {
                     val sub = if (name == "_") then context.root else context.root.push(name)
-                    val content = compile(block, firstPass)(sub)
+                    if (!meta.isLib){
+                        compile(Settings.globalImport, meta)(sub)
+                    }
+                    val content = compile(block, meta)(sub)
                     if (content.length > 0){
                         val init = sub.getNamedBlock("__init__", content)
                         init.modifiers.isLoading = true
@@ -321,10 +324,10 @@ object Compiler{
                     List()
                 }
                 case InstructionList(block) => {
-                    block.flatMap(inst => compile(inst, firstPass))
+                    block.flatMap(inst => compile(inst, meta))
                 }
                 case InstructionBlock(block) => {
-                    block.flatMap(inst => compile(inst, firstPass))
+                    block.flatMap(inst => compile(inst, meta))
                 }
                 case FunctionCall(name, args, typeargs) => {
                     val (fct,cargs) = context.getFunction(name, args, typeargs, VoidType)
@@ -337,7 +340,7 @@ object Compiler{
                     (name, args).call(ret)
                 }
                 case If(BinaryOperation("||", left, right), ifBlock, elseBlock) => {
-                    compile(If(left, ifBlock, ElseIf(right, ifBlock) :: elseBlock), firstPass)
+                    compile(If(left, ifBlock, ElseIf(right, ifBlock) :: elseBlock), meta)
                 }
                 case ifb: If => Execute.ifs(ifb)
                 case swit: Switch => Execute.switch(swit)
@@ -354,4 +357,9 @@ object Compiler{
             }
         }
     }
+}
+
+case class Meta(firstPass: Boolean, isLib: Boolean){
+    def withLib = Meta(firstPass, true)
+    def withFirstPass = Meta(true, isLib)
 }

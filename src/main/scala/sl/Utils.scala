@@ -163,7 +163,7 @@ object Utils{
             case TupleValue(values) => TupleValue(values.map(subst(_, from, to)))
             case FunctionCallValue(name, args, typeargs, selector) => FunctionCallValue(subst(name, from, to), args.map(subst(_, from, to)), typeargs, selector)
             case ConstructorCall(name, args, generics) => ConstructorCall(name, args.map(subst(_, from, to)), generics)
-            case RangeValue(min, max) => RangeValue(subst(min, from, to), subst(max, from, to))
+            case RangeValue(min, max, delta) => RangeValue(subst(min, from, to), subst(max, from, to), subst(delta, from, to))
             case LambdaValue(args, instr) => LambdaValue(args, subst(instr, from, to))
             case lk: LinkedVariableValue => lk
     }
@@ -257,7 +257,7 @@ object Utils{
             case TupleValue(values) => TupleValue(values.map(subst(_, from, to)))
             case FunctionCallValue(name, args, typeargs, selector) => FunctionCallValue(subst(name, from, to), args.map(subst(_, from, to)), typeargs, selector)
             case ConstructorCall(name, args, generics) => ConstructorCall(name, args.map(subst(_, from, to)), generics)
-            case RangeValue(min, max) => RangeValue(subst(min, from, to), subst(max, from, to))
+            case RangeValue(min, max, delta) => RangeValue(subst(min, from, to), subst(max, from, to), subst(delta, from, to))
             case LambdaValue(args, instr) => LambdaValue(args.map(_.replaceAllLiterally(from, to)), subst(instr, from, to))
             case lk: LinkedVariableValue => lk
             case null => null
@@ -496,7 +496,7 @@ object Utils{
                     case StructType(struct, generics) => ConstructorCall(struct.fullName, args.map(fix(_)), generics.map(fix(_)))
                     case ClassType(clazz, generics) => ConstructorCall(clazz.fullName, args.map(fix(_)), generics.map(fix(_)))
                     case other => throw new Exception(f"Cannot constructor call $other")
-            case RangeValue(min, max) => RangeValue(fix(min), fix(max))
+            case RangeValue(min, max, delta) => RangeValue(fix(min), fix(max), fix(delta))
             case LambdaValue(args, instr) => LambdaValue(args, fix(instr))
             case lk: LinkedVariableValue => lk
             case null => null
@@ -549,7 +549,7 @@ object Utils{
             case TupleValue(values) => TupleValue(values.map(subst(_, from, to)))
             case FunctionCallValue(name, args, typeargs, selector) => FunctionCallValue(name, args.map(subst(_, from, to)), typeargs, selector)
             case ConstructorCall(name, args, generics) => ConstructorCall(name, args.map(subst(_, from, to)), generics)
-            case RangeValue(min, max) => RangeValue(subst(min, from, to), subst(max, from, to))
+            case RangeValue(min, max, delta) => RangeValue(subst(min, from, to), subst(max, from, to), subst(delta, from, to))
             case LambdaValue(args, instr) => LambdaValue(args, subst(instr, from, to))
             case lk: LinkedVariableValue => lk
     }
@@ -673,7 +673,7 @@ object Utils{
             case ConstructorCall(name, args, generics) => {
                 context.getType(IdentifierType(name.toString(), generics), args)
             }
-            case RangeValue(min, max) => RangeType(typeof(min))
+            case RangeValue(min, max, delta) => RangeType(typeof(min))
             case LinkedVariableValue(vari, sel) => vari.getType()
     }
 
@@ -714,7 +714,7 @@ object Utils{
             case TupleValue(values) => values.exists(containsFunctionCall(_))
             case ArrayGetValue(name, index) => containsFunctionCall(name)
             case ConstructorCall(name, args, generics) => true
-            case RangeValue(min, max) => containsFunctionCall(min) || containsFunctionCall(max)
+            case RangeValue(min, max, delta) => containsFunctionCall(min) || containsFunctionCall(max) || containsFunctionCall(delta)
             case _ => false
         }
     }
@@ -798,7 +798,7 @@ object Utils{
                     case (JsonValue(JsonDictionary(content)), List(StringValue(n))) => jsonToExpr(content(n))
                     case (_, _) => ArrayGetValue(inner, index2)
             }
-            case RangeValue(min, max) => RangeValue(simplify(min), simplify(max))
+            case RangeValue(min, max, delta) => RangeValue(simplify(min), simplify(max), simplify(delta))
             case other => other
     }
 
@@ -1017,7 +1017,7 @@ object Utils{
 
     def getForgenerateCases(key: String, provider: Expression)(implicit context: Context): IterableOnce[List[(String, String)]] = {
         simplify(provider) match
-            case RangeValue(IntValue(min), IntValue(max)) => Range(min, max+1).map(elm => List((key, elm.toString())))
+            case RangeValue(IntValue(min), IntValue(max), IntValue(delta)) => Range(min, max+1, delta).map(elm => List((key, elm.toString())))
             case TupleValue(lst) => lst.map(elm => List((key, elm.toString())))
             case VariableValue(iden, sel) if iden.toString().startsWith("@") => {
                 context.getFunctionTags(iden).getCompilerFunctionsName().map(name => List((key, name)))
@@ -1101,7 +1101,7 @@ object Utils{
     }
     def getForeachCases(key: String, provider: Expression)(implicit context: Context): IterableOnce[List[(String, Expression)]] = {
         Utils.simplify(provider) match
-            case RangeValue(IntValue(min), IntValue(max)) => Range(min, max+1).map(elm => List((key,IntValue(elm))))
+            case RangeValue(IntValue(min), IntValue(max), IntValue(delta)) => Range(min, max+1, delta).map(elm => List((key,IntValue(elm))))
             case TupleValue(lst) => lst.map(elm => List((key, elm)))
             case VariableValue(iden, sel) if iden.toString().startsWith("@") => {
                 context.getFunctionTags(iden).getCompilerFunctionsName().map(name => List((key, VariableValue(name))))
@@ -1182,7 +1182,21 @@ object Utils{
             case _ => throw new Exception(f"Unknown generator: $provider")
     }
     def getSelector(expr: Expression)(implicit context: Context): (List[String],Selector) = {
+        def apply(selector: Expression): (List[String],Selector) = {
+            val vari = context.getFreshVariable(EntityType)
+            val (prefix, sel) = getSelector(LinkedVariableValue(vari))
+            (sl.Compilation.Execute.withInstr(With(selector, BoolValue(false), BoolValue(true), 
+                VariableAssigment(List((Right(vari), Selector.self)), "=", SelectorValue(Selector.self)))):::prefix, sel)
+        }
         Utils.simplify(expr) match
+            case VariableValue(Identifier(List("@attacker")), selector) if Settings.target.hasFeature("execute on") => apply(expr)
+            case VariableValue(Identifier(List("@controller")), selector) if Settings.target.hasFeature("execute on") => apply(expr)
+            case VariableValue(Identifier(List("@leasher")), selector) if Settings.target.hasFeature("execute on") => apply(expr)
+            case VariableValue(Identifier(List("@origin")), selector) if Settings.target.hasFeature("execute on") => apply(expr)
+            case VariableValue(Identifier(List("@owner")), selector) if Settings.target.hasFeature("execute on") => apply(expr)
+            case VariableValue(Identifier(List("@passengers")), selector) if Settings.target.hasFeature("execute on") => apply(expr)
+            case VariableValue(Identifier(List("@target")), selector) if Settings.target.hasFeature("execute on") => apply(expr)
+            case VariableValue(Identifier(List("@vehicle")), selector) if Settings.target.hasFeature("execute on") => apply(expr)
             case VariableValue(name, sel) => {
                 context.tryGetClass(name) match
                     case None => getSelector(context.resolveVariable(expr))

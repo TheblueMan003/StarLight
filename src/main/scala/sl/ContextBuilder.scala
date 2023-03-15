@@ -14,16 +14,16 @@ object ContextBuilder{
 
         DefaultFunction.get()(context)
 
-        extra.foreach(a => buildRec(a)(context))
-        buildRec(inst)(context)
+        extra.foreach(a => buildRec(a)(context, Meta(true, false)))
+        buildRec(inst)(context, Meta(true, false))
 
-        extra.foreach(a => Compiler.compile(a, true)(context))
-        Compiler.compile(inst, true)(context)
+        extra.foreach(a => Compiler.compile(a, Meta(true, false))(context))
+        Compiler.compile(inst, Meta(true, false))(context)
 
         context
     }
 
-    private def buildRec(inst: Instruction)(implicit context: Context):Unit = {
+    private def buildRec(inst: Instruction)(implicit context: Context, meta: Meta):Unit = {
         inst match{
             case StructDecl(name, generics, block, modifier, parent) => {
                 val parentStruct = parent match
@@ -55,17 +55,23 @@ object ContextBuilder{
             }
             case Package(name, block) => {
                 if (name == "_"){
-                    buildRec(block)(context.root)
+                    if (!meta.isLib){
+                        buildRec(Settings.globalImport)(context.root, meta)
+                    }
+                    buildRec(block)(context.root, meta)
                 }
                 else{
-                    buildRec(block)(context.root.push(name))
+                    if (!meta.isLib){
+                        buildRec(Settings.globalImport)(context.root.push(name), meta)
+                    }
+                    buildRec(block)(context.root.push(name), meta)
                 }
             }
             case InstructionList(block) => {
-                block.foreach(p => buildRec(p)(context))
+                block.foreach(p => buildRec(p)(context, meta))
             }
             case InstructionBlock(block) => {
-                block.foreach(p => buildRec(p)(context))
+                block.foreach(p => buildRec(p)(context, meta))
             }
             case ForGenerate(key, provider, instr) => {
                 val cases = Utils.getForgenerateCases(key, provider)
@@ -84,8 +90,8 @@ object ContextBuilder{
                         throw new ObjectNotFoundException(f"Cannot find package: $lib")
                     }
                     val libC = libp.get
-                    buildRec(libC)(context.root)
-                    Compiler.compile(libC, true)(context.root)
+                    buildRec(libC)(context.root, meta)
+                    Compiler.compile(libC, meta)(context.root)
                 }
 
                 if (value != null){

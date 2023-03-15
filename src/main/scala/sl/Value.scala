@@ -243,8 +243,8 @@ case class ConstructorCall(val name: Identifier, val args: List[Expression], val
     override def getString()(implicit context: Context): String = throw new Exception(f"Constructor Function call cannot be transformed to string")
 }
 
-case class RangeValue(val min: Expression, val max: Expression) extends Expression with SmallValue{
-    override def toString(): String = f"$min .. $max"
+case class RangeValue(val min: Expression, val max: Expression, val jump: Expression) extends Expression with SmallValue{
+    override def toString(): String = f"$min .. $max by $jump"
     override def getIntValue(): Int = ???
     override def hasIntValue(): Boolean = false
     override def hasFloatValue(): Boolean = false

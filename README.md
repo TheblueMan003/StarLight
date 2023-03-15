@@ -277,6 +277,23 @@ with(@a, false, a == 0){
 }
 ```
 
+(Java Only)
+To execute commands with the attacker, controller, leasher, origin, owner, passengers, target or vehicle of an entity, you can use the following selectors:
+`@attacker`, `@controller`, `@leasher`, `@origin`, `@owner`, `@passengers`, `@target` and `@vehicle`
+```
+with(@attacker){
+    // do stuff
+}
+```
+
+To execute on top of an height map you can use the following selectors:
+`@world_surface`, `@motion_blocking`, `@motion_blocking_no_leaves`, and `@ocean_floor`
+```
+at(@world_surface){
+    // do stuff
+}
+```
+
 ## Function
 Functions can be declared with 
 ```
@@ -425,6 +442,7 @@ predicate example(int count, string itemID){
       "mainhand": {
         "items": [
           itemID
+        ]
         "count": count
       }
     }
@@ -566,6 +584,7 @@ struct typ{
     def fct(){
         a += b
     }
+}
 ```
 
 This allow to do static string & json manipulation.

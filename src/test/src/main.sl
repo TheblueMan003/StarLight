@@ -1,7 +1,14 @@
 package cell
 
-import mc.inventory.Setup
+import game.Region
 
-Setup main{
-    forceChestplate(minecraft:dimaond_chestplate)
+Region test{
+    init(0,0,0,16,10,16)
+}
+
+def init(){
+    test.load()
+    if (test.isLoaded()){
+        /say hi
+    }
 }

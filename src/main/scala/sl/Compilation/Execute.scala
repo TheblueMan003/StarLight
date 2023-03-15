@@ -72,21 +72,33 @@ object Execute{
         ifs(If(whl.cond, LinkedFunctionCall(block, List(), null), List()))
     }
     def withInstr(ass: With)(implicit context: Context):List[String] = {
-        def apply(selector: String)={
+        def apply(keyword: String, selector: String)={
             val (pref2, cases) = getIfCase(ass.cond)
             val tail = getListCase(cases)
             Utils.simplify(ass.isat) match
-                case BoolValue(true) => pref2:::makeExecute(f" as $selector at @s"+tail, Compiler.compile(ass.block))
-                case BoolValue(false) => pref2:::makeExecute(f" as $selector"+tail, Compiler.compile(ass.block))
+                case BoolValue(true) => pref2:::makeExecute(f" $keyword $selector at @s"+tail, Compiler.compile(ass.block))
+                case BoolValue(false) => pref2:::makeExecute(f" $keyword $selector"+tail, Compiler.compile(ass.block))
                 case other => {
                     val (pref, vari) = Utils.simplifyToVariable(other)
-                    pref2:::pref ::: makeExecute(getListCase(List(IFValueCase(vari))) + f" as $selector at @s"+tail, Compiler.compile(ass.block))
-                            ::: makeExecute(getListCase(List(IFNotValueCase(IFValueCase(vari)))) + f" as $selector"+tail, Compiler.compile(ass.block))
+                    pref2:::pref ::: makeExecute(getListCase(List(IFValueCase(vari))) + f" $keyword $selector at @s"+tail, Compiler.compile(ass.block))
+                            ::: makeExecute(getListCase(List(IFNotValueCase(IFValueCase(vari)))) + f" $keyword $selector"+tail, Compiler.compile(ass.block))
                 }
         }
 
-        val (prefix, selector) = Utils.getSelector(ass.expr)
-        prefix:::apply(selector.getString())
+        ass.expr match{
+            case VariableValue(Identifier(List("@attacker")), selector) if Settings.target.hasFeature("execute on") => apply("on", "attacker")
+            case VariableValue(Identifier(List("@controller")), selector) if Settings.target.hasFeature("execute on") => apply("on", "controller")
+            case VariableValue(Identifier(List("@leasher")), selector) if Settings.target.hasFeature("execute on") => apply("on", "leasher")
+            case VariableValue(Identifier(List("@origin")), selector) if Settings.target.hasFeature("execute on") => apply("on", "origin")
+            case VariableValue(Identifier(List("@owner")), selector) if Settings.target.hasFeature("execute on") => apply("on", "owner")
+            case VariableValue(Identifier(List("@passengers")), selector) if Settings.target.hasFeature("execute on") => apply("on", "passengers")
+            case VariableValue(Identifier(List("@target")), selector) if Settings.target.hasFeature("execute on") => apply("on", "target")
+            case VariableValue(Identifier(List("@vehicle")), selector) if Settings.target.hasFeature("execute on") => apply("on", "vehicle")
+            case other => {
+                val (prefix, selector) = Utils.getSelector(ass.expr)
+                prefix:::apply("as", selector.getString())
+            }
+        }
     }
     def executeInstr(exec: Execute)(implicit context: Context):List[String] = {
         exec.typ match
@@ -96,6 +108,19 @@ object Execute{
                     case SelectorValue(value) => {
                         val (prefix, selector) = Utils.getSelector(exec.exprs.head)
                         prefix:::makeExecute(f" at ${selector.getString()}", Compiler.compile(exec.block))
+                    }
+                    case VariableValue(Identifier(List("@world_surface")), selector) if Settings.target.hasFeature("execute positioned over") => makeExecute(f" positioned over world_surface", Compiler.compile(exec.block))
+                    case VariableValue(Identifier(List("@motion_blocking")), selector) if Settings.target.hasFeature("execute positioned over") => makeExecute(f" positioned over motion_blocking", Compiler.compile(exec.block))
+                    case VariableValue(Identifier(List("@motion_blocking_no_leaves")), selector) if Settings.target.hasFeature("execute positioned over") => makeExecute(f" positioned over motion_blocking_no_leaves", Compiler.compile(exec.block))
+                    case VariableValue(Identifier(List("@ocean_floor")), selector) if Settings.target.hasFeature("execute positioned over") => makeExecute(f" positioned over ocean_floor", Compiler.compile(exec.block))
+                    case VariableValue(vari, selector) => {
+                        try{
+                            val (prefix, selector) = Utils.getSelector(exec.exprs.head)
+                            prefix:::makeExecute(f" at ${selector.getString()}", Compiler.compile(exec.block))
+                        }
+                        catch{
+                            _ => Compiler.compile(FunctionCall("__at__", exec.exprs ::: List(LinkedFunctionValue(context.getFreshBlock(Compiler.compile(exec.block)))), List()))
+                        }
                     }
                     case LinkedVariableValue(vari, selector) if vari.getType() == EntityType => {
                         val (prefix, selector) = Utils.getSelector(exec.exprs.head)
@@ -363,7 +388,7 @@ object Execute{
                 val ll = Utils.simplifyToVariable(left)
                 val rr = Utils.simplify(right)
                 rr match
-                    case RangeValue(min, max) => (ll._1, List(IFValueCase(BinaryOperation(op, ll._2, rr))))
+                    case RangeValue(min, max, IntValue(1)) => (ll._1, List(IFValueCase(BinaryOperation(op, ll._2, rr))))
                     case VariableValue(name, selector) => (ll._1, List(IFValueCase(BinaryOperation(op, ll._2, rr))))
                     case LinkedVariableValue(name, selector) => (ll._1, List(IFValueCase(BinaryOperation(op, ll._2, rr))))
                     case other => {
@@ -448,6 +473,16 @@ object Execute{
                     )
                 if check then (List(), List(IFTrue)) else (List(), List(IFFalse))
             }
+            case FunctionCallValue(name, args, typeargs, sel) if name.toString() == "loaded" && args.length > 0 => {
+                if (Settings.target == MCJava){
+                    args.map(Utils.simplify(_)) match
+                        case PositionValue(pos)::Nil => (List(), List(IFLoaded(pos)))
+                        case other => throw new Exception(f"Invalid argument to loaded: $other")
+                }
+                else{
+                    throw new Exception(f"unsupported if loaded for target: ${Settings.target}")
+                }
+            }
             case FunctionCallValue(name, args, typeargs, sel) if name.toString() == "block" && args.length > 0 => {
                 if (Settings.target == MCJava){
                     args.map(Utils.simplify(_)) match
@@ -509,7 +544,7 @@ object Execute{
             case LambdaValue(args, instr) => (List(), List(IFTrue))
             case StringValue(string) => throw new Exception("Can't use if with string")
             case JsonValue(json) => throw new Exception("Can't use if with json")
-            case RangeValue(min, max) => throw new Exception("Can't use if with range")
+            case RangeValue(min, max, delta) => throw new Exception("Can't use if with range")
             case TupleValue(values) => throw new Exception("Can't use if with tuple")
             case RawJsonValue(value) => throw new Exception("Can't use if with rawjson")
             case NamespacedName(value) => throw new Exception("Can't use if with mcobject")
@@ -625,7 +660,7 @@ object Execute{
                     val block = context.getFreshBlock(makeTree(cond, x.map(p => p._1).sortBy(_._1)))
                     val min = x.map(p => p._1).head._1
                     val max = x.map(p => p._1).last._1
-                    makeExecute(getListCase(List(IFValueCase(BinaryOperation("in", LinkedVariableValue(cond), RangeValue(IntValue(min), IntValue(max)))))), block.call(List()))
+                    makeExecute(getListCase(List(IFValueCase(BinaryOperation("in", LinkedVariableValue(cond), RangeValue(IntValue(min), IntValue(max), IntValue(1)))))), block.call(List()))
                 }
                 else{
                     makeExecute(getListCase(List(IFValueCase(BinaryOperation("==", LinkedVariableValue(cond), IntValue(x.head._1._1))))), Compiler.compile(x.head._1._2))
@@ -692,19 +727,19 @@ case class IFValueCase(val value: Expression) extends IFCase{
                 f"unless score ${left.getSelector()(sel)} matches ${getComparator(op, right.getIntValue())}"
             }
 
-            case BinaryOperation("in", LinkedVariableValue(left, sel), RangeValue(min, max)) if min.hasIntValue() && max.hasIntValue()=> {
+            case BinaryOperation("in", LinkedVariableValue(left, sel), RangeValue(min, max, IntValue(1))) if min.hasIntValue() && max.hasIntValue()=> {
                 f"if score ${left.getSelector()(sel)} matches ${min.getIntValue()}..${max.getIntValue()}"
             }
 
-            case BinaryOperation("in", LinkedVariableValue(left, sel), RangeValue(LinkedVariableValue(right, sel2), max)) if max.hasIntValue()=> {
+            case BinaryOperation("in", LinkedVariableValue(left, sel), RangeValue(LinkedVariableValue(right, sel2), max, IntValue(1))) if max.hasIntValue()=> {
                 f"if score ${left.getSelector()(sel)} >= ${right.getSelector()(sel2)} if score ${left.getSelector()(sel)} matches ..${max.getIntValue()}"
             }
 
-            case BinaryOperation("in", LinkedVariableValue(left, sel), RangeValue(min, LinkedVariableValue(right, sel2))) if min.hasIntValue()=> {
+            case BinaryOperation("in", LinkedVariableValue(left, sel), RangeValue(min, LinkedVariableValue(right, sel2), IntValue(1))) if min.hasIntValue()=> {
                 f"if score ${left.getSelector()(sel)} matches ${min.getIntValue()}.. if score ${left.getSelector()(sel)} <= ${right.getSelector()(sel2)}"
             }
 
-            case BinaryOperation("in", LinkedVariableValue(left, sel), RangeValue(LinkedVariableValue(right1, sel1), LinkedVariableValue(right2, sel2))) => {
+            case BinaryOperation("in", LinkedVariableValue(left, sel), RangeValue(LinkedVariableValue(right1, sel1), LinkedVariableValue(right2, sel2), IntValue(1))) => {
                 f"if score ${left.getSelector()(sel1)} >= ${right1.getSelector()(sel1)} if score ${left.getSelector()(sel1)} <= ${right2.getSelector()(sel2)}"
             }
 
@@ -777,6 +812,11 @@ case class IFBlock(val value: String) extends IFCase{
 case class IFBlocks(val value: String) extends IFCase{
     def get()(implicit context: Context): String = {
         f"if blocks $value"
+    }
+}
+case class IFLoaded(val value: String) extends IFCase{
+    def get()(implicit context: Context): String = {
+        f"if loaded $value"
     }
 }
 case object IFTrue extends IFCase{
