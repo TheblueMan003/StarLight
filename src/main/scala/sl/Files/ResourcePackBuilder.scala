@@ -8,11 +8,12 @@ import java.util.zip.{ ZipEntry, ZipOutputStream }
 import java.io.PrintWriter
 import java.io.File
 import sl.Reporter
+import sl.IR.*
 
 object ResourcePackBuilder{
     var previous = Map[String, List[String]]()
     def clearCache() = previous = Map[String, List[String]]()
-    def build(source: List[String], target: String, jsonFiles: List[(String, List[String])])={
+    def build(source: List[String], target: String, jsonFiles: List[(String, List[IRTree])])={
         Reporter.ok(f"Building Resource Pack: $target")
         if (target.endsWith(".zip/")){
             makeRPZip(source, target.replaceAllLiterally(".zip/",".zip"), jsonFiles)
@@ -25,7 +26,7 @@ object ResourcePackBuilder{
         }
         Reporter.ok(f"Resource Pack build")
     }
-    def makeRPFolder(sources: List[String], target: String, jsonFiles: List[(String, List[String])])={
+    def makeRPFolder(sources: List[String], target: String, jsonFiles: List[(String, List[IRTree])])={
         FileUtils.deleteDirectory(target)
         sources.flatMap(source => getListOfRPFiles(source, "").map(f => (source, f)))
         .groupBy(_._2)
@@ -38,10 +39,10 @@ object ResourcePackBuilder{
             Files.copy(originalPath, copied, StandardCopyOption.REPLACE_EXISTING);
         })
         jsonFiles.map((file, content) => {
-            FileUtils.safeWriteFile(target+file, content)
+            FileUtils.safeWriteFile(target+file, content.map(_.getString()))
         })
     }
-    def makeRPZip(sources: List[String], target: String, jsonFiles: List[(String, List[String])])={
+    def makeRPZip(sources: List[String], target: String, jsonFiles: List[(String, List[IRTree])])={
         val Buffer = 2 * 1024
         var data = new Array[Byte](Buffer)
         val zip = new ZipOutputStream(new FileOutputStream(target))
@@ -71,7 +72,7 @@ object ResourcePackBuilder{
         .map((k,v) => v.sortBy(_._2.length).head)
         .map(f => (f._1, f._2)).foreach { (name, content) =>
             zip.putNextEntry(new ZipEntry(if name.startsWith("/") then name.drop(1) else name))
-            content.foreach(x => writer.println(x))
+            content.foreach(x => writer.println(x.getString()))
             writer.flush()
             zip.closeEntry()
         }

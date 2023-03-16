@@ -6,9 +6,10 @@ import objects.types.{VoidType, TupleType, IdentifierType, ArrayType}
 import sl.Compilation.Execute
 import sl.Compilation.Selector.Selector
 import objects.types.JsonType
+import sl.IR.*
 
 object Compiler{
-    def compile(context: Context):List[(String, List[String])] = {
+    def compile(context: Context):List[(String, List[IRTree])] = {
         var fct = context.getFunctionToCompile()
 
         while(fct != null){
@@ -34,7 +35,7 @@ object Compiler{
             context.getAllPredicates().flatMap(_.getFiles()):::
             Settings.target.getExtraFiles(context)
     }
-    def compile(instruction: Instruction, meta: Meta = Meta(false, false))(implicit context: Context):List[String]={   
+    def compile(instruction: Instruction, meta: Meta = Meta(false, false))(implicit context: Context):List[IRTree]={   
         try{
             instruction match{
                 case FunctionDecl(name, block, typ2, args, typevars, modifier) =>{
@@ -305,7 +306,7 @@ object Compiler{
                     compile(If(BinaryOperation("!=",VariableValue("__exceptionThrown"), IntValue(0)), except, List()), meta) :::
                     compile(finallyBlock, meta)
                 }
-                case CMD(value) => List(value.replaceAllLiterally("\\\"","\""))
+                case CMD(value) => List(CommandIR(value.replaceAllLiterally("\\\"","\"")))
                 case Package(name, block) => {
                     val sub = if (name == "_") then context.root else context.root.push(name)
                     if (!meta.isLib){

@@ -8,12 +8,13 @@ import sl.Argument
 import sl.Expression
 import sl.Utils
 import sl.Settings
+import sl.IR.*
 
 class Predicate(context: Context, name: String, val arguments: List[Argument], _modifier: Modifier, val block: JSONElement) extends CObject(context, name, _modifier){
     val minArgCount = getMinArgCount(arguments)
 
     private val predicates = mutable.Map[List[Expression], String]()
-    private val files = mutable.Map[String, List[String]]()
+    private val files = mutable.Map[String, List[JsonIR]]()
     private var counter = 0
     var argumentsVariables: List[Variable] = List()
 
@@ -60,7 +61,7 @@ class Predicate(context: Context, name: String, val arguments: List[Argument], _
             vari
         })
     }
-    def getFiles(): List[(String, List[String])] = {
+    def getFiles(): List[(String, List[JsonIR])] = {
         files.toList
     }
     def call(args: List[Expression])(implicit ctx: Context): String = {
@@ -69,7 +70,7 @@ class Predicate(context: Context, name: String, val arguments: List[Argument], _
         val va = argMap(args).map((v, e) => v.assign("=", e)(context))
         val compiled = Utils.compileJson(block)(context.push(name))
         val pname = context.getPath() +"."+ name +"."+ counter
-        files.put(Settings.target.getPredicatePath(pname), List(compiled.getString()(context.push(name))))
+        files.put(Settings.target.getPredicatePath(pname), List(JsonIR(compiled.getString()(context.push(name)))))
         predicates.put(uargs, Settings.target.getFunctionName(pname))
         counter+=1
         Settings.target.getFunctionName(pname)

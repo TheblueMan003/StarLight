@@ -5,7 +5,7 @@ import objects.{Variable, Context}
 import sl.Utils
 import sl.*
 import objects.types.EntityType
-
+import sl.IR.*
 
 private lazy val colorMap = Utils.getConfig("color.csv")
                             .map(l => l.split(";").toList)
@@ -14,13 +14,13 @@ private lazy val colorMap = Utils.getConfig("color.csv")
                             .toMap
 
 object Print{
-    def toRawJson(expr: List[Expression])(implicit ctx: Context): (List[String], RawJsonValue) = {
+    def toRawJson(expr: List[Expression])(implicit ctx: Context): (List[IRTree], RawJsonValue) = {
         val res = expr.map(toRawJson(_, true))
         val prefix = res.map(_._1).flatten
         val json1 = res.map(_._2).flatten
         (prefix, RawJsonValue(json1))
     }
-    def toRawJson(expr: Expression, top: Boolean = false)(implicit ctx: Context): (List[String], List[Printable])= {
+    def toRawJson(expr: Expression, top: Boolean = false)(implicit ctx: Context): (List[IRTree], List[Printable])= {
         var mod = TextModdifier(false, false, false, false, false)
         var col = Namecolor("white")
         expr match

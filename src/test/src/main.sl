@@ -1,10 +1,10 @@
-package cell
-
-import cmd.tag as tag
+package test
 
 def main(){
-    tag.add("test")
-    if (tag.has("test")){
-        /say hi
+    int a
+    with(@a,true){
+        if (a){
+            /say hi
+        }
     }
 }

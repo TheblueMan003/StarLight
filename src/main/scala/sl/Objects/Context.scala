@@ -10,6 +10,7 @@ import sl.VariableValue
 import sl.Compilation.Selector.Selector
 import sl.NullValue
 import sl.Compiler
+import sl.IR.*
 
 object Context{
     def getNew(name: String):Context = {
@@ -163,7 +164,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
         addFunction(name, fct)
         fct
     }
-    def getFreshBlock(content: List[String]): BlockFunction = {
+    def getFreshBlock(content: List[IRTree]): BlockFunction = {
         val r = fctCtx
         r.synchronized{
             r.varId += 1
@@ -178,7 +179,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
             push("_"+varId.toString())
         }
     }
-    def getNamedBlock(name: String, content: List[String]): Function = {
+    def getNamedBlock(name: String, content: List[IRTree]): Function = {
         val name2 = getFunctionWorkingName(name)
         synchronized{
             addFunction(name, BlockFunction(this, name2, List(), content))

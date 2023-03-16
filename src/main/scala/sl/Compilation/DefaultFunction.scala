@@ -8,6 +8,7 @@ import java.util.Random
 import sys.process._
 import java.nio.file.Files
 import java.nio.file.Paths
+import sl.IR.*
 
 object DefaultFunction{
     def get()(implicit context: Context) = {
@@ -612,11 +613,11 @@ object DefaultFunction{
                 args match{
                     case LambdaValue(arg, instr)::Nil => {
                         val ret = Compiler.compile(instr)(ctx)
-                        (List(), JsonValue(JsonArray(ret.map(v => JsonString(v)))))
+                        (List(), JsonValue(JsonArray(ret.map(v => JsonString(v.getString())))))
                     }
                     case VariableValue(vari, sel)::Nil => {
                         val ret = Compiler.compile(FunctionCall(vari, List(), List()))(ctx)
-                        (List(), JsonValue(JsonArray(ret.map(v => JsonString(v)))))
+                        (List(), JsonValue(JsonArray(ret.map(v => JsonString(v.getString())))))
                     }
                     case other => throw new Exception(f"Illegal Arguments $other for callToArray")
                 }
@@ -633,10 +634,10 @@ object DefaultFunction{
                             val e = name.split(":")(1)
                             val splitted = e.split("\\.")
                             if (splitted.length == 1){
-                                (List(f"function ${splitted(0)}:summon/default"), (NullValue))
+                                (List(CommandIR(f"function ${splitted(0)}:summon/default")), (NullValue))
                             }
                             else{
-                                (List(f"function ${splitted(0)}:summon/${splitted(1)}"), (NullValue))
+                                (List(CommandIR(f"function ${splitted(0)}:summon/${splitted(1)}")), (NullValue))
                             }
                         }
                         case other => throw new Exception(f"Illegal Arguments $other for blockbenchSummon")
@@ -651,11 +652,11 @@ object DefaultFunction{
                         args match{
                             case LinkedVariableValue(vari, sel)::LambdaValue(arg, instr)::Nil => {
                                 val ret = Compiler.compile(instr)(ctx)
-                                (ret.take(ret.length - 1) ::: List(f"execute store result score ${vari.getSelector()(sel)} run "+ret.last), NullValue)
+                                (ret.take(ret.length - 1) ::: List(CommandIR(f"execute store result score ${vari.getSelector()(sel)} run "+ret.last)), NullValue)
                             }
                             case VariableValue(vari, sel)::LambdaValue(arg, instr)::Nil => {
                                 val ret = Compiler.compile(instr)(ctx)
-                                (ret.take(ret.length - 1) ::: List(f"execute store result score ${ctx.getVariable(vari).getSelector()(sel)} run "+ret.last), NullValue)
+                                (ret.take(ret.length - 1) ::: List(CommandIR(f"execute store result score ${ctx.getVariable(vari).getSelector()(sel)} run "+ret.last)), NullValue)
                             }
                             case other => throw new Exception(f"Illegal Arguments $other for cmdstore")
                         }
@@ -670,10 +671,10 @@ object DefaultFunction{
                     (args: List[Expression],ctx: Context) => {
                         args match{
                             case LinkedVariableValue(vari, sel)::IntValue(min)::IntValue(max)::Nil => {
-                                (List(f"scoreboard players random ${vari.getSelector()(sel)} $min $max"), NullValue)
+                                (List(CommandIR(f"scoreboard players random ${vari.getSelector()(sel)} $min $max")), NullValue)
                             }
                             case VariableValue(vari, sel)::IntValue(min)::IntValue(max)::Nil => {
-                                (List(f"scoreboard players random ${ctx.getVariable(vari).getSelector()(sel)} $min $max"), NullValue)
+                                (List(CommandIR(f"scoreboard players random ${ctx.getVariable(vari).getSelector()(sel)} $min $max")), NullValue)
                             }
                             case other => throw new Exception(f"Illegal Arguments $other for random")
                         }

@@ -3,6 +3,7 @@ package sl
 import objects.Context
 import java.util.Random
 import objects.types.VoidType
+import sl.IR.*
 
 case class PackInfo(var version: Int, var description: String, var min_engine_version: List[Int])
 class SettingsContext(){
@@ -52,8 +53,8 @@ trait Target{
     def getFunctionName(path: String): String
     def getJsonPath(path: String): String
     def getRPJsonPath(path: String): String
-    def getExtraFiles(context: Context): List[(String, List[String])]
-    def getResourcesExtraFiles(context: Context): List[(String, List[String])]
+    def getExtraFiles(context: Context): List[(String, List[IRTree])]
+    def getResourcesExtraFiles(context: Context): List[(String, List[IRTree])]
 
     def hasFeature(feature: String): Boolean
 }
@@ -76,7 +77,7 @@ case object MCJava extends Target{
     def getRPJsonPath(path: String): String = {
         "/assets/minecraft/" + path.replaceAllLiterally(".","/")+ ".json"
     }
-    def getExtraFiles(context: Context): List[(String, List[String])] = {
+    def getExtraFiles(context: Context): List[(String, List[IRTree])] = {
         val ticks = context.getAllFunction()
                         .filter(_.modifiers.isTicking)
                         .map(f => getFunctionName(f.fullName))
@@ -92,19 +93,19 @@ case object MCJava extends Target{
                         .reduceOption(_ +","+_)
                         .getOrElse("")
 
-        val dfScore = List(f"scoreboard objectives add ${Settings.tmpScoreboard} dummy",
-                            f"scoreboard objectives add ${Settings.valueScoreboard} dummy",
-                            f"scoreboard objectives add ${Settings.constScoreboard} dummy",
-                            f"scoreboard objectives add ${Settings.variableScoreboard} dummy")::: 
-                            context.getAllConstant().map(v => f"scoreboard players set c$v ${Settings.constScoreboard} $v"):::
-                            context.getAllVariable().filter(_.modifiers.isEntity).map(v => f"scoreboard objectives add ${v.scoreboard} ${v.criterion}")
+        val dfScore = List(CommandIR(f"scoreboard objectives add ${Settings.tmpScoreboard} dummy"),
+                            CommandIR(f"scoreboard objectives add ${Settings.valueScoreboard} dummy"),
+                            CommandIR(f"scoreboard objectives add ${Settings.constScoreboard} dummy"),
+                            CommandIR(f"scoreboard objectives add ${Settings.variableScoreboard} dummy"))::: 
+                            context.getAllConstant().map(v => ScoreboardSet(SBLink(f"c$v", Settings.constScoreboard), v)):::
+                            context.getAllVariable().filter(_.modifiers.isEntity).map(v => CommandIR(f"scoreboard objectives add ${v.scoreboard} ${v.criterion}"))
 
         
 
-        List(("pack.mcmeta", List(getPackMeta())),
+        List(("pack.mcmeta", List(JsonIR(getPackMeta()))),
             (f"data/${context.root.getPath()}/functions/__init__.mcfunction", dfScore),
-            ("data/minecraft/tags/functions/tick.json", List("{", f"\t\"values\":[$ticks]", "}")),
-            ("data/minecraft/tags/functions/load.json", List("{", f"\t\"values\":[$loads]", "}")))
+            ("data/minecraft/tags/functions/tick.json", List(JsonIR("{"+ f"\t\"values\":[$ticks]"+ "}"))),
+            ("data/minecraft/tags/functions/load.json", List(JsonIR("{"+ f"\t\"values\":[$loads]"+ "}"))))
     }
 
     def getPackMeta()=
@@ -116,8 +117,8 @@ case object MCJava extends Target{
             }
         }
         """
-    def getResourcesExtraFiles(context: Context):List[(String, List[String])]= {
-        List((f"pack.mcmeta", List(getResourcePackMeta())))
+    def getResourcesExtraFiles(context: Context):List[(String, List[IRTree])]= {
+        List((f"pack.mcmeta", List(JsonIR(getResourcePackMeta()))))
     }
     def getResourcePackMeta()=
         f"""
@@ -148,7 +149,7 @@ case object MCBedrock extends Target{
     def getRPJsonPath(path: String): String = {
         "/" + path.replaceAllLiterally(".","/")+ ".json"
     }
-    def getExtraFiles(context: Context): List[(String, List[String])] = {
+    def getExtraFiles(context: Context): List[(String, List[IRTree])] = {
         val ticks = context.getAllFunction()
                         .filter(_.modifiers.isTicking)
                         .map(f => getFunctionName(f.fullName))
@@ -156,18 +157,18 @@ case object MCBedrock extends Target{
                         .reduceOption(_ +","+_)
                         .getOrElse("")
 
-        val dfScore = List(f"scoreboard objectives add ${Settings.tmpScoreboard} dummy",
-                            f"scoreboard objectives add ${Settings.valueScoreboard} dummy",
-                            f"scoreboard objectives add ${Settings.constScoreboard} dummy",
-                            f"scoreboard objectives add ${Settings.variableScoreboard} dummy")::: 
-                            context.getAllConstant().map(v => f"scoreboard players set c$v ${Settings.constScoreboard} $v"):::
-                            context.getAllVariable().filter(_.modifiers.isEntity).map(v => f"scoreboard objectives add ${v.scoreboard} dummy"):::
-                            context.getAllVariable().filter(v => !v.modifiers.isEntity && !v.modifiers.isLazy && v.getType() != VoidType).map(v => f"scoreboard players set ${v.getSelector()} 0"):::
-                            List(f"function ${context.root.getPath()}/__load__")
+        val dfScore = List(CommandIR(f"scoreboard objectives add ${Settings.tmpScoreboard} dummy"),
+                            CommandIR(f"scoreboard objectives add ${Settings.valueScoreboard} dummy"),
+                            CommandIR(f"scoreboard objectives add ${Settings.constScoreboard} dummy"),
+                            CommandIR(f"scoreboard objectives add ${Settings.variableScoreboard} dummy"))::: 
+                            context.getAllConstant().map(v => ScoreboardSet(SBLink(f"c$v", Settings.constScoreboard), v)):::
+                            context.getAllVariable().filter(_.modifiers.isEntity).map(v => CommandIR(f"scoreboard objectives add ${v.scoreboard} dummy")):::
+                            context.getAllVariable().filter(v => !v.modifiers.isEntity && !v.modifiers.isLazy && v.getType() != VoidType).map(v => ScoreboardSet(v.getIRSelector(), 0)):::
+                            List(CommandIR(f"function ${context.root.getPath()}/__load__"))
 
-        List((f"manifest.json", List(getManifestContent())),
+        List((f"manifest.json", List(JsonIR(getManifestContent()))),
             (f"functions/__init__.mcfunction", dfScore),
-            ("functions/tick.json", List("{", f"\t\"values\":[$ticks]", "}")))
+            ("functions/tick.json", List(JsonIR("{"+ f"\t\"values\":[$ticks]"+ "}"))))
     }
 
     def getManifestContent(): String = {
@@ -192,8 +193,8 @@ case object MCBedrock extends Target{
         """
     }
 
-    def getResourcesExtraFiles(context: Context):List[(String, List[String])]= {
-        List((f"manifest.json", List(getResourcesManifestContent())))
+    def getResourcesExtraFiles(context: Context):List[(String, List[IRTree])]= {
+        List((f"manifest.json", List(JsonIR(getResourcesManifestContent()))))
     }
 
     def getResourcesManifestContent(): String = {

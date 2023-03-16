@@ -5,6 +5,7 @@ import objects.ConcreteFunction
 import sl.*
 import sl.Compilation.Selector.Selector
 import scala.collection.mutable
+import sl.IR.*
 
 class Class(context: Context, name: String, val generics: List[String], _modifier: Modifier, val block: Instruction, val parent: Class, val entities: Map[String, Expression]) extends CObject(context, name, _modifier){
     var implemented = mutable.Map[List[Type], Class]()
@@ -173,9 +174,9 @@ class Class(context: Context, name: String, val generics: List[String], _modifie
             false
         }
     }
-    def addClassTags():List[String] = {
+    def addClassTags():List[IRTree] = {
         virutalFunctionVariable.zip(virutalFunctionBase).flatMap((vari, fct) => vari.assign("=", LinkedFunctionValue(fct))(context.push(name))) :::
-        List(f"tag @s add ${getTag()}") ::: (if (parent != null){
+        List(CommandIR(f"tag @s add ${getTag()}")) ::: (if (parent != null){
             parent.addClassTags()
         }
         else{

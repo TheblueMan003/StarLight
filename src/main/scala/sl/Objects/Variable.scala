@@ -6,6 +6,7 @@ import sl.Compilation.Execute
 import sl.Compilation.Print
 import sl.Compilation.Selector.{Selector, JavaSelector, SelectorIdentifier}
 import sl.Compilation.Array
+import sl.IR.*
 
 private val entityTypeSubVariable = List((BoolType, "isPlayer"))
 object Variable {
@@ -112,7 +113,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 
 
 
-	def assign(op: String, value: Expression)(implicit context: Context, selector: Selector = Selector.self): List[String] = {
+	def assign(op: String, value: Expression)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		if (modifiers.isConst && wasAssigned) throw new Exception(f"Cannot reassign variable $fullName")
 		val ret = if (modifiers.isLazy){
 			getType() match{
@@ -267,10 +268,10 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 		ret
 	}
 
-	def checkNull()(implicit selector: Selector = Selector.self) = 
+	def checkNull(tree: IRTree)(implicit selector: Selector = Selector.self) = 
 		getType() match
-			case EntityType => f" unless entity @e[tag=$tagName]"
-			case _ => f" unless score ${getSelector()} = ${getSelector()}"
+			case EntityType => IfEntity(f"@e[tag=$tagName]", tree, true)
+			case _ => IfScoreboard(getIRSelector(), "=", getIRSelector(), tree, true)
 	
 
 	def defaultAssign(expr: Expression)(implicit context: Context, selector: Selector = Selector.self) = {
@@ -278,7 +279,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 			List()
 		}
 		else if (Settings.target == MCJava){
-			Execute.makeExecute(checkNull(), assign("=", expr))
+			Execute.makeExecute(checkNull, assign("=", expr))
 		}
 		else{
 			???
@@ -289,7 +290,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 	/**
 	 * Assign the value to a tmp variable then apply op with the variable.
 	 */
-	def assignTmp(op: String, expr: Expression)(implicit context: Context, selector: Selector = Selector.self): List[String] = {
+	def assignTmp(op: String, expr: Expression)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		val vari = context.getFreshVariable(getType())
 		vari.assign("=", expr) ::: assign(op, LinkedVariableValue(vari))
 	}
@@ -298,7 +299,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 	/**
 	 * Assign binary operator to the variable.
 	 */
-	def assignBinaryOperator(op: String, value: BinaryOperation)(implicit context: Context, selector: Selector = Selector.self): List[String] = {
+	def assignBinaryOperator(op: String, value: BinaryOperation)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		op match{
 			case "=" => assign("=", value.left) ::: assign(value.op+"=", value.right)
 			case "+=" => {
@@ -330,22 +331,22 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 	}
 
 
-	def assignForce(vari: Variable)(implicit context: Context, selector: Selector = Selector.self): List[String] = {
-		List(f"scoreboard players operation ${getSelector()} = ${vari.getSelector()}")
+	def assignForce(vari: Variable)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
+		List(ScoreboardOperation(getIRSelector(), "=", vari.getIRSelector()))
 	}
 	/**
 	 * Assign a value to the int variable
 	 */
-	def assignInt(op: String, value: Expression)(implicit context: Context, selector: Selector = Selector.self): List[String] = {
+	def assignInt(op: String, value: Expression)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		value match
 			case IntValue(value) => {
 				op match{
-					case "=" => List(f"scoreboard players set ${getSelector()} ${value}")
-					case "+=" => List(f"scoreboard players add ${getSelector()} ${value}")
-					case "-=" => List(f"scoreboard players remove ${getSelector()} ${value}")
+					case "=" => List(ScoreboardSet(getIRSelector(), value))
+					case "+=" => List(ScoreboardAdd(getIRSelector(), value))
+					case "-=" => List(ScoreboardRemove(getIRSelector(), value))
 					case "*=" | "/=" | "%=" => {
 						context.requestConstant(value)
-						List(f"scoreboard players operation ${getSelector()} ${op} c${value} ${Settings.constScoreboard}")
+						List(ScoreboardOperation(getIRSelector(), op, SBLink(f"c$value", Settings.constScoreboard)))
 					}
 					case "&=" => {
 						context.requestLibrary("standard.int")
@@ -363,8 +364,8 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 				}
 			}
 			case EnumIntValue(value) => assignInt(op, IntValue(value))
-			case DefaultValue => List(f"scoreboard players set ${getSelector()} 0")
-			case NullValue => List(f"scoreboard players reset ${getSelector()}")
+			case DefaultValue => List(ScoreboardSet(getIRSelector(), 0))
+			case NullValue => List(ScoreboardReset(getIRSelector()))
 			case BoolValue(value) => assignInt(op, IntValue(if value then 1 else 0))
 			case FloatValue(value) => assignInt(op, IntValue(value.toInt))
 			case VariableValue(name, sel) => assignInt(op, context.resolveVariable(value))
@@ -375,7 +376,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 			case _ => throw new Exception(f"Unknown cast to int: $value")
 	}
 
-	def handleFunctionCall(op: String, name: Expression, args: List[Expression], typeargs: List[Type], sel: Selector)(implicit context: Context, selector: Selector = Selector.self):List[String] = {
+	def handleFunctionCall(op: String, name: Expression, args: List[Expression], typeargs: List[Type], sel: Selector)(implicit context: Context, selector: Selector = Selector.self):List[IRTree] = {
 		if (sel != Selector.self && modifiers.isEntity){
 			val (pref,vari) = Utils.simplifyToVariable(FunctionCallValue(name, args, typeargs, sel))
 			pref ::: assign(op, vari)
@@ -397,7 +398,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 		}
 	}
 
-	def handleArrayGetValue(op: String, name2: Expression, index: List[Expression])(implicit context: Context):List[String] = {
+	def handleArrayGetValue(op: String, name2: Expression, index: List[Expression])(implicit context: Context):List[IRTree] = {
 		val (prev,name) = Utils.simplifyToVariable(name2)
 		prev ::: (
 		name match{
@@ -417,29 +418,30 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 		)
 	}
 
-	def assignIntLinkedVariable(op: String, vari: Variable, oselector: Selector)(implicit context: Context, selector: Selector = Selector.self) = {
+	def assignIntLinkedVariable(op: String, vari: Variable, oselector: Selector)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		vari.getType() match{
 			case FloatType => {
 				op match{
 					case "=" => {
 						context.requestConstant(Settings.floatPrec)
-						List(f"scoreboard players operation ${getSelector()} ${op} ${vari.getSelector()(oselector)}",
-								f"scoreboard players operation ${getSelector()} /= c${Settings.floatPrec} ${Settings.constScoreboard}")
+						List(ScoreboardOperation(getIRSelector(), op, vari.getIRSelector()(oselector)),
+							ScoreboardOperation(getIRSelector(), "/=", SBLink(f"c${Settings.floatPrec}", Settings.constScoreboard)))
 					}
 					case other => {
 						val tmp = context.getFreshId()
 						context.requestConstant(Settings.floatPrec)
-						List(f"scoreboard players operation ${tmp} ${Settings.tmpScoreboard} ${op} ${vari.getSelector()(oselector)}",
-								f"scoreboard players operation ${tmp} ${Settings.tmpScoreboard} /= c${Settings.floatPrec} ${Settings.constScoreboard}",
-								f"scoreboard players operation ${getSelector()} = ${tmp} ${Settings.tmpScoreboard}"
-						)
+
+						List(ScoreboardOperation(SBLink(tmp, Settings.tmpScoreboard), op, vari.getIRSelector()(oselector)),
+							ScoreboardOperation(SBLink(tmp, Settings.tmpScoreboard), "/=", SBLink(f"c${Settings.floatPrec}", Settings.constScoreboard)),
+							ScoreboardOperation(getIRSelector(), op, SBLink(tmp, Settings.tmpScoreboard))
+							)
 					}
 				}
 			}
 			case other if other.isSubtypeOf(getType()) => 
 				op match{
 					case "=" | "+=" | "-=" | "*=" | "/=" | "%=" => 
-						List(f"scoreboard players operation ${getSelector()} ${op} ${vari.getSelector()(oselector)}")
+						List(ScoreboardOperation(getIRSelector(), op, vari.getIRSelector()(oselector)))
 					case "&=" => {
 						context.requestLibrary("standard.int")
 						handleFunctionCall("=", VariableValue("standard.int.bitwiseAnd"), List(LinkedVariableValue(this, selector), LinkedVariableValue(vari, oselector)), List(), Selector.self)
@@ -454,7 +456,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					}
 					case other => throw new Exception(f"Cannot use $other with $fullName & ${vari.fullName}")
 				}
-			case FuncType(sources, output) => List(f"scoreboard players operation ${getSelector()} ${op} ${vari.getSelector()(oselector)}")
+			case FuncType(sources, output) => List(ScoreboardOperation(getIRSelector(), op, vari.getIRSelector()(oselector)))
 			case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()}")
 		}
 	}
@@ -463,7 +465,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 	/**
 	 * Assign a value to the enum variable
 	 */
-	def assignEnum(op: String, value: Expression)(implicit context: Context, selector: Selector = Selector.self): List[String] = {
+	def assignEnum(op: String, value: Expression)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		value match
 			case VariableValue(name, sel) => {
 				val a = getType().asInstanceOf[EnumType].enm.values.indexWhere(_.name == name.toString())
@@ -486,29 +488,29 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 	/**
 	 * Assign a value to the float variable
 	 */
-	def assignFloat(op: String, value: Expression)(implicit context: Context, selector: Selector = Selector.self): List[String] = {
+	def assignFloat(op: String, value: Expression)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		value match
 			case FloatValue(value) => {
 				val fvalue = (value * Settings.floatPrec).toInt
 				op match{
-					case "=" => List(f"scoreboard players set ${getSelector()} ${fvalue}")
-					case "+=" => List(f"scoreboard players add ${getSelector()} ${fvalue}")
-					case "-=" => List(f"scoreboard players remove ${getSelector()} ${fvalue}")
+					case "=" => List(ScoreboardSet(getIRSelector(), fvalue))
+					case "+=" => List(ScoreboardAdd(getIRSelector(), fvalue))
+					case "-=" => List(ScoreboardRemove(getIRSelector(), fvalue))
 					case "*=" => {
 						context.requestConstant(fvalue)
 						context.requestConstant(Settings.floatPrec)
-						List(f"scoreboard players operation ${getSelector()} *= c${fvalue} ${Settings.constScoreboard}",
-							f"scoreboard players operation ${getSelector()} /= c${Settings.floatPrec} ${Settings.constScoreboard}")
+						List(ScoreboardOperation(getIRSelector(), op, SBLink(f"c${fvalue}", Settings.constScoreboard)),
+							ScoreboardOperation(getIRSelector(), "/=", SBLink(f"c${Settings.floatPrec}", Settings.constScoreboard)))
 					}
 					case "/=" => {
 						context.requestConstant(fvalue)
 						context.requestConstant(Settings.floatPrec)
-						List(f"scoreboard players operation ${getSelector()} /= c${fvalue} ${Settings.constScoreboard}",
-							f"scoreboard players operation ${getSelector()} *= c${Settings.floatPrec} ${Settings.constScoreboard}")
+						List(ScoreboardOperation(getIRSelector(), op, SBLink(f"c${fvalue}", Settings.constScoreboard)),
+							ScoreboardOperation(getIRSelector(), "*=", SBLink(f"c${Settings.floatPrec}", Settings.constScoreboard)))
 					}
 					case "%=" => {
 						context.requestConstant(fvalue)
-						List(f"scoreboard players operation ${getSelector()} %%= c${fvalue} ${Settings.constScoreboard}")
+						List(ScoreboardOperation(getIRSelector(), op, SBLink(f"c${fvalue}", Settings.constScoreboard)))
 					}
 					case "^=" => {
 						context.requestLibrary("standard.float")
@@ -517,16 +519,16 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					case other => throw new Exception(f"Cannot use $other with $fullName")
 				}
 			}
-			case DefaultValue => List(f"scoreboard players set ${getSelector()} 0")
+			case DefaultValue => List(ScoreboardSet(getIRSelector(), 0))
 			case IntValue(value) => {
 				val fvalue = (value * Settings.floatPrec).toInt
 				op match{
-					case "=" => List(f"scoreboard players set ${getSelector()} ${fvalue}")
-					case "+=" => List(f"scoreboard players add ${getSelector()} ${fvalue}")
-					case "-=" => List(f"scoreboard players remove ${getSelector()} ${fvalue}")
+					case "=" => List(ScoreboardSet(getIRSelector(), fvalue))
+					case "+=" => List(ScoreboardAdd(getIRSelector(), fvalue))
+					case "-=" => List(ScoreboardRemove(getIRSelector(), fvalue))
 					case "*=" |"/="|"%=" => {
 						context.requestConstant(fvalue)
-						List(f"scoreboard players operation ${getSelector()} $op ${value} ${Settings.constScoreboard}")
+						List(ScoreboardOperation(getIRSelector(), op, SBLink(f"c$value", Settings.constScoreboard)))
 					}
 					case "^=" => {
 						context.requestLibrary("standard.float")
@@ -535,7 +537,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					case other => throw new Exception(f"Cannot use $other with $fullName")
 				}
 			}
-			case NullValue => List(f"scoreboard players reset ${getSelector()}")
+			case NullValue => List(ScoreboardReset(getIRSelector()))
 			case BoolValue(value) => assignFloat(op, IntValue(if value then 1 else 0))
 			case VariableValue(name, sel) => assignFloat(op, context.resolveVariable(value))
 			case LinkedVariableValue(vari, sel) => assignFloatLinkedVariable(op, vari, sel)
@@ -548,16 +550,16 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 	/**
 	 * Assign a value to the float variable
 	 */
-	def assignBool(op: String, value: Expression)(implicit context: Context, selector: Selector = Selector.self): List[String] = {
+	def assignBool(op: String, value: Expression)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		value match
 			case BoolValue(value) => 
 				op match{
-					case "=" => List(f"scoreboard players set ${getSelector()} ${if value then 1 else 0}")
-					case "|=" => if value then List(f"scoreboard players set ${getSelector()} 1") else List()
-					case "||=" => if value then List(f"scoreboard players set ${getSelector()} 1") else List()
-					case "+=" => if value then List(f"scoreboard players set ${getSelector()} 1") else List()
-					case "&=" => if value then List() else List(f"scoreboard players set ${getSelector()} 0")
-					case "&&=" => if value then List() else List(f"scoreboard players set ${getSelector()} 0")
+					case "=" => List(ScoreboardSet(getIRSelector(), if value then 1 else 0))
+					case "|=" => if value then List(ScoreboardSet(getIRSelector(), 1)) else List()
+					case "||=" => if value then List(ScoreboardSet(getIRSelector(), 1)) else List()
+					case "+=" => if value then List(ScoreboardSet(getIRSelector(), 1)) else List()
+					case "&=" => if value then List() else List(ScoreboardSet(getIRSelector(), 0))
+					case "&&=" => if value then List() else List(ScoreboardSet(getIRSelector(), 0))
 				}
 			case UnaryOperation("!", value) => {
 				op match{
@@ -568,48 +570,48 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 						prev ::: assignBool(op, vari)
 				}
 			}
-			case NullValue => List(f"scoreboard players reset ${getSelector()}")
-			case DefaultValue => List(f"scoreboard players set 0")
+			case NullValue => List(ScoreboardReset(getIRSelector()))
+			case DefaultValue => List(ScoreboardSet(getIRSelector(), 0))
 			case VariableValue(name, sel) => assignBool(op, context.resolveVariable(value))
 			case LinkedVariableValue(vari, sel) => 
 				vari.getType() match
 					case a if a.isSubtypeOf(BoolType) => {
 						op match
-							case "&=" => List(f"scoreboard players operation ${getSelector()} *= ${vari.getSelector()(sel)}")
-							case "&&=" => List(f"scoreboard players operation ${getSelector()} *= ${vari.getSelector()(sel)}")
-							case "|=" => List(f"scoreboard players operation ${getSelector()} += ${vari.getSelector()(sel)}")
-							case "||=" => List(f"scoreboard players operation ${getSelector()} += ${vari.getSelector()(sel)}")
-							case "+=" => List(f"scoreboard players operation ${getSelector()} += ${vari.getSelector()(sel)}")
-							case _ => List(f"scoreboard players operation ${getSelector()} $op ${vari.getSelector()(sel)}")
+							case "&=" => List(ScoreboardOperation(getIRSelector(), "*=", vari.getIRSelector()(sel)))
+							case "&&=" => List(ScoreboardOperation(getIRSelector(), "*=", vari.getIRSelector()(sel)))
+							case "|=" => List(ScoreboardOperation(getIRSelector(), "+=", vari.getIRSelector()(sel)))
+							case "||=" => List(ScoreboardOperation(getIRSelector(), "+=", vari.getIRSelector()(sel)))
+							case "+=" => List(ScoreboardOperation(getIRSelector(), "+=", vari.getIRSelector()(sel)))
+							case _ => List(ScoreboardOperation(getIRSelector(), "*=", vari.getIRSelector()(sel)))
 					}
-					case EntityType => f"scoreboard players set ${getSelector()} 0"::Compiler.compile(If(value, VariableAssigment(List((Right(this), selector)), "=", BoolValue(true)), List()))
+					case EntityType => ScoreboardSet(getIRSelector(), 0)::Compiler.compile(If(value, VariableAssigment(List((Right(this), selector)), "=", BoolValue(true)), List()))
 					case other => throw new Exception(f"Cannot assign $value of type $other to $fullName of type ${getType()}")
 			case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 			case ArrayGetValue(name, index) => handleArrayGetValue(op, name, index)
 			case bin: BinaryOperation => assignBinaryOperator(op, bin)
-			case SelectorValue(sel) => f"scoreboard players set ${getSelector()} 0"::Compiler.compile(If(value, VariableAssigment(List((Right(this), selector)), "=", BoolValue(true)), List()))
+			case SelectorValue(sel) => ScoreboardSet(getIRSelector(), 0)::Compiler.compile(If(value, VariableAssigment(List((Right(this), selector)), "=", BoolValue(true)), List()))
 			case _ => throw new Exception(f"Unknown cast to bool $value")
 	}
 
-	def assignFloatLinkedVariable(op: String, vari: Variable, sel: Selector)(implicit context: Context, selector: Selector = Selector.self)={
+	def assignFloatLinkedVariable(op: String, vari: Variable, sel: Selector)(implicit context: Context, selector: Selector = Selector.self):List[IRTree]={
 		vari.getType() match{
 			case FloatType => {
 				op match{
 					case "=" | "+=" | "-=" => {
-						List(f"scoreboard players operation ${getSelector()} ${op} ${vari.getSelector()(sel)}")
+						List(ScoreboardOperation(getIRSelector(), op, vari.getIRSelector()(sel)))
 					}
 					case "*=" => {
 						context.requestConstant(Settings.floatPrec)
-						List(f"scoreboard players operation ${getSelector()} *= ${vari.getSelector()(sel)}",
-							f"scoreboard players operation ${getSelector()} /= c${Settings.floatPrec} ${Settings.constScoreboard}")
+						List(ScoreboardOperation(getIRSelector(), op, vari.getIRSelector()(sel)),
+							ScoreboardOperation(getIRSelector(), "/=", SBLink(f"c${Settings.floatPrec}", Settings.constScoreboard)))
 					}
 					case "/=" => {
 						context.requestConstant(Settings.floatPrec)
-						List(f"scoreboard players operation ${getSelector()} /= ${vari.getSelector()(sel)}",
-							f"scoreboard players operation ${getSelector()} *= c${Settings.floatPrec} ${Settings.constScoreboard}")
+						List(ScoreboardOperation(getIRSelector(), op, vari.getIRSelector()(sel)),
+							ScoreboardOperation(getIRSelector(), "*=", SBLink(f"c${Settings.floatPrec}", Settings.constScoreboard)))
 					}
 					case "%=" => {
-						List(f"scoreboard players operation ${getSelector()} %%= ${vari.getSelector()(sel)}")
+						List(ScoreboardOperation(getIRSelector(), "%=", vari.getIRSelector()(sel)))
 					}
 					case "^=" => {
 						context.requestLibrary("standard.float")
@@ -622,11 +624,11 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 				op match{
 					case "=" => {
 						context.requestConstant(Settings.floatPrec)
-						List(f"scoreboard players operation ${getSelector()} ${op} ${vari.getSelector()(sel)}",
-								f"scoreboard players operation ${getSelector()} *= c${Settings.floatPrec} ${Settings.constScoreboard}")
+						List(ScoreboardOperation(getIRSelector(), op, vari.getIRSelector()(sel)),
+							ScoreboardOperation(getIRSelector(), "*=", SBLink(f"c${Settings.floatPrec}", Settings.constScoreboard)))
 					}
 					case "*=" | "/=" => {
-						List(f"scoreboard players operation ${getSelector()} $op ${vari.getSelector()(sel)}")
+						List(ScoreboardOperation(getIRSelector(), op, vari.getIRSelector()(sel)))
 					}
 					case "^=" => {
 						context.requestLibrary("standard.float")
@@ -635,16 +637,17 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					case other => {
 						val tmp = context.getFreshId()
 						context.requestConstant(Settings.floatPrec)
-						List(f"scoreboard players operation ${tmp} ${Settings.tmpScoreboard} = ${vari.getSelector()(sel)}",
-								f"scoreboard players operation ${tmp} ${Settings.tmpScoreboard} *= c${Settings.floatPrec} ${Settings.constScoreboard}",
-								f"scoreboard players operation ${getSelector()} ${op} ${tmp} ${Settings.tmpScoreboard}"
+						List(
+							ScoreboardOperation(SBLink(tmp, Settings.tmpScoreboard), "=", vari.getIRSelector()(sel)),
+							ScoreboardOperation(SBLink(tmp, Settings.tmpScoreboard), "*=", SBLink(f"c${Settings.floatPrec}", Settings.constScoreboard)),
+							ScoreboardOperation(getIRSelector(), op, SBLink(tmp, Settings.tmpScoreboard))
 						)
 					}
 				}
 			}
 			case a if a.isSubtypeOf(getType()) => 
 				op match
-					case "=" | "+=" | "-=" | "*=" | "/=" | "%=" => List(f"scoreboard players operation ${getSelector()} ${op} ${vari.getSelector()(sel)}")
+					case "=" | "+=" | "-=" | "*=" | "/=" | "%=" => List(ScoreboardOperation(getIRSelector(), op, vari.getIRSelector()(sel)))
 					case otherOp => throw new Exception(f"Cannot assign ${vari.fullName} of type ${vari.getType()} to $fullName of type ${getType()} with operator $otherOp")
 			case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()}")
 		}
@@ -698,26 +701,26 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 	}
 
 
-	def assignFunc(op: String, expr: Expression)(implicit context: Context, selector: Selector = Selector.self):List[String]={
+	def assignFunc(op: String, expr: Expression)(implicit context: Context, selector: Selector = Selector.self):List[IRTree]={
 		if (op != "=") throw new Exception(f"Illegal operation with ${name}: $op")
 		
 		expr match
 			case VariableValue(name, sel) => {
 				val vari = context.tryGetVariable(name)
 				vari match
-					case Some(value) => List(f"scoreboard players operation ${getSelector()} = ${value.getSelector()(sel)}")
+					case Some(vari) => List(ScoreboardOperation(getIRSelector(), op, vari.getIRSelector()(sel)))
 					case None =>{
 						val typ = getType().asInstanceOf[FuncType]
 						val fct = context.getFunction(name, typ.sources, List(), typ.output, true).asInstanceOf[ConcreteFunction]
 						fct.markAsUsed()
 						context.addFunctionToMux(typ.sources, typ.output, fct)
-						List(f"scoreboard players set ${getSelector()} ${fct.getMuxID()}")
+						List(ScoreboardSet(getIRSelector(), fct.getMuxID()))
 				}
 			}
 			case LinkedVariableValue(vari, sel) => {
 				vari.getType() match
-					case other if other.isSubtypeOf(getType()) => List(f"scoreboard players operation ${getSelector()} = ${vari.getSelector()(sel)}")
-					case IntType => List(f"scoreboard players operation ${getSelector()} = ${vari.getSelector()(sel)}")
+					case other if other.isSubtypeOf(getType()) => List(ScoreboardOperation(getIRSelector(), op, vari.getIRSelector()(sel)))
+					case IntType => List(ScoreboardOperation(getIRSelector(), op, vari.getIRSelector()(sel)))
 					case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()}")
 			}
 			case LambdaValue(args, instr) => {
@@ -725,17 +728,17 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 				val fct = context.getFreshLambda(args, typ.sources, typ.output, instr).asInstanceOf[ConcreteFunction]
 				fct.markAsUsed()
 				context.addFunctionToMux(typ.sources, typ.output, fct)
-				List(f"scoreboard players set ${getSelector()} ${fct.getMuxID()}")
+				List(ScoreboardSet(getIRSelector(), fct.getMuxID()))
 			}
-			case NullValue => List(f"scoreboard players set ${getSelector()} 0")
-			case DefaultValue => List(f"scoreboard players set ${getSelector()} 0")
+			case NullValue => List(ScoreboardSet(getIRSelector(), 0))
+			case DefaultValue => List(ScoreboardSet(getIRSelector(), 0))
 			case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 			case ArrayGetValue(name, index) => handleArrayGetValue(op, name, index)
 			case TupleValue(value) => tupleVari.zip(value).flatMap((t, v) => t.assign(op, v))
 			case LinkedFunctionValue(fct: ConcreteFunction) => {
 				fct.markAsUsed()
 				context.addFunctionToMux(fct.arguments.map(_.typ), fct.getType(), fct)
-				List(f"scoreboard players set ${getSelector()} ${fct.getMuxID()}")
+				List(ScoreboardSet(getIRSelector(), fct.getMuxID()))
 			}
 			case _ => throw new Exception("Unsupported Operation")
 	}
@@ -744,7 +747,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 						CMD(f"tag @a[tag=${tagName}] remove $tagName"), 
 						List(ElseIf(BoolValue(true), CMD(f"tag @e[tag=${tagName}] remove $tagName")))))
 	}
-	def assignEntity(op: String, expr: Expression)(implicit context: Context, selector: Selector = Selector.self):List[String]={
+	def assignEntity(op: String, expr: Expression)(implicit context: Context, selector: Selector = Selector.self):List[IRTree]={
 		expr match{
 			case BinaryOperation("not in", left, right) => {
 				val (p, s) = Utils.getSelector(expr)
@@ -790,7 +793,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 						// copy fields
 						tupleVari.zip(List(BoolValue(value.isPlayer))).flatMap((t, v) => t.assign(op, v)) ::: 
 						// Add tag to new entities
-						List(f"tag ${value.getString()} add $tagName")
+						List(CommandIR(f"tag ${value.getString()} add $tagName"))
 					}
 					case bin: BinaryOperation => assignBinaryOperator(op, bin)
 					case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
@@ -819,7 +822,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 						// Remove copy fields
 						tupleVari.zip(List(BoolValue(value.isPlayer))).flatMap((t, v) => t.assign(op, v)) ::: 
 						// Add tag to new entities
-						List(f"tag ${value.getString()} add $tagName")
+						List(CommandIR(f"tag ${value.getString()} add $tagName"))
 					}
 					case NullValue => List()
 					case bin: BinaryOperation => assignBinaryOperator(op, bin)
@@ -845,7 +848,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					case IntValue(0) => List()
 					case SelectorValue(value) => {
 						// Add tag to new entities
-						List(f"tag ${value.getString()} remove $tagName")
+						List(CommandIR(f"tag ${value.getString()} remove $tagName"))
 					}
 					case NullValue => List()
 					case bin: BinaryOperation => assignBinaryOperator(op, bin)
@@ -859,7 +862,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 	/**
 	 * Assign a value to the float variable
 	 */
-	def assignJson(op: String, value: Expression)(implicit context: Context, selector: Selector = Selector.self): List[String] = {
+	def assignJson(op: String, value: Expression)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		if (Settings.target == MCBedrock){
 			throw new Exception(f"Dynamic Json Variable Not Supported in Bedrock ($fullName)")
 		}
@@ -870,37 +873,37 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 			value match
 				case JsonValue(value) => 
 					op match{
-						case "=" => List(f"data modify storage ${fullName} json set value ${value.getNbt()}")
-						case "+=" => List(f"data modify storage ${fullName} json append value ${value.getNbt()}")
-						case "&=" => List(f"data modify storage ${fullName} json merge value ${value.getNbt()}")
+						case "=" => List(CommandIR(f"data modify storage ${fullName} json set value ${value.getNbt()}"))
+						case "+=" => List(CommandIR(f"data modify storage ${fullName} json append value ${value.getNbt()}"))
+						case "&=" => List(CommandIR(f"data modify storage ${fullName} json merge value ${value.getNbt()}"))
 					}
-				case DefaultValue => List(f"data modify storage ${fullName} json set value {}")
+				case DefaultValue => List(CommandIR(f"data modify storage ${fullName} json set value {}"))
 				case VariableValue(name, sel) => assignBool(op, context.resolveVariable(value))
 				case LinkedVariableValue(vari, sel) => 
 					vari.getType() match{
 						case JsonType => {
 							op match{
-								case "=" => List(f"data modify storage ${fullName} json set from storage ${vari.fullName} json")
-								case "+=" => List(f"data modify storage ${fullName} json append from storage ${vari.fullName} json")
-								case "&=" => List(f"data modify storage ${fullName} json merge from storage ${vari.fullName} json")
+								case "=" => List(CommandIR(f"data modify storage ${fullName} json set from storage ${vari.fullName} json"))
+								case "+=" => List(CommandIR(f"data modify storage ${fullName} json append from storage ${vari.fullName} json"))
+								case "&=" => List(CommandIR(f"data modify storage ${fullName} json merge from storage ${vari.fullName} json"))
 							}
 						}
 						case IntType => {
 							op match{
-								case "=" => List(f"execute store result storage ${fullName} json int 1 run scoreboard players get ${vari.getSelector()(sel)}")
-								case "+=" => List(f"execute store result storage ${fullName} tmp int 1 run scoreboard players get ${vari.getSelector()(sel)}", 
-												f"data modify storage ${fullName} json append from storage ${fullName} tmp")
-								case "&=" => List(f"execute store result storage ${fullName} tmp int 1 run scoreboard players get ${vari.getSelector()(sel)}", 
-												f"data modify storage ${fullName} json merge from storage ${fullName} tmp")
+								case "=" => List(CommandIR(f"execute store result storage ${fullName} json int 1 run scoreboard players get ${vari.getSelector()(sel)}"))
+								case "+=" => List(CommandIR(f"execute store result storage ${fullName} tmp int 1 run scoreboard players get ${vari.getSelector()(sel)}"), 
+												CommandIR(f"data modify storage ${fullName} json append from storage ${fullName} tmp"))
+								case "&=" => List(CommandIR(f"execute store result storage ${fullName} tmp int 1 run scoreboard players get ${vari.getSelector()(sel)}"), 
+												CommandIR(f"data modify storage ${fullName} json merge from storage ${fullName} tmp"))
 							}
 						}
 						case FloatType => {
 							op match{
-								case "=" => List(f"execute store result storage ${fullName} json float ${1/Settings.floatPrec} run scoreboard players get ${vari.getSelector()(sel)}")
-								case "+=" => List(f"execute store result storage ${fullName} tmp float ${1/Settings.floatPrec} run scoreboard players get ${vari.getSelector()(sel)}", 
-												f"data modify storage ${fullName} json append from storage ${fullName} tmp")
-								case "&=" => List(f"execute store result storage ${fullName} tmp float ${1/Settings.floatPrec} run scoreboard players get ${vari.getSelector()(sel)}", 
-												f"data modify storage ${fullName} json merge from storage ${fullName} tmp")
+								case "=" => List(CommandIR(f"execute store result storage ${fullName} json float ${1/Settings.floatPrec} run scoreboard players get ${vari.getSelector()(sel)}"))
+								case "+=" => List(CommandIR(f"execute store result storage ${fullName} tmp float ${1/Settings.floatPrec} run scoreboard players get ${vari.getSelector()(sel)}"), 
+												CommandIR(f"data modify storage ${fullName} json append from storage ${fullName} tmp"))
+								case "&=" => List(CommandIR(f"execute store result storage ${fullName} tmp float ${1/Settings.floatPrec} run scoreboard players get ${vari.getSelector()(sel)}"), 
+												CommandIR(f"data modify storage ${fullName} json merge from storage ${fullName} tmp"))
 							}
 						}
 						case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()}")
@@ -915,7 +918,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 	/**
 	 * Assign a value to the struct variable
 	 */
-	def assignStruct(op: String, value: Expression)(implicit context: Context, selector: Selector = Selector.self): List[String] = {
+	def assignStruct(op: String, value: Expression)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		if value == DefaultValue then return List()
 		op match
 			case "=" => {
@@ -965,13 +968,13 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 	/**
 	 * Assign a value to the struct variable
 	 */
-	def assignClass(op: String, value: Expression)(implicit context: Context, selector: Selector = Selector.self): List[String] = {
+	def assignClass(op: String, value: Expression)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		if value == DefaultValue then return List()
 		op match
 			case "=" => {
 				value match
 					case LinkedVariableValue(vari, sel) if vari.getType().isSubtypeOf(getType()) || vari.getType() == getType()=> {
-						deref() ::: List(f"scoreboard players operation ${getSelector()} ${op} ${vari.getSelector()(sel)}") ::: addref()
+						deref() ::: List(ScoreboardOperation(getIRSelector(), op, vari.getIRSelector()(sel))) ::: addref()
 					}
 					case VariableValue(name, sel) => assignClass(op, context.resolveVariable(value))
 					case ConstructorCall(name2, args, typevars) => {
@@ -1001,10 +1004,10 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 							}
 							case other => throw new Exception(f"Cannot constructor call $other")
 					}
-					case NullValue => deref() ::: List(f"scoreboard players set ${getSelector()} 0")
-					case DefaultValue => List(f"scoreboard players set ${getSelector()} 0")
+					case NullValue => deref() ::: List(ScoreboardSet(getIRSelector(), 0))
+					case DefaultValue => List(ScoreboardSet(getIRSelector(), 0))
 					case LinkedVariableValue(vari, sel) if vari.name == "__totalRefCount" => {
-						List(f"scoreboard players operation ${getSelector()} ${op} ${vari.getSelector()(sel)}")
+						List(ScoreboardOperation(getIRSelector(), op, vari.getIRSelector()(sel)))
 					}
 					case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 					case ArrayGetValue(name, index) => handleArrayGetValue(op, name, index)
@@ -1065,6 +1068,16 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 			f"${inGameName} ${Settings.variableScoreboard}"
 		}
 	}
+	def getIRSelector()(implicit selector: Selector = Selector.self): SBLink = {
+		checkSelectorUse()
+
+		if (modifiers.isEntity){
+			SBLink(selector.getString()(context), scoreboard)
+		}
+		else{
+			SBLink(inGameName, Settings.variableScoreboard)
+		}
+	}
 
 	def getSelectorName()(implicit selector: Selector = Selector.self): String = {
 		checkSelectorUse()
@@ -1094,7 +1107,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 }
 
 class PropertySetVariable(context: Context, getter: Function, setter: Function, variable: Variable) extends Variable(context, "", VoidType, Modifier.newPublic()){
-	override def assign(op: String, value: Expression)(implicit context: Context, selector: Compilation.Selector.Selector): List[String] = {
+	override def assign(op: String, value: Expression)(implicit context: Context, selector: Compilation.Selector.Selector): List[IRTree] = {
 		if (op == ":=") throw new Exception("Operator not supported for Properties")
 		if (op == "="){
 			if (selector != Selector.self){

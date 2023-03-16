@@ -40,8 +40,6 @@ def lazy append(entity target, string key, json data){
 }
 
 """
-
-"""
 Set the data of current block to data
 """
 def lazy setBlock(json data){

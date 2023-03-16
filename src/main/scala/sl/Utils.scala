@@ -9,7 +9,8 @@ import scala.collection.parallel.CollectionConverters._
 import sl.Compilation.Selector.*
 import java.io.File
 import sys.process._
-import scala.collection.immutable.LazyList.cons
+import sl.IR.*
+
 
 object Utils{
     def getFile(path: String): String = {
@@ -555,7 +556,7 @@ object Utils{
     }
 
 
-    def unpackDotValue(dot: DotValue)(implicit context: Context): (List[String], Expression) = {
+    def unpackDotValue(dot: DotValue)(implicit context: Context): (List[IRTree], Expression) = {
         dot match
             case DotValue(left, VariableValue(v, sel)) => {
                 val (list, vari) = simplifyToVariable(left)
@@ -576,7 +577,7 @@ object Utils{
             case DotValue(left, right) => throw new Exception(f"Cannot unpack $dot")
 
     }
-    def simplifyToVariable(expr: Expression)(implicit context: Context): (List[String], LinkedVariableValue) = {
+    def simplifyToVariable(expr: Expression)(implicit context: Context): (List[IRTree], LinkedVariableValue) = {
         expr match
             case VariableValue(name, sel) => simplifyToVariable(context.resolveVariable(expr))
             case LinkedVariableValue(name, sel) => (List(), LinkedVariableValue(name, sel))
@@ -596,7 +597,7 @@ object Utils{
                 (vari.assign("=", other), LinkedVariableValue(vari))
             }
     }
-    def simplifyToLazyVariable(expr: Expression)(implicit context: Context): (List[String], LinkedVariableValue) = {
+    def simplifyToLazyVariable(expr: Expression)(implicit context: Context): (List[IRTree], LinkedVariableValue) = {
         expr match
             case VariableValue(name, sel) => simplifyToLazyVariable(context.resolveVariable(expr))
             case LinkedVariableValue(name, sel) => (List(), LinkedVariableValue(name, sel))
@@ -840,7 +841,7 @@ object Utils{
                     toJson(vari.lazyValue)
                 }
                 else{
-                    JsonString(fct.call().last)
+                    JsonString(fct.call().last.getString())
                 }
             }
             case FunctionCallValue(LinkedFunctionValue(fct), args, typeargs, selector) => {
@@ -851,7 +852,7 @@ object Utils{
                     toJson(vari.lazyValue)
                 }
                 else{
-                    JsonString((fct,args).call().last)
+                    JsonString((fct,args).call().last.getString())
                 }
             }
             case LinkedFunctionValue(fct) => JsonString(Settings.target.getFunctionName(fct.fullName))
@@ -876,7 +877,7 @@ object Utils{
                         else{
                             val fct = context.getFunction(value, args, typeargs, VoidType).call()
                             if (fct.length == 1){
-                                JsonString(fct.last.replaceAll("function ", ""))
+                                JsonString(fct.last.getString().replaceAll("function ", ""))
                             }
                             else{
                                 val block = context.getFreshBlock(fct)
@@ -902,7 +903,7 @@ object Utils{
                                 case v => throw new Exception(f"Cannot cast $v (from variable: ${vari.fullName}) to json")
                         }
                         else{
-                            JsonArray(fct.call().map(v => JsonString(v)))
+                            JsonArray(fct.call().map(v => JsonString(v.getString())))
                         }
                     }
             }
@@ -1181,8 +1182,8 @@ object Utils{
             }
             case _ => throw new Exception(f"Unknown generator: $provider")
     }
-    def getSelector(expr: Expression)(implicit context: Context): (List[String],Selector) = {
-        def apply(selector: Expression): (List[String],Selector) = {
+    def getSelector(expr: Expression)(implicit context: Context): (List[IRTree],Selector) = {
+        def apply(selector: Expression): (List[IRTree],Selector) = {
             val vari = context.getFreshVariable(EntityType)
             val (prefix, sel) = getSelector(LinkedVariableValue(vari))
             (sl.Compilation.Execute.withInstr(With(selector, BoolValue(false), BoolValue(true), 

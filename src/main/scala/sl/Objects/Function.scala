@@ -6,10 +6,11 @@ import sl.Utils
 import scala.collection.mutable
 import sl.Compilation.Selector.*
 import sl.Compilation.Print
+import sl.IR.*
 
 object Function {
   extension (str: (Function, List[Expression])) {
-    def call(ret: Variable = null, op: String = "=")(implicit context: Context) = {
+    def call(ret: Variable = null, op: String = "=")(implicit context: Context): List[IRTree] = {
         if (str._1 == null){
             List()
         }
@@ -98,7 +99,7 @@ abstract class Function(context: Context, name: String, val arguments: List[Argu
             case Nil => 0
         }
     }
-    def call(args: List[Expression], ret: Variable = null, op: String = "=")(implicit ctx: Context): List[String]
+    def call(args: List[Expression], ret: Variable = null, op: String = "=")(implicit ctx: Context): List[IRTree]
     def generateArgument()(implicit ctx: Context):Unit = {
         val ctx2 = ctx.push(name)
         argumentsVariables = arguments.map(a => {
@@ -121,7 +122,7 @@ abstract class Function(context: Context, name: String, val arguments: List[Argu
     }
     def exists(): Boolean
     def getName(): String
-    def getContent(): List[String]
+    def getContent(): List[IRTree]
     def getFunctionType() = FuncType(arguments.map(a => a.typ), typ)
 }
 
@@ -129,7 +130,7 @@ class ConcreteFunction(context: Context, name: String, arguments: List[Argument]
     private var _needCompiling = topLevel || Settings.allFunction
     private var wasCompiled = false
     
-    protected var content = List[String]()
+    protected var content = List[IRTree]()
     val returnVariable = {
         val ctx = context.push(name)
         val vari = new Variable(ctx, "_ret", typ, Modifier.newPrivate())
@@ -152,10 +153,10 @@ class ConcreteFunction(context: Context, name: String, arguments: List[Argument]
         super.generateArgument()
     }
     
-    def call(args2: List[Expression], ret: Variable = null, op: String = "=")(implicit ctx: Context): List[String] = {
+    def call(args2: List[Expression], ret: Variable = null, op: String = "=")(implicit ctx: Context): List[IRTree] = {
         markAsUsed()
         val r = argMap(args2).flatMap(p => p._1.assign("=", Utils.simplify(p._2))) :::
-            List("function " + Settings.target.getFunctionName(fullName))
+            List(BlockCall(Settings.target.getFunctionName(fullName)))
 
         if (ret != null){
             r ::: ret.assign(op, LinkedVariableValue(returnVariable))
@@ -173,15 +174,15 @@ class ConcreteFunction(context: Context, name: String, arguments: List[Argument]
         }
     }
 
-    def addMuxCleanUp(cnt: List[String]): Unit = {
+    def addMuxCleanUp(cnt: List[IRTree]): Unit = {
         content = cnt ::: content
     }
-    def append(cnt: List[String]): Unit = {
+    def append(cnt: List[IRTree]): Unit = {
         content = content ::: cnt
     }
 
     def exists(): Boolean = (wasCompiled || Settings.allFunction) && content.length > 0
-    def getContent(): List[String] = content
+    def getContent(): List[IRTree] = content
     def getName(): String = Settings.target.getFunctionPath(fullName)
 
     def needCompiling():Boolean = {
@@ -199,23 +200,23 @@ class ConcreteFunction(context: Context, name: String, arguments: List[Argument]
     }
 }
 
-class BlockFunction(context: Context, name: String, arguments: List[Argument], var body: List[String]) extends Function(context, name, arguments, VoidType, Modifier.newPrivate()){
-    def call(args2: List[Expression], ret: Variable = null, op: String = "=")(implicit ctx: Context): List[String] = {
+class BlockFunction(context: Context, name: String, arguments: List[Argument], var body: List[IRTree]) extends Function(context, name, arguments, VoidType, Modifier.newPrivate()){
+    def call(args2: List[Expression], ret: Variable = null, op: String = "=")(implicit ctx: Context): List[IRTree] = {
         argMap(args2).flatMap(p => p._1.assign("=", p._2)) :::
-            List("function " + Settings.target.getFunctionName(fullName))
+            List(BlockCall(Settings.target.getFunctionName(fullName)))
     }
 
     def exists(): Boolean = true
-    def getContent(): List[String] = body
+    def getContent(): List[IRTree] = body
     def getName(): String = Settings.target.getFunctionPath(fullName)
 
-    def append(cnt: List[String]): Unit = {
+    def append(cnt: List[IRTree]): Unit = {
         body = body ::: cnt
     }
 }
 
 class LazyFunction(context: Context, name: String, arguments: List[Argument], typ: Type, _modifier: Modifier, val body: Instruction) extends Function(context, name, arguments, typ, _modifier){
-    def call(args: List[Expression], ret: Variable = null, op: String = "=")(implicit ctx: Context): List[String] = {
+    def call(args: List[Expression], ret: Variable = null, op: String = "=")(implicit ctx: Context): List[IRTree] = {
         var block = body
         val sub = ctx.push(ctx.getLazyCallId())
         sub.setLazyCall()
@@ -250,7 +251,7 @@ class LazyFunction(context: Context, name: String, arguments: List[Argument], ty
     override def canBeCallAtCompileTime = true
 
     def exists(): Boolean = false
-    def getContent(): List[String] = List()
+    def getContent(): List[IRTree] = List()
     def getName(): String = Settings.target.getFunctionPath(fullName)
 }
 
@@ -327,10 +328,10 @@ class TagFunction(context: Context, name: String, arguments: List[Argument]) ext
 class ClassFunction(variable: Variable, function: Function) extends Function(function.context, function.name, function.arguments, function.getType(), function.modifiers){
     override def exists()= false
 
-    override def getContent(): List[String] = List()
+    override def getContent(): List[IRTree] = List()
     override def getName(): String = function.name
 
-    def call(args2: List[Expression], ret: Variable = null, op: String = "=")(implicit ctx: Context): List[String] = {
+    def call(args2: List[Expression], ret: Variable = null, op: String = "=")(implicit ctx: Context): List[IRTree] = {
         val selector = SelectorValue(JavaSelector("@e", List(("tag", SelectorIdentifier("__class__")))))
 
         def callNoEntity(comp: Variable, ret: Variable = null) = {
@@ -342,7 +343,7 @@ class ClassFunction(variable: Variable, function: Function) extends Function(fun
                 ))
         }
 
-        var pre = List[String]()
+        var pre = List[IRTree]()
         val comp = if (variable.modifiers.isEntity){
             val vari = ctx.getFreshVariable(IntType)
             pre = vari.assignForce(variable)
@@ -363,15 +364,15 @@ class ClassFunction(variable: Variable, function: Function) extends Function(fun
 }
 
 
-class CompilerFunction(context: Context, name: String, arguments: List[Argument], typ: Type, _modifier: Modifier, val body: (List[Expression], Context)=>(List[String],Expression)) extends Function(context, name, arguments, typ, _modifier){
+class CompilerFunction(context: Context, name: String, arguments: List[Argument], typ: Type, _modifier: Modifier, val body: (List[Expression], Context)=>(List[IRTree],Expression)) extends Function(context, name, arguments, typ, _modifier){
     generateArgument()(context.push(name, this))
     argumentsVariables.foreach(_.modifiers.isLazy = true)
     override def exists()= false
 
-    override def getContent(): List[String] = List()
+    override def getContent(): List[IRTree] = List()
     override def getName(): String = name
 
-    def call(args2: List[Expression], ret: Variable = null, op: String = "=")(implicit ctx: Context): List[String] = {
+    def call(args2: List[Expression], ret: Variable = null, op: String = "=")(implicit ctx: Context): List[IRTree] = {
         val call = body(argMap(args2).map((v,e) => Utils.simplify(e)), ctx)
         if (ret != null){
             call._1 ::: ret.assign(op, call._2)
@@ -389,10 +390,10 @@ class GenericFunction(context: Context, name: String, arguments: List[Argument],
 
     override def exists()= false
 
-    override def getContent(): List[String] = List()
+    override def getContent(): List[IRTree] = List()
     override def getName(): String = name
 
-    def call(args2: List[Expression], ret: Variable = null, op: String = "=")(implicit ctx: Context): List[String] = {
+    def call(args2: List[Expression], ret: Variable = null, op: String = "=")(implicit ctx: Context): List[IRTree] = {
         get(args2.map(Utils.typeof)).call(args2, ret, op)
     }
 

@@ -13,11 +13,12 @@ import java.nio.file.StandardCopyOption
 import java.io.{ BufferedInputStream, FileInputStream, FileOutputStream }
 import java.util.zip.{ ZipEntry, ZipOutputStream }
 import java.io.File
+import sl.IR.*
 
 object DataPackBuilder{
-    var previous = Map[String, List[String]]()
-    def clearCache() = previous = Map[String, List[String]]()
-    def build(source: List[String], dirs: List[String], output: List[(String, List[String])]):Unit={
+    var previous = Map[String, List[IRTree]]()
+    def clearCache() = previous = Map[String, List[IRTree]]()
+    def build(source: List[String], dirs: List[String], output: List[(String, List[IRTree])]):Unit={
         if (previous.size == 0){
             Reporter.info("Clearing old Data Packs")
             dirs.foreach(FileUtils.deleteDirectory(_))
@@ -59,7 +60,7 @@ object DataPackBuilder{
         zip.close()
     }
 
-    def makeDPFolder(sources: List[String], target: String, generated: List[(String, List[String])])={
+    def makeDPFolder(sources: List[String], target: String, generated: List[(String, List[IRTree])])={
         sources.flatMap(source => getListOfDPFiles(source, "").map(f => (source, f)))
         .groupBy(_._2)
         .toList
@@ -73,11 +74,11 @@ object DataPackBuilder{
         generated.map{case (file, content) => {
             val filename = target+file
             if (!previous.contains(filename) || previous(filename) != content){
-                FileUtils.safeWriteFile(target+file, content)
+                FileUtils.safeWriteFile(target+file, content.map(_.getString()))
             }
         }}
     }
-    def makeDPZip(sources: List[String], target: String, generated: List[(String, List[String])])={
+    def makeDPZip(sources: List[String], target: String, generated: List[(String, List[IRTree])])={
         val Buffer = 2 * 1024
         var data = new Array[Byte](Buffer)
         val zip = new ZipOutputStream(new FileOutputStream(target))

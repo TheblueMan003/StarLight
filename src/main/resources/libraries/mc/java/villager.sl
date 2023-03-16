@@ -27,20 +27,20 @@ def lazy clearTrade(){
 Add a trade offer to the current villager.
 """
 def lazy addTrade(mcobject item1, int count1, mcobject res, int countr){
-    data.append("Offers.Recipes", {maxUses: 999999, buyB: {id: "minecraft:air", Count: 1b}, buy: {id: item1, Count: count1}, sell: {id: res, Count: countr}})
+    data.append("Offers.Recipes", {maxUses: 999999, buyB: {id: "minecraft:air", Count: 1}, buy: {id: item1, Count: count1}, sell: {id: res, Count: countr}})
 }
 
 """
 Add a trade offer to the current villager.
 """
 def lazy addTrade(int max, mcobject item1, int count1, mcobject res, int countr){
-    data.append("Offers.Recipes", {maxUses: max, buyB: {id: "minecraft:air", Count: 1b}, buy: {id: item1, Count: count1b}, sell: {id: res, Count: countr}})
+    data.append("Offers.Recipes", {maxUses: max, buyB: {id: "minecraft:air", Count: 1}, buy: {id: item1, Count: count1}, sell: {id: res, Count: countr}})
 }
 
 """
 Add a trade offer to the current villager.
 """
-def lazy addTrade(mcobject item1, int count1,mcobject item2, int count2, mcobject res, int countr){
+def lazy addTrade(mcobject item1, int count1, mcobject item2, int count2, mcobject res, int countr){
     data.append("Offers.Recipes", {maxUses: 999999, buyB: {id: item2, Count: count2}, buy: {id: item1, Count: count1}, sell: {id: res, Count: countr}})
 }
 
