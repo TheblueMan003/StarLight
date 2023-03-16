@@ -1,4 +1,4 @@
-package mc.java.font
+package mc.java.resourcespack.font
 
 """
 Add a new font to the game

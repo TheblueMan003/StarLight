@@ -393,7 +393,7 @@ class GenericFunction(context: Context, name: String, arguments: List[Argument],
     override def getName(): String = name
 
     def call(args2: List[Expression], ret: Variable = null, op: String = "=")(implicit ctx: Context): List[String] = {
-        throw new Exception("Generic function can't be called")
+        get(args2.map(Utils.typeof)).call(args2, ret, op)
     }
 
     override def generateArgument()(implicit ctx: Context): Unit = {}

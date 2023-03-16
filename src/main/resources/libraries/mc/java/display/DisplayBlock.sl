@@ -1,7 +1,7 @@
 package mc.java.display.DisplayBlock
 
 import mc.java.display.DisplayEntity
-import mc.java.data as data
+import cmd.java.data as data
 
 """
 Class representing an block display entity.

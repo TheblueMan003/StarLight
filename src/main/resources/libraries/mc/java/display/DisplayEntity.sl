@@ -1,6 +1,6 @@
 package mc.java.display
 
-import mc.java.data as data
+import cmd.java.data as data
 
 """
 Class representing an generic display entity.

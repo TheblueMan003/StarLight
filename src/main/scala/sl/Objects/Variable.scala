@@ -364,6 +364,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 			}
 			case EnumIntValue(value) => assignInt(op, IntValue(value))
 			case DefaultValue => List(f"scoreboard players set ${getSelector()} 0")
+			case NullValue => List(f"scoreboard players reset ${getSelector()}")
 			case BoolValue(value) => assignInt(op, IntValue(if value then 1 else 0))
 			case FloatValue(value) => assignInt(op, IntValue(value.toInt))
 			case VariableValue(name, sel) => assignInt(op, context.resolveVariable(value))
@@ -371,7 +372,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 			case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 			case ArrayGetValue(name, index) => handleArrayGetValue(op, name, index)
 			case bin: BinaryOperation => assignBinaryOperator(op, bin)
-			case _ => throw new Exception(f"Unknown cast to int $value")
+			case _ => throw new Exception(f"Unknown cast to int: $value")
 	}
 
 	def handleFunctionCall(op: String, name: Expression, args: List[Expression], typeargs: List[Type], sel: Selector)(implicit context: Context, selector: Selector = Selector.self):List[String] = {
@@ -534,6 +535,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					case other => throw new Exception(f"Cannot use $other with $fullName")
 				}
 			}
+			case NullValue => List(f"scoreboard players reset ${getSelector()}")
 			case BoolValue(value) => assignFloat(op, IntValue(if value then 1 else 0))
 			case VariableValue(name, sel) => assignFloat(op, context.resolveVariable(value))
 			case LinkedVariableValue(vari, sel) => assignFloatLinkedVariable(op, vari, sel)
@@ -566,6 +568,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 						prev ::: assignBool(op, vari)
 				}
 			}
+			case NullValue => List(f"scoreboard players reset ${getSelector()}")
 			case DefaultValue => List(f"scoreboard players set 0")
 			case VariableValue(name, sel) => assignBool(op, context.resolveVariable(value))
 			case LinkedVariableValue(vari, sel) => 

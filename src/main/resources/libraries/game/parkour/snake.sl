@@ -198,8 +198,8 @@ def headMain(){
 }
 
 def rmblock(){
-    block.set(tripwire)
-    particles.sphere(end_rod,1,0.1,1)
+    block.set(minecraft:tripwire)
+    particles.sphere(minecraft:end_rod,1,0.1,1)
 }
 
 def copyTail(){
@@ -324,8 +324,8 @@ def @playertick playerticker(){
         bool spawn = false
         int speed
         int length
-        if(block(~ ~-0.2 ~ purple_glazed_terracotta)){
-            setblock(~ ~-0.2 ~ obsidian)
+        if(block(~ ~-0.2 ~, minecraft:purple_glazed_terracotta)){
+            setblock(~ ~-0.2 ~ minecraft:obsidian)
             /summon marker ~ ~ ~ {Invisible:1,Tags:["limeSnake","rSnake"],NoGravity:1}
             spawn = true
             speed = GreenSpeed
@@ -377,7 +377,7 @@ CProcess reload{
         with(@e[tag=limeSnake,type=marker],true){
             SnakeTime ++
             if (SnakeTime > 125){
-                setblock(~ ~-1 ~ purple_glazed_terracotta)
+                block.set(~ ~-1 ~, minecraft:purple_glazed_terracotta)
                 stop()
                 kill(@s)
             }
@@ -385,7 +385,7 @@ CProcess reload{
         with(@e[tag=redSnake,type=marker],true){
             SnakeTime ++
             if (SnakeTime > 125){
-                setblock(~ ~-1 ~ red_glazed_terracotta)
+                block.set(~ ~-1 ~ minecraft:red_glazed_terracotta)
                 stop()
                 kill(@s)
             }

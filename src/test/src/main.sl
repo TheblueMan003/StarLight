@@ -1,14 +1,10 @@
 package cell
 
-import game.Region
+import cmd.tag as tag
 
-Region test{
-    init(0,0,0,16,10,16)
-}
-
-def init(){
-    test.load()
-    if (test.isLoaded()){
+def main(){
+    tag.add("test")
+    if (tag.has("test")){
         /say hi
     }
 }

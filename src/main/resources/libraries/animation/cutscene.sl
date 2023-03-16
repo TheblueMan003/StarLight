@@ -11,7 +11,11 @@ def private lazy teleportFront(int $distance){
 def private lazy teleportHere(){
    /tp @s ~ ~ ~ ~ ~
 }
-template Cutscene{
+
+"""
+Template for cutscene
+"""
+template Cutscene extends Process{
     entity entities
     lazy int buildScene = 0
     lazy bool _groupped = false
@@ -28,6 +32,7 @@ template Cutscene{
         entities = e
         init()
         with(e)gm.spectator()
+        start()
     }
     
     """
@@ -369,5 +374,146 @@ template Cutscene{
         fct()
         _groupped = false
         buildScene ++
+    }
+
+    """
+    Constant delta movement
+    """
+    def lazy delta(mcposition $pos, int time, void=>void whileActive){
+        lazy val myScene = buildScene
+        if (!_groupped){
+            buildScene ++
+        }
+        if (myScene == scene){
+            if (endOfSegment){
+                endOfSegment = false
+            }
+            whileActive(tick)
+            tick++
+            with(camera,true){
+                /tp @s $pos ~ ~
+                if (tick >= time)nextSegment()
+            }
+        }
+    }
+
+    """
+    Constant delta movement
+    """
+    def lazy delta(mcposition $start, mcposition $pos, int time, void=>void whileActive){
+        lazy val myScene = buildScene
+        if (!_groupped){
+            buildScene ++
+        }
+        if (myScene == scene){
+            if (endOfSegment){
+                endOfSegment = false
+            }
+            whileActive(tick)
+            tick++
+            with(camera,true){
+                if (tick == 1){
+                    /tp @s $start ~ ~
+                }
+                else{
+                    /tp @s $pos ~ ~
+                }
+                if (tick >= time)nextSegment()
+            }
+        }
+    }
+
+    """
+    Constant delta movement Looking at `target`
+    """
+    def lazy deltaLooking(mcposition $pos, mcposition target, int time, void=>void whileActive){
+        lazy val myScene = buildScene
+        if (!_groupped){
+            buildScene ++
+        }
+        if (myScene == scene){
+            if (endOfSegment){
+                endOfSegment = false
+            }
+            whileActive(tick)
+            tick++
+            with(camera,true){
+                facing(target)./tp @s $pos ~ ~
+                if (tick >= time)nextSegment()
+            }
+        }
+    }
+
+    """
+    Constant delta movement Looking at `target`
+    """
+    def lazy deltaLooking(mcposition $start, mcposition $pos, mcposition target, int time, void=>void whileActive){
+        lazy val myScene = buildScene
+        if (!_groupped){
+            buildScene ++
+        }
+        if (myScene == scene){
+            if (endOfSegment){
+                endOfSegment = false
+            }
+            whileActive(tick)
+            tick++
+            with(camera,true){
+                if (tick == 1){
+                    facing(target)./tp @s $start ~ ~
+                }
+                else{
+                    facing(target)./tp @s $pos ~ ~
+                }
+                if (tick >= time)nextSegment()
+            }
+        }
+    }
+
+    """
+    Constant delta movement With angle `u` and `v`
+    """
+    def lazy deltaAngle(mcposition $pos, float $u, float $v, int time, void=>void whileActive){
+        lazy val myScene = buildScene
+        if (!_groupped){
+            buildScene ++
+        }
+        if (myScene == scene){
+            if (endOfSegment){
+                endOfSegment = false
+            }
+            whileActive(tick)
+            tick++
+            with(camera,true){
+                /tp @s $pos $u $v
+                if (tick >= time)nextSegment()
+            }
+        }
+    }
+
+    """
+    Constant delta movement With angle `u` and `v`
+    """
+    def lazy deltaAngle(mcposition $start, mcposition $pos, float $u, float $v, int time, void=>void whileActive){
+        lazy val myScene = buildScene
+        if (!_groupped){
+            buildScene ++
+        }
+        if (myScene == scene){
+            if (endOfSegment){
+                endOfSegment = false
+            }
+            whileActive(tick)
+            tick++
+            with(camera,true){
+                if (tick == 1){
+                    /tp @s $start $u $v
+                }
+                else{
+                    /tp @s $pos $u $v
+                }
+                if (tick >= time)nextSegment()
+            }
+        }
     }
 }

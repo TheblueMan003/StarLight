@@ -2,10 +2,17 @@ package game.Timer
 
 import cmd.actionbar as actionbar
 
+"""
+TimerState
+"""
 enum TimerState{
     None, Play, Pause, Ended
 }
 
+
+"""
+Structure of Timer
+"""
 struct Timer{
     int h, m, s, t
     int kill, level, maxlevel, death
@@ -47,39 +54,66 @@ struct Timer{
         sKill, sDeath, sLevels, sCheat, display = false
         kill, level,maxlevel, death = 0
     }
+    """
+    Reset the time of timer
+    """
     def resetTime(){
         h,m,s,t = 0
     }
+        
+    """
+    Start the timer
+    """
     def start(){
         if (stat == TimerState.None){
             stat = TimerState.Play
         }
     }
     
+    """
+    Pause the timer
+    """
     def pause(){
         if (stat == TimerState.Play){
             stat = TimerState.Pause
         }
     }
     
+    """
+    Unpause the timer
+    """
     def continue(){
         if (stat == TimerState.Pause){
             stat = TimerState.Play
         }
     }
     
+    """
+    Stop the timer
+    """
     def stop(){
         if (stat == TimerState.Pause || stat == TimerState.Play){
             stat = TimerState.Ended
         }
     }
+        
+    """
+    Return the time in ticks
+    """
     int getTime(){
         return (((h*60+m)*60+s)*20+t)
     }
+        
+    """
+    Return the millisecond of the timer
+    """
     int getMilisec(){
         return(t*5)
     }
     
+    """
+    Set the level of the timer
+    """
     def setLevel(int l){
         if (l < maxlevel){
             level = l
@@ -88,35 +122,75 @@ struct Timer{
             level = maxlevel
         }
     }
+
+    """
+    Set the max level of the timer
+    """
     def setMaxLevel(int l){
         maxlevel = l
     }
+
+    """
+    Add a death to the timer
+    """
     def addDeath(){
         death ++
     }
+
+    """
+    Add a kill to the timer
+    """
     def addKill(){
         kill++
     }
+
+    """
+    Reset the timer
+    """
     def reset(){
         h,m,s,t = 0
         stat = TimerState.None
         kill, level, death = 0
     }
-    def forceDeath(bool d = true){
+
+    """
+    Set if the death should be shown
+    """
+    def showDeath(bool d = true){
         sDeath = d
     }
-    def forceKill(bool d = true){
+
+    """
+    Set if the kill should be shown
+    """
+    def showKill(bool d = true){
         sKill = d
     }
-    def forceCheat(bool d = true){
+
+    """
+    Set if the cheat state should be shown
+    """
+    def showCheat(bool d = true){
         sCheat = d
     }
-    def forceLevel(bool d = true){
+
+    """
+    Set if the levels should be shown
+    """
+    def showLevel(bool d = true){
         sLevels = d
     }
+
+    """
+    Set if the timer is global
+    """
     def setGlobal(bool g = true){
         global = g
     }
+
+    """
+    Set if the timer should be displayed
+    """
     def setDisplay(bool d = true){
         display = d
     }
@@ -423,11 +497,17 @@ struct Timer{
         }
     }
     
+    """
+    Return the current time in ticks
+    """
     int getTotalTick(){
         int tt = t + 20*(s + 60 * (m + (60 * h)))
         return(tt)
     }
     
+    """
+    Tick the timer
+    """
     def tick(){
         __display__()
         

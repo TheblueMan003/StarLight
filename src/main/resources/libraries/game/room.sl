@@ -70,6 +70,9 @@ def @test.after show(){
                     (unknown,"yellow"),("/"),(total,"yellow"),(" Unknown","yellow"),(" - "))
 }
 
+"""
+Template for a room that need to execute a function when a player enter it, stay in it, exit it, or when the room is activated or desactivated.
+"""
 template Room{
     lazy int sx, sy, sz, ex, ey, ez
     Color color

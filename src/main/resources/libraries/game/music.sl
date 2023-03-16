@@ -11,6 +11,9 @@ scoreboard bool Enabled
 scoreboard bool WasStopped
 bool enabled := true
 
+"""
+Play the music with the given name
+"""
 def lazy play(string name){
     lazy val trackID = musicDic[name]
     WasStopped:=false
@@ -22,6 +25,10 @@ def lazy play(string name){
     }
 }
 
+"""
+Add a new music track with the given name, file, and length
+file must be inside the music folder
+"""
 def lazy add(string name, string file, int min, int sec){
     lazy val trackID = trackCount
     trackCount++
@@ -61,33 +68,54 @@ def private ticking main(){
     }
 }
 
+"""
+Stop the music
+"""
 def stop(){
     MusicTick = -10000000
     /stopsound @s record
     WasStopped = true
     currTrack = -1
 }
+
+"""
+Stop the music for all players
+"""
 def stopForAll(){
     with(@a){
         stop()
     }
 }
 
+"""
+Pause the music
+"""
 def pause(){
     MusicTick = -10000000
     /stopsound @s record
     WasStopped = true
 }
+
+"""
+Pause the music for all players
+"""
 def pauseForAll(){
     with(@a){
         pause()
     }
 }
 
+"""
+Continue the music
+"""
 def continue(){
     MusicTick = 10000000
     WasStopped = false
 }
+
+"""
+Continue the music for all players
+"""
 def continueForAll(){
     with(@a){
         MusicTick = 10000000
@@ -95,11 +123,17 @@ def continueForAll(){
     }
 }
 
-
+"""
+Disable the music for the player
+"""
 def disablePlayer(){
     Enabled = false
     /stopsound @s record
 }
+
+"""
+Enable the music for the player
+"""
 def enablePlayer(){
     Enabled = true
     if (!WasStopped){
@@ -107,6 +141,9 @@ def enablePlayer(){
     }
 }
 
+"""
+Toggle the music for the player
+"""
 def togglePlayer(){
     if (Enabled){
         disablePlayer()
@@ -115,13 +152,25 @@ def togglePlayer(){
         enablePlayer()
     }
 }
+    
+"""
+Disable the music for all players
+"""
 def disableGlobal(){
     enabled = false
     /stopsound @a record
 }
+
+"""
+Enable the music for all players
+"""
 def enableGlobal(){
     enabled = true
 }
+
+"""
+Toggle the music for all players
+"""
 def toggleGlobal(){
     if (enabled){
         disableGlobal()

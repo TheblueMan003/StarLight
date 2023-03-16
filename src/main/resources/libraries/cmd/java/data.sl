@@ -1,4 +1,4 @@
-package mc.java.data
+package cmd.java.data
 
 """
 Set the data of current entity to data
