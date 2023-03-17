@@ -124,6 +124,9 @@ abstract class Function(context: Context, name: String, val arguments: List[Argu
     def getName(): String
     def getContent(): List[IRTree]
     def getFunctionType() = FuncType(arguments.map(a => a.typ), typ)
+    def getIRFile(): IRFile ={
+        IRFile(getName(), fullName, getContent(), false)
+    }
 }
 
 class ConcreteFunction(context: Context, name: String, arguments: List[Argument], typ: Type, _modifier: Modifier, val body: Instruction, topLevel: Boolean) extends Function(context, name, arguments, typ, _modifier){
@@ -156,7 +159,7 @@ class ConcreteFunction(context: Context, name: String, arguments: List[Argument]
     def call(args2: List[Expression], ret: Variable = null, op: String = "=")(implicit ctx: Context): List[IRTree] = {
         markAsUsed()
         val r = argMap(args2).flatMap(p => p._1.assign("=", Utils.simplify(p._2))) :::
-            List(BlockCall(Settings.target.getFunctionName(fullName)))
+            List(BlockCall(Settings.target.getFunctionName(fullName), fullName))
 
         if (ret != null){
             r ::: ret.assign(op, LinkedVariableValue(returnVariable))
@@ -181,7 +184,7 @@ class ConcreteFunction(context: Context, name: String, arguments: List[Argument]
         content = content ::: cnt
     }
 
-    def exists(): Boolean = (wasCompiled || Settings.allFunction) && content.length > 0
+    def exists(): Boolean = true
     def getContent(): List[IRTree] = content
     def getName(): String = Settings.target.getFunctionPath(fullName)
 
@@ -203,7 +206,7 @@ class ConcreteFunction(context: Context, name: String, arguments: List[Argument]
 class BlockFunction(context: Context, name: String, arguments: List[Argument], var body: List[IRTree]) extends Function(context, name, arguments, VoidType, Modifier.newPrivate()){
     def call(args2: List[Expression], ret: Variable = null, op: String = "=")(implicit ctx: Context): List[IRTree] = {
         argMap(args2).flatMap(p => p._1.assign("=", p._2)) :::
-            List(BlockCall(Settings.target.getFunctionName(fullName)))
+            List(BlockCall(Settings.target.getFunctionName(fullName), fullName))
     }
 
     def exists(): Boolean = true

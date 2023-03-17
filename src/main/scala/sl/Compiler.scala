@@ -9,7 +9,7 @@ import objects.types.JsonType
 import sl.IR.*
 
 object Compiler{
-    def compile(context: Context):List[(String, List[IRTree])] = {
+    def compile(context: Context):List[IRFile] = {
         var fct = context.getFunctionToCompile()
 
         while(fct != null){
@@ -29,10 +29,10 @@ object Compiler{
         context.getTags().foreach(x => x.compile())
 
 
-        context.getAllFunction().filter(_.exists()).map(fct => (fct.getName(), fct.getContent())) ::: 
-            context.getAllJsonFiles().filter(f => f.exists() && f.isDatapack()).map(fct => (fct.getName(), fct.getContent())):::
-            context.getAllBlockTag().filter(_.exists()).map(fct => (fct.getName(), fct.getContent())):::
-            context.getAllPredicates().flatMap(_.getFiles()):::
+        context.getAllFunction().filter(_.exists()).map(_.getIRFile()) ::: 
+            context.getAllJsonFiles().filter(f => f.exists() && f.isDatapack()).map(fct => (fct.getIRFile())):::
+            context.getAllBlockTag().filter(_.exists()).map(fct => (fct.getIRFile())):::
+            context.getAllPredicates().flatMap(_.getIRFiles()):::
             Settings.target.getExtraFiles(context)
     }
     def compile(instruction: Instruction, meta: Meta = Meta(false, false))(implicit context: Context):List[IRTree]={   

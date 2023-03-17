@@ -49,7 +49,7 @@ object Execute{
             else if (exp._2.head == IFFalse){
             }
             else{
-                val block = (if multi && i != length-1 then vari.assign("=", IntValue(i+1)) else List()) ::: sl.Compiler.compile(inner)
+                val block = (if multi && i != length-1 then vari.assign("=", IntValue(1)) else List()) ::: sl.Compiler.compile(inner)
                 if (i == 0){
                     content = content ::: makeExecute(getListCase(exp._2), block)
                 }

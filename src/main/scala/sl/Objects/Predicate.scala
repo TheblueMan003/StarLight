@@ -75,4 +75,8 @@ class Predicate(context: Context, name: String, val arguments: List[Argument], _
         counter+=1
         Settings.target.getFunctionName(pname)
     }
+
+    def getIRFiles(): List[IRFile] = {
+        files.map((name, content) => IRFile(name, name, content, true)).toList
+    }
 }

@@ -15,4 +15,8 @@ class JSONFile(context: Context, _name: String, _modifier: Modifier, _json: JSON
     def isDatapack(): Boolean = !modifiers.hasAttributes("bedrock_rp")(context) && !modifiers.hasAttributes("java_rp")(context)
     def isBedrockRP(): Boolean = modifiers.hasAttributes("bedrock_rp")(context)
     def isJavaRP(): Boolean = modifiers.hasAttributes("java_rp")(context)
+
+    def getIRFile(): IRFile = {
+        IRFile(getName(), name, getContent(), true)
+    }
 }

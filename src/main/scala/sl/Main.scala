@@ -134,8 +134,8 @@ object Main{
 
     val time = ChronoUnit.MILLIS.between(start, LocalDateTime.now())
     Reporter.info(f"Number of files: ${output.size}")
-    Reporter.info(f"Number of mcfunctions: ${output.filter(_._1.endsWith(".mcfunction")).size}")
-    Reporter.info(f"Number of commands: ${output.filter(_._1.endsWith(".mcfunction")).map(_._2.size).foldRight(0)(_ + _)}")
+    Reporter.info(f"Number of mcfunctions: ${output.filter(_.getPath().endsWith(".mcfunction")).size}")
+    Reporter.info(f"Number of commands: ${output.filter(_.getPath().endsWith(".mcfunction")).map(_.getContents().size).foldRight(0)(_ + _)}")
     Reporter.info(f"Total compile Time: ${time}ms")
 
     val exportStart = LocalDateTime.now()
@@ -143,16 +143,21 @@ object Main{
       if (!path.endsWith("/") && !path.endsWith("\\"))then path + "/" else path
     ).toList
 
+    if (Settings.optimizeInlining){
+      Reporter.info(f"Optimizing calls")
+      output = sl.IR.BlockReduce(output).run()
+    }
+
     DataPackBuilder.build(dataInput, outputPath, output)
     if (Settings.target == MCJava){
         Settings.java_resourcepack_output.map(path => 
           if (!path.endsWith("/") && !path.endsWith("\\"))then path + "/" else path
-        ).foreach(f => ResourcePackBuilder.build(resourceInput, f, Settings.target.getResourcesExtraFiles(context) :::context.getAllJsonFiles().filter(_.isJavaRP()).map(f => (f.getName(), f.getContent()))))
+        ).foreach(f => ResourcePackBuilder.build(resourceInput, f, Settings.target.getResourcesExtraFiles(context) :::context.getAllJsonFiles().filter(_.isJavaRP()).map(f => (f.getIRFile()))))
     }
     if (Settings.target == MCBedrock){
         Settings.bedrock_resourcepack_output.map(path => 
           if (!path.endsWith("/") && !path.endsWith("\\"))then path + "/" else path
-        ).foreach(f => ResourcePackBuilder.build(resourceInput, f, Settings.target.getResourcesExtraFiles(context):::context.getAllJsonFiles().filter(_.isBedrockRP()).map(f => (f.getName(), f.getContent()))))
+        ).foreach(f => ResourcePackBuilder.build(resourceInput, f, Settings.target.getResourcesExtraFiles(context):::context.getAllJsonFiles().filter(_.isBedrockRP()).map(f => (f.getIRFile()))))
     }
 
     val time2 = ChronoUnit.MILLIS.between(exportStart, LocalDateTime.now())

@@ -63,6 +63,10 @@ object ConfigLoader{
                     case ("mc.bedrock.resourcepack.description", value)       => Settings.bedrock_resourcepack_version.description = value
                     case ("mc.bedrock.resourcepack.min_engine_version", value)=> Settings.bedrock_resourcepack_version.min_engine_version = value.split(raw"\.").map(_.toInt).toList
 
+                    case ("optimization", value) => Settings.optimize = value == "true"
+                    case ("optimization.inlining", value) => Settings.optimizeInlining = value == "true"
+                    case ("optimization.deduplication", value)  => Settings.optimizeDeduplication = value == "true"
+
                     case ("obfuscate", value)          => Settings.obfuscate = value == "true"
 
                     case ("folder.block", name)        => Settings.functionFolder = name
@@ -115,6 +119,10 @@ object ConfigLoader{
             f"tree.size=${Settings.treeSize}",
 
             f"obfuscate=${Settings.obfuscate}",
+
+            f"optimization=${Settings.optimize}",
+            f"optimization.inlining=${Settings.optimizeInlining}",
+            f"optimization.deduplication=${Settings.optimizeDeduplication}",
 
             f"meta.debug=true",
         )

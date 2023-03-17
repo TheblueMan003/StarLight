@@ -3,8 +3,10 @@ package sl.IR
 trait IRTree{
     def getString(): String
 }
-trait IRExecute{
+trait IRExecute extends IRTree{
     def getExecuteString(): String
+    def getStatements: IRTree
+    def withStatements(statements: IRTree): IRExecute
 }
 
 object EmptyIR extends IRTree{
@@ -41,6 +43,8 @@ case class IfScoreboard(left: SBLink, op: String, right: SBLink, statement: IRTr
             case _ => " run "+statement.getString()
         )
     }
+    def getStatements = statement
+    def withStatements(nstatement: IRTree): IRExecute = IfScoreboard(left, op, right, nstatement, invert)
 }
 case class IfScoreboardMatch(left: SBLink, min: Int, max: Int, statement: IRTree, invert: Boolean = false) extends IRTree with IRExecute{
     def getBound = {
@@ -68,6 +72,8 @@ case class IfScoreboardMatch(left: SBLink, min: Int, max: Int, statement: IRTree
             case _ => " run "+statement.getString()
         )
     }
+    def getStatements = statement
+    def withStatements(nstatement: IRTree): IRExecute = IfScoreboardMatch(left, min, max, nstatement, invert)
 }
 case class IfEntity(selector: String, statement: IRTree, invert: Boolean = false) extends IRTree with IRExecute{
     def condition={
@@ -88,6 +94,8 @@ case class IfEntity(selector: String, statement: IRTree, invert: Boolean = false
             case _ => " run "+statement.getString()
         )
     }
+    def getStatements = statement
+    def withStatements(nstatement: IRTree): IRExecute = IfEntity(selector, nstatement, invert)
 }
 
 case class IfBlock(value: String, statement: IRTree, invert: Boolean = false) extends IRTree with IRExecute{
@@ -109,6 +117,8 @@ case class IfBlock(value: String, statement: IRTree, invert: Boolean = false) ex
             case _ => " run "+statement.getString()
         )
     }
+    def getStatements = statement
+    def withStatements(nstatement: IRTree): IRExecute = IfBlock(value, nstatement, invert)
 }
 
 case class IfBlocks(value: String, statement: IRTree, invert: Boolean = false) extends IRTree with IRExecute{
@@ -130,6 +140,8 @@ case class IfBlocks(value: String, statement: IRTree, invert: Boolean = false) e
             case _ => " run "+statement.getString()
         )
     }
+    def getStatements = statement
+    def withStatements(nstatement: IRTree): IRExecute = IfBlocks(value, nstatement, invert)
 }
 
 case class IfPredicate(value: String, statement: IRTree, invert: Boolean = false) extends IRTree with IRExecute{
@@ -151,6 +163,8 @@ case class IfPredicate(value: String, statement: IRTree, invert: Boolean = false
             case _ => " run "+statement.getString()
         )
     }
+    def getStatements = statement
+    def withStatements(nstatement: IRTree): IRExecute = IfPredicate(value, nstatement, invert)
 }
 
 case class IfLoaded(value: String, statement: IRTree, invert: Boolean = false) extends IRTree with IRExecute{
@@ -172,6 +186,8 @@ case class IfLoaded(value: String, statement: IRTree, invert: Boolean = false) e
             case _ => " run "+statement.getString()
         )
     }
+    def getStatements = statement
+    def withStatements(nstatement: IRTree): IRExecute = IfLoaded(value, nstatement, invert)
 }
 
 class ExecuteIR(block: String, statement: IRTree) extends IRTree with IRExecute{
@@ -187,6 +203,8 @@ class ExecuteIR(block: String, statement: IRTree) extends IRTree with IRExecute{
             case _ => " run "+statement.getString()
         )
     }
+    def getStatements = statement
+    def withStatements(nstatement: IRTree): IRExecute = new ExecuteIR(block, nstatement)
 }
 case class OnIR(selector: String, statement: IRTree) extends ExecuteIR(f"on ${selector}", statement)
 case class AsIR(selector: String, statement: IRTree) extends ExecuteIR(f"as ${selector}", statement)
@@ -215,6 +233,6 @@ case class ScoreboardReset(target: SBLink) extends IRTree{
     def getString(): String = s"scoreboard players reset $target"
 }
 
-case class BlockCall(block: String) extends IRTree{
-    def getString(): String = s"function $block"
+case class BlockCall(function: String, fullName: String) extends IRTree{
+    def getString(): String = s"function $function"
 }

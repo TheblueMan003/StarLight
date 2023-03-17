@@ -18,13 +18,13 @@ import sl.IR.*
 object DataPackBuilder{
     var previous = Map[String, List[IRTree]]()
     def clearCache() = previous = Map[String, List[IRTree]]()
-    def build(source: List[String], dirs: List[String], output: List[(String, List[IRTree])]):Unit={
+    def build(source: List[String], dirs: List[String], output: List[IRFile]):Unit={
         if (previous.size == 0){
             Reporter.info("Clearing old Data Packs")
             dirs.foreach(FileUtils.deleteDirectory(_))
         }
 
-        val newSet = dirs.flatMap(dir => output.map((path, content) => (dir + path, content))).toMap
+        val newSet = dirs.flatMap(dir => output.map(file => (dir + file.getPath(), file.getContents()))).toMap
         previous.filter(x => !newSet.contains(x._1)).foreach(x => {
             Reporter.debug(f"Removing old file: ${x._1}")
             FileUtils.deleteFile(x._1)
@@ -48,19 +48,21 @@ object DataPackBuilder{
         previous = newSet
     }
 
-    def exportOutputZip(out: String, files: List[(String, List[String])]) = {
+    def exportOutputZip(out: String, files: List[IRFile]) = {
         val zip = new ZipOutputStream(new FileOutputStream(out))
         val writer = new PrintWriter(zip)
-        files.foreach { (name, content) =>
-        zip.putNextEntry(new ZipEntry(if name.startsWith("/") then name.drop(1) else name))
-        content.foreach(x => writer.println(x))
-        writer.flush()
-        zip.closeEntry()
+        files.foreach { file =>
+            val name = file.getPath()
+            val content = file.getContents()
+            zip.putNextEntry(new ZipEntry(if name.startsWith("/") then name.drop(1) else name))
+            content.foreach(x => writer.println(x.getString()))
+            writer.flush()
+            zip.closeEntry()
         }
         zip.close()
     }
 
-    def makeDPFolder(sources: List[String], target: String, generated: List[(String, List[IRTree])])={
+    def makeDPFolder(sources: List[String], target: String, generated: List[IRFile])={
         sources.flatMap(source => getListOfDPFiles(source, "").map(f => (source, f)))
         .groupBy(_._2)
         .toList
@@ -71,14 +73,16 @@ object DataPackBuilder{
             FileUtils.createFolderForFiles(File(target+file))
             Files.copy(originalPath, copied, StandardCopyOption.REPLACE_EXISTING);
         })
-        generated.map{case (file, content) => {
+        generated.map{case irfile => {
+            val content = irfile.getContents()
+            val file = irfile.getPath()
             val filename = target+file
             if (!previous.contains(filename) || previous(filename) != content){
                 FileUtils.safeWriteFile(target+file, content.map(_.getString()))
             }
         }}
     }
-    def makeDPZip(sources: List[String], target: String, generated: List[(String, List[IRTree])])={
+    def makeDPZip(sources: List[String], target: String, generated: List[IRFile])={
         val Buffer = 2 * 1024
         var data = new Array[Byte](Buffer)
         val zip = new ZipOutputStream(new FileOutputStream(target))
@@ -87,7 +91,7 @@ object DataPackBuilder{
         // Copy Files
         sources.flatMap(source => getListOfDPFiles(source, "").map(f => (source, f)))
         .groupBy(_._2)
-        .filterNot(x => generated.exists(_._1 == x._1))
+        .filterNot(x => generated.exists(_.getPath() == x._1))
         .toList
         .map((k,v) => v.sortBy(_._1.length()).head)
         .map((source, name) =>{
@@ -103,10 +107,12 @@ object DataPackBuilder{
         })
 
         // Add Generated Files
-        generated.groupBy(_._1)
+        generated.groupBy(_.getPath())
         .toList
-        .map((k,v) => v.sortBy(_._2.length).head)
-        .foreach { (name, content) =>
+        .map((k,v) => v.sortBy(_.getContents().length).head)
+        .foreach { file =>
+            val content = file.getContents()
+            val name = file.getPath()
             zip.putNextEntry(new ZipEntry(if name.startsWith("/") then name.drop(1) else name))
             content.foreach(x => writer.println(x))
             writer.flush()

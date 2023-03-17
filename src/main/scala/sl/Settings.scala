@@ -37,6 +37,11 @@ class SettingsContext(){
     var debug = false
     var allFunction = true
 
+    var optimize = true
+    var optimizeInlining = true
+    var optimizeDeduplication = true
+    var optimizeVariableValue = true
+
     var globalImport: Instruction = InstructionList(List())
 
     var metaVariable = List(
@@ -53,8 +58,8 @@ trait Target{
     def getFunctionName(path: String): String
     def getJsonPath(path: String): String
     def getRPJsonPath(path: String): String
-    def getExtraFiles(context: Context): List[(String, List[IRTree])]
-    def getResourcesExtraFiles(context: Context): List[(String, List[IRTree])]
+    def getExtraFiles(context: Context): List[IRFile]
+    def getResourcesExtraFiles(context: Context): List[IRFile]
 
     def hasFeature(feature: String): Boolean
 }
@@ -77,7 +82,7 @@ case object MCJava extends Target{
     def getRPJsonPath(path: String): String = {
         "/assets/minecraft/" + path.replaceAllLiterally(".","/")+ ".json"
     }
-    def getExtraFiles(context: Context): List[(String, List[IRTree])] = {
+    def getExtraFiles(context: Context): List[IRFile] = {
         val ticks = context.getAllFunction()
                         .filter(_.modifiers.isTicking)
                         .map(f => getFunctionName(f.fullName))
@@ -102,10 +107,10 @@ case object MCJava extends Target{
 
         
 
-        List(("pack.mcmeta", List(JsonIR(getPackMeta()))),
-            (f"data/${context.root.getPath()}/functions/__init__.mcfunction", dfScore),
-            ("data/minecraft/tags/functions/tick.json", List(JsonIR("{"+ f"\t\"values\":[$ticks]"+ "}"))),
-            ("data/minecraft/tags/functions/load.json", List(JsonIR("{"+ f"\t\"values\":[$loads]"+ "}"))))
+        List(IRFile("pack.mcmeta", "pack.mcmeta", List(JsonIR(getPackMeta())), true),
+            IRFile(f"data/${context.root.getPath()}/functions/__init__.mcfunction", "__init__", dfScore, false),
+            IRFile("data/minecraft/tags/functions/tick.json", "data/minecraft/tags/functions/tick.json", List(JsonIR("{"+ f"\t\"values\":[$ticks]"+ "}")), true),
+            IRFile("data/minecraft/tags/functions/load.json", "data/minecraft/tags/functions/load.json", List(JsonIR("{"+ f"\t\"values\":[$loads]"+ "}")), true))
     }
 
     def getPackMeta()=
@@ -117,8 +122,8 @@ case object MCJava extends Target{
             }
         }
         """
-    def getResourcesExtraFiles(context: Context):List[(String, List[IRTree])]= {
-        List((f"pack.mcmeta", List(JsonIR(getResourcePackMeta()))))
+    def getResourcesExtraFiles(context: Context):List[IRFile]= {
+        List(IRFile(f"pack.mcmeta", f"pack.mcmeta", List(JsonIR(getResourcePackMeta())), true))
     }
     def getResourcePackMeta()=
         f"""
@@ -149,7 +154,7 @@ case object MCBedrock extends Target{
     def getRPJsonPath(path: String): String = {
         "/" + path.replaceAllLiterally(".","/")+ ".json"
     }
-    def getExtraFiles(context: Context): List[(String, List[IRTree])] = {
+    def getExtraFiles(context: Context): List[IRFile] = {
         val ticks = context.getAllFunction()
                         .filter(_.modifiers.isTicking)
                         .map(f => getFunctionName(f.fullName))
@@ -166,9 +171,9 @@ case object MCBedrock extends Target{
                             context.getAllVariable().filter(v => !v.modifiers.isEntity && !v.modifiers.isLazy && v.getType() != VoidType).map(v => ScoreboardSet(v.getIRSelector(), 0)):::
                             List(CommandIR(f"function ${context.root.getPath()}/__load__"))
 
-        List((f"manifest.json", List(JsonIR(getManifestContent()))),
-            (f"functions/__init__.mcfunction", dfScore),
-            ("functions/tick.json", List(JsonIR("{"+ f"\t\"values\":[$ticks]"+ "}"))))
+        List(IRFile(f"manifest.json", f"manifest.json", List(JsonIR(getManifestContent())), true),
+            IRFile(f"functions/__init__.mcfunction", "__init__", dfScore, false),
+            IRFile("functions/tick.json", "functions/tick.json", List(JsonIR("{"+ f"\t\"values\":[$ticks]"+ "}")), true))
     }
 
     def getManifestContent(): String = {
@@ -193,8 +198,8 @@ case object MCBedrock extends Target{
         """
     }
 
-    def getResourcesExtraFiles(context: Context):List[(String, List[IRTree])]= {
-        List((f"manifest.json", List(JsonIR(getResourcesManifestContent()))))
+    def getResourcesExtraFiles(context: Context):List[IRFile]= {
+        List(IRFile(f"manifest.json", f"manifest.json", List(JsonIR(getResourcesManifestContent())), true))
     }
 
     def getResourcesManifestContent(): String = {
