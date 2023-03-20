@@ -76,14 +76,14 @@ class DisplayEntity{
     Set entity Sky Light.
     """
     def lazy setSkyLight(int value){
-        data.set({"brightness":{"sky":value}})
+        data.set({"brightness":{"sky":value, "block":value}})
     }
 
     """
     Set entity Block Light.
     """
     def lazy setBlockLight(int value){
-        data.set({"brightness":{"block":value}})
+        data.set({"brightness":{"block":value, "sky":value}})
     }
 
     """
@@ -163,5 +163,9 @@ class DisplayEntity{
     """
     def lazy interpolateTranslation(int duration, float x, float y, float z){
         data.set({"start_interpolation":0, "interpolation_duration":duration,"transformation":{"translation":[x, y, z]}})
+    }
+
+    def lazy run(void=>void fct){
+        fct()
     }
 }

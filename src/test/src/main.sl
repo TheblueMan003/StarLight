@@ -1,14 +1,10 @@
 package test
 
-import standard::print
+import mc.inventory as inventory
 
 public void main(){
-    /say hi
-    int a = 1
-    int b = 2
-    int c = 3
-    c = a + b
-    if (c == 3){
-        print(c)
+    lazy val item2 = minecraft:iron_ingot
+    if (inventory.isHoldingItem(item2)){
+        /say hi
     }
 }

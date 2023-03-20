@@ -67,7 +67,7 @@ class Predicate(context: Context, name: String, val arguments: List[Argument], _
     def call(args: List[Expression])(implicit ctx: Context): String = {
         val uargs = argMap2(args.map(Utils.simplify(_)(ctx)))
         if (predicates.contains(uargs)) return predicates(uargs)
-        val va = argMap(args).map((v, e) => v.assign("=", e)(context))
+        val va = argMap(args).map((v, e) => v.assign("=", e)(ctx))
         val compiled = Utils.compileJson(block)(context.push(name))
         val pname = context.getPath() +"."+ name +"."+ counter
         files.put(Settings.target.getPredicatePath(pname), List(JsonIR(compiled.getString()(context.push(name)))))

@@ -110,7 +110,7 @@ case object MCJava extends Target{
         
 
         List(IRFile("pack.mcmeta", "pack.mcmeta", List(JsonIR(getPackMeta())), true),
-            IRFile(f"data/${context.root.getPath()}/functions/__init__.mcfunction", "__init__", dfScore, false),
+            IRFile(f"data/${context.root.getPath()}/functions/__init__.mcfunction", "__init__", dfScore, false, false),
             IRFile("data/minecraft/tags/functions/tick.json", "data/minecraft/tags/functions/tick.json", List(JsonIR("{"+ f"\t\"values\":[$ticks]"+ "}")), true),
             IRFile("data/minecraft/tags/functions/load.json", "data/minecraft/tags/functions/load.json", List(JsonIR("{"+ f"\t\"values\":[$loads]"+ "}")), true))
     }
@@ -174,7 +174,7 @@ case object MCBedrock extends Target{
                             List(CommandIR(f"function ${context.root.getPath()}/__load__"))
 
         List(IRFile(f"manifest.json", f"manifest.json", List(JsonIR(getManifestContent())), true),
-            IRFile(f"functions/__init__.mcfunction", "__init__", dfScore, false),
+            IRFile(f"functions/__init__.mcfunction", "__init__", dfScore, false, false),
             IRFile("functions/tick.json", "functions/tick.json", List(JsonIR("{"+ f"\t\"values\":[$ticks]"+ "}")), true))
     }
 
