@@ -30,6 +30,9 @@ object Function {
             str._1.call(str._2, ret, op)
         }
     }
+    def markAsStringUsed()={
+        str._1.markAsStringUsed()
+    }
   }
 }
 abstract class Function(context: Context, name: String, val arguments: List[Argument], typ: Type, _modifier: Modifier) extends CObject(context, name, _modifier) with Typed(typ){
@@ -42,6 +45,7 @@ abstract class Function(context: Context, name: String, val arguments: List[Argu
     var argumentsVariables: List[Variable] = List()
     val clazz = context.getCurrentClass()
     var overridedFunction: Function = null
+    var stringUsed = false
 
     if (modifiers.isVirtual){
 
@@ -49,7 +53,9 @@ abstract class Function(context: Context, name: String, val arguments: List[Argu
     if (modifiers.isConst){
         throw new Exception("Function cannot be marked as const")
     }
-
+    def markAsStringUsed()={
+        stringUsed = true
+    }
     private def getMaxArgCount(args: List[Argument]): Int = {
         if args.length == 0 then 0 else
         args.last.typ match
@@ -125,7 +131,7 @@ abstract class Function(context: Context, name: String, val arguments: List[Argu
     def getContent(): List[IRTree]
     def getFunctionType() = FuncType(arguments.map(a => a.typ), typ)
     def getIRFile(): IRFile ={
-        IRFile(getName(), fullName, getContent(), false)
+        IRFile(getName(), fullName, getContent(), false, !(modifiers.isTicking || modifiers.isLoading || modifiers.protection == Protection.Public || stringUsed))
     }
 }
 

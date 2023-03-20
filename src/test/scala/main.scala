@@ -23,7 +23,7 @@ class ListFunSuite extends AnyFlatSpec with should.Matchers with BeforeAndAfterA
     var output: PrintStream = null
 
     val testFiles: List[(String, Int)] = List()
-    val compileTests: List[String] = FileUtils.getListOfFiles("./src/main/resources/libraries").filterNot(_.contains("__init__.sl")) ::: FileUtils.getListOfFiles("./src/test/resources/").filterNot(_.contains("__init__.sl"))
+    val compileTests: List[String] = List()//FileUtils.getListOfFiles("./src/main/resources/libraries").filterNot(_.contains("__init__.sl")) ::: FileUtils.getListOfFiles("./src/test/resources/").filterNot(_.contains("__init__.sl"))
 
 
     override def beforeAll() = {

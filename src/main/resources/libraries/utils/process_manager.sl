@@ -7,7 +7,7 @@ int t_running, t_total
 """
 Show the list of processes
 """
-def @test.after show(){
+public @test.after void show(){
     standard.print(("===[ Running Processes ]===","green"))
     int running = 0
     int off = 0
@@ -40,14 +40,14 @@ def @test.after show(){
 """
 Stop all the active processes
 """
-def stopAll(){
+public void stopAll(){
     @process.stop()
 }
 
 """
 Return the number of currently active processes
 """
-int count(){
+public int count(){
     int total = 0
     
     forgenerate($i, @process.count){

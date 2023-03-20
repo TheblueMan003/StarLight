@@ -66,6 +66,10 @@ object ConfigLoader{
                     case ("optimization", value) => Settings.optimize = value == "true"
                     case ("optimization.inlining", value) => Settings.optimizeInlining = value == "true"
                     case ("optimization.deduplication", value)  => Settings.optimizeDeduplication = value == "true"
+                    case ("optimization.variable", value) => Settings.optimizeVariableValue = value == "true"
+                    case ("optimization.variable.local", value) => Settings.optimizeVariableLocal = value == "true"
+                    case ("optimization.variable.global", value) => Settings.optimizeVariableGlobal = value == "true"
+
 
                     case ("obfuscate", value)          => Settings.obfuscate = value == "true"
 
@@ -123,6 +127,9 @@ object ConfigLoader{
             f"optimization=${Settings.optimize}",
             f"optimization.inlining=${Settings.optimizeInlining}",
             f"optimization.deduplication=${Settings.optimizeDeduplication}",
+            f"optimization.variable=${Settings.optimizeVariableValue}",
+            f"optimization.variable.local=${Settings.optimizeVariableLocal}",
+            f"optimization.variable.global=${Settings.optimizeVariableGlobal}",
 
             f"meta.debug=true",
         )

@@ -239,6 +239,55 @@ object Execute{
                 getIfCase(BinaryOperation(op, left, context.resolveVariable(VariableValue(right, sel))))
 
             // Tuple
+            // Float with int
+            case BinaryOperation(op @ ("==" | ">" | "<" | ">=" | "<="), LinkedVariableValue(left, sel1), LinkedVariableValue(right, sel2))
+                if left.getType() == FloatType && right.getType() == IntType => {
+                    val vari = context.getFreshVariable(FloatType)
+                    (vari.assign("=", LinkedVariableValue(right, sel2)), List(IFValueCase(BinaryOperation(op, LinkedVariableValue(left, sel1), LinkedVariableValue(vari)))))
+                }
+
+            case BinaryOperation(op @ ("==" | ">" | "<" | ">=" | "<="), LinkedVariableValue(left, sel1), LinkedVariableValue(right, sel2))
+                if left.getType() == IntType && right.getType() == FloatType => {
+                    val vari = context.getFreshVariable(FloatType)
+                    (vari.assign("=", LinkedVariableValue(left, sel1)), List(IFValueCase(BinaryOperation(op, LinkedVariableValue(vari), LinkedVariableValue(right, sel2)))))
+                }
+
+            case BinaryOperation(op @ ("==" | ">" | "<" | ">=" | "<="), LinkedVariableValue(left, sel), IntValue(right))
+                if left.getType() == FloatType => 
+                    (List(), List(IFValueCase(BinaryOperation(op, LinkedVariableValue(left, sel), FloatValue(right)))))
+
+            case BinaryOperation(op @ ("==" | ">" | "<" | ">=" | "<="), IntValue(right), LinkedVariableValue(left, sel))
+                if left.getType() == FloatType => 
+                    (List(), List(IFValueCase(BinaryOperation(op, FloatValue(right), LinkedVariableValue(left, sel)))))
+
+            // Int with float
+            case BinaryOperation(op @ (">" | "<" | ">=" | "<="), LinkedVariableValue(left, sel), FloatValue(right))
+                if left.getType() == IntType => 
+                    (List(), List(IFValueCase(BinaryOperation(op, LinkedVariableValue(left, sel), IntValue(right.toInt)))))
+
+            case BinaryOperation(op @ (">" | "<" | ">=" | "<="), FloatValue(right), LinkedVariableValue(left, sel))
+                if left.getType() == IntType => 
+                    (List(), List(IFValueCase(BinaryOperation(op, IntValue(right.toInt), LinkedVariableValue(left, sel)))))
+
+            case BinaryOperation(op @ ("=="), LinkedVariableValue(left, sel), FloatValue(right))
+                if left.getType() == IntType => 
+                    if right == right.toInt then (List(), List(IFValueCase(BinaryOperation(op, LinkedVariableValue(left, sel), IntValue(right.toInt))))) else (List(), List(IFFalse))
+
+            case BinaryOperation(op @ ("=="), FloatValue(right), LinkedVariableValue(left, sel))
+                if left.getType() == IntType => 
+                    if right == right.toInt then (List(), List(IFValueCase(BinaryOperation(op, IntValue(right.toInt), LinkedVariableValue(left, sel))))) else (List(), List(IFFalse))
+
+            case BinaryOperation(op @ ("!="), LinkedVariableValue(left, sel), FloatValue(right))
+                if left.getType() == IntType => 
+                    if right == right.toInt then (List(), List(IFValueCase(BinaryOperation(op, LinkedVariableValue(left, sel), IntValue(right.toInt))))) else (List(), List(IFTrue))
+
+            case BinaryOperation(op @ ("!="), FloatValue(right), LinkedVariableValue(left, sel))
+                if left.getType() == IntType => 
+                    if right == right.toInt then (List(), List(IFValueCase(BinaryOperation(op, IntValue(right.toInt), LinkedVariableValue(left, sel))))) else (List(), List(IFTrue))
+
+            
+
+
             case BinaryOperation("==", LinkedVariableValue(left, sel), right) 
                 if right.hasIntValue() && left.getType().isDirectComparable() => 
                     (List(), List(IFValueCase(expr)))

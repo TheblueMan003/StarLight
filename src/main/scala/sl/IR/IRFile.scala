@@ -1,12 +1,27 @@
 package sl.IR
 
-class IRFile(path: String, name: String, contents: List[IRTree], isJson: Boolean = false) {
+class IRFile(path: String, name: String, contents: List[IRTree], isJson: Boolean = false, canDelete: Boolean = true) {
     var calledBy: List[String] = List()
     var calling = List[String]()
+
+    var scoreboardAccess: List[SBLink] = List()
+    var scoreboardModified: List[SBLink] = List()
 
 
     var deleted: Boolean = false
     var _content = contents
+
+
+    def addScoreboardAccess(link: SBLink): Unit = {
+        scoreboardAccess = scoreboardAccess :+ link
+    }
+    def addScoreboardModified(link: SBLink): Unit = {
+        scoreboardModified = scoreboardModified :+ link
+    }
+    def resetScoreboard(): Unit = {
+        scoreboardAccess = List()
+        scoreboardModified = List()
+    }
 
     def getPath(): String = {
         path
@@ -45,7 +60,12 @@ class IRFile(path: String, name: String, contents: List[IRTree], isJson: Boolean
 
 
     def delete(): Unit = {
-        deleted = true
+        if (canDelete){
+            deleted = true
+        }
+    }
+    def canBeDeleted(): Boolean = {
+        canDelete
     }
 
     def hasSelfCall(): Boolean = {

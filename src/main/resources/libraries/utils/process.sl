@@ -21,7 +21,7 @@ template Process{
     """
     Restart the process on load. (JAVA Only)
     """
-    def loading reload(){
+    def @load reload(){
         if (Compiler.isJava){
             run()
         }
@@ -45,7 +45,7 @@ template Process{
     """
     Start the process
     """
-    def start(){
+    public void start(){
         enabled:=false
         if (!enabled){
             enabled = true
@@ -77,7 +77,7 @@ template Process{
         """
         Main loop for the process (Bedrock Only)
         """
-        def ticking mainLoop(){
+        def @tick mainLoop(){
             if (enabled){
                 if (crashDetect){
                     crash()
@@ -92,7 +92,7 @@ template Process{
     """
     Stop the process
     """
-    def stop(){
+    public void stop(){
         if (enabled){
             onStop()
             enabled = false

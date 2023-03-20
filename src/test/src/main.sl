@@ -1,21 +1,14 @@
 package test
 
-import math.raycast as raycast
+import standard::print
 
-def main(){
-    raycast.shoot(10,0.1,!block(minecraft:air)){
-        /setblock ~ ~ ~ minecraft:stone
-    }
-}
-
-def test(){
-    int a
-    if (a > 0){
-        /say a
-        /say b
-    }
-    if (a > 0){
-        /say a
-        /say b
+public void main(){
+    /say hi
+    int a = 1
+    int b = 2
+    int c = 3
+    c = a + b
+    if (c == 3){
+        print(c)
     }
 }

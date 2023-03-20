@@ -520,6 +520,7 @@ object Utils{
             case JsonCall(value, args, typeargs) => {
                 if ignore.contains(Identifier.fromString(value)) then JsonIdentifier(value) else{
                     val (fct, args2) = context.getFunction(value, args.map(fix(_)), typeargs, JsonType)
+                    fct.markAsStringUsed()
                     JsonCall(fct.fullName, args2, typeargs)
                 }
             }
@@ -841,6 +842,7 @@ object Utils{
                     toJson(vari.lazyValue)
                 }
                 else{
+                    fct.markAsStringUsed()
                     JsonString(fct.call().last.getString())
                 }
             }
@@ -852,6 +854,7 @@ object Utils{
                     toJson(vari.lazyValue)
                 }
                 else{
+                    fct.markAsStringUsed()
                     JsonString((fct,args).call().last.getString())
                 }
             }
@@ -871,16 +874,18 @@ object Utils{
                         if (fct._1.modifiers.isLazy){
                             var vari = context.getFreshVariable(fct._1.getType())
                             vari.modifiers.isLazy = true
-                            val call = context.getFunction(value, args, typeargs, VoidType).call(vari)
+                            val call = fct.call(vari)
                             toJson(vari.lazyValue)
                         }
                         else{
-                            val fct = context.getFunction(value, args, typeargs, VoidType).call()
-                            if (fct.length == 1){
-                                JsonString(fct.last.getString().replaceAll("function ", ""))
+                            val fctCall = fct.call()
+                            if (fctCall.length == 1){
+                                fct.markAsStringUsed()
+                                JsonString(fctCall.last.getString().replaceAll("function ", ""))
                             }
                             else{
-                                val block = context.getFreshBlock(fct)
+                                val block = context.getFreshBlock(fctCall)
+                                block.markAsStringUsed()
                                 JsonString(MCJava.getFunctionName(block.fullName))
                             }
                         }
@@ -903,6 +908,7 @@ object Utils{
                                 case v => throw new Exception(f"Cannot cast $v (from variable: ${vari.fullName}) to json")
                         }
                         else{
+                            fct.markAsStringUsed()
                             JsonArray(fct.call().map(v => JsonString(v.getString())))
                         }
                     }

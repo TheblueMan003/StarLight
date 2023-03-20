@@ -33,6 +33,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
     private val predicates = mutable.Map[String, List[Predicate]]()
     private val blocktags = mutable.Map[String, Tag]()
     private val names = mutable.Set[String]()
+    private val scoreboardUsedForce = mutable.Set[SBLink]()
 
     private val functionTags = mutable.Map[Identifier, TagFunction]()
     
@@ -125,6 +126,21 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
         val r = tagCtx
         r.synchronized{
             r.functionTags.values.toList
+        }
+    }
+
+    def addScoreboardUsedForce(link: SBLink) = {
+        if (!link.entity.startsWith("@")){
+            val r = root
+            r.synchronized{
+                r.scoreboardUsedForce.add(link)
+            }
+        }
+    }
+    def getScoreboardUsedForce():mutable.Set[SBLink] = {
+        val r = root
+        r.synchronized{
+            r.scoreboardUsedForce
         }
     }
 

@@ -56,6 +56,19 @@ object DefaultFunction{
                     }
                 }
             ))
+        ctx.addFunction("getTemplateName", CompilerFunction(ctx, "getTemplateName", 
+                List(),
+                StringType,
+                Modifier.newPublic(),
+                (args: List[Expression],ctx: Context) => {
+                    args match{
+                        case Nil => {
+                            (List(), StringValue(ctx.getCurrentTemplateUse()))
+                        }
+                        case other => throw new Exception(f"Illegal Arguments $other for getTemplateName")
+                    }
+                }
+            ))
         ctx.addFunction("pushUpward", CompilerFunction(ctx, "pushUpward", 
                 List(Argument("class", MCObjectType, None)),
                 VoidType,
@@ -197,10 +210,13 @@ object DefaultFunction{
                 (args: List[Expression],ctx: Context) => {
                     args match{
                         case LinkedVariableValue(vari, sel)::Nil => {
+                            ctx.addScoreboardUsedForce(vari.getIRSelector())
                             (List(), NamespacedName(vari.getSelectorObjective()))
                         }
                         case VariableValue(vari, sel)::Nil => {
-                            (List(), NamespacedName(ctx.getVariable(vari).getSelectorObjective()))
+                            val varj = ctx.getVariable(vari)
+                            ctx.addScoreboardUsedForce(varj.getIRSelector())
+                            (List(), NamespacedName(varj.getSelectorObjective()))
                         }
                         case sv::Nil if sv.hasIntValue() => {
                             ctx.requestConstant(sv.getIntValue())
@@ -217,10 +233,13 @@ object DefaultFunction{
             (args: List[Expression],ctx: Context) => {
                 args match{
                     case LinkedVariableValue(vari, sel)::Nil => {
+                        ctx.addScoreboardUsedForce(vari.getIRSelector())
                         (List(), NamespacedName(vari.getSelectorName()(sel)))
                     }
                     case VariableValue(vari, sel)::Nil => {
-                        (List(), NamespacedName(ctx.getVariable(vari).getSelectorName()(sel)))
+                        val varj = ctx.getVariable(vari)
+                        ctx.addScoreboardUsedForce(varj.getIRSelector())
+                        (List(), NamespacedName(varj.getSelectorName()(sel)))
                     }
                     case sv::Nil if sv.hasIntValue() => {
                         ctx.requestConstant(sv.getIntValue())
@@ -652,11 +671,14 @@ object DefaultFunction{
                         args match{
                             case LinkedVariableValue(vari, sel)::LambdaValue(arg, instr)::Nil => {
                                 val ret = Compiler.compile(instr)(ctx)
+                                ctx.addScoreboardUsedForce(vari.getIRSelector())
                                 (ret.take(ret.length - 1) ::: List(CommandIR(f"execute store result score ${vari.getSelector()(sel)} run "+ret.last)), NullValue)
                             }
                             case VariableValue(vari, sel)::LambdaValue(arg, instr)::Nil => {
                                 val ret = Compiler.compile(instr)(ctx)
-                                (ret.take(ret.length - 1) ::: List(CommandIR(f"execute store result score ${ctx.getVariable(vari).getSelector()(sel)} run "+ret.last)), NullValue)
+                                val varj = ctx.getVariable(vari)
+                                ctx.addScoreboardUsedForce(varj.getIRSelector())
+                                (ret.take(ret.length - 1) ::: List(CommandIR(f"execute store result score ${varj.getSelector()(sel)} run "+ret.last)), NullValue)
                             }
                             case other => throw new Exception(f"Illegal Arguments $other for cmdstore")
                         }
@@ -671,10 +693,13 @@ object DefaultFunction{
                     (args: List[Expression],ctx: Context) => {
                         args match{
                             case LinkedVariableValue(vari, sel)::IntValue(min)::IntValue(max)::Nil => {
+                                ctx.addScoreboardUsedForce(vari.getIRSelector())
                                 (List(CommandIR(f"scoreboard players random ${vari.getSelector()(sel)} $min $max")), NullValue)
                             }
                             case VariableValue(vari, sel)::IntValue(min)::IntValue(max)::Nil => {
-                                (List(CommandIR(f"scoreboard players random ${ctx.getVariable(vari).getSelector()(sel)} $min $max")), NullValue)
+                                val varj = ctx.getVariable(vari)
+                                ctx.addScoreboardUsedForce(varj.getIRSelector())
+                                (List(CommandIR(f"scoreboard players random ${varj.getSelector()(sel)} $min $max")), NullValue)
                             }
                             case other => throw new Exception(f"Illegal Arguments $other for random")
                         }

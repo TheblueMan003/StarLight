@@ -3,8 +3,11 @@ if (Compiler.isBedrock){
         @__loading__()
     }
 }
-def [compile.order=999999] ticking __tick__(){
+def [compile.order=999999] ticking __tick_tag__(){
     @tick()
+}
+def [compile.order=999999] loading __load_tag__(){
+    @load()
 }
 def @tick __playertick__(){
     if (@playertick){

@@ -48,7 +48,7 @@ def lazy add(string name, string file, int min, int sec){
     sounds.music("music/"+file)
 }
 
-def private ticking main(){
+def private @tick main(){
     enabled := true
     if (enabled){
         with(@a,true){
@@ -71,7 +71,7 @@ def private ticking main(){
 """
 Stop the music
 """
-def stop(){
+public void stop(){
     MusicTick = -10000000
     /stopsound @s record
     WasStopped = true
@@ -81,7 +81,7 @@ def stop(){
 """
 Stop the music for all players
 """
-def stopForAll(){
+public void stopForAll(){
     with(@a){
         stop()
     }
@@ -90,7 +90,7 @@ def stopForAll(){
 """
 Pause the music
 """
-def pause(){
+public void pause(){
     MusicTick = -10000000
     /stopsound @s record
     WasStopped = true
@@ -99,7 +99,7 @@ def pause(){
 """
 Pause the music for all players
 """
-def pauseForAll(){
+public void pauseForAll(){
     with(@a){
         pause()
     }
@@ -108,7 +108,7 @@ def pauseForAll(){
 """
 Continue the music
 """
-def continue(){
+public void continue(){
     MusicTick = 10000000
     WasStopped = false
 }
@@ -116,7 +116,7 @@ def continue(){
 """
 Continue the music for all players
 """
-def continueForAll(){
+public void continueForAll(){
     with(@a){
         MusicTick = 10000000
         WasStopped = false
@@ -126,7 +126,7 @@ def continueForAll(){
 """
 Disable the music for the player
 """
-def disablePlayer(){
+public void disablePlayer(){
     Enabled = false
     /stopsound @s record
 }
@@ -134,7 +134,7 @@ def disablePlayer(){
 """
 Enable the music for the player
 """
-def enablePlayer(){
+public void enablePlayer(){
     Enabled = true
     if (!WasStopped){
         MusicTick = 10000000
@@ -144,7 +144,7 @@ def enablePlayer(){
 """
 Toggle the music for the player
 """
-def togglePlayer(){
+public void togglePlayer(){
     if (Enabled){
         disablePlayer()
     }
@@ -156,7 +156,7 @@ def togglePlayer(){
 """
 Disable the music for all players
 """
-def disableGlobal(){
+public void disableGlobal(){
     enabled = false
     /stopsound @a record
 }
@@ -164,14 +164,14 @@ def disableGlobal(){
 """
 Enable the music for all players
 """
-def enableGlobal(){
+public void enableGlobal(){
     enabled = true
 }
 
 """
 Toggle the music for all players
 """
-def toggleGlobal(){
+public void toggleGlobal(){
     if (enabled){
         disableGlobal()
     }

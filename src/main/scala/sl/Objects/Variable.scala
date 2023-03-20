@@ -526,9 +526,13 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					case "=" => List(ScoreboardSet(getIRSelector(), fvalue))
 					case "+=" => List(ScoreboardAdd(getIRSelector(), fvalue))
 					case "-=" => List(ScoreboardRemove(getIRSelector(), fvalue))
-					case "*=" |"/="|"%=" => {
-						context.requestConstant(fvalue)
+					case "*=" |"/=" => {
+						context.requestConstant(value)
 						List(ScoreboardOperation(getIRSelector(), op, SBLink(f"c$value", Settings.constScoreboard)))
+					}
+					case "%=" => {
+						context.requestConstant(fvalue)
+						List(ScoreboardOperation(getIRSelector(), op, SBLink(f"c$fvalue", Settings.constScoreboard)))
 					}
 					case "^=" => {
 						context.requestLibrary("standard.float")

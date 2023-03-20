@@ -1,2 +1,5 @@
-scoreboard players set default.test.main.0.dis tbms.var 10000
-execute positioned ~ ~1.5 ~ run function default:zzz_sl_block/6
+say hi
+scoreboard players set default.test.main.c tbms.var 3
+scoreboard players set default.test.main.c tbms.var 1
+scoreboard players set default.test.main.c tbms.var 3
+tellraw @a [{"score": { "name": "default.test.main.c", "objective": "tbms.var"}, "bold":"false","obfuscated":"false","strikethrough":"false","underlined":"false","italic":"false", "color":"white"}]

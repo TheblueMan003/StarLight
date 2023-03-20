@@ -200,7 +200,8 @@ case class LinkedFunctionValue(val fct: Function) extends Expression with SmallV
     override def hasFloatValue(): Boolean = false
     override def getFloatValue(): Double = ???
     override def getString()(implicit context: Context): String = {
-        fct.fullName
+        fct.markAsStringUsed()
+        Settings.target.getFunctionName(fct.fullName)
     }
 }
 
@@ -221,6 +222,7 @@ case class LambdaValue(val args: List[String], val instr: Instruction) extends E
     override def getFloatValue(): Double = ???
     override def getString()(implicit context: Context): String = {
         val block = context.getFreshLambda(args, List(), VoidType, instr, false)
+        block.markAsStringUsed()
         Settings.target.getFunctionName(block.fullName)
     }
 }

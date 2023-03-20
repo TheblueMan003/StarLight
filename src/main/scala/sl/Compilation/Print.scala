@@ -56,6 +56,7 @@ object Print{
                     toRawJson(vari.lazyValue)
                 }
                 else{
+                    ctx.addScoreboardUsedForce(vari.getIRSelector())
                     vari.getType() match
                         case EntityType => (List(), List(PrintSelector(vari.getEntityVariableSelector(), col, mod)))
                         case other => (List(), List(PrintVariable(vari, sel, col, mod)))
@@ -114,7 +115,10 @@ object Print{
                                 print match
                                     case PrintSelector(selector, color, modifier) => PrintSelector(selector, col, mod)
                                     case PrintString(text, color, modifier) => PrintString(text, col, mod)
-                                    case PrintVariable(vari, sel, color, modifier) => PrintVariable(vari, sel, col, mod)
+                                    case PrintVariable(vari, sel, color, modifier) => {
+                                        ctx.addScoreboardUsedForce(vari.getIRSelector())
+                                        PrintVariable(vari, sel, col, mod)
+                                    }
                             }
                             values.drop(1).foreach(checkArg(_));
 

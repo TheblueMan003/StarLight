@@ -25,7 +25,7 @@ template CProcess{
     """
     Restart the process on load. (JAVA Only)
     """
-    def loading reload(){
+    def @load reload(){
         if (Compiler.isJava){
             run()
         }
@@ -49,7 +49,7 @@ template CProcess{
     """
     Start the process
     """
-    def start(){
+    public void start(){
         count++
         if (count == 1){
             onStart()
@@ -79,7 +79,7 @@ template CProcess{
         """
         Main loop for the process (Bedrock Only)
         """
-        def ticking mainLoop(){
+        def @tick mainLoop(){
             if (count > 0){
                 if (crashDetect){
                     crash()
@@ -94,7 +94,7 @@ template CProcess{
     """
     Stop the process
     """
-    def stop(){
+    public void stop(){
         if (count > 0){
             count--
         }
@@ -126,7 +126,9 @@ template CProcess{
     Stop the process
     """
     def @process.stop stopall(){
-        stop()
+        while(count){
+            stop()
+        }
     }
 
     def onStop(){

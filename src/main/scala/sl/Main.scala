@@ -9,8 +9,12 @@ import java.time.LocalDateTime
 import java.time.temporal.ChronoUnit
 import sl.files.*
 import sl.files.CacheAST
+import sl.IR.*
 
 object Main{
+  private var lastIR: List[IRFile] = null
+  private var interpreter: Interpreter = null
+
   def main(args: Array[String]): Unit = {
     if (args.length == 0){
       mainLoop()
@@ -49,6 +53,24 @@ object Main{
               Reporter.ok("Build Completed!")
             }
           }
+          case "run" => {
+            if (args.length < 1) then {
+              Reporter.error(f"Expected 1 argument got: ${args.length-1}")
+            }
+            else{
+              run(args(1))
+              Reporter.ok("Run Completed!")
+            }
+          }
+          case "debug" => {
+            if (args.length < 1) then {
+              Reporter.error(f"Expected 1 argument got: ${args.length-1}")
+            }
+            else{
+              debug(args(1))
+              Reporter.ok("Debug Completed!")
+            }
+          }
           case "new" => {
             newProject(Array())
             Reporter.ok("Project created!")
@@ -78,6 +100,21 @@ object Main{
       }
     }
   }
+  def run(args: String): Unit = {
+    if (interpreter == null){
+      interpreter = new Interpreter(lastIR)
+    }
+    interpreter.run(args, false)
+    interpreter.printScoreboards()
+  }
+  def debug(args: String): Unit = {
+    if (interpreter == null){
+      interpreter = new Interpreter(lastIR)
+    }
+    interpreter.run(args, true)
+    interpreter.printScoreboards()
+  }
+
   def newProject(args: Array[String]): Unit = {
     println("Project Name: ")
     val name = scala.io.StdIn.readLine()
@@ -126,8 +163,10 @@ object Main{
     val start = LocalDateTime.now()
     var files = FileUtils.getFiles(inputs)
 
+    Reporter.phase(f"===========[Parsing]==========")
     var tokenized = files.par.map(f => Parser.parseFromFile(f, ()=>Utils.getFile(f))).toList
 
+    Reporter.phase(f"===========[Compiling]==========")
     if (tokenized.contains(None)) throw new Exception("Failled to Parse")
     val context = ContextBuilder.build(Settings.name, InstructionList(tokenized))
     var output = Compiler.compile(context)
@@ -143,11 +182,40 @@ object Main{
       if (!path.endsWith("/") && !path.endsWith("\\"))then path + "/" else path
     ).toList
 
-    if (Settings.optimizeInlining){
-      Reporter.info(f"Optimizing calls")
-      output = sl.IR.BlockReduce(output).run()
+    if (Settings.optimize){
+      Reporter.phase(f"===========[Optimizing]==========")
+      val optstart = LocalDateTime.now()
+      var count = 0
+      var changed = true
+      while(count < 20 && changed){
+        changed = false
+        Reporter.info(f"Iteration ${count}")
+        if (Settings.optimizeVariableValue){
+          Reporter.info(f">> Optimizing variable")
+          val (a, b) = sl.IR.ScoreboardReduce(output, context.getScoreboardUsedForce()).run()
+          output = a
+          changed |= b
+        }
+        if (Settings.optimizeInlining){
+          Reporter.info(f">> Optimizing calls")
+          val (a, b) = sl.IR.BlockReduce(output).run()
+          output = a
+          changed |= b
+        }
+        count += 1
+      }
+
+      val opttime = ChronoUnit.MILLIS.between(optstart, LocalDateTime.now())
+      Reporter.info(f"Number of files: ${output.size}")
+      Reporter.info(f"Number of mcfunctions: ${output.filter(_.getPath().endsWith(".mcfunction")).size}")
+      Reporter.info(f"Number of commands: ${output.filter(_.getPath().endsWith(".mcfunction")).map(_.getContents().size).foldRight(0)(_ + _)}")
+      Reporter.info(f"Total optimization Time: ${opttime}ms")
     }
 
+    Reporter.phase(f"===========[Exporting]==========")
+
+    lastIR = output
+    interpreter = null
     DataPackBuilder.build(dataInput, outputPath, output)
     if (Settings.target == MCJava){
         Settings.java_resourcepack_output.map(path => 

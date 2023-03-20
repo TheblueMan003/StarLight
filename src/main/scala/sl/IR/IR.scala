@@ -19,6 +19,11 @@ case class JsonIR(json: String) extends IRTree{
 case class SBLink(entity: String, objective: String) extends IRTree{
     def getString(): String = s"$entity $objective"
     override def toString(): String = getString()
+
+    def getKey()(implicit context: IRContext) = {
+        if entity.startsWith("@") then ???
+        else entity+" "+objective
+    }
 }
 
 case class CommandIR(statement: String) extends IRTree{
@@ -190,7 +195,7 @@ case class IfLoaded(value: String, statement: IRTree, invert: Boolean = false) e
     def withStatements(nstatement: IRTree): IRExecute = IfLoaded(value, nstatement, invert)
 }
 
-class ExecuteIR(block: String, statement: IRTree) extends IRTree with IRExecute{
+case class ExecuteIR(block: String, statement: IRTree) extends IRTree with IRExecute{
     def getString(): String = {
         "execute "+block + (statement match
             case a: IRExecute => " "+a.getExecuteString()
@@ -206,16 +211,16 @@ class ExecuteIR(block: String, statement: IRTree) extends IRTree with IRExecute{
     def getStatements = statement
     def withStatements(nstatement: IRTree): IRExecute = new ExecuteIR(block, nstatement)
 }
-case class OnIR(selector: String, statement: IRTree) extends ExecuteIR(f"on ${selector}", statement)
-case class AsIR(selector: String, statement: IRTree) extends ExecuteIR(f"as ${selector}", statement)
-case class AtIR(selector: String, statement: IRTree) extends ExecuteIR(f"at ${selector}", statement)
-case class PositionedOverIR(pos: String, statement: IRTree) extends ExecuteIR(f"positioned over ${pos}", statement)
-case class PositionedIR(pos: String, statement: IRTree) extends ExecuteIR(f"positioned ${pos}", statement)
-case class RotatedIR(rot: String, statement: IRTree) extends ExecuteIR(f"rotated ${rot}", statement)
-case class RotatedEntityIR(rot: String, statement: IRTree) extends ExecuteIR(f"rotated as ${rot}", statement)
-case class FacingIR(value: String, statement: IRTree) extends ExecuteIR(f"facing ${value}", statement)
-case class FacingEntityIR(ent: String, height: String, statement: IRTree) extends ExecuteIR(f"facing entity ${ent} $height", statement)
-case class AlignIR(value: String, statement: IRTree) extends ExecuteIR(f"align ${value}", statement)
+def OnIR(selector: String, statement: IRTree) = ExecuteIR(f"on ${selector}", statement)
+def AsIR(selector: String, statement: IRTree) = ExecuteIR(f"as ${selector}", statement)
+def AtIR(selector: String, statement: IRTree) = ExecuteIR(f"at ${selector}", statement)
+def PositionedOverIR(pos: String, statement: IRTree) = ExecuteIR(f"positioned over ${pos}", statement)
+def PositionedIR(pos: String, statement: IRTree) = ExecuteIR(f"positioned ${pos}", statement)
+def RotatedIR(rot: String, statement: IRTree) = ExecuteIR(f"rotated ${rot}", statement)
+def RotatedEntityIR(rot: String, statement: IRTree) = ExecuteIR(f"rotated as ${rot}", statement)
+def FacingIR(value: String, statement: IRTree) = ExecuteIR(f"facing ${value}", statement)
+def FacingEntityIR(ent: String, height: String, statement: IRTree) = ExecuteIR(f"facing entity ${ent} $height", statement)
+def AlignIR(value: String, statement: IRTree) = ExecuteIR(f"align ${value}", statement)
 
 case class ScoreboardOperation(target: SBLink, operation: String, source: SBLink) extends IRTree{
     def getString(): String = s"scoreboard players operation $target $operation $source"

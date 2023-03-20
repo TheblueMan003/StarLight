@@ -27,7 +27,7 @@ def (int,int,int) version(){
         Compiler.getProjectVersionPatch())
 }
 package _
-def printVersion(){
+public void printVersion(){
     lazy string name = Compiler.getProjectName()
     lazy string type = Compiler.getProjectVersionType()
     lazy int major = Compiler.getProjectVersionMajor()

@@ -114,7 +114,7 @@ object DataPackBuilder{
             val content = file.getContents()
             val name = file.getPath()
             zip.putNextEntry(new ZipEntry(if name.startsWith("/") then name.drop(1) else name))
-            content.foreach(x => writer.println(x))
+            content.foreach(x => writer.println(x.getString()))
             writer.flush()
             zip.closeEntry()
         }

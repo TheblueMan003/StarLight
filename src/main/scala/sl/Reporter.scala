@@ -20,6 +20,9 @@ object Reporter{
     def warning(value: String) = {
         println(f"[${Console.YELLOW}warning${Console.WHITE}] ${value}")
     }
+    def phase(value: String) = {
+        println(f"${Console.YELLOW}========${value}========${Console.WHITE}")
+    }
     def error(value: String) = {
         println(f"[${Console.RED}error${Console.WHITE}] ${value}")
     }

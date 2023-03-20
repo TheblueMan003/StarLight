@@ -41,6 +41,8 @@ class SettingsContext(){
     var optimizeInlining = true
     var optimizeDeduplication = true
     var optimizeVariableValue = true
+    var optimizeVariableGlobal = true
+    var optimizeVariableLocal = true
 
     var globalImport: Instruction = InstructionList(List())
 

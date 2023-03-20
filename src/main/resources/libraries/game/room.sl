@@ -40,7 +40,7 @@ def [tag.order=100] @tick room_detection_end(){
 """
 Show the list of active room
 """
-def @test.after show(){
+public @test.after void show(){
     standard.print(("===[ Running Room ]===","green"))
     int running = 0
     int off = 0
