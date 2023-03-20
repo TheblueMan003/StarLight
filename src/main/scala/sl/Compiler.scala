@@ -354,6 +354,7 @@ object Compiler{
         }
         catch{
             e => {
+                Reporter.error(f"${e.getMessage()} at ${instruction.pos}\n${instruction.pos.longString}")
                 throw e
             }
         }

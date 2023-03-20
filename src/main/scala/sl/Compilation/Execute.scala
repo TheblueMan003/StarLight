@@ -199,7 +199,7 @@ object Execute{
      * get IfCase from Expression
      */
     private val comparator = List(">", "<", ">=", "<=", "==", "!=")
-    private def getIfCase(expr: Expression)(implicit context: Context): (List[IRTree], List[IFCase]) = {
+    private def getIfCase(expr: Expression)(implicit context: Context): (List[IRTree], List[IFCase]) = try{
         expr match
             case IntValue(value) => if value == 0 then (List(), List(IFFalse)) else (List(), List(IFTrue))
             case EnumIntValue(value) => if value == 0 then (List(), List(IFFalse)) else (List(), List(IFTrue))
@@ -579,6 +579,12 @@ object Execute{
             case ConstructorCall(name, args, generics) => throw new Exception("Can't use if with constructor call")
             case PositionValue(value) => throw new Exception("Can't use if with position")
             case TagValue(value) => throw new Exception("Can't use if with tag")
+    }
+    catch{
+        e => {
+            Reporter.error(f"${e.getMessage()} at ${expr.pos}\n${expr.pos.longString}")
+            throw e
+        }
     }
 
     def switch(swit: Switch)(implicit context: Context):List[IRTree] = {

@@ -21,12 +21,16 @@ object CacheAST{
         obj
     }
     def add(file: String, instr: Instruction)={
-        val filename = "./bin/" + file.replace(".sl", "")+".slbin"
-        FileUtils.createFolderForFiles(new File(filename))
-        val oos = new ObjectOutputStream(new FileOutputStream(filename))
-        oos.writeObject(instr)
-        oos.close
-        map(file) = CacheLine(new File(file).lastModified(), filename)
+        try{
+            val filename = "./bin/" + file.replace(".sl", "")+".slbin"
+            FileUtils.createFolderForFiles(new File(filename))
+            val oos = new ObjectOutputStream(new FileOutputStream(filename))
+            oos.writeObject(instr)
+            oos.close
+            map(file) = CacheLine(new File(file).lastModified(), filename)
+        }catch{
+            _ => ()
+        }
     }
 }
 case class CacheLine(lastWriteTime: Long, file: String)

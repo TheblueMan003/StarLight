@@ -27,7 +27,7 @@ object ReturnState{
 
 
 object StaticAnalyser{
-    def check(instruction: Instruction): Instruction = {
+    def check(instruction: Instruction): Instruction = Utils.positioned(instruction, {
         instruction match
             case Package(name, block) => Package(name, check(block))
             case InstructionBlock(instructions) => InstructionBlock(instructions.map(check))
@@ -60,7 +60,7 @@ object StaticAnalyser{
             case TemplateDecl(name, block, modifier, parent) => TemplateDecl(name, check(block), modifier, parent)
             case TemplateUse(template, name, block) => TemplateUse(template, name, check(block))
             case _ => instruction
-    }
+    })
     def hasReturn(instruction: Instruction): ReturnState = {
         instruction match
             case InstructionBlock(instructions) => 
@@ -86,7 +86,7 @@ object StaticAnalyser{
             case ForGenerate(key, provider, instr) => hasReturn(instr)
             case _ => ReturnState.None
     }
-    def returnOne(instruction: Instruction): Instruction = {
+    def returnOne(instruction: Instruction): Instruction = Utils.positioned(instruction, {
         instruction match
             case Package(name, block) => throw new Exception("Package cannot return")
             case InstructionBlock(instructions) => InstructionBlock(returnOnce(instructions))
@@ -118,7 +118,7 @@ object StaticAnalyser{
                     case _ => ForGenerate(key, provider, If(getComparaison("__hasFunctionReturned__", IntValue(0)), instr, List()))
             case Return(_) => instruction
             case other => other
-    }
+    })
     def returnOnce(instructions: List[Instruction])={
         var buffer = instructions
         var lst = List[Instruction]()

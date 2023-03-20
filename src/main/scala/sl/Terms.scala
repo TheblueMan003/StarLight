@@ -12,7 +12,8 @@ import sl.Compilation.Selector.Selector
 case class Argument(val name: String, val typ: Type, val defValue: Option[Expression])
 
 /** Abstract Syntax Trees for terms. */
-sealed abstract class Instruction extends Positional
+sealed abstract class Instruction extends Positional{
+}
 
 case class Package(val name: String, val block: Instruction) extends Instruction {
   override def toString() = f"package ${name} {${block}}"
