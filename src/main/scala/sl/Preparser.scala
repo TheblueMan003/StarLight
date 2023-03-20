@@ -17,7 +17,7 @@ object Preparser{
                 case Some(value) => {
                     value.matched
                     text2 = value.before.toString()+
-                    "%%%"+ Utils.stringify(value.group(1))+ "%%%" +
+                    "\n%%%"+ Utils.stringify(value.group(1))+ "%%%" +
                     value.after.toString()
                 }
         }

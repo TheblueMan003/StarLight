@@ -21,6 +21,7 @@ object Reporter{
         println(f"[${Console.YELLOW}warning${Console.WHITE}] ${value}")
     }
     def error(value: String) = {
-        println(f"[${Console.RED}error${Console.WHITE}] ${value}")
+        val text=value.replace("\n",f"\n[${Console.RED}error${Console.WHITE}] ")
+        println(f"[${Console.RED}error${Console.WHITE}] ${text}")
     }
 }

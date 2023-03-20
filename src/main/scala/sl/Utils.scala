@@ -39,7 +39,15 @@ object Utils{
     def stringify(string: String): String = {
         f"\"${string.replaceAllLiterally("\\\\", "\\\\").replaceAllLiterally("\"", "\\\"")}\""
     }
-    def substReturn(instr: Instruction, to: Variable)(implicit isFullReturn: Boolean): Instruction = {
+    def positioned(original: Instruction, newone: Instruction): Instruction = {
+        newone.setPos(original.pos)
+        newone
+    }
+    def positioned(original: Expression, newone: Expression): Expression = {
+        newone.setPos(original.pos)
+        newone
+    }
+    def substReturn(instr: Instruction, to: Variable)(implicit isFullReturn: Boolean): Instruction = positioned(instr, {
         instr match
             case Package(name, block) => Package(name, substReturn(block, to))
             case StructDecl(name, generics, block, modifier, parent) => StructDecl(name, generics, substReturn(block, to), modifier, parent)
@@ -87,10 +95,10 @@ object Utils{
             case With(expr, isAt, cond, block) => With(expr, isAt, cond, substReturn(block, to))
 
             case Switch(cond, cases, cv) => Switch(cond, cases.map(x => SwitchCase(x.expr, substReturn(x.instr, to))), cv)
-    }
+    })
 
 
-    def subst(instr: Instruction, from: Identifier, to: Identifier): Instruction = {
+    def subst(instr: Instruction, from: Identifier, to: Identifier): Instruction = positioned(instr,{
         instr match
             case Package(name, block) => Package(name, subst(block, from, to))
             case StructDecl(name, generics, block, modifier, parent) => StructDecl(name, generics, subst(block, from, to), modifier, parent)
@@ -133,14 +141,14 @@ object Utils{
             case With(expr, isAt, cond, block) => With(subst(expr, from, to), subst(isAt, from, to), subst(cond, from, to), subst(block, from, to))
 
             case Switch(cond, cases, cv) => Switch(subst(cond, from, to), cases.map(x => SwitchCase(subst(x.expr, from, to), subst(x.instr, from, to))), cv)
-    }
+    })
     def subst(vari: Either[Identifier, Variable], from: Identifier, to: Identifier): Either[Identifier, Variable] = {
         vari match
             case Left(value) => Left(value.replaceAllLiterally(from, to))
             case Right(value) => Right(value)
     }
 
-    def subst(instr: Expression, from: Identifier, to: Identifier): Expression = {
+    def subst(instr: Expression, from: Identifier, to: Identifier): Expression = positioned(instr,{
         instr match
             case IntValue(value) => instr
             case FloatValue(value) => instr
@@ -167,10 +175,10 @@ object Utils{
             case RangeValue(min, max, delta) => RangeValue(subst(min, from, to), subst(max, from, to), subst(delta, from, to))
             case LambdaValue(args, instr) => LambdaValue(args, subst(instr, from, to))
             case lk: LinkedVariableValue => lk
-    }
+    })
 
 
-    def subst(instr: Instruction, from: String, to: String): Instruction = {
+    def subst(instr: Instruction, from: String, to: String): Instruction = positioned(instr,{
         instr match
             case Package(name, block) => Package(name.replaceAllLiterally(from, to), subst(block, from, to))
             case StructDecl(name, generics, block, modifier, parent) => StructDecl(name.replaceAllLiterally(from, to), generics, subst(block, from, to), modifier, parent)
@@ -227,14 +235,14 @@ object Utils{
             case With(expr, isAt, cond, block) => With(subst(expr, from, to), subst(isAt, from, to), subst(cond, from, to), subst(block, from, to))
 
             case Switch(cond, cases, cv) => Switch(subst(cond, from, to), cases.map(x => SwitchCase(subst(x.expr, from, to), subst(x.instr, from, to))), cv)
-    }
+    })
     def subst(vari: Either[Identifier, Variable], from: String, to: String): Either[Identifier, Variable] = {
         vari match
             case Left(value) => Left(value.toString().replaceAllLiterally(from, to))
             case Right(value) => Right(value)
     }
 
-    def subst(instr: Expression, from: String, to: String): Expression = {
+    def subst(instr: Expression, from: String, to: String): Expression = positioned(instr, {
         instr match
             case IntValue(value) => instr
             case FloatValue(value) => instr
@@ -262,7 +270,7 @@ object Utils{
             case LambdaValue(args, instr) => LambdaValue(args.map(_.replaceAllLiterally(from, to)), subst(instr, from, to))
             case lk: LinkedVariableValue => lk
             case null => null
-    }
+    })
 
     def subst(json: JSONElement, from: String, to: String): JSONElement = {
         json match{
@@ -278,7 +286,7 @@ object Utils{
     }
 
 
-    def subst(instr: Instruction, from: String, to: Expression): Instruction = {
+    def subst(instr: Instruction, from: String, to: Expression): Instruction = positioned(instr, {
         instr match
             case Package(name, block) => Package(name, subst(block, from, to))
             case StructDecl(name, generics, block, modifier, parent) => StructDecl(name, generics, subst(block, from, to), modifier, parent)
@@ -327,9 +335,9 @@ object Utils{
             case With(expr, isAt, cond, block) => With(subst(expr, from, to), subst(isAt, from, to), subst(cond, from, to), subst(block, from, to))
 
             case Switch(cond, cases, cv) => Switch(subst(cond, from, to), cases.map(x => SwitchCase(subst(x.expr, from, to), subst(x.instr, from, to))), cv)
-    }
+    })
 
-    def rmFunctions(instr: Instruction): Instruction = {
+    def rmFunctions(instr: Instruction): Instruction = positioned(instr, {
         instr match
             case Package(name, block) => Package(name, rmFunctions(block))
             case StructDecl(name, generics, block, modifier, parent) => StructDecl(name, generics, rmFunctions(block), modifier, parent)
@@ -370,7 +378,7 @@ object Utils{
             case With(expr, isAt, cond, block) => With(expr, isAt, cond, rmFunctions(block))
 
             case Switch(cond, cases, cv) => Switch(cond, cases.map(x => SwitchCase(x.expr, rmFunctions(x.instr))), cv)
-    }
+    })
 
     def fix(name: Either[Identifier, Variable])(implicit context: Context, ignore: Set[Identifier]) = {
         name match
@@ -391,7 +399,7 @@ object Utils{
             case _ => Set()
     }
 
-    def fix(instr: Instruction)(implicit context: Context, ignore: Set[Identifier]): Instruction = {
+    def fix(instr: Instruction)(implicit context: Context, ignore: Set[Identifier]): Instruction = positioned(instr, {
         instr match
             case Package(name, block) => Package(name, fix(block))
             case StructDecl(name, generics, block, modifier, parent) => StructDecl(name, generics, fix(block), modifier, parent)
@@ -446,7 +454,7 @@ object Utils{
             case With(expr, isAt, cond, block) => With(fix(expr), fix(isAt), fix(cond), fix(block))
 
             case Switch(cond, cases, cv) => Switch(fix(cond), cases.map(x => SwitchCase(fix(x.expr), fix(x.instr))), cv)
-    }
+    })
     def fix(typ: Type)(implicit context: Context, ignore: Set[Identifier]): Type = {
         typ match
             case TupleType(sub) => TupleType(sub.map(fix(_)))
@@ -460,7 +468,7 @@ object Utils{
             case other => other
         
     }
-    def fix(instr: Expression)(implicit context: Context, ignore: Set[Identifier]): Expression = {
+    def fix(instr: Expression)(implicit context: Context, ignore: Set[Identifier]): Expression = positioned(instr, {
         instr match
             case IntValue(value) => instr
             case FloatValue(value) => instr
@@ -501,7 +509,7 @@ object Utils{
             case LambdaValue(args, instr) => LambdaValue(args, fix(instr))
             case lk: LinkedVariableValue => lk
             case null => null
-    }
+    })
     def fix(json: JSONElement)(implicit context: Context, ignore: Set[Identifier]): JSONElement = {
         json match{
             case JsonArray(content) => JsonArray(content.map(fix(_)))
@@ -526,7 +534,7 @@ object Utils{
         } 
     }
 
-    def subst(instr: Expression, from: String, to: Expression): Expression = {
+    def subst(instr: Expression, from: String, to: Expression): Expression = positioned(instr, {
         instr match
             case IntValue(value) => instr
             case FloatValue(value) => instr
@@ -553,7 +561,7 @@ object Utils{
             case RangeValue(min, max, delta) => RangeValue(subst(min, from, to), subst(max, from, to), subst(delta, from, to))
             case LambdaValue(args, instr) => LambdaValue(args, subst(instr, from, to))
             case lk: LinkedVariableValue => lk
-    }
+    })
 
 
     def unpackDotValue(dot: DotValue)(implicit context: Context): (List[IRTree], Expression) = {
@@ -731,7 +739,7 @@ object Utils{
             case JsonDictionary(values) => JsonValue(json)
     }
 
-    def simplify(expr: Expression)(implicit context: Context): Expression = {
+    def simplify(expr: Expression)(implicit context: Context): Expression = positioned(expr, {
         expr match
             case BinaryOperation("<" | "<=" | "==" | "!=" | ">=" | ">", left, right) => {
                 val op = expr.asInstanceOf[BinaryOperation].op
@@ -801,7 +809,8 @@ object Utils{
             }
             case RangeValue(min, max, delta) => RangeValue(simplify(min), simplify(max), simplify(delta))
             case other => other
-    }
+            
+    })
 
     def combineJson(elm1: JSONElement, elm2: JSONElement): JSONElement = {
         elm1 match
