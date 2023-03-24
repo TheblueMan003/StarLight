@@ -10,7 +10,7 @@ import sl.Compilation.*
 import objects.Function
 import sl.Compilation.Printable
 
-trait Expression extends Positional{
+trait Expression extends CPositionable{
     def hasIntValue(): Boolean
     def getIntValue(): Int
     def hasFloatValue(): Boolean

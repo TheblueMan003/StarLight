@@ -15,7 +15,7 @@ class ScoreboardReduce(files: List[IRFile], access: mutable.Set[SBLink]){
         while(changed){
             changed = false
             resetState()
-            files.filterNot(_.isJsonFile()).map(f => {
+            files.filterNot(f => f.isJsonFile() || f.deleted).map(f => {
                 f.getContents().foreach(instr => {
                     computeState0(instr)(f)
                 })
@@ -25,9 +25,13 @@ class ScoreboardReduce(files: List[IRFile], access: mutable.Set[SBLink]){
                 reduceState()
             }
             if (Settings.optimizeVariableGlobal){
-                files.filterNot(_.isJsonFile()).map(f => {
+                files.filterNot(f => f.isJsonFile() || f.deleted).map(f => {
                     f.setContents(f.getContents().map(instr => {
-                        reduce(instr)(f)
+                        val ret = reduce(instr)(f)
+                        if (ret != instr) {
+                            changed = true
+                        }
+                        ret
                     }).filterNot(_ == EmptyIR))
                 })
             }
@@ -39,7 +43,6 @@ class ScoreboardReduce(files: List[IRFile], access: mutable.Set[SBLink]){
                 globalChanged = true
             }
         }
-
         (files, globalChanged)
     }
     def resetState()={
@@ -273,7 +276,7 @@ class ScoreboardReduce(files: List[IRFile], access: mutable.Set[SBLink]){
         ret
     }
     def reduceState(): Unit = {
-        files.foreach(file => {
+        files.filterNot(f => f.isJsonFile() || f.deleted).foreach(file => {
             var localState = mutable.Map[SBLink, ScoreboardState]()
             file.setContents(reduceStateForBlock(file.getContents())(localState))
         })
@@ -288,7 +291,7 @@ class ScoreboardReduce(files: List[IRFile], access: mutable.Set[SBLink]){
             }
         }
         def reduceOne(tree: IRTree)(implicit inIf: Boolean): IRTree = {
-            tree match{
+            val ret = tree match{
                 case ScoreboardSet(target, value) => {
                     val state = lgetOrAdd(target)
                     state.possibleValue match
@@ -593,6 +596,10 @@ class ScoreboardReduce(files: List[IRFile], access: mutable.Set[SBLink]){
                     other
                 }
             }
+            if (ret != tree){
+                changed = true
+            }
+            ret
         }
 
         if (lst.isEmpty) return lst

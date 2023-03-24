@@ -114,7 +114,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 
 
 	def assign(op: String, value: Expression)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
-		if (modifiers.isConst && wasAssigned) throw new Exception(f"Cannot reassign variable $fullName")
+		if (modifiers.isConst && wasAssigned) throw new Exception(f"Cannot reassign variable $fullName at \n${value.pos.longString}")
 		val ret = if (modifiers.isLazy){
 			getType() match{
 				case StructType(struct, sub) => {
@@ -146,16 +146,16 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 									op match{
 										case "=" => lazyValue = value2._2
 										case "+=" => lazyValue = Utils.simplify(BinaryOperation("+", lazyValue, value2._2))
-										case other => throw new Exception(f"Unsupported operation: $fullName $op $value")
+										case other => throw new Exception(f"Unsupported operation: $fullName $op $value at \n${value.pos.longString}")
 									}
 									return value2._1
-								case other => throw new Exception(f"Unsupported operation: $fullName $op $value")
+								case other => throw new Exception(f"Unsupported operation: $fullName $op $value at \n${value.pos.longString}")
 						}
 						case RawJsonType => {
 							op match{
 								case "=" => lazyValue = value
 								case "+=" => lazyValue = Utils.simplify(BinaryOperation("+", lazyValue, value))
-								case other => throw new Exception(f"Unsupported operation: $fullName $op $value")
+								case other => throw new Exception(f"Unsupported operation: $fullName $op $value at \n${value.pos.longString}")
 							}
 						}
 						case other => {
@@ -163,7 +163,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 							op match{
 								case "=" => lazyValue = value2._2
 								case "+=" => lazyValue = Utils.simplify(BinaryOperation("+", lazyValue, value2._2))
-								case other => throw new Exception(f"Unsupported operation: $fullName $op $value")
+								case other => throw new Exception(f"Unsupported operation: $fullName $op $value at \n${value.pos.longString}")
 							}
 							return value2._1
 						}
@@ -221,7 +221,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 						case "|=" => lazyValue = Utils.simplify(BinaryOperation("|", LinkedVariableValue(this), fixed))
 						case "^=" => lazyValue = Utils.simplify(BinaryOperation("^", LinkedVariableValue(this), fixed))
 						case ":=" => {}
-						case other => throw new Exception(f"Unsupported operation: $fullName $op $value")
+						case other => throw new Exception(f"Unsupported operation: $fullName $op $value at \n${value.pos.longString}")
 					}
 				}
 			}
@@ -257,7 +257,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 									case ArrayType(innter, size) => assignArray(op, value)
 									case EntityType => assignEntity(op, value)
 									case EnumType(enm) => assignEnum(op, value)
-									case other => throw new Exception(f"Cannot Assign to $fullName of type $other")
+									case other => throw new Exception(f"Cannot Assign to $fullName of type $other at \n${value.pos.longString}")
 							}
 						}
 					}
@@ -337,8 +337,8 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 	/**
 	 * Assign a value to the int variable
 	 */
-	def assignInt(op: String, value: Expression)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
-		value match
+	def assignInt(op: String, valueE: Expression)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
+		valueE match
 			case IntValue(value) => {
 				op match{
 					case "=" => List(ScoreboardSet(getIRSelector(), value))
@@ -360,7 +360,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 						context.requestLibrary("standard.int")
 						handleFunctionCall("=", VariableValue("standard.int.pow"), List(LinkedVariableValue(this, selector), IntValue(value)), List(), Selector.self)
 					}
-					case other => throw new Exception(f"Cannot assign use op: $other with int")
+					case other => throw new Exception(f"Cannot assign use op: $other with int at \n${valueE.pos.longString}")
 				}
 			}
 			case EnumIntValue(value) => assignInt(op, IntValue(value))
@@ -368,12 +368,12 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 			case NullValue => List(ScoreboardReset(getIRSelector()))
 			case BoolValue(value) => assignInt(op, IntValue(if value then 1 else 0))
 			case FloatValue(value) => assignInt(op, IntValue(value.toInt))
-			case VariableValue(name, sel) => assignInt(op, context.resolveVariable(value))
+			case VariableValue(name, sel) => assignInt(op, context.resolveVariable(valueE))
 			case LinkedVariableValue(vari, sel) => assignIntLinkedVariable(op, vari, sel)
 			case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 			case ArrayGetValue(name, index) => handleArrayGetValue(op, name, index)
 			case bin: BinaryOperation => assignBinaryOperator(op, bin)
-			case _ => throw new Exception(f"Unknown cast to int: $value")
+			case _ => throw new Exception(f"Unknown cast to int: $valueE at \n${valueE.pos.longString}")
 	}
 
 	def handleFunctionCall(op: String, name: Expression, args: List[Expression], typeargs: List[Type], sel: Selector)(implicit context: Context, selector: Selector = Selector.self):List[IRTree] = {
@@ -393,7 +393,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					v.vari.getType() match
 						case FuncType(sources, output) =>
 							t ::: (context.getFunctionMux(sources, output)(context), v::args).call(this, op)
-						case other => throw new Exception(f"Cannot call $other")
+						case other => throw new Exception(f"Cannot call $other at \n${name.pos.longString}")
 				}
 		}
 	}
@@ -407,7 +407,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					case ArrayType(sub, IntValue(size)) => {
 						index.map(Utils.simplify(_)) match
 							case IntValue(i)::Nil => {
-								if (i >= size || i < 0) then throw new Exception(f"Index out of Bound for array $name: $i not in 0..$size")
+								if (i >= size || i < 0) then throw new Exception(f"Index out of Bound for array $name: $i not in 0..$size at \n${name2.pos.longString}")
 								assign(op, LinkedVariableValue(vari.tupleVari(i)))
 							}
 							case _ => assign(op, FunctionCallValue(VariableValue(vari.fullName+".get"), index, List()))
@@ -470,7 +470,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 			case VariableValue(name, sel) => {
 				val a = getType().asInstanceOf[EnumType].enm.values.indexWhere(_.name == name.toString())
 				if (a >= 0 && sel == Selector.self){
-					if (op != "=") throw new Exception(f"Illegal operation: $op on enum")
+					if (op != "=") throw new Exception(f"Illegal operation: $op on enum at \n${value.pos.longString}")
 					assignInt(op, IntValue(a))
 				}
 				else{
@@ -488,8 +488,8 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 	/**
 	 * Assign a value to the float variable
 	 */
-	def assignFloat(op: String, value: Expression)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
-		value match
+	def assignFloat(op: String, valueE: Expression)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
+		valueE match
 			case FloatValue(value) => {
 				val fvalue = (value * Settings.floatPrec).toInt
 				op match{
@@ -516,7 +516,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 						context.requestLibrary("standard.float")
 						handleFunctionCall("=", VariableValue("standard.float.pow"), List(LinkedVariableValue(this, selector), FloatValue(value)), List(), Selector.self)
 					}
-					case other => throw new Exception(f"Cannot use $other with $fullName")
+					case other => throw new Exception(f"Cannot use $other with $fullName at \n${valueE.pos.longString}")
 				}
 			}
 			case DefaultValue => List(ScoreboardSet(getIRSelector(), 0))
@@ -538,17 +538,17 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 						context.requestLibrary("standard.float")
 						handleFunctionCall("=", VariableValue("standard.float.pow"), List(LinkedVariableValue(this, selector), FloatValue(value)), List(), Selector.self)
 					}
-					case other => throw new Exception(f"Cannot use $other with $fullName")
+					case other => throw new Exception(f"Cannot use $other with $fullName at \n${valueE.pos.longString}")
 				}
 			}
 			case NullValue => List(ScoreboardReset(getIRSelector()))
 			case BoolValue(value) => assignFloat(op, IntValue(if value then 1 else 0))
-			case VariableValue(name, sel) => assignFloat(op, context.resolveVariable(value))
+			case VariableValue(name, sel) => assignFloat(op, context.resolveVariable(valueE))
 			case LinkedVariableValue(vari, sel) => assignFloatLinkedVariable(op, vari, sel)
 			case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 			case ArrayGetValue(name, index) => handleArrayGetValue(op, name, index)
 			case bin: BinaryOperation => assignBinaryOperator(op, bin)
-			case _ => throw new Exception(f"Unknown cast to float for $fullName and value $value")
+			case _ => throw new Exception(f"Unknown cast to float for $fullName and value $valueE at \n${valueE.pos.longString}")
 	}
 
 	/**
@@ -589,12 +589,15 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 							case _ => List(ScoreboardOperation(getIRSelector(), "*=", vari.getIRSelector()(sel)))
 					}
 					case EntityType => ScoreboardSet(getIRSelector(), 0)::Compiler.compile(If(value, VariableAssigment(List((Right(this), selector)), "=", BoolValue(true)), List()))
-					case other => throw new Exception(f"Cannot assign $value of type $other to $fullName of type ${getType()}")
+					case other => throw new Exception(f"Cannot assign $value of type $other to $fullName of type ${getType()} at \n${value.pos.longString}")
 			case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 			case ArrayGetValue(name, index) => handleArrayGetValue(op, name, index)
+			case BinaryOperation(op @ ("==" | "<=" | "<" | ">" | ">=" | "!=" | "||" | "&&" ), left, right) => {
+				ScoreboardSet(getIRSelector(), 0)::Compiler.compile(If(value, VariableAssigment(List((Right(this), selector)), "=", BoolValue(true)), List()))
+			}
 			case bin: BinaryOperation => assignBinaryOperator(op, bin)
 			case SelectorValue(sel) => ScoreboardSet(getIRSelector(), 0)::Compiler.compile(If(value, VariableAssigment(List((Right(this), selector)), "=", BoolValue(true)), List()))
-			case _ => throw new Exception(f"Unknown cast to bool $value")
+			case _ => throw new Exception(f"Unknown cast to bool $value at \n${value.pos.longString}")
 	}
 
 	def assignFloatLinkedVariable(op: String, vari: Variable, sel: Selector)(implicit context: Context, selector: Selector = Selector.self):List[IRTree]={
@@ -689,7 +692,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 				}
 			}
 			case JsonValue(JsonArray(array)) => {
-				if (array.size != tupleVari.size) throw new Exception(f"Cannot assign array of size ${array.size} to array of size ${tupleVari.size}")
+				if (array.size != tupleVari.size) throw new Exception(f"Cannot assign array of size ${array.size} to array of size ${tupleVari.size} at \n${expr2.pos.longString}")
 				tupleVari.zip(array).flatMap((t, v) => t.assign(op, Utils.jsonToExpr(v)))
 			}
 			case ConstructorCall(Identifier(List("standard","array","Array")), List(IntValue(n)), typeArg) if op == "=" && List(sub) == typeArg && n == size => {
@@ -706,7 +709,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 
 
 	def assignFunc(op: String, expr: Expression)(implicit context: Context, selector: Selector = Selector.self):List[IRTree]={
-		if (op != "=") throw new Exception(f"Illegal operation with ${name}: $op")
+		if (op != "=") throw new Exception(f"Illegal operation with ${name}: $op at \n${expr.pos.longString}")
 		
 		expr match
 			case VariableValue(name, sel) => {
@@ -725,7 +728,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 				vari.getType() match
 					case other if other.isSubtypeOf(getType()) => List(ScoreboardOperation(getIRSelector(), op, vari.getIRSelector()(sel)))
 					case IntType => List(ScoreboardOperation(getIRSelector(), op, vari.getIRSelector()(sel)))
-					case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()}")
+					case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()} at \n${expr.pos.longString}")
 			}
 			case LambdaValue(args, instr) => {
 				val typ = getType().asInstanceOf[FuncType]
@@ -744,7 +747,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 				context.addFunctionToMux(fct.arguments.map(_.typ), fct.getType(), fct)
 				List(ScoreboardSet(getIRSelector(), fct.getMuxID()))
 			}
-			case _ => throw new Exception("Unsupported Operation")
+			case _ => throw new Exception(f"Unsupported Operation at \n${expr.pos.longString}")
 	}
 	def removeEntityTag()(implicit context: Context)={
 		Compiler.compile(If(LinkedVariableValue(tupleVari(0)), 
@@ -782,7 +785,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 													CMD(f"tag @a[tag=${vari.tagName}] add $tagName"), 
 													List(ElseIf(BoolValue(true), CMD(f"tag @e[tag=${vari.tagName}] add $tagName")))))
 							}
-							case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()}")
+							case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()} at \n${expr.pos.longString}")
 					}
 					case NullValue => {
 						val vari = context.getVariable(name)
@@ -801,7 +804,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					}
 					case bin: BinaryOperation => assignBinaryOperator(op, bin)
 					case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
-					case _ => throw new Exception(f"No cast from ${expr} to entity")
+					case _ => throw new Exception(f"No cast from ${expr} to entity at \n${expr.pos.longString}")
 			}
 			case "+=" | "&=" => {
 				expr match
@@ -819,19 +822,19 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 													CMD(f"tag @a[tag=${vari.tagName}] add $tagName"), 
 													List(ElseIf(BoolValue(true), CMD(f"tag @e[tag=${vari.tagName}] add $tagName")))))
 							}
-							case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()}")
+							case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()} at \n${expr.pos.longString}")
 					}
 					case IntValue(0) => List()
 					case SelectorValue(value) => {
 						// Remove copy fields
-						tupleVari.zip(List(BoolValue(value.isPlayer))).flatMap((t, v) => t.assign(op, v)) ::: 
+						tupleVari.zip(List(BoolValue(value.isPlayer))).flatMap((t, v) => t.assign("&=", v)) ::: 
 						// Add tag to new entities
 						List(CommandIR(f"tag ${value.getString()} add $tagName"))
 					}
 					case NullValue => List()
 					case bin: BinaryOperation => assignBinaryOperator(op, bin)
 					case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
-					case _ => throw new Exception(f"No cast from ${expr} to entity")
+					case _ => throw new Exception(f"No cast from ${expr} to entity at \n${expr.pos.longString}")
 			}
 			case "-=" | "/=" => {
 				expr match
@@ -847,7 +850,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 													CMD(f"tag @a[tag=${vari.tagName}] remove $tagName"), 
 													List(ElseIf(BoolValue(true), CMD(f"tag @e[tag=${vari.tagName}] remove $tagName")))))
 							}
-							case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()}")
+							case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()} at \n${expr.pos.longString}")
 					}
 					case IntValue(0) => List()
 					case SelectorValue(value) => {
@@ -857,9 +860,9 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					case NullValue => List()
 					case bin: BinaryOperation => assignBinaryOperator(op, bin)
 					case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
-					case _ => throw new Exception(f"No cast from ${expr} to entity")
+					case _ => throw new Exception(f"No cast from ${expr} to entity at \n${expr.pos.longString}")
 			}
-			case _ => throw new Exception(f"Illegal operation with ${name}: $op")
+			case _ => throw new Exception(f"Illegal operation with ${name}: $op at \n${expr.pos.longString}")
 		}
 	}
 
@@ -868,10 +871,10 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 	 */
 	def assignJson(op: String, value: Expression)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		if (Settings.target == MCBedrock){
-			throw new Exception(f"Dynamic Json Variable Not Supported in Bedrock ($fullName)")
+			throw new Exception(f"Dynamic Json Variable Not Supported in Bedrock ($fullName) at \n${value.pos.longString}")
 		}
 		if (modifiers.isEntity){
-			throw new Exception("Not Supported")
+			throw new Exception(f"Not Supported at \n${value.pos.longString}")
 		}
 		else{
 			value match
@@ -910,12 +913,12 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 												CommandIR(f"data modify storage ${fullName} json merge from storage ${fullName} tmp"))
 							}
 						}
-						case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()}")
+						case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()} at \n${value.pos.longString}")
 					}
 				case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 				case ArrayGetValue(name, index) => handleArrayGetValue(op, name, index)
 				case bin: BinaryOperation => assignBinaryOperator(op, bin)
-				case _ => throw new Exception(f"Unknown cast to json $value")
+				case _ => throw new Exception(f"Unknown cast to json $value at \n${value.pos.longString}")
 		}
 	}
 
@@ -949,7 +952,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 									assign("=", LinkedVariableValue(vari))
 								}
 							}
-							case other => throw new Exception(f"Cannot constructor call $other")
+							case other => throw new Exception(f"Cannot constructor call $other at \n${value.pos.longString}")
 					}
 					case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 					case BinaryOperation(op, left, right) => assignBinaryOperator("=", BinaryOperation(op, left, right))
@@ -983,7 +986,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					case VariableValue(name, sel) => assignClass(op, context.resolveVariable(value))
 					case ConstructorCall(name2, args, typevars) => {
 						context.getType(IdentifierType(name2.toString(), typevars)) match
-							case StructType(struct, sub) => throw new Exception("Cannot call struct constructor for class")
+							case StructType(struct, sub) => throw new Exception(f"Cannot call struct constructor for class at \n${value.pos.longString}")
 							case typ@ClassType(clazz2, sub) => {
 								val clazz = clazz2.get(sub)
 								if (typ == getType() && typevars.map(context.getType(_)) == sub && !isFunctionArgument){
@@ -1006,7 +1009,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 									vari.assign("=", value):::assign("=", LinkedVariableValue(vari))
 								}
 							}
-							case other => throw new Exception(f"Cannot constructor call $other")
+							case other => throw new Exception(f"Cannot constructor call $other at \n${value.pos.longString}")
 					}
 					case NullValue => deref() ::: List(ScoreboardSet(getIRSelector(), 0))
 					case DefaultValue => List(ScoreboardSet(getIRSelector(), 0))

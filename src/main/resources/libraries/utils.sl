@@ -10,10 +10,13 @@ def lazy forCube(int sizeX, int sizeY, int sizeZ, (int,int,int)=>void fct){
                 fct(sizeX - x, sizeY - y, sizeZ - z)
                 if (x > 0)at(~1 ~ ~)traverseX(x-1)
             }
+            traverseX(sizeX)
             if (y > 0)at(~ ~1 ~)traverseY(y-1)
         }
-        if (z > 0)at(~ ~ ~1)traverseZ(z-1)        
+        traverseY(sizeY)
+        if (z > 0)at(~ ~ ~1)traverseZ(z-1)
     }
+    traverseZ(sizeZ)
 }
 
 """
@@ -26,10 +29,13 @@ def lazy forArea(int sizeX, int sizeY, int sizeZ, void=>void fct){
                 fct()
                 if (x > 0)at(~1 ~ ~)traverseX(x-1)
             }
+            traverseX(sizeX)
             if (y > 0)at(~ ~1 ~)traverseY(y-1)
         }
+        traverseY(sizeY)
         if (z > 0)at(~ ~ ~1)traverseZ(z-1)
     }
+    traverseZ(sizeZ)
 }
 
 """

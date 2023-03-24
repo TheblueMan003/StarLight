@@ -75,4 +75,6 @@ class IRFile(path: String, name: String, contents: List[IRTree], isJson: Boolean
     def isBlock(): Boolean = {
         name.contains(".zzz_sl_block.")
     }
+
+    override def toString(): String = name
 }

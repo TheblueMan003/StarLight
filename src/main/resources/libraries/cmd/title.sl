@@ -26,7 +26,7 @@ def reset(){
 """
 Show text in the title
 """
-def lazy show(rawjson $text){
+def lazy force(rawjson $text){
     if (Compiler.isJava()){
         /title @s title $text
     }

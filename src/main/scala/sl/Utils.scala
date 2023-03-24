@@ -40,11 +40,13 @@ object Utils{
         f"\"${string.replaceAllLiterally("\\\\", "\\\\").replaceAllLiterally("\"", "\\\"")}\""
     }
     def positioned(original: Instruction, newone: Instruction): Instruction = {
-        newone.setPos(original.pos)
+        if (original != null)
+            newone.setPos(original.pos)
         newone
     }
     def positioned(original: Expression, newone: Expression): Expression = {
-        newone.setPos(original.pos)
+        if (original != null)
+            newone.setPos(original.pos)
         newone
     }
     def substReturn(instr: Instruction, to: Variable)(implicit isFullReturn: Boolean): Instruction = positioned(instr, {

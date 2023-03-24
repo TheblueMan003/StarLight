@@ -1,10 +1,12 @@
 package test
 
-import mc.inventory as inventory
+import cmd.bossbar as bs
+import animation.bossbar as ab
+
+bs.Bossbar test = new bs.Bossbar("bar")
 
 public void main(){
-    lazy val item2 = minecraft:iron_ingot
-    if (inventory.isHoldingItem(item2)){
-        /say hi
-    }
+    int tick
+    bool a = ab.show(test, tick, "Hello World!")
+    tick ++
 }

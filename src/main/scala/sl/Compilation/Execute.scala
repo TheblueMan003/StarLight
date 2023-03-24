@@ -95,6 +95,22 @@ object Execute{
             case VariableValue(Identifier(List("@passengers")), selector) if Settings.target.hasFeature("execute on") => apply(x => OnIR("passengers", x))
             case VariableValue(Identifier(List("@target")), selector) if Settings.target.hasFeature("execute on") => apply(x => OnIR("target", x))
             case VariableValue(Identifier(List("@vehicle")), selector) if Settings.target.hasFeature("execute on") => apply(x => OnIR("vehicle", x))
+            case VariableValue(variName, selector) => {
+                val vari = context.getVariable(variName)
+                vari.getType() match{
+                    case EntityType if !vari.modifiers.isLazy => {
+                        val (prefix, selector) = Utils.getSelector(ass.expr)
+                        vari.tupleVari(0)
+                        
+                        prefix ::: makeExecute(f => IfScoreboardMatch(vari.tupleVari(0).getIRSelector(), 1, 1, f), apply(x => AsIR(selector.withPrefix("@a").getString(), x)))
+                               ::: makeExecute(f => IfScoreboardMatch(vari.tupleVari(0).getIRSelector(), 0, 0, f), apply(x => AsIR(selector.getString(), x)))
+                    }
+                    case _ => {
+                        val (prefix, selector) = Utils.getSelector(ass.expr)
+                        prefix:::apply(x => AsIR(selector.getString(), x))
+                    }
+                }
+            }
             case other => {
                 val (prefix, selector) = Utils.getSelector(ass.expr)
                 prefix:::apply(x => AsIR(selector.getString(), x))

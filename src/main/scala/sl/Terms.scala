@@ -7,13 +7,25 @@ import objects.{Identifier, Variable, Function, Context}
 import objects.EnumField
 import objects.EnumValue
 import sl.Compilation.Selector.Selector
+import scala.util.parsing.input.Position
 
 
 case class Argument(val name: String, val typ: Type, val defValue: Option[Expression])
 
-/** Abstract Syntax Trees for terms. */
-sealed abstract class Instruction extends Positional{
+case class CPosition(_line: Int, _column: Int, _lineContents: String) extends Position{
+  override def lineContents = _lineContents
+  override def column = _column
+  override def line = _line
+  override def toString() = f"line ${line} at ${column}"
 }
+trait CPositionable extends Positional{
+  override def setPos(newpos: Position): this.type = {
+    super.setPos(CPosition(newpos.line, newpos.column, newpos.longString.split("\n")(0)))
+    this
+  }
+}
+
+sealed abstract class Instruction extends CPositionable
 
 case class Package(val name: String, val block: Instruction) extends Instruction {
   override def toString() = f"package ${name} {${block}}"

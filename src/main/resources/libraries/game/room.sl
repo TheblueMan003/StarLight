@@ -242,7 +242,7 @@ template Room{
                         particule()
                     }
                 }
-                kill(@s)
+                /kill @s
             }
         }
     }

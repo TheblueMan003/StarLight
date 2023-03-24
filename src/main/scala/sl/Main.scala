@@ -234,6 +234,8 @@ object Main{
     val time3 = ChronoUnit.MILLIS.between(start, LocalDateTime.now())
     Reporter.info(f"Total Time: ${time3}ms")
 
+    FileUtils.safeWriteFile("vscode/token", Utils.getConfig("blocks.txt"):::Utils.getConfig("sounds/java.csv").map("minecraft:"+_):::Utils.getConfig("particles.txt"))
+
     context
   }
 

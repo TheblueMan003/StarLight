@@ -39,7 +39,7 @@ class BlockReduce(var files: List[IRFile]){
                 case BlockCall(function, fullName) => {
                     map.get(fullName) match {
                         case Some(file) => file.addCalledBy(parent.getName())
-                        case None => (println("error: " + fullName + " not found"))
+                        case None => (println("error: " + fullName + " not found in " + parent.getName()))
                     }
                 }
                 case e: IRExecute => apply(e.getStatements)
@@ -47,7 +47,7 @@ class BlockReduce(var files: List[IRFile]){
             }
         }
         files.filterNot(_.isJsonFile()).map(f => f.resetCallGraph())
-        files.filterNot(f => f.isJsonFile() && !f.deleted).map(f => {
+        files.filterNot(f => f.isJsonFile() || f.deleted).map(f => {
             f.getContents().foreach(instr => {
                 apply(instr)(f)
             })
@@ -86,7 +86,7 @@ class BlockReduce(var files: List[IRFile]){
                             val size = file.getContents().length
                             if (file.callByCount() == 1 && !file.hasSelfCall() && file.canBeDeleted()){
                                 file.delete()
-                                if (debug){println("delete " + file.getName() + " because it is only called once by "+ parent.getName())}
+                                if (debug){println("delete " + file.getName() + " because it is only called once by "+ file.calledBy)}
                                 file.getContents().flatMap(c => applyTop(c)(file))
                             }
                             else if (size == 0){
@@ -110,7 +110,7 @@ class BlockReduce(var files: List[IRFile]){
                             val size = file.getContents().length
                             if (file.callByCount() == 1 && size == 1 && !file.hasSelfCall() && file.canBeDeleted()){
                                 file.delete()
-                                if (debug){println("delete " + file.getName() + " because it is only called once by "+ parent.getName())}
+                                if (debug){println("delete " + file.getName() + " because it is only 1 line and called once by "+ parent.getName())}
                                 apply(file.getContents().head)(file)
                             }
                             else if (size == 1 && !file.hasSelfCall()){
@@ -135,7 +135,7 @@ class BlockReduce(var files: List[IRFile]){
             }
         }
 
-        files.filterNot(_.isJsonFile()).map(f => {
+        files.filterNot(f => f.isJsonFile() && !f.deleted).map(f => {
             f.setContents(f.getContents().flatMap(instr=> applyTop(instr)(f)).map(instr => {
                 apply(instr)(f)
             }).filterNot(_ == EmptyIR))

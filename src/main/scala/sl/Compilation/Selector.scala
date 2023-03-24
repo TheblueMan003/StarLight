@@ -64,6 +64,8 @@ trait Selector{
             case "@e" => prefix2
         }
     }
+
+    def withPrefix(prefix: String): Selector
 }
 val EmptySelector = JavaSelector("@s", List(("tag", SelectorIdentifier("sl_empty"))))
 
@@ -168,6 +170,7 @@ case class BedrockSelector(val prefix: String, val filters: List[(String, Select
             BedrockSelector(prefix, newFilter)
         }
     }
+    def withPrefix(prefix: String): Selector = BedrockSelector(prefix, filters)
 }
 case class JavaSelector(val prefix: String, val filters: List[(String, SelectorFilterValue)]) extends Selector{
     override def getString()(implicit context: Context): String = {
@@ -266,6 +269,7 @@ case class JavaSelector(val prefix: String, val filters: List[(String, SelectorF
             BedrockSelector(prefix, newFilter)
         }
     }
+    def withPrefix(prefix: String): Selector = JavaSelector(prefix, filters)
 }
 
 
