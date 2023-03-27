@@ -631,4 +631,24 @@ This can be used to compile according to some compilation settings. Here is a li
 * `Compiler.isJava`: Tell if the target is MC Java
 * `Compiler.isBedrock`: Tell if the target is MC Bedrock
 * `Compiler.isDebug`: Used to add extra info in the datapack that can be used to debug
-* `@tagExample`: where tagExample is a function tag. Tell if there is at least one function inside the tag.
+* `@tagExample`: where tagExample is a function tag. Tell if there is at least one function inside the tag when the compiler reach the condition.
+
+
+### Compile Type Checking
+When a lazy variable get assign a value. The type of the value is keep inside the lazy variable.
+For instance:
+```
+lazy float a = 1
+```
+Will contains an int value.
+
+It is therefor possible to write the following code:
+```
+if (a is int){
+    print("Is int")
+}
+if (a is float){
+    print("Is float")
+}
+```
+This is computed at compile time and not runtime.

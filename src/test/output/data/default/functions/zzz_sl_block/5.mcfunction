@@ -1,5 +1,11 @@
-function default:zzz_sl_block/2
-scoreboard players set default.test.test.main.test.enabled tbms.var 0
-scoreboard players operation default.zzz_sl_mux.void___to___void.__fct__ tbms.var = default.test.test.main.test.callback tbms.var
-function default:zzz_sl_block/3
-scoreboard players set default.test.test.main.test.callback tbms.var 0
+scoreboard players operation default.test.test.array.get._0 tbms.var = default.test.test.array.get.index tbms.var
+execute if score default.test.test.array.get._0 tbms.var matches 0 run scoreboard players operation default.test.test.array.get._ret tbms.var = default.test.test.array.0 tbms.var
+execute if score default.test.test.array.get._0 tbms.var matches 1 run scoreboard players operation default.test.test.array.get._ret tbms.var = default.test.test.array.1 tbms.var
+execute if score default.test.test.array.get._0 tbms.var matches 2 run scoreboard players operation default.test.test.array.get._ret tbms.var = default.test.test.array.2 tbms.var
+execute if score default.test.test.array.get._0 tbms.var matches 3 run scoreboard players operation default.test.test.array.get._ret tbms.var = default.test.test.array.3 tbms.var
+execute if score default.test.test.array.get._0 tbms.var matches 4 run scoreboard players operation default.test.test.array.get._ret tbms.var = default.test.test.array.4 tbms.var
+execute if score default.test.test.array.get._0 tbms.var matches 5 run scoreboard players operation default.test.test.array.get._ret tbms.var = default.test.test.array.5 tbms.var
+execute if score default.test.test.array.get._0 tbms.var matches 6 run scoreboard players operation default.test.test.array.get._ret tbms.var = default.test.test.array.6 tbms.var
+execute if score default.test.test.array.get._0 tbms.var matches 7 run scoreboard players operation default.test.test.array.get._ret tbms.var = default.test.test.array.7 tbms.var
+execute if score default.test.test.array.get._0 tbms.var matches 8 run scoreboard players operation default.test.test.array.get._ret tbms.var = default.test.test.array.8 tbms.var
+execute if score default.test.test.array.get._0 tbms.var matches 9 run scoreboard players operation default.test.test.array.get._ret tbms.var = default.test.test.array.9 tbms.var

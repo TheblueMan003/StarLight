@@ -6,6 +6,7 @@ import java.util.zip.ZipOutputStream
 import java.io.FileOutputStream
 import java.util.zip.ZipEntry
 import scala.collection.parallel.CollectionConverters._
+import scala.collection.mutable
 import sl.Reporter
 import java.nio.file.Files
 import java.nio.file.Paths
@@ -16,16 +17,16 @@ import java.io.File
 import sl.IR.*
 
 object DataPackBuilder{
-    var previous = Map[String, List[IRTree]]()
-    def clearCache() = previous = Map[String, List[IRTree]]()
-    def build(source: List[String], dirs: List[String], output: List[IRFile]):Unit={
-        if (previous.size == 0){
+    var previous = mutable.Map[String, Map[String, List[IRTree]]]()
+    def clearCache() = previous = mutable.Map[String, Map[String, List[IRTree]]]()
+    def build(build: String, source: List[String], dirs: List[String], output: List[IRFile]):Unit={
+        if (!previous.contains(build)){
             Reporter.info("Clearing old Data Packs")
             dirs.foreach(FileUtils.deleteDirectory(_))
         }
 
         val newSet = dirs.flatMap(dir => output.map(file => (dir + file.getPath(), file.getContents()))).toMap
-        previous.filter(x => !newSet.contains(x._1)).foreach(x => {
+        previous.getOrElse(build, Map[String, List[IRTree]]()).filter(x => !newSet.contains(x._1)).foreach(x => {
             //Reporter.debug(f"Removing old file: ${x._1}")
             FileUtils.deleteFile(x._1)
         }
@@ -40,12 +41,12 @@ object DataPackBuilder{
                 makeDPZip(source, target.replaceAllLiterally(".mcpack/",".mcpack"), output)
             }
             else{
-                makeDPFolder(source, target, output)
+                makeDPFolder(build, source, target, output)
             }
             Reporter.ok(f"Resource Data build")
         })
 
-        previous = newSet
+        previous(build) = newSet
     }
 
     def exportOutputZip(out: String, files: List[IRFile]) = {
@@ -62,7 +63,7 @@ object DataPackBuilder{
         zip.close()
     }
 
-    def makeDPFolder(sources: List[String], target: String, generated: List[IRFile])={
+    def makeDPFolder(build: String, sources: List[String], target: String, generated: List[IRFile])={
         sources.flatMap(source => getListOfDPFiles(source, "").map(f => (source, f)))
         .groupBy(_._2)
         .toList
@@ -77,7 +78,7 @@ object DataPackBuilder{
             val content = irfile.getContents()
             val file = irfile.getPath()
             val filename = target+file
-            if (!previous.contains(filename) || previous(filename) != content){
+            if (!previous.getOrElse(build, Map[String, List[IRTree]]()).contains(filename) || previous.getOrElse(build, Map[String, List[IRTree]]())(filename) != content){
                 FileUtils.safeWriteFile(target+file, content.map(_.getString()))
             }
         }}

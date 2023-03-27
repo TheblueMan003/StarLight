@@ -1,0 +1,11 @@
+scoreboard players operation default.test.test.array.set._0 tbms.var = default.test.test.array.set.index tbms.var
+execute if score default.test.test.array.set._0 tbms.var matches 0 run scoreboard players operation default.test.test.array.0 tbms.var = default.test.test.array.set.value tbms.var
+execute if score default.test.test.array.set._0 tbms.var matches 1 run scoreboard players operation default.test.test.array.1 tbms.var = default.test.test.array.set.value tbms.var
+execute if score default.test.test.array.set._0 tbms.var matches 2 run scoreboard players operation default.test.test.array.2 tbms.var = default.test.test.array.set.value tbms.var
+execute if score default.test.test.array.set._0 tbms.var matches 3 run scoreboard players operation default.test.test.array.3 tbms.var = default.test.test.array.set.value tbms.var
+execute if score default.test.test.array.set._0 tbms.var matches 4 run scoreboard players operation default.test.test.array.4 tbms.var = default.test.test.array.set.value tbms.var
+execute if score default.test.test.array.set._0 tbms.var matches 5 run scoreboard players operation default.test.test.array.5 tbms.var = default.test.test.array.set.value tbms.var
+execute if score default.test.test.array.set._0 tbms.var matches 6 run scoreboard players operation default.test.test.array.6 tbms.var = default.test.test.array.set.value tbms.var
+execute if score default.test.test.array.set._0 tbms.var matches 7 run scoreboard players operation default.test.test.array.7 tbms.var = default.test.test.array.set.value tbms.var
+execute if score default.test.test.array.set._0 tbms.var matches 8 run scoreboard players operation default.test.test.array.8 tbms.var = default.test.test.array.set.value tbms.var
+execute if score default.test.test.array.set._0 tbms.var matches 9 run scoreboard players operation default.test.test.array.9 tbms.var = default.test.test.array.set.value tbms.var

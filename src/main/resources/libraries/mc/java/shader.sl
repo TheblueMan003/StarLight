@@ -43,7 +43,7 @@ Add the creeper shader to the player
 """
 def creeper(){
     if (SSneak){
-        title.show(("warning","red"))
+        title.show(100,10,("warning","red"))
         title.showSubtitle(("Stop Sneaking","red"))
         failled += @s
         schedule.add(1){
@@ -57,8 +57,7 @@ def creeper(){
     else{
         SSneak = 0
         save()
-        title.show(("","red"))
-        title.showSubtitle(("","red"))
+        title.clear()
         /spawnpoint @s ~ ~ ~ ~
         entity mob
         with(mob,true){
@@ -99,7 +98,7 @@ Clear the shader
 """
 def clear(){
     if (SSneak){
-        title.show(("warning","red"))
+        title.show(100,10,("warning","red"))
         title.showSubtitle(("Stop Sneaking","red"))
         failled += @s
         schedule.add(1){
@@ -113,8 +112,7 @@ def clear(){
     else{
         SSneak = 0
         save()
-        title.show(("","red"))
-        title.showSubtitle(("","red"))
+        title.clear()
         /spawnpoint @s ~ ~ ~ ~
         entity mob
         with(mob,true){
@@ -155,7 +153,7 @@ Add the spider shader to the player
 """
 def spider(){
     if (SSneak){
-        title.show(("warning","red"))
+        title.show(100,10,("warning","red"))
         title.showSubtitle(("Stop Sneaking","red"))
         failled += @s
         schedule.add(1){
@@ -169,8 +167,7 @@ def spider(){
     else{
         SSneak = 0
         save()
-        title.show(("","red"))
-        title.showSubtitle(("","red"))
+        title.clear()
         /spawnpoint @s ~ ~ ~ ~
         entity mob
         with(mob,true){
@@ -212,7 +209,7 @@ Add the enderman shader to the player
 """
 def enderman(){
     if (SSneak){
-        title.show(("warning","red"))
+        title.show(100,10,("warning","red"))
         title.showSubtitle(("Stop Sneaking","red"))
         failled += @s
         schedule.add(1){
@@ -226,8 +223,7 @@ def enderman(){
     else{
         SSneak = 0
         save()
-        title.show(("","red"))
-        title.showSubtitle(("","red"))
+        title.clear()
         /spawnpoint @s ~ ~ ~ ~
         entity mob
         with(mob,true){

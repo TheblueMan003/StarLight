@@ -14,6 +14,7 @@ import sl.IR.*
 object Main{
   private var lastIR: List[IRFile] = null
   private var interpreter: Interpreter = null
+  private var lastBuild: String = null
 
   def main(args: Array[String]): Unit = {
     if (args.length == 0){
@@ -45,10 +46,15 @@ object Main{
             Reporter.ok("Documentation Completed!")
           }
           case "build" => {
-            if (args.length < 1) then {
+            if (args.length < 1 && lastBuild == null) then {
               Reporter.error(f"Expected 1 argument got: ${args.length-1}")
             }
+            else if (args.length < 1 && lastBuild != null) then {
+              build(lastBuild)
+              Reporter.ok("Build Completed!")
+            }
             else{
+              lastBuild = args(1)+".slconf"
               build(args(1)+".slconf")
               Reporter.ok("Build Completed!")
             }
@@ -84,6 +90,8 @@ object Main{
           case "help" => {
             println("build <config_name>: Build the project with the config contains in the file config_name. The .slconf must be omited.")
             println("new: Make a new project")
+            println("run <function>: Interpret the function. The .sl must be omited and the internal name must be used. Example: `main.ticking.main`. You must compile the project before.")
+            println("debug <function>: Interpret the function in debug mode (print every operation). The .sl must be omited and the internal name must be used. Example: `main.ticking.main`. You must compile the project before.")
             println("help: Show this")
             println("exit: Close")
           }
@@ -148,18 +156,18 @@ object Main{
                 FileUtils.getListOfFiles("./lib").map(l => "./lib/"+l+"/bedrock_resourcepack")
 
     if (Settings.target == MCJava){
-      compile("./src"::libs, "./java_datapack"::datpack, "./java_resourcepack"::respack, Settings.java_datapack_output)
+      compile(args, "./src"::libs, "./java_datapack"::datpack, "./java_resourcepack"::respack, Settings.java_datapack_output)
     }
     if (Settings.target == MCBedrock){
-      compile("./src"::libs, "./bedrock_datapack"::datpack, "./bedrock_resourcepack"::respack, Settings.bedrock_behaviorpack_output)
+      compile(args, "./src"::libs, "./bedrock_datapack"::datpack, "./bedrock_resourcepack"::respack, Settings.bedrock_behaviorpack_output)
     }
     ConfigLoader.saveProject()
   }
   def compile(args: Array[String]): Unit = {
     if (hasArg(args, "-bedrock")) Settings.target= MCBedrock
-    compile(sourceFromArg(args, "-i"), List(), List(), List(getArg(args, "-o")))
+    compile("_", sourceFromArg(args, "-i"), List(), List(), List(getArg(args, "-o")))
   }
-  def compile(inputs: List[String], dataInput: List[String],resourceInput: List[String], outputs: List[String]): Context = {
+  def compile(script: String, inputs: List[String], dataInput: List[String],resourceInput: List[String], outputs: List[String]): Context = {
     val start = LocalDateTime.now()
     var files = FileUtils.getFiles(inputs)
 
@@ -216,7 +224,7 @@ object Main{
 
     lastIR = output
     interpreter = null
-    DataPackBuilder.build(dataInput, outputPath, output)
+    DataPackBuilder.build(script, dataInput, outputPath, output)
     if (Settings.target == MCJava){
         Settings.java_resourcepack_output.map(path => 
           if (!path.endsWith("/") && !path.endsWith("\\"))then path + "/" else path
@@ -234,7 +242,7 @@ object Main{
     val time3 = ChronoUnit.MILLIS.between(start, LocalDateTime.now())
     Reporter.info(f"Total Time: ${time3}ms")
 
-    FileUtils.safeWriteFile("vscode/token", Utils.getConfig("blocks.txt"):::Utils.getConfig("sounds/java.csv").map("minecraft:"+_):::Utils.getConfig("particles.txt"))
+    //FileUtils.safeWriteFile("vscode/token", Utils.getConfig("blocks.txt"):::Utils.getConfig("sounds/java.csv").map("minecraft:"+_):::Utils.getConfig("particles.txt"))
 
     context
   }
