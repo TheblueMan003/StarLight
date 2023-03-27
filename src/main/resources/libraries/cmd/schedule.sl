@@ -95,15 +95,15 @@ if (Compiler.isJava()){
     """
     remove `func` from the schedule
     """
-    def lazy clear(void=>void $func){
-        /schedule clear $func
+    def lazy clear(void=>void func){
+        Compiler.scheduleClear(func)
     }
 
     """
     add `func` to the schedule int `t` tick
     """
-    def lazy add(int $t, void=>void $func){
-        /schedule function $func $t append
+    def lazy add(int t, void=>void func){
+        Compiler.schedule(func, t)
     }
 }
 if (Compiler.isBedrock()){

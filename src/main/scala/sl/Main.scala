@@ -13,6 +13,7 @@ import sl.IR.*
 
 object Main{
   private var lastIR: List[IRFile] = null
+  private var lastContxt: Context = null
   private var interpreter: Interpreter = null
   private var lastBuild: String = null
 
@@ -57,6 +58,16 @@ object Main{
               lastBuild = args(1)+".slconf"
               build(args(1)+".slconf")
               Reporter.ok("Build Completed!")
+            }
+          }
+          case "test" => {
+            if (args.length < 1) then {
+              Reporter.error(f"Expected 1 argument got: ${args.length-1}")
+            }
+            else{
+              compile(args.drop(1))
+              test()
+              Reporter.ok("Test Completed!")
             }
           }
           case "run" => {
@@ -108,16 +119,22 @@ object Main{
       }
     }
   }
+  def test(): Unit = {
+    if (interpreter == null){
+      interpreter = new Interpreter(lastIR, lastContxt)
+    }
+    interpreter.run(1000, "default.test.runAll")
+  }
   def run(args: String): Unit = {
     if (interpreter == null){
-      interpreter = new Interpreter(lastIR)
+      interpreter = new Interpreter(lastIR, lastContxt)
     }
     interpreter.run(args, false)
     interpreter.printScoreboards()
   }
   def debug(args: String): Unit = {
     if (interpreter == null){
-      interpreter = new Interpreter(lastIR)
+      interpreter = new Interpreter(lastIR, lastContxt)
     }
     interpreter.run(args, true)
     interpreter.printScoreboards()
@@ -223,6 +240,7 @@ object Main{
     Reporter.phase(f"===========[Exporting]==========")
 
     lastIR = output
+    lastContxt = context
     interpreter = null
     DataPackBuilder.build(script, dataInput, outputPath, output)
     if (Settings.target == MCJava){

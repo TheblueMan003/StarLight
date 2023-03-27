@@ -1,21 +1,48 @@
 package sl.IR
 
 import scala.collection.mutable
+import objects.Context
+import sl.Settings
 
-class Interpreter(var files: List[IRFile]){
+class Interpreter(var files: List[IRFile], val context: Context){
     val map = files.map(f => f.getName() -> f).toMap
     val scoreboards = mutable.Map[String, Int]()
-
+    val scheduled = mutable.Map[Int, List[String]]()
     def printScoreboards(): Unit = {
         scoreboards.foreach(entry => {
             println(entry._1 + ": " + entry._2)
         })
     }
+    def run(turn: Int, name: String):Unit = {
+        val ticks = context.getAllFunction()
+                        .filter(_.modifiers.isTicking)
+                        .map(f => f.fullName)
 
+        val loads = context.getAllFunction()
+                        .filter(_.modifiers.isLoading)
+                        .sortBy(f => f.modifiers.getAttributesFloat("tag.order", ()=> 0)(f.context))
+                        .map(f => f.fullName)
+                        
+        context.getAllConstant().map(v => run(ScoreboardSet(SBLink(f"c$v", Settings.constScoreboard), v))(IRContext((0,0,0), (0,0), null, "", debug)))
+        loads.foreach(f => run(f, false))
+        ticks.foreach(f => run(f, false))
+        run(name, false)
+        0 to turn foreach { _ =>
+            ticks.foreach(f => run(f, false))
+            scheduled.get(1) match {
+                case Some(list) => list.foreach(f => run(f, false))
+                case None => ()
+            }
+            scheduled.remove(1)
+            scheduled.foreach(entry => {
+                scheduled.put(entry._1 - 1, entry._2)
+            })
+        }
+    }
     def run(name: String, debug: Boolean):Unit = {
         map.get(name) match {
             case Some(file) => file.getContents().foreach(instr => run(instr)(IRContext((0,0,0), (0,0), null, "", debug)))
-            case None => throw new Exception("File not found: " + name)
+            case None => throw new Exception("File not found: " + name+ " in "+ map.keys.mkString(","))
         }
     }
     def run(ir: IRTree)(implicit context: IRContext):Unit = {
@@ -117,6 +144,18 @@ class Interpreter(var files: List[IRFile]){
             }
             case CommandIR(statement) => {
                 println(context.shift + "/" + statement)
+            }
+            case ScheduleCall(function, functionName, delay) => {
+                val current = scheduled.getOrElse(delay, List())
+                scheduled.put(delay, current :+ functionName)
+            }
+            case ScheduleClear(function, functionName) => {
+                scheduled.foreach(entry => {
+                    scheduled.put(entry._1, entry._2.filter(_ != functionName))
+                })
+            }
+            case InterpreterException(message) => {
+                throw new Exception(message)
             }
             case EmptyIR => ()
             case e: IRExecute if debug => run(e.getStatements)(context)
