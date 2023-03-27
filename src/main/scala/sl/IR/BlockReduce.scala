@@ -84,9 +84,9 @@ class BlockReduce(var files: List[IRFile]){
                     map.get(fullName) match {
                         case Some(file) => {
                             val size = file.getContents().length
-                            if (file.callByCount() == 1 && !file.hasSelfCall() && file.canBeDeleted()){
-                                file.delete()
-                                if (debug){println("delete " + file.getName() + " because it is only called once by "+ file.calledBy)}
+                            if (file.callByCount() == 1 && !file.hasSelfCall() && !parent.deleted){
+                                //file.delete()
+                                //if (debug){println("delete " + file.getName() + " because it is only called once by "+ file.calledBy)}
                                 file.getContents().flatMap(c => applyTop(c)(file))
                             }
                             else if (size == 0){
@@ -108,9 +108,9 @@ class BlockReduce(var files: List[IRFile]){
                     map.get(fullName) match {
                         case Some(file) => {
                             val size = file.getContents().length
-                            if (file.callByCount() == 1 && size == 1 && !file.hasSelfCall() && file.canBeDeleted()){
-                                file.delete()
-                                if (debug){println("delete " + file.getName() + " because it is only 1 line and called once by "+ parent.getName())}
+                            if (file.callByCount() == 1 && size == 1 && !file.hasSelfCall() && !parent.deleted){
+                                //file.delete()
+                                //if (debug){println("delete " + file.getName() + " because it is only 1 line and called once by "+ file.calledBy+" in "+parent.getName())}
                                 apply(file.getContents().head)(file)
                             }
                             else if (size == 1 && !file.hasSelfCall()){
@@ -156,10 +156,10 @@ class BlockReduce(var files: List[IRFile]){
                     map.get(fullName) match {
                         case Some(file) => {
                             irMap.get(file.getContents()) match {
-                                case Some(f) if f != file => {
+                                case Some(f) if f != file && !parent.deleted=> {
                                     changed = true
-                                    file.delete()
-                                    if(debug){println("replace " + file.getName() + " with " + f.getName() +" in "+parent.getName()+ " because they are the same:\n"+file.getContents()+"\n===\n"+f.getContents())}
+                                    //file.delete()
+                                    //if(debug){println("replace " + file.getName() + " with " + f.getName() +" in "+parent.getName()+ " because they are the same:\n"+file.getContents()+"\n===\n"+f.getContents())}
                                     BlockCall(Settings.target.getFunctionName(f.getName()), f.getName())
                                 }
                                 case _ => instr

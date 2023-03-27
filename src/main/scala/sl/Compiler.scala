@@ -41,7 +41,7 @@ object Compiler{
                 case FunctionDecl(name, block, typ2, args, typevars, modifier) =>{
                     var fname = context.getFunctionWorkingName(name)
                     if (typevars.length > 0){
-                        val func = new GenericFunction(context, fname, args, typevars, typ2, modifier, block)
+                        val func = new GenericFunction(context, context.getPath()+"."+name, fname, args, typevars, typ2, modifier, block)
                         func.overridedFunction = if modifier.isOverride then context.getFunction(Identifier.fromString(name), args.map(_.typ), List(), typ2, false) else null
                         func.modifiers.isVirtual |= modifier.isOverride
                         context.addFunction(name, func)
@@ -54,14 +54,14 @@ object Compiler{
                         }
                         val clazz = context.getCurrentClass()
                         if (!modifier.isLazy){
-                            val func = new ConcreteFunction(context, fname, args, context.getType(typ), modifier, block, meta.firstPass)
+                            val func = new ConcreteFunction(context, context.getPath()+"."+name, fname, args, context.getType(typ), modifier, block, meta.firstPass)
                             func.overridedFunction = if modifier.isOverride then context.getFunction(Identifier.fromString(name), args.map(_.typ), List(), typ, false) else null
                             func.modifiers.isVirtual |= modifier.isOverride
                             context.addFunction(name, func)
                             func.generateArgument()(context)
                         }
                         else{
-                            val func = new LazyFunction(context, fname, args, context.getType(typ), modifier, Utils.fix(block)(context, args.map(a => Identifier.fromString(a.name)).toSet))
+                            val func = new LazyFunction(context, context.getPath()+"."+name, fname, args, context.getType(typ), modifier, Utils.fix(block)(context, args.map(a => Identifier.fromString(a.name)).toSet))
                             func.overridedFunction = if modifier.isOverride then context.getFunction(Identifier.fromString(name), args.map(_.typ), List(), typ, false) else null
                             context.addFunction(name, func)
                             func.generateArgument()(context)

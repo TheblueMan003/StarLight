@@ -181,8 +181,11 @@ template Setup{
     }
     def lazy remove(){
         applyTo -= @s
+        inventory.clear()
     }
     def lazy remove(entity e){
-        applyTo -= e
+        with(e){
+            remove()
+        }
     }
 }

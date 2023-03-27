@@ -72,11 +72,11 @@ class Class(context: Context, name: String, val generics: List[String], _modifie
                 .filter(_.getter == null)
                 .filter(_.modifiers.protection == Protection.Public)
                 .foreach(vari => 
-                    vari.getter = ConcreteFunction(ctx, f"__get_${vari.name}", List(), vari.getType(), vari.modifiers, Return(LinkedVariableValue(vari)), false)
+                    vari.getter = ConcreteFunction(ctx, ctx.getPath()+f".__get_${vari.name}", f"__get_${vari.name}", List(), vari.getType(), vari.modifiers, Return(LinkedVariableValue(vari)), false)
                     vari.getter.generateArgument()(ctx)
                     ctx.addFunction(f"__get_${vari.name}", vari.getter)
 
-                    vari.setter = ConcreteFunction(ctx, f"__set_${vari.name}", List(new Argument("value", vari.getType(), None)), VoidType, vari.modifiers, VariableAssigment(List((Right(vari), Selector.self)), "=", VariableValue("value")), false)
+                    vari.setter = ConcreteFunction(ctx, ctx.getPath()+f".__set_${vari.name}", f"__set_${vari.name}", List(new Argument("value", vari.getType(), None)), VoidType, vari.modifiers, VariableAssigment(List((Right(vari), Selector.self)), "=", VariableValue("value")), false)
                     vari.setter.generateArgument()(ctx)
                     ctx.addFunction(f"__set_${vari.name}", vari.setter)
                 )
@@ -99,7 +99,7 @@ class Class(context: Context, name: String, val generics: List[String], _modifie
                     modifier.isVirtual = false
                     modifier.isOverride = false
                     
-                    val fct2 = ConcreteFunction(ctx, f"--${fct.name}", fct.arguments, fct.getType(), modifier,
+                    val fct2 = ConcreteFunction(ctx, ctx.getPath()+f".--${fct.name}", f"--${fct.name}", fct.arguments, fct.getType(), modifier,
                         if (fct.getType() == VoidType) FunctionCall(vari.fullName,fct.arguments.map(arg => VariableValue(arg.name)), List())
                         else Return(FunctionCallValue(LinkedVariableValue(vari),fct.arguments.map(arg => VariableValue(arg.name)), List(), Selector.self)), false)
                     fct2.generateArgument()(ctx)
@@ -121,11 +121,11 @@ class Class(context: Context, name: String, val generics: List[String], _modifie
                 .filter(isNotClassFunction)
                 .filter(f => f.context == context.push(name) || context.push(name).isInheriting(f.context))
                 .map(fct => {
-                    val deco = ClassFunction(vari, fct)
+                    val deco = ClassFunction(ctx.getPath()+"."+fct.name, vari, fct)
                     ctx.addFunction(fct.name, deco)
                 })
             virutalFunction.map((name, fct) => {
-                val deco = ClassFunction(vari, fct)
+                val deco = ClassFunction(ctx.getPath()+"."+fct.name, vari, fct)
                 ctx.addFunction(name, deco)
             })
             getAllVariables()
@@ -135,9 +135,9 @@ class Class(context: Context, name: String, val generics: List[String], _modifie
                 .filter(_.getter != null)
                 .filter(_.setter != null)
                 .map(vari => {
-                    val getter = ClassFunction(vari, vari.getter)
+                    val getter = ClassFunction(ctx.getPath()+"."+vari.getter.name, vari, vari.getter)
                     ctx.addFunction(vari.getter.name, getter)
-                    val setter = ClassFunction(vari, vari.setter)
+                    val setter = ClassFunction(ctx.getPath()+"."+vari.setter.name, vari, vari.setter)
                     ctx.addFunction(vari.setter.name, setter)
                     ctx.addProperty(Property(vari.name, getter, setter, vari))
                 })

@@ -10,12 +10,13 @@ if (Compiler.isJava){
     int x, y, z
 
     def @playertick player(){
-        @game.room.tick()
+        x,y,z = nbt.x, nbt.y, nbt.z
+        @templates.parent.room.tick()
     }
 }
 if (Compiler.isBedrock){
     def @playertick player(){
-        @game.room.tick()
+        @templates.parent.room.tick()
     }
 }
 
@@ -72,6 +73,8 @@ public @test.after void show(){
 
 """
 Template for a room that need to execute a function when a player enter it, stay in it, exit it, or when the room is activated or desactivated.
+
+Nested template are supported. The nested room only check if a player is in the parent room.
 """
 template Room{
     lazy int sx, sy, sz, ex, ey, ez
@@ -175,7 +178,7 @@ template Room{
         }
     }
     
-    def @game.room.show show(){
+    def @game.room.show __show__(){
         if (Compiler.isJava && Compiler.isDebug()){
             /summon marker ~ 0 ~ {Invisible:1,Tags:["trg_show"]}
             with(@e[tag=trg_show]){
@@ -266,7 +269,10 @@ template Room{
             return @s[x=sx,dx=ex,y=sy,dy=ey,z=sz,dz=ez]
         }
     }
-    def [Compile.order=100] @game.room.tick __main_player__(){
+    def [Compile.order=100] @templates.parent.room.tick __main_player__(){
+        if (nbPlayer > 0){
+            @templates.room.tick()
+        }
         if (check()){
             if (counting){
                 nbPlayer++
@@ -275,7 +281,7 @@ template Room{
                 onStay()
                 if (Compiler.isJava()){
                     if (display && !hasDisplay && @s[gamemode=creative]){
-                        show()
+                        __show__()
                         hasDisplay = true
                     }
                 }

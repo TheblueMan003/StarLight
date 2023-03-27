@@ -121,19 +121,24 @@ class ScoreboardReduce(files: List[IRFile], access: mutable.Set[SBLink]){
                 state.operation.foreach(op => {
                     val sourceState = getOrAdd(op.source)
                     val prev = state.possibleValue
-                    (state.possibleValue, op.operation, sourceState.possibleValue) match{
-                        case (DirectValue(v1), "+=", DirectValue(v2)) => state.possibleValue = setOrDirect(v1, v1 + v2)
-                        case (DirectValue(v1), "-=", DirectValue(v2)) => state.possibleValue = setOrDirect(v1, v1 - v2)
-                        case (DirectValue(v1), "*=", DirectValue(v2)) => state.possibleValue = setOrDirect(v1, v1 * v2)
-                        case (DirectValue(v1), "/=", DirectValue(v2)) => state.possibleValue = setOrDirect(v1, v1 / v2)
-                        case (DirectValue(v1), "%=", DirectValue(v2)) => state.possibleValue = setOrDirect(v1, v1 % v2)
-                        case (DirectValue(v1), "=", DirectValue(v2)) => state.possibleValue = setOrDirect(v1, v2)
+                    try{
+                        (state.possibleValue, op.operation, sourceState.possibleValue) match{
+                            case (DirectValue(v1), "+=", DirectValue(v2)) => state.possibleValue = setOrDirect(v1, v1 + v2)
+                            case (DirectValue(v1), "-=", DirectValue(v2)) => state.possibleValue = setOrDirect(v1, v1 - v2)
+                            case (DirectValue(v1), "*=", DirectValue(v2)) => state.possibleValue = setOrDirect(v1, v1 * v2)
+                            case (DirectValue(v1), "/=", DirectValue(v2)) => state.possibleValue = setOrDirect(v1, v1 / v2)
+                            case (DirectValue(v1), "%=", DirectValue(v2)) => state.possibleValue = setOrDirect(v1, v1 % v2)
+                            case (DirectValue(v1), "=", DirectValue(v2)) => state.possibleValue = setOrDirect(v1, v2)
 
-                        case (SetValue(v1), "=", SetValue(v2)) => state.possibleValue = SetValue(v1 ++ v2)
-                        case (SetValue(v1), "=", DirectValue(v2)) => state.possibleValue = SetValue(v1 + v2)
-                        case (DirectValue(v1), "=", SetValue(v2)) => state.possibleValue = SetValue(v2 + v1)
+                            case (SetValue(v1), "=", SetValue(v2)) => state.possibleValue = SetValue(v1 ++ v2)
+                            case (SetValue(v1), "=", DirectValue(v2)) => state.possibleValue = SetValue(v1 + v2)
+                            case (DirectValue(v1), "=", SetValue(v2)) => state.possibleValue = SetValue(v2 + v1)
 
-                        case (_, _, _) => state.possibleValue = AnyValue
+                            case (_, _, _) => state.possibleValue = AnyValue
+                        }
+                    }
+                    catch{
+                        case e: ArithmeticException => state.possibleValue = AnyValue
                     }
                     if (prev != state.possibleValue) lchange = true
                 })
@@ -542,27 +547,31 @@ class ScoreboardReduce(files: List[IRFile], access: mutable.Set[SBLink]){
                 case ScoreboardOperation(target, operation, source) => {
                     val lstate = lgetOrAdd(target)
                     val rstate = lgetOrAdd(source)
-                    
-                    (lstate.possibleValue, operation, rstate.possibleValue) match{
-                        case (DirectValue(v1), "+=", DirectValue(v2)) => lstate.possibleValue = if (inIf){SetValue(Set(v1, v1 + v2))}else{DirectValue(v1 + v2)}
-                        case (DirectValue(v1), "-=", DirectValue(v2)) => lstate.possibleValue = if (inIf){SetValue(Set(v1, v1 - v2))}else{DirectValue(v1 - v2)}
-                        case (DirectValue(v1), "*=", DirectValue(v2)) => lstate.possibleValue = if (inIf){SetValue(Set(v1, v1 * v2))}else{DirectValue(v1 * v2)}
-                        case (DirectValue(v1), "/=", DirectValue(v2)) => lstate.possibleValue = if (inIf){SetValue(Set(v1, v1 / v2))}else{DirectValue(v1 / v2)}
-                        case (DirectValue(v1), "%=", DirectValue(v2)) => lstate.possibleValue = if (inIf){SetValue(Set(v1, v1 % v2))}else{DirectValue(v1 % v2)}
-                        case (_, "=", DirectValue(v2)) => lstate.possibleValue = if (inIf){AnyValue}else{DirectValue(v2)}
-                        case (_, "=", SetValue(v2)) => lstate.possibleValue = if (inIf){AnyValue}else{SetValue(v2)}
-                        case (DirectValue(v1), "+=", SetValue(v2)) => lstate.possibleValue = if (inIf){SetValue(v2.map(_ + v1)+v1)}else{SetValue(v2.map(_ + v1))}
-                        case (DirectValue(v1), "-=", SetValue(v2)) => lstate.possibleValue = if (inIf){SetValue(v2.map(_ - v1)+v1)}else{SetValue(v2.map(_ - v1))}
-                        case (DirectValue(v1), "*=", SetValue(v2)) => lstate.possibleValue = if (inIf){SetValue(v2.map(_ * v1)+v1)}else{SetValue(v2.map(_ * v1))}
-                        case (DirectValue(v1), "/=", SetValue(v2)) => lstate.possibleValue = if (inIf){SetValue(v2.map(_ / v1)+v1)}else{SetValue(v2.map(_ / v1))}
-                        case (DirectValue(v1), "%=", SetValue(v2)) => lstate.possibleValue = if (inIf){SetValue(v2.map(_ % v1)+v1)}else{SetValue(v2.map(_ % v1))}
-                        case (SetValue(v1), "+=", DirectValue(v2)) => lstate.possibleValue = if (inIf){SetValue(v1.map(_ + v2)+v2)}else{SetValue(v1.map(_ + v2))}
-                        case (SetValue(v1), "-=", DirectValue(v2)) => lstate.possibleValue = if (inIf){SetValue(v1.map(_ - v2)+v2)}else{SetValue(v1.map(_ - v2))}
-                        case (SetValue(v1), "*=", DirectValue(v2)) => lstate.possibleValue = if (inIf){SetValue(v1.map(_ * v2)+v2)}else{SetValue(v1.map(_ * v2))}
-                        case (SetValue(v1), "/=", DirectValue(v2)) => lstate.possibleValue = if (inIf){SetValue(v1.map(_ / v2)+v2)}else{SetValue(v1.map(_ / v2))}
-                        case (SetValue(v1), "%=", DirectValue(v2)) => lstate.possibleValue = if (inIf){SetValue(v1.map(_ % v2)+v2)}else{SetValue(v1.map(_ % v2))}
-                        
-                        case _ => lstate.possibleValue = AnyValue
+                    try{
+                        (lstate.possibleValue, operation, rstate.possibleValue) match{
+                            case (DirectValue(v1), "+=", DirectValue(v2)) => lstate.possibleValue = if (inIf){SetValue(Set(v1, v1 + v2))}else{DirectValue(v1 + v2)}
+                            case (DirectValue(v1), "-=", DirectValue(v2)) => lstate.possibleValue = if (inIf){SetValue(Set(v1, v1 - v2))}else{DirectValue(v1 - v2)}
+                            case (DirectValue(v1), "*=", DirectValue(v2)) => lstate.possibleValue = if (inIf){SetValue(Set(v1, v1 * v2))}else{DirectValue(v1 * v2)}
+                            case (DirectValue(v1), "/=", DirectValue(v2)) => lstate.possibleValue = if (inIf){SetValue(Set(v1, v1 / v2))}else{DirectValue(v1 / v2)}
+                            case (DirectValue(v1), "%=", DirectValue(v2)) => lstate.possibleValue = if (inIf){SetValue(Set(v1, v1 % v2))}else{DirectValue(v1 % v2)}
+                            case (_, "=", DirectValue(v2)) => lstate.possibleValue = if (inIf){AnyValue}else{DirectValue(v2)}
+                            case (_, "=", SetValue(v2)) => lstate.possibleValue = if (inIf){AnyValue}else{SetValue(v2)}
+                            case (DirectValue(v1), "+=", SetValue(v2)) => lstate.possibleValue = if (inIf){SetValue(v2.map(_ + v1)+v1)}else{SetValue(v2.map(_ + v1))}
+                            case (DirectValue(v1), "-=", SetValue(v2)) => lstate.possibleValue = if (inIf){SetValue(v2.map(_ - v1)+v1)}else{SetValue(v2.map(_ - v1))}
+                            case (DirectValue(v1), "*=", SetValue(v2)) => lstate.possibleValue = if (inIf){SetValue(v2.map(_ * v1)+v1)}else{SetValue(v2.map(_ * v1))}
+                            case (DirectValue(v1), "/=", SetValue(v2)) => lstate.possibleValue = if (inIf){SetValue(v2.map(_ / v1)+v1)}else{SetValue(v2.map(_ / v1))}
+                            case (DirectValue(v1), "%=", SetValue(v2)) => lstate.possibleValue = if (inIf){SetValue(v2.map(_ % v1)+v1)}else{SetValue(v2.map(_ % v1))}
+                            case (SetValue(v1), "+=", DirectValue(v2)) => lstate.possibleValue = if (inIf){SetValue(v1.map(_ + v2)+v2)}else{SetValue(v1.map(_ + v2))}
+                            case (SetValue(v1), "-=", DirectValue(v2)) => lstate.possibleValue = if (inIf){SetValue(v1.map(_ - v2)+v2)}else{SetValue(v1.map(_ - v2))}
+                            case (SetValue(v1), "*=", DirectValue(v2)) => lstate.possibleValue = if (inIf){SetValue(v1.map(_ * v2)+v2)}else{SetValue(v1.map(_ * v2))}
+                            case (SetValue(v1), "/=", DirectValue(v2)) => lstate.possibleValue = if (inIf){SetValue(v1.map(_ / v2)+v2)}else{SetValue(v1.map(_ / v2))}
+                            case (SetValue(v1), "%=", DirectValue(v2)) => lstate.possibleValue = if (inIf){SetValue(v1.map(_ % v2)+v2)}else{SetValue(v1.map(_ % v2))}
+                            
+                            case _ => lstate.possibleValue = AnyValue
+                        }
+                    }
+                    catch{
+                        case e: ArithmeticException => lstate.possibleValue = AnyValue
                     }
                     (lstate.possibleValue, operation, rstate.possibleValue) match
                         case (DirectValue(v), "=", _)=> ScoreboardSet(target, v)

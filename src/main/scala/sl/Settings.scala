@@ -37,7 +37,7 @@ class SettingsContext(){
     var debug = false
     var allFunction = true
 
-    var optimize = true
+    var optimize = false
     var optimizeInlining = true
     var optimizeDeduplication = true
     var optimizeVariableValue = true
@@ -94,6 +94,7 @@ case object MCJava extends Target{
 
         val loads = context.getAllFunction()
                         .filter(_.modifiers.isLoading)
+                        .sortBy(f => f.modifiers.getAttributesFloat("tag.order", ()=> 0)(f.context))
                         .map(f => getFunctionName(f.fullName))
                         .prepended(f"${context.root.getPath()}:__init__")
                         .map(Utils.stringify(_))

@@ -18,6 +18,7 @@ if (Compiler.isJava()){
             ndata += data
             lazy string nbt = Compiler.toNBT(ndata)
             _summon(name, nbt)
+            _ret += 1
             with(_ret, true){
                 fct()
             }
@@ -42,6 +43,7 @@ if (Compiler.isJava()){
             removetag(tag)
             ndata += data
             lazy string nbt = Compiler.toNBT(ndata)
+            _ret += 1
             _summon(name, nbt)
         }
         else{
@@ -56,6 +58,7 @@ if (Compiler.isJava()){
             removetag(tag)
             lazy string nbt = Compiler.toNBT(ndata)
             _summon(name, nbt)
+            _ret += 1
             with(_ret, true){
                 fct()
             }

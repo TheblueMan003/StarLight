@@ -222,6 +222,10 @@ object Execute{
             case FloatValue(value) => if value == 0 then (List(), List(IFFalse)) else (List(), List(IFTrue))
             case BoolValue(value) => if value then (List(), List(IFTrue)) else (List(), List(IFFalse))
             case DefaultValue => (List(), List(IFFalse))
+
+            case IsType(left, typ) if Utils.typeof(Utils.simplify(left)) == context.getType(typ) => (List(), List(IFTrue))
+            case IsType(left, typ) => (List(), List(IFFalse))
+
             case NullValue => (List(), List(IFFalse))
             case LinkedFunctionValue(fct) => (List(), List(IFTrue))
             case SelectorValue(value) => (List(), List(IFValueCase(expr)))

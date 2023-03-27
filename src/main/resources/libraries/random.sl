@@ -39,3 +39,17 @@ lazy int next(){
     import standard.int as int
     return range(int.minValue, int.maxValue)
 }
+
+"""
+Return a random number between `x` (included) and `y` (excluded)
+"""
+lazy bool chance(float percent){
+    float a = range(0, 10000)
+    float b = percent*10000
+    if (a < b){
+        return true
+    }
+    else{
+        return false
+    }
+}

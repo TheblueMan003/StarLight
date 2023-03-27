@@ -26,7 +26,7 @@ object DataPackBuilder{
 
         val newSet = dirs.flatMap(dir => output.map(file => (dir + file.getPath(), file.getContents()))).toMap
         previous.filter(x => !newSet.contains(x._1)).foreach(x => {
-            Reporter.debug(f"Removing old file: ${x._1}")
+            //Reporter.debug(f"Removing old file: ${x._1}")
             FileUtils.deleteFile(x._1)
         }
         )

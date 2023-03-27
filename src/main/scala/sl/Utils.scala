@@ -166,6 +166,7 @@ object Utils{
             case TagValue(value) => instr
             case DefaultValue => DefaultValue
             case NullValue => NullValue
+            case IsType(value, typ) => IsType(subst(value, from, to), typ)
             case DotValue(left, right) => DotValue(subst(left, from, to), subst(right, from, to))
             case ArrayGetValue(name, index) => ArrayGetValue(subst(name, from, to), index.map(subst(_, from, to)))
             case VariableValue(name, sel) => VariableValue(name.replaceAllLiterally(from, to), sel)
@@ -260,6 +261,7 @@ object Utils{
             case LinkedFunctionValue(fct) => instr
             case DefaultValue => DefaultValue
             case NullValue => NullValue
+            case IsType(left, right) => IsType(subst(left, from, to), right)
             case ArrayGetValue(name, index) => ArrayGetValue(subst(name, from, to), index.map(subst(_, from, to)))
             case JsonValue(content) => JsonValue(subst(content, from, to))
             case VariableValue(name, sel) => VariableValue(name.toString().replaceAllLiterally(from, to), sel)
@@ -484,6 +486,7 @@ object Utils{
             case TagValue(value) => instr
             case DefaultValue => DefaultValue
             case NullValue => NullValue
+            case IsType(left, right) => IsType(fix(left), fix(right))
             case PositionValue(value) => instr
             case DotValue(left, right) => DotValue(fix(left), fix(right))
             case JsonValue(content) => JsonValue(fix(content))
@@ -551,6 +554,7 @@ object Utils{
             case LinkedFunctionValue(fct) => instr
             case PositionValue(value) => instr
             case TagValue(value) => instr
+            case IsType(left, right) => IsType(subst(left, from, to), right)
             case ArrayGetValue(name, index) => ArrayGetValue(subst(name, from, to), index.map(subst(_, from, to)))
             case DefaultValue => DefaultValue
             case NullValue => NullValue
@@ -638,6 +642,7 @@ object Utils{
             case NamespacedName(value) => MCObjectType
             case PositionValue(value) => MCPositionType
             case TagValue(value) => MCObjectType
+            case IsType(left, right) => BoolType
             case dot : DotValue => {
                 val (list, vari) = unpackDotValue(dot)
                 typeof(vari)
@@ -744,6 +749,9 @@ object Utils{
 
     def simplify(expr: Expression)(implicit context: Context): Expression = positioned(expr, {
         expr match
+            case IsType(left, typ) if Utils.typeof(simplify(left)) == context.getType(typ) =>BoolValue(true)
+            case IsType(left, typ) => BoolValue(false)
+
             case BinaryOperation("<" | "<=" | "==" | "!=" | ">=" | ">", left, right) => {
                 val op = expr.asInstanceOf[BinaryOperation].op
                 val nl = simplify(left)

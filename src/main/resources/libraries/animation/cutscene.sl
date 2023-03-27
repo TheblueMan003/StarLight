@@ -1,6 +1,5 @@
 package animation.Cutscene
 
-import utils.Process
 import mc.pointer as pointer
 import cmd.entity as entity
 import cmd.gamemode as gm
@@ -15,7 +14,7 @@ def private lazy teleportHere(){
 """
 Template for cutscene
 """
-template Cutscene extends Process{
+template Cutscene{
     entity entities
     lazy int buildScene = 0
     lazy bool _groupped = false
@@ -32,7 +31,6 @@ template Cutscene extends Process{
         entities = e
         init()
         with(e)gm.spectator()
-        start()
     }
     
     """

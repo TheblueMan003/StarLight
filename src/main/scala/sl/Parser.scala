@@ -18,7 +18,7 @@ object Parser extends StandardTokenParsers{
   lexical.delimiters ++= List("(", ")", "\\", ".", "..", ":", "=", "->", "{", "}", ",", "*", "[", "]", "/", "+", "-", "*", "/", "\\", "%", "&&", "||", "=>", ";",
                               "+=", "-=", "/=", "*=", "%=", "?=", ":=", "%", "@", "@e", "@a", "@s", "@r", "@p", "~", "^", "<=", "==", ">=", "<", ">", "!=", "%%%", "???", "$",
                               "!", "!=", "#", "<<", ">>", "&", "<<=", ">>=", "&=", "|=", "::")
-  lexical.reserved   ++= List("true", "false", "if", "then", "else", "return", "switch", "for", "do", "while", "by",
+  lexical.reserved   ++= List("true", "false", "if", "then", "else", "return", "switch", "for", "do", "while", "by", "is",
                               "as", "at", "with", "to", "import", "doc", "template", "null", "typedef", "foreach", "in", "not",
                               "def", "package", "struct", "enum", "class", "lazy", "jsonfile", "blocktag", "throw", "try", "catch", "finally",
                               "public", "protected", "private", "scoreboard", "forgenerate", "from", "rotated", "facing", "align",
@@ -295,7 +295,8 @@ object Parser extends StandardTokenParsers{
   def exprComp: Parser[Expression] = positioned(exprAdd ~ rep(comparator ~ exprComp) ^^ {unpack(_)})
   def exprNotIn: Parser[Expression] = positioned(exprComp ~ rep("not" ~> "in" ~> exprNotIn) ^^ {unpack("not in", _)})
   def exprIn: Parser[Expression] = positioned(exprNotIn ~ rep("in" ~> exprIn) ^^ {unpack("in", _)})
-  def exprShiftRight: Parser[Expression] = positioned(exprIn ~ rep(">>" ~> exprShiftRight) ^^ {unpack(">>", _)})
+  def exprIs: Parser[Expression] = positioned((exprIn ~ opt("is" ~ types)) ^^ {case e ~ Some(_ ~ t) => IsType(e, t);case e ~ None => e})
+  def exprShiftRight: Parser[Expression] = positioned(exprIs ~ rep(">>" ~> exprShiftRight) ^^ {unpack(">>", _)})
   def exprShiftLeft: Parser[Expression] = positioned(exprShiftRight ~ rep("<<" ~> exprShiftLeft) ^^ {unpack("<<", _)})
   def exprBitwiseAnd: Parser[Expression] = positioned(exprShiftLeft ~ rep("&" ~> exprBitwiseAnd) ^^ {unpack("&", _)})
   def exprBitwiseOr: Parser[Expression] = positioned(exprBitwiseAnd ~ rep("|" ~> exprBitwiseOr) ^^ {unpack("|", _)})

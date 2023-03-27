@@ -825,6 +825,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 							case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()} at \n${expr.pos.longString}")
 					}
 					case IntValue(0) => List()
+					case IntValue(1) => tupleVari.flatMap(t => t.assign(op, BoolValue(false)))
 					case SelectorValue(value) => {
 						// Remove copy fields
 						tupleVari.zip(List(BoolValue(value.isPlayer))).flatMap((t, v) => t.assign("&=", v)) ::: 

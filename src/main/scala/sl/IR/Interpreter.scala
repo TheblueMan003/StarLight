@@ -119,6 +119,7 @@ class Interpreter(var files: List[IRFile]){
                 println(context.shift + "/" + statement)
             }
             case EmptyIR => ()
+            case e: IRExecute if debug => run(e.getStatements)(context)
             case _ => throw new Exception("Unknown instruction: " + ir)
         }
     }

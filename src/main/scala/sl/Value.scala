@@ -299,6 +299,14 @@ case class UnaryOperation(val op: String, val left: Expression) extends Expressi
     override def getString()(implicit context: Context): String = f"($op ${left.getString()})"
 }
 
+case class IsType(val left: Expression, val right: Type) extends Expression{
+    override def toString(): String = f"($left is $right)"
+    override def getIntValue(): Int = ???
+    override def hasIntValue(): Boolean = false
+    override def hasFloatValue(): Boolean = false
+    override def getFloatValue(): Double = ???
+    override def getString()(implicit context: Context): String = f"(${left.getString()} is ${right})"
+}
 
 case class JsonValue(val content: JSONElement) extends Expression{
     override def toString(): String = f"$content"

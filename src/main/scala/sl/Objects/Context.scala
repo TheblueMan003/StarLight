@@ -11,6 +11,7 @@ import sl.Compilation.Selector.Selector
 import sl.NullValue
 import sl.Compiler
 import sl.IR.*
+import scala.util.matching.Regex
 
 object Context{
     def getNew(name: String):Context = {
@@ -175,7 +176,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
         val mod = Modifier.newPrivate()
         mod.isLazy = isLazy
         mod.addAtrribute("compileAtCall", BoolValue(true))
-        val fct = if isLazy then LazyFunction(this, name, args, output, mod, instr) else ConcreteFunction(this, name, args, output, mod, instr, true)
+        val fct = if isLazy then LazyFunction(this, getPath()+"."+name, name, args, output, mod, instr) else ConcreteFunction(this, getPath()+"."+name, name, args, output, mod, instr, true)
         fct.generateArgument()(this)
         addFunction(name, fct)
         fct
@@ -184,7 +185,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
         val r = fctCtx
         r.synchronized{
             r.varId += 1
-            val fct = BlockFunction(r, r.varId.toString(), List(), content)
+            val fct = BlockFunction(r, r.getPath()+"."+r.varId.toString(), r.varId.toString(), List(), content)
             r.addFunction(r.varId.toString(), fct)
             fct
         }
@@ -198,7 +199,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
     def getNamedBlock(name: String, content: List[IRTree]): Function = {
         val name2 = getFunctionWorkingName(name)
         synchronized{
-            addFunction(name, BlockFunction(this, name2, List(), content))
+            addFunction(name, BlockFunction(this, getPath()+"."+name2, name2, List(), content))
         }
     }
     def getFreshFunctionIdentifier(): Identifier = {
@@ -350,6 +351,13 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
     def getCurrentTemplateUse():String={
         if templateUse == null && parent != null then parent.getCurrentTemplateUse() else templateUse
     }
+    def getCurrentParentTemplateUse()(implicit count: Int):String={
+        if count == 0 then getCurrentTemplateUse() else {
+            if templateUse != null && parent != null then parent.getCurrentParentTemplateUse()(count-1) else
+            if parent != null then parent.getCurrentParentTemplateUse() else
+            null
+        }
+    }
     def setLazyCall()={
         inLazyCall = true
     }
@@ -483,7 +491,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
                               .sortBy(_._1)
                               .head._2
                               .map(_._2)
-                              .sortBy(f => -f.fullName.length)
+                              .sortBy(f => -f.contextName.length)
                               .head
 
             ret
@@ -508,7 +516,11 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
     }
     def mapFunctionTag(tag: Identifier): Identifier = {
         if (tag.head() == "@templates" && getCurrentTemplateUse() != null) {
-            Identifier(getCurrentTemplateUse() :: tag.drop().values)
+            val parentCount = tag.drop().values.count(_ == "parent")
+            val dropped = tag.drop(parentCount + 1)
+            val parent = getCurrentParentTemplateUse()(parentCount)
+            if (parent == null) tag else
+            Identifier("@"+parent :: dropped.values)
         }
         else {
             tag
@@ -518,7 +530,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
         tagCtx.synchronized{
             if (!tagCtx.functionTags.contains(tag)){
                 val name = tagCtx.getLazyCallId()
-                val fct = new TagFunction(tagCtx, name, args)
+                val fct = new TagFunction(tagCtx, tagCtx.getPath()+"."+name, name, args)
                 tagCtx.functionTags.addOne(tag, fct)
                 tagCtx.addFunction(name, fct)
             }
@@ -564,7 +576,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
         if (!muxCtx.mux.contains(key)){
             val name = source.map(_.getName()).reduceOption(_ + "___"+ _).getOrElse("void") + "___to___" + output.getName()
             var args = sl.Argument(f"__fct__", IntType, None) :: source.filter(_ != VoidType).zipWithIndex.map((t, i) => sl.Argument(f"a_$i", t, None))
-            val muxFct = new MultiplexFunction(muxCtx, name, args, output)
+            val muxFct = new MultiplexFunction(muxCtx, muxCtx.getPath()+"."+name, name, args, output)
             muxFct.generateArgument()(muxCtx)
             muxCtx.addFunction(name, muxFct)
             muxCtx.mux.addOne(key, muxFct)

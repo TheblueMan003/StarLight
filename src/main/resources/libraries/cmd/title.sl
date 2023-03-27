@@ -24,6 +24,14 @@ def reset(){
 }
 
 """
+Clear the title and subtitle
+"""
+def lazy clear(){
+    force("")
+    showSubtitle("")
+}
+
+"""
 Show text in the title
 """
 def lazy force(rawjson $text){

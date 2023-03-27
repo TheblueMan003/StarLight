@@ -44,3 +44,11 @@ Lock Player in place
 def lazy lockPosition(mcposition pos=~~~){
     at(pos)as(@s[distance=0.1..,gamemode=!creative])./tp @s ~ ~ ~
 }
+
+def lazy observe(int value, void=>void fct){
+    int tmp
+    if (value != tmp){
+        tmp = value
+        fct()
+    }
+}

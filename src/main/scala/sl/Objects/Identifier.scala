@@ -16,6 +16,9 @@ case class Identifier(values: List[String]) {
     def drop(): Identifier = {
         Identifier(values.tail)
     }
+    def drop(n: Int): Identifier = {
+        Identifier(values.drop(n))
+    }
     def size(): Int = {
         values.size
     }

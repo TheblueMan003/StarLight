@@ -35,11 +35,11 @@ object Function {
     }
   }
 }
-abstract class Function(context: Context, name: String, val arguments: List[Argument], typ: Type, _modifier: Modifier) extends CObject(context, name, _modifier) with Typed(typ){
+abstract class Function(context: Context, val contextName: String, name: String, val arguments: List[Argument], typ: Type, _modifier: Modifier) extends CObject(context, name, _modifier) with Typed(typ){
     val parentFunction = context.getCurrentFunction()
     val parentVariable = context.getCurrentVariable()
     val parentClass = context.getCurrentClass()
-    override lazy val fullName: String = if (context.isInLazyCall() || parentFunction != null || parentVariable != null || modifiers.protection==Protection.Private || Settings.obfuscate) then context.fctCtx.getFreshId()else context.getPath() + "." + name
+    override lazy val fullName: String = if (context.isInLazyCall() || parentFunction != null || parentVariable != null || modifiers.protection==Protection.Private || Settings.obfuscate) then context.fctCtx.getFreshId() else context.getPath() + "." + name
     val minArgCount = getMinArgCount(arguments)
     val maxArgCount = getMaxArgCount(arguments)
     var argumentsVariables: List[Variable] = List()
@@ -135,7 +135,7 @@ abstract class Function(context: Context, name: String, val arguments: List[Argu
     }
 }
 
-class ConcreteFunction(context: Context, name: String, arguments: List[Argument], typ: Type, _modifier: Modifier, val body: Instruction, topLevel: Boolean) extends Function(context, name, arguments, typ, _modifier){
+class ConcreteFunction(context: Context, _contextName: String, name: String, arguments: List[Argument], typ: Type, _modifier: Modifier, val body: Instruction, topLevel: Boolean) extends Function(context, _contextName, name, arguments, typ, _modifier){
     private var _needCompiling = topLevel || Settings.allFunction
     private var wasCompiled = false
     
@@ -209,7 +209,7 @@ class ConcreteFunction(context: Context, name: String, arguments: List[Argument]
     }
 }
 
-class BlockFunction(context: Context, name: String, arguments: List[Argument], var body: List[IRTree]) extends Function(context, name, arguments, VoidType, Modifier.newPrivate()){
+class BlockFunction(context: Context, _contextName: String, name: String, arguments: List[Argument], var body: List[IRTree]) extends Function(context, _contextName, name, arguments, VoidType, Modifier.newPrivate()){
     def call(args2: List[Expression], ret: Variable = null, op: String = "=")(implicit ctx: Context): List[IRTree] = {
         argMap(args2).flatMap(p => p._1.assign("=", p._2)) :::
             List(BlockCall(Settings.target.getFunctionName(fullName), fullName))
@@ -224,7 +224,7 @@ class BlockFunction(context: Context, name: String, arguments: List[Argument], v
     }
 }
 
-class LazyFunction(context: Context, name: String, arguments: List[Argument], typ: Type, _modifier: Modifier, val body: Instruction) extends Function(context, name, arguments, typ, _modifier){
+class LazyFunction(context: Context, _contextName: String, name: String, arguments: List[Argument], typ: Type, _modifier: Modifier, val body: Instruction) extends Function(context, _contextName, name, arguments, typ, _modifier){
     def call(args: List[Expression], ret: Variable = null, op: String = "=")(implicit ctx: Context): List[IRTree] = {
         var block = body
         val sub = ctx.push(ctx.getLazyCallId())
@@ -240,7 +240,7 @@ class LazyFunction(context: Context, name: String, arguments: List[Argument], ty
 
         if (ret != null) sub.addVariable("_ret", ret)
         if (ret == null){
-            sub.addVariable("_ret", new Variable(sub, "_ret", VoidType, Modifier.newPrivate()))
+            sub.addVariable("_ret", new Variable(sub, "_ret", typ, Modifier.newPrivate()))
             sl.Compiler.compile(block)(if modifiers.hasAttributes("inline") then ctx else sub)
         }
         else if (op == "="){
@@ -264,7 +264,7 @@ class LazyFunction(context: Context, name: String, arguments: List[Argument], ty
     def getName(): String = Settings.target.getFunctionPath(fullName)
 }
 
-class MultiplexFunction(context: Context, name: String, arguments: List[Argument], typ: Type) extends ConcreteFunction(context, name, arguments, typ, objects.Modifier.newPrivate(), sl.InstructionList(List()), false){
+class MultiplexFunction(context: Context, _contextName: String, name: String, arguments: List[Argument], typ: Type) extends ConcreteFunction(context, _contextName, name, arguments, typ, objects.Modifier.newPrivate(), sl.InstructionList(List()), false){
     private val functions = mutable.ListBuffer[ConcreteFunction]()
     override def needCompiling():Boolean = {
         false
@@ -291,7 +291,7 @@ class MultiplexFunction(context: Context, name: String, arguments: List[Argument
     }
 }
 
-class TagFunction(context: Context, name: String, arguments: List[Argument]) extends ConcreteFunction(context, name, arguments, VoidType, objects.Modifier.newPrivate(), sl.InstructionList(List()), false){
+class TagFunction(context: Context, _contextName: String, name: String, arguments: List[Argument]) extends ConcreteFunction(context, _contextName, name, arguments, VoidType, objects.Modifier.newPrivate(), sl.InstructionList(List()), false){
     private val functions = mutable.Set[Function]()
     override def needCompiling():Boolean = {
         false
@@ -308,7 +308,7 @@ class TagFunction(context: Context, name: String, arguments: List[Argument]) ext
     }
 
     def getCompilerFunctionsName(): List[String] = {
-        functions.map(fct => fct.fullName).toList
+        functions.map(fct => fct.contextName).toList
     }
 
 
@@ -334,7 +334,7 @@ class TagFunction(context: Context, name: String, arguments: List[Argument]) ext
     }
 }
 
-class ClassFunction(variable: Variable, function: Function) extends Function(function.context, function.name, function.arguments, function.getType(), function.modifiers){
+class ClassFunction(_contextName: String, variable: Variable, function: Function) extends Function(function.context, _contextName, function.name, function.arguments, function.getType(), function.modifiers){
     override def exists()= false
 
     override def getContent(): List[IRTree] = List()
@@ -373,7 +373,7 @@ class ClassFunction(variable: Variable, function: Function) extends Function(fun
 }
 
 
-class CompilerFunction(context: Context, name: String, arguments: List[Argument], typ: Type, _modifier: Modifier, val body: (List[Expression], Context)=>(List[IRTree],Expression)) extends Function(context, name, arguments, typ, _modifier){
+class CompilerFunction(context: Context, name: String, arguments: List[Argument], typ: Type, _modifier: Modifier, val body: (List[Expression], Context)=>(List[IRTree],Expression)) extends Function(context, context.getPath()+"."+name, name, arguments, typ, _modifier){
     generateArgument()(context.push(name, this))
     argumentsVariables.foreach(_.modifiers.isLazy = true)
     override def exists()= false
@@ -394,7 +394,7 @@ class CompilerFunction(context: Context, name: String, arguments: List[Argument]
     override def canBeCallAtCompileTime: Boolean = true
 }
 
-class GenericFunction(context: Context, name: String, arguments: List[Argument], val generics: List[String], val typ: Type, _modifier: Modifier, val body: Instruction) extends Function(context, name, arguments, typ, _modifier){
+class GenericFunction(context: Context, _contextName: String, name: String, arguments: List[Argument], val generics: List[String], val typ: Type, _modifier: Modifier, val body: Instruction) extends Function(context, _contextName, name, arguments, typ, _modifier){
     var implemented = mutable.Map[List[Type], Function]() 
 
     override def exists()= false

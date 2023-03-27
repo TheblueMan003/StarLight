@@ -65,6 +65,14 @@ class Modifier() extends Serializable{
             case other => Utils.simplify(other)(context).toString()
     }
 
+    def getAttributesFloat(key: String, default: ()=>Double)(implicit context: Context): Double = {
+        attributes.getOrElse(key, null) match
+            case null => default()
+            case FloatValue(value) => value
+            case IntValue(value) => value.toDouble
+            case other => ???
+    }
+
     def hasAttributes(key: String)(implicit context: Context): Boolean = {
         attributes.getOrElse(key, BoolValue(false)) match
             case BoolValue(value) => value
