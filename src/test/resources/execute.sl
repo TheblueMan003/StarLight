@@ -1,3 +1,5 @@
+import test
+
 align("xyz")./say hi
 rotated(0,0)./say hi
 rotated(@p)./say hi

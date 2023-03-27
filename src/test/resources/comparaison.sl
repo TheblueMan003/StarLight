@@ -1,3 +1,5 @@
+import test
+
 def intComparaison(){
     int a
     int b

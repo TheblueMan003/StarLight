@@ -42,6 +42,18 @@ class BlockReduce(var files: List[IRFile]){
                         case None => (println("error: " + fullName + " not found in " + parent.getName()))
                     }
                 }
+                case ScheduleCall(function, fullName, time) => {
+                    map.get(fullName) match {
+                        case Some(file) => file.addCalledBy(parent.getName())
+                        case None => (println("error: " + fullName + " not found in " + parent.getName()))
+                    }
+                }
+                case ScheduleClear(function, fullName) => {
+                    map.get(fullName) match {
+                        case Some(file) => file.addCalledBy(parent.getName())
+                        case None => (println("error: " + fullName + " not found in " + parent.getName()))
+                    }
+                }
                 case e: IRExecute => apply(e.getStatements)
                 case _ => ()
             }

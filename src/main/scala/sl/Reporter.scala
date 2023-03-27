@@ -4,6 +4,7 @@ import Console._
 
 object Reporter{
     var debugEnabled = false
+    var errorThrow = false
 
     def ok(value: String) = {
         println(f"[${Console.GREEN}success${Console.WHITE}] ${value}")
@@ -27,6 +28,9 @@ object Reporter{
         if (value != null){
             val text=value.replace("\n",f"\n[${Console.RED}error${Console.WHITE}] ")
             println(f"[${Console.RED}error${Console.WHITE}] ${text}")
+        }
+        if (errorThrow){
+            throw new Exception("Error: "+value)
         }
     }
 }

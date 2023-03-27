@@ -28,6 +28,7 @@ template Test extends Process{
             }
             else{
                 standard.print(("[FAILLED] ","red"),"$name")
+                Compiler.interpreterException("Test failled: $name")
                 __fail__ ++
             }
             __total__ ++

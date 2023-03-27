@@ -241,3 +241,12 @@ case class ScoreboardReset(target: SBLink) extends IRTree{
 case class BlockCall(function: String, fullName: String) extends IRTree{
     def getString(): String = s"function $function"
 }
+case class ScheduleCall(function: String, fullName: String, time: Int) extends IRTree{
+    def getString(): String = s"schedule function $function $time append"
+}
+case class ScheduleClear(function: String, fullName: String) extends IRTree{
+    def getString(): String = s"schedule clear $function"
+}
+case class InterpreterException(message: String) extends IRTree{
+    def getString(): String = s""
+}
