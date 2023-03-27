@@ -33,7 +33,7 @@ class Tag(context: Context, _name: String, _modifier: Modifier, _content: List[E
         foreach(block in $name)
             if (block(block))_ret = true
         """)
-        val fct = ConcreteFunction(sub, "test", List(), BoolType, mod, body, true)
+        val fct = ConcreteFunction(sub, sub.getPath() + ".test", "test", List(), BoolType, mod, body, true)
         sub.addFunction("test", fct)
         fct.generateArgument()(context)
         fct
