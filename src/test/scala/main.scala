@@ -42,7 +42,7 @@ class ListFunSuite extends AnyFlatSpec with should.Matchers with BeforeAndAfterA
             Settings.optimize = false
             FileUtils.deleteDirectory("./bin")
             sl.Reporter.errorThrow = true
-            sl.Main.main(Array("test", "-i", f, "-o", "./test_env/world/datapacks/test/"))
+            sl.Main.main(Array("testScala", "-i", f, "-o", "./test_env/world/datapacks/test/"))
         }
     })
     testFiles.foreach(f => {
@@ -55,7 +55,7 @@ class ListFunSuite extends AnyFlatSpec with should.Matchers with BeforeAndAfterA
             Settings.optimizeVariableLocal = true
             FileUtils.deleteDirectory("./bin")
             sl.Reporter.errorThrow = true
-            sl.Main.main(Array("test", "-i", f, "-o", "./test_env/world/datapacks/test/"))
+            sl.Main.main(Array("testScala", "-i", f, "-o", "./test_env/world/datapacks/test/"))
         }
     })
 }

@@ -65,6 +65,17 @@ object Main{
               Reporter.error(f"Expected 1 argument got: ${args.length-1}")
             }
             else{
+              lastBuild = args(1)+".slconf"
+              build(args(1)+".slconf")
+              test()
+              Reporter.ok("Test Completed!")
+            }
+          }
+          case "testScala" => {
+            if (args.length < 1) then {
+              Reporter.error(f"Expected 1 argument got: ${args.length-1}")
+            }
+            else{
               compile(args.drop(1))
               test()
               Reporter.ok("Test Completed!")
