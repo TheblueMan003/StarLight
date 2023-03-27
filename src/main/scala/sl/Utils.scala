@@ -13,6 +13,10 @@ import sl.IR.*
 
 
 object Utils{
+    val libaries = sl.files.FileUtils.getListOfFiles("./src/main/resources/libraries")
+            .map(f => f.replace("\\","/").replace("./src/main/resources/libraries/",""))
+            .map(f => (f.toLowerCase -> f))
+            .toMap
     def getFile(path: String): String = {
         val source = scala.io.Source.fromFile(path)
         source.getLines mkString "\n"
@@ -21,10 +25,15 @@ object Utils{
         val source = scala.io.Source.fromFile(path)
         source.getLines.toList
     }
+    def getLibPath(path: String)={
+        libaries.get(path.toLowerCase) match
+            case Some(p) => p
+            case None => path
+    }
     def getLib(path: String): Option[Instruction] = {
         val cpath = path.replace(".","/")
         val ipath = path.replace("/",".").replace("\\",".")
-        Some(Parser.parseFromFile("libraries/"+path, ()=>Source.fromResource("libraries/"+cpath+".sl").getLines.reduce((x,y) => x + "\n" +y)))
+        Some(Parser.parseFromFile("libraries/"+path, ()=>Source.fromResource("libraries/"+getLibPath(cpath+".sl")).getLines.reduce((x,y) => x + "\n" +y)))
     }
     def getConfig(path: String): List[String] = {
         val projectFile = new File("./configs/"+path)

@@ -512,7 +512,13 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
         val fcts = getElementList(_.functions)(identifier)
         if (fcts.size == 0) throw new ObjectNotFoundException(f"Unknown function: $identifier in context: $path")
         if (fcts.size == 1) return fcts.head
-        throw new Exception(f"Ambiguity for function: $identifier in context: $path ${fcts.map(_.prototype())}")
+        val minArg = fcts.map(_.minArgCount).min
+        val maxArg = fcts.map(_.maxArgCount).max
+        val minArg2 = fcts.map(_.minArgCount).max
+        val maxArg2 = fcts.map(_.maxArgCount).min
+        if (minArg != minArg2 || maxArg != maxArg2) throw new ObjectNotFoundException(f"Ambiguity for function: $identifier in context: $path ${fcts.map(_.prototype())}")
+        val ret = fcts.sortBy(f => -f.contextName.length).head
+        ret
     }
     def mapFunctionTag(tag: Identifier): Identifier = {
         if (tag.head() == "@templates" && getCurrentTemplateUse() != null) {
