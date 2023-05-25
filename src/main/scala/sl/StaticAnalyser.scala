@@ -35,7 +35,10 @@ object StaticAnalyser{
             case If(cond, ifBlock, elseBlock) => If(cond, check(ifBlock), elseBlock.map(e => ElseIf(e.cond, check(e.ifBlock))))
             case WhileLoop(cond, block) => WhileLoop(cond, check(block))
             case DoWhileLoop(cond, block) => DoWhileLoop(cond, check(block))
-            case Switch(value, cases, _) => Switch(value, cases.map(c => SwitchCase(c.expr, check(c.instr))))
+            case Switch(value, cases, _) => Switch(value, cases.map{case x: SwitchCase => SwitchCase(x.expr, check(x.instr));
+                                                                    case x: SwitchForGenerate => SwitchForGenerate(x.key, x.provider, SwitchCase(x.instr.expr, check(x.instr.instr)));
+                                                                    case x: SwitchForEach => SwitchForEach(x.key, x.provider, SwitchCase(x.instr.expr, check(x.instr.instr)));
+                                                                    })
             case Execute(typ, exprs, block) => Execute(typ, exprs, check(block))
             case With(expr, isat, cond, block) => With(expr, isat, cond, check(block))
             case Try(block, except, finallyBlock) => Try(check(block), check(except), check(finallyBlock))
@@ -79,7 +82,10 @@ object StaticAnalyser{
                 }
             case WhileLoop(cond, block) => hasReturn(block)
             case DoWhileLoop(cond, block) => hasReturn(block)
-            case Switch(value, cases, _) => cases.map(c => hasReturn(c.instr)).foldLeft(ReturnState.None)(ReturnState.combine)
+            case Switch(value, cases, _) => cases.map{case x: SwitchCase => hasReturn(x.instr);
+                                                    case x: SwitchForGenerate => hasReturn(x.instr.instr);
+                                                    case x: SwitchForEach => hasReturn(x.instr.instr);
+                                                    }.foldLeft(ReturnState.None)(ReturnState.combine)
             case Execute(typ, exprs, block) => hasReturn(block)
             case With(expr, isat, cond, block) => hasReturn(block)
             case ForEach(key, provider, instr) => hasReturn(instr)
@@ -103,7 +109,10 @@ object StaticAnalyser{
                     case _ => DoWhileLoop(BinaryOperation("&&", cond, getComparaison("__hasFunctionReturned__", IntValue(0))), returnOne(block))
             }
             case Switch(value, cases, default) => {
-                val newCases = cases.map(c => SwitchCase(c.expr, returnOne(c.instr)))
+                val newCases = cases.map{case x: SwitchCase => SwitchCase(x.expr, InstructionList(returnOnce(List(x.instr))));
+                                        case x: SwitchForGenerate => SwitchForGenerate(x.key, x.provider, SwitchCase(x.instr.expr, InstructionList(returnOnce(List(x.instr.instr)))));
+                                        case x: SwitchForEach => SwitchForEach(x.key, x.provider, SwitchCase(x.instr.expr, InstructionList(returnOnce(List(x.instr.instr)))));
+                                        }
                 Switch(value, newCases, default)
             }
             case Execute(typ, exprs, block) => Execute(typ, exprs, returnOne(block))

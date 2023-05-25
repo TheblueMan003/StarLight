@@ -86,7 +86,15 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
             false
         }
     }
-
+    def getObjects():List[String]={
+        if (this == root){
+            child.flatMap(_._2.getObjects()).toList
+        }
+        else{
+            functions.keys.map(n => name+";"+n+"()").toList :::
+                child.flatMap(c => c._2.functions.keys.map(n => name+";"+c._1+"."+n+"()")).toList
+        }
+    }
     def addFunctionToCompile(fct: ConcreteFunction) = {
         val r = root
         r.synchronized{
@@ -401,15 +409,20 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
             push(iden.head()).addVariable(iden.drop(), variable)
         }
     }
-    def getScoreboardID(variable: Variable): Int = {
-        val r = root
-        r.synchronized{
-            var hash = scala.util.hashing.MurmurHash3.stringHash(variable.fullName)
-            while (r.scoreboardIDs.contains(hash)){
-                hash += 1
+    def getScoreboardID(variable: Variable): String = {
+        if (Settings.hashedScoreboard){
+            val r = root
+            r.synchronized{
+                var hash = scala.util.hashing.MurmurHash3.stringHash(variable.fullName)
+                while (r.scoreboardIDs.contains(hash)){
+                    hash += 1
+                }
+                r.scoreboardIDs.add(hash)
+                "s"+hash.toString()
             }
-            r.scoreboardIDs.add(hash)
-            hash
+        }
+        else{
+            variable.fullName
         }
     }
     def getAllVariable(set: mutable.Set[Context] = mutable.Set()):List[Variable] = {
@@ -912,9 +925,9 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
             case Some(value) => {
                 if (value.isInstanceOf[CObject]) then{
                     val obj = value.asInstanceOf[CObject]
-                    if (obj.modifiers.protection == Protection.Private && !isChildOf(value.asInstanceOf[CObject].context)){
+                    /*if (obj.modifiers.protection == Protection.Private && !isChildOf(value.asInstanceOf[CObject].context)){
                         throw new Exception(f"Cannot access private object: $identifier")
-                    }
+                    }*/
                     Some(value)
                 }
                 Some(value)

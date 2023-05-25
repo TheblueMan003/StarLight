@@ -1,6 +1,7 @@
 package sl.IR
 
 trait IRTree{
+    var canBeDeleted = false
     def getString(): String
 }
 trait IRExecute extends IRTree{
@@ -18,6 +19,7 @@ case class JsonIR(json: String) extends IRTree{
 
 case class SBLink(entity: String, objective: String) extends IRTree{
     def getString(): String = s"$entity $objective"
+    def getStorage(): String = s"${objective.replaceFirst("\\.",":")} $entity"
     override def toString(): String = getString()
 
     def getKey()(implicit context: IRContext) = {
@@ -230,6 +232,25 @@ case class ScoreboardSet(target: SBLink, value: Int) extends IRTree{
 }
 case class ScoreboardAdd(target: SBLink, value: Int) extends IRTree{
     def getString(): String = s"scoreboard players add $target $value"
+}
+case class StringSet(target: SBLink, value: String) extends IRTree{
+    def getString(): String = s"data modify storage ${target.getStorage()} set value $value"
+}
+case class StringCopy(target: SBLink, value: SBLink, start: Int = Int.MinValue, end: Int = Int.MaxValue) extends IRTree{
+    def getString(): String = {
+        if (start == Int.MinValue && end == Int.MaxValue){
+            s"data modify storage ${target.getStorage()} set string storage ${value.getStorage()}"    
+        }
+        else if (end == Int.MaxValue){
+            s"data modify storage ${target.getStorage()} set string storage ${value.getStorage()} $start"
+        }
+        else if (start == Int.MinValue){
+            s"data modify storage ${target.getStorage()} set string storage ${value.getStorage()} 0 $end"
+        }
+        else{
+            s"data modify storage ${target.getStorage()}set string storage ${value.getStorage()} $start $end"
+        }
+    }
 }
 case class ScoreboardRemove(target: SBLink, value: Int) extends IRTree{
     def getString(): String = s"scoreboard players remove $target $value"

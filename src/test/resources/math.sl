@@ -88,3 +88,33 @@ Test sqrt3{
         }
     }
 }
+
+
+Test bitwise_and{
+    bool getResult(){
+        int a = 13
+        int b = 6
+        b &= a
+        if (b == 4){
+            return true
+        }
+        else{
+            return false
+        }
+    }
+}
+
+
+Test bitwise_or{
+    bool getResult(){
+        int a = 13
+        int b = 6
+        b |= a
+        if (b == 15){
+            return true
+        }
+        else{
+            return false
+        }
+    }
+}

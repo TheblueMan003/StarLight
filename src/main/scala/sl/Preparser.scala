@@ -46,8 +46,9 @@ object Preparser{
         }
 
         paternsToReplace.foreach(p => text2 = text2.replaceAllLiterally(p._1, p._2))
-
-        Reporter.ok(f"Preparsed: $name")
+        if (name != ""){
+            Reporter.ok(f"Preparsed: $name")
+        }
         
         text2.replaceAll("\"\"\"([^\"]*)\"\"\"", "").replaceAllLiterally("\\\"","◘")
     }

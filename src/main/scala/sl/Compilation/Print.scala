@@ -4,7 +4,7 @@ import sl.Compilation.Selector.Selector
 import objects.{Variable, Context}
 import sl.Utils
 import sl.*
-import objects.types.EntityType
+import objects.types.*
 import sl.IR.*
 
 private lazy val colorMap = Utils.getConfig("color.csv")
@@ -50,7 +50,11 @@ object Print{
                         ???
                     }
             }
-            case ArrayGetValue(name, index) => ???
+            case ArrayGetValue(name, index) => {
+                val (p1, vari) = Utils.simplifyToVariable(expr)
+                val (p2, print) = toRawJson(vari)
+                (p1:::p2, print)
+            }
             case LinkedVariableValue(vari, sel) => {
                 if (vari.modifiers.isLazy){
                     toRawJson(vari.lazyValue)
@@ -58,6 +62,19 @@ object Print{
                 else{
                     ctx.addScoreboardUsedForce(vari.getIRSelector())
                     vari.getType() match
+                        case ArrayType(inner, size) => {
+                            val (p1, print) = vari.tupleVari.map(v => toRawJson(LinkedVariableValue(v), false)(ctx))
+                            .reduce((a,b) => 
+                                (a._1:::b._1, a._2::: List(PrintString(f",", col, mod)) :::b._2))
+                            (p1, List(PrintString(f"[", col, mod)) ::: print ::: List(PrintString(f"]", col, mod)))
+                        }
+                        case TupleType(inner) => {
+                            val (p1, print) = vari.tupleVari.map(v => toRawJson(LinkedVariableValue(v), false)(ctx))
+                            .reduce((a,b) => 
+                                (a._1:::b._1, a._2::: List(PrintString(f",", col, mod)) :::b._2))
+                            (p1, List(PrintString(f"(", col, mod)) ::: print ::: List(PrintString(f")", col, mod)))
+                        }
+                        case StringType => (List(), List(PrintNBT(vari, col, mod)))
                         case EntityType => (List(), List(PrintSelector(vari.getEntityVariableSelector(), col, mod)))
                         case other => (List(), List(PrintVariable(vari, sel, col, mod)))
                 }
@@ -208,6 +225,16 @@ case class PrintSelector(val selector: Selector, val color: PrintColor, val modi
         f"{\"selector\": \"${selector.getString()}\", ${modifier.toJava()}, ${color.toJava()}}"
     def toBedrock()(implicit ctx: Context): String = {
         f"{\"selector\":\"${selector.getString()}\"}"
+    }
+    def getLength()(implicit ctx: Context): Int = 1
+    def sub(size: Int)(implicit ctx: Context): Printable = 
+        if (size >= 1) this else PrintString("", color, modifier)
+}
+case class PrintNBT(val vari: Variable, val color: PrintColor, val modifier: TextModdifier) extends Printable{
+    def toJava()(implicit ctx: Context): String = 
+        f"{\"nbt\": \"${vari.getSelectorName()}\", \"storage\":\"${vari.getSelectorObjective().replaceFirst("\\.",":")}\",${modifier.toJava()}, ${color.toJava()}}"
+    def toBedrock()(implicit ctx: Context): String = {
+        ???
     }
     def getLength()(implicit ctx: Context): Int = 1
     def sub(size: Int)(implicit ctx: Context): Printable = 

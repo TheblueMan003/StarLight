@@ -11,6 +11,7 @@ import objects.types.BoolType
 import sl.Compilation.Selector.*
 import scala.collection.parallel.CollectionConverters._
 import sl.IR.*
+import objects.Modifier
 
 object Execute{
     def ifs(ifb: If)(implicit context: Context): List[IRTree] = {
@@ -43,7 +44,7 @@ object Execute{
             }
 
             if (exp._2.length == 1 && exp._2.head == IFTrue && !multi){
-                content = content ::: sl.Compiler.compile(inner)
+                content = content ::: sl.Compiler.compile(inner.unBlockify())
                 return content
             }
             else if (exp._2.head == IFFalse){
@@ -353,6 +354,23 @@ object Execute{
                     checkComparaisonError(right.getType(), Utils.typeof(left), expr)
                     (List(), List(IFValueCase(expr)))
 
+
+            case BinaryOperation("==", LinkedVariableValue(left, sel), NullValue) 
+                if left.getType().isDirectEqualitable() => 
+                    (List(), List(IFNotValueCase(IFValueCase(BinaryOperation("==", LinkedVariableValue(left, sel), LinkedVariableValue(left, sel))))))
+
+            case BinaryOperation("!=", LinkedVariableValue(left, sel), NullValue) 
+                if left.getType().isDirectEqualitable() => 
+                    (List(), List(IFValueCase(BinaryOperation("==", LinkedVariableValue(left, sel), LinkedVariableValue(left, sel)))))
+
+            case BinaryOperation("==", NullValue, LinkedVariableValue(left, sel)) 
+                if left.getType().isDirectEqualitable() => 
+                    (List(), List(IFNotValueCase(IFValueCase(BinaryOperation("==", LinkedVariableValue(left, sel), LinkedVariableValue(left, sel))))))
+
+            case BinaryOperation("!=", NullValue, LinkedVariableValue(left, sel)) 
+                if left.getType().isDirectEqualitable() => 
+                    (List(), List(IFValueCase(BinaryOperation("==", LinkedVariableValue(left, sel), LinkedVariableValue(left, sel)))))
+
             // Special Case for class
             case BinaryOperation("==" | "!=", LinkedVariableValue(left, sel), LinkedVariableValue(right, sel2)) 
                 if left.getType().isDirectEqualitable() && right.name == "__ref" => 
@@ -606,12 +624,41 @@ object Execute{
             throw e
         }
     }
-
+    def flattenSwitchCase(ori: List[SwitchElement])(implicit context: Context) = {
+        ori.flatMap(c => 
+            c match{
+                case SwitchCase(expr, instr) => List(SwitchCase(expr, instr))
+                case SwitchForGenerate(key, provider, SwitchCase(expr, instr)) => {
+                    val gcases = Utils.getForgenerateCases(key, provider)
+                    
+                    gcases.map(lst => lst.sortBy(0 - _._1.length()).foldLeft(SwitchCase(expr, instr))
+                        {case (SwitchCase(expr, instr), elm) => 
+                            SwitchCase(Utils.subst(expr, elm._1, elm._2), Utils.subst(instr, elm._1, elm._2))}
+                    ).toList
+                }
+                case SwitchForEach(key, provider, SwitchCase(expr, instr)) => {
+                    val cases = Utils.getForeachCases(key.toString(), provider)
+                    
+                    cases.flatMap(v =>{
+                        val ctx = context.getFreshContext()
+                        v.map(v => {
+                            val mod = Modifier.newPrivate()
+                            mod.isLazy = true
+                            val vari = new Variable(ctx, "dummy", Utils.typeof(v._2), mod)
+                            ctx.addVariable(Identifier.fromString(v._1), vari)
+                            vari.assign("=", v._2)
+                            SwitchCase(Utils.fix(expr)(ctx, Set()), Utils.fix(instr)(ctx, Set()))
+                        })
+                    }).toList
+                }
+            }
+        )
+    }
     def switch(swit: Switch)(implicit context: Context):List[IRTree] = {
         val expr = Utils.simplify(swit.value)
         Utils.typeof(expr) match
             case IntType | FloatType | BoolType | FuncType(_, _) | EnumType(_) => {
-                val cases = swit.cases.map(c => SwitchCase(Utils.simplify(c.expr), c.instr))
+                val cases = flattenSwitchCase(swit.cases).map(c => SwitchCase(Utils.simplify(c.expr), c.instr))
                 expr match{
                     case VariableValue(name, sel) if !swit.copyVariable=> {
                         makeTree(context.getVariable(name), cases.par.filter(_.expr.hasIntValue()).map(x => (x.expr.getIntValue(), x.instr)).toList):::
@@ -688,10 +735,10 @@ object Execute{
                 }
                 
                 if (sub.size == 1){
-                    switch(Switch(getHead(expr), swit.cases.map(c => SwitchCase(getHead(c.expr), c.instr))))
+                    switch(Switch(getHead(expr), flattenSwitchCase(swit.cases).map(c => SwitchCase(getHead(c.expr), c.instr))))
                 }
                 else{
-                    val cases = swit.cases.groupBy(c => getHead(c.expr))
+                    val cases = flattenSwitchCase(swit.cases).groupBy(c => getHead(c.expr))
                                           .map((g, cases) => SwitchCase(g, Switch(getTail(expr), cases.map(c => SwitchCase(getTail(c.expr), c.instr)))))
                                           .toList
                                           

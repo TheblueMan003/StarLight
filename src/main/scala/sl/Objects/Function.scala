@@ -177,7 +177,7 @@ class ConcreteFunction(context: Context, _contextName: String, name: String, arg
 
     def compile():Unit={
         if (!wasCompiled){
-            val suf = sl.Compiler.compile(body)(context.push(name, this))
+            val suf = sl.Compiler.compile(body.unBlockify())(context.push(name, this))
             content = content ::: suf
             wasCompiled = true
         }
@@ -241,16 +241,16 @@ class LazyFunction(context: Context, _contextName: String, name: String, argumen
         if (ret != null) sub.addVariable("_ret", ret)
         if (ret == null){
             sub.addVariable("_ret", new Variable(sub, "_ret", typ, Modifier.newPrivate()))
-            sl.Compiler.compile(block)(if modifiers.hasAttributes("inline") then ctx else sub)
+            sl.Compiler.compile(block.unBlockify())(if modifiers.hasAttributes("inline") then ctx else sub)
         }
         else if (op == "="){
             block = Utils.substReturn(block, ret)(!modifiers.hasAttributes("__returnCheck__"))
-            sl.Compiler.compile(block)(if modifiers.hasAttributes("inline") then ctx else sub)
+            sl.Compiler.compile(block.unBlockify())(if modifiers.hasAttributes("inline") then ctx else sub)
         }
         else{
             val vari = ctx.getFreshVariable(getType())
             block = Utils.substReturn(block, vari)(!modifiers.hasAttributes("__returnCheck__"))
-            sl.Compiler.compile(block)(if modifiers.hasAttributes("inline") then ctx else sub) ::: (if ret == null then List() else ret.assign(op, LinkedVariableValue(vari)))
+            sl.Compiler.compile(block.unBlockify())(if modifiers.hasAttributes("inline") then ctx else sub) ::: (if ret == null then List() else ret.assign(op, LinkedVariableValue(vari)))
         }
     }
     override def generateArgument()(implicit ctx: Context):Unit = {
@@ -287,7 +287,7 @@ class MultiplexFunction(context: Context, _contextName: String, name: String, ar
                 functions.zipWithIndex.map((x, i) => SwitchCase(IntValue(x.getMuxID()), LinkedFunctionCall(x, argumentsVariables.tail.map(LinkedVariableValue(_)), returnVariable))).toList
         
         val switch = Switch(LinkedVariableValue(argumentsVariables.head), cases, false)
-        content = sl.Compiler.compile(switch)(context.push(name, this))
+        content = sl.Compiler.compile(switch.unBlockify())(context.push(name, this))
     }
 }
 

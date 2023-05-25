@@ -18,6 +18,7 @@ class SettingsContext(){
     var multiplexFolder = "zzz_sl_mux"
     var tagsFolder = "zzz_sl_tags"
     var outputName = "default"
+    var hashedScoreboard = false
 
     var java_datapack_version = PackInfo(10, "Made With StarLight", List(1,19,3))
     var java_resourcepack_version = PackInfo(10, "Made With StarLight", List(1,19,3))
@@ -66,7 +67,7 @@ trait Target{
     def hasFeature(feature: String): Boolean
 }
 case object MCJava extends Target{
-    val features = List("execute on", "execute positioned over")
+    val features = List("execute on", "execute positioned over", "string")
     def hasFeature(feature: String): Boolean = features.exists(x => x == feature)
 
     def getFunctionPath(path: String): String = {

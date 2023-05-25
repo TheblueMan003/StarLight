@@ -33,7 +33,29 @@ object Utils{
     def getLib(path: String): Option[Instruction] = {
         val cpath = path.replace(".","/")
         val ipath = path.replace("/",".").replace("\\",".")
-        Some(Parser.parseFromFile("libraries/"+path, ()=>Source.fromResource("libraries/"+getLibPath(cpath+".sl")).getLines.reduce((x,y) => x + "\n" +y)))
+        
+        Some(Parser.parseFromFile("libraries/"+path, ()=>(
+            if (path == "__init__"){
+                (Source.fromResource("libraries/"+getLibPath(cpath+".sl"))).getLines.reduce((x,y) => x + "\n" +y)
+            }
+            else{
+                //try{
+                    Library.Downloader.getLibrary(path)
+                /*}
+                catch{
+                    case e: Exception => {
+                        (try{
+                            Source.fromResource("libraries/"+getLibPath(cpath+".sl"))
+                        }
+                        catch{
+                            case e: Exception => Source.fromResource("libraries/"+getLibPath(cpath+".sl").toLowerCase())
+                        }
+                        ).getLines.reduce((x,y) => x + "\n" +y)
+                    }
+                }*/
+            }
+            )
+        ))
     }
     def getConfig(path: String): List[String] = {
         val projectFile = new File("./configs/"+path)
@@ -105,7 +127,10 @@ object Utils{
             case Execute(typ, expr, block) => Execute(typ, expr, substReturn(block, to))
             case With(expr, isAt, cond, block) => With(expr, isAt, cond, substReturn(block, to))
 
-            case Switch(cond, cases, cv) => Switch(cond, cases.map(x => SwitchCase(x.expr, substReturn(x.instr, to))), cv)
+            case Switch(cond, cases, cv) => Switch(cond, cases.map{case x: SwitchCase => SwitchCase(x.expr, substReturn(x.instr, to));
+                                                                    case x: SwitchForGenerate => SwitchForGenerate(x.key, x.provider, SwitchCase(x.instr.expr, substReturn(x.instr.instr, to)));
+                                                                    case x: SwitchForEach => SwitchForEach(x.key, x.provider, SwitchCase(x.instr.expr, substReturn(x.instr.instr, to)));
+                                                                    }, cv)
     })
 
 
@@ -151,7 +176,10 @@ object Utils{
             case Execute(typ, expr, block) => Execute(typ, expr.map(subst(_, from, to)), subst(block, from, to))
             case With(expr, isAt, cond, block) => With(subst(expr, from, to), subst(isAt, from, to), subst(cond, from, to), subst(block, from, to))
 
-            case Switch(cond, cases, cv) => Switch(subst(cond, from, to), cases.map(x => SwitchCase(subst(x.expr, from, to), subst(x.instr, from, to))), cv)
+            case Switch(cond, cases, cv) => Switch(subst(cond, from, to), cases.map{case x: SwitchCase => SwitchCase(subst(x.expr, from, to), subst(x.instr, from, to));
+                                                                                    case x: SwitchForGenerate => SwitchForGenerate(x.key, subst(x.provider, from, to), SwitchCase(subst(x.instr.expr, from, to), subst(x.instr.instr, from, to)));
+                                                                                    case x: SwitchForEach => SwitchForEach(x.key, subst(x.provider, from, to), SwitchCase(subst(x.instr.expr, from, to), subst(x.instr.instr, from, to)));
+                                                                                    }, cv)
     })
     def subst(vari: Either[Identifier, Variable], from: Identifier, to: Identifier): Either[Identifier, Variable] = {
         vari match
@@ -246,7 +274,10 @@ object Utils{
             case Execute(typ, expr, block) => Execute(typ, expr.map(subst(_, from, to)), subst(block, from, to))
             case With(expr, isAt, cond, block) => With(subst(expr, from, to), subst(isAt, from, to), subst(cond, from, to), subst(block, from, to))
 
-            case Switch(cond, cases, cv) => Switch(subst(cond, from, to), cases.map(x => SwitchCase(subst(x.expr, from, to), subst(x.instr, from, to))), cv)
+            case Switch(cond, cases, cv) => Switch(subst(cond, from, to), cases.map{case x: SwitchCase => SwitchCase(subst(x.expr, from, to), subst(x.instr, from, to));
+                                                                                    case x: SwitchForGenerate => SwitchForGenerate(x.key, subst(x.provider, from, to), SwitchCase(subst(x.instr.expr, from, to), subst(x.instr.instr, from, to)));
+                                                                                    case x: SwitchForEach => SwitchForEach(x.key, subst(x.provider, from, to), SwitchCase(subst(x.instr.expr, from, to), subst(x.instr.instr, from, to)));
+                                                                                    }, cv)
     })
     def subst(vari: Either[Identifier, Variable], from: String, to: String): Either[Identifier, Variable] = {
         vari match
@@ -347,7 +378,10 @@ object Utils{
             case Execute(typ, expr, block) => Execute(typ, expr.map(subst(_, from, to)), subst(block, from, to))
             case With(expr, isAt, cond, block) => With(subst(expr, from, to), subst(isAt, from, to), subst(cond, from, to), subst(block, from, to))
 
-            case Switch(cond, cases, cv) => Switch(subst(cond, from, to), cases.map(x => SwitchCase(subst(x.expr, from, to), subst(x.instr, from, to))), cv)
+            case Switch(cond, cases, cv) => Switch(subst(cond, from, to), cases.map{case x: SwitchCase => SwitchCase(subst(x.expr, from, to), subst(x.instr, from, to));
+                                                                                    case x: SwitchForGenerate => SwitchForGenerate(x.key, subst(x.provider, from, to), SwitchCase(subst(x.instr.expr, from, to), subst(x.instr.instr, from, to)));
+                                                                                    case x: SwitchForEach => SwitchForEach(x.key, subst(x.provider, from, to), SwitchCase(subst(x.instr.expr, from, to), subst(x.instr.instr, from, to)));
+                                                                                    }, cv)
     })
 
     def rmFunctions(instr: Instruction): Instruction = positioned(instr, {
@@ -390,7 +424,10 @@ object Utils{
             case Execute(typ, expr, block) => Execute(typ, expr, rmFunctions(block))
             case With(expr, isAt, cond, block) => With(expr, isAt, cond, rmFunctions(block))
 
-            case Switch(cond, cases, cv) => Switch(cond, cases.map(x => SwitchCase(x.expr, rmFunctions(x.instr))), cv)
+            case Switch(cond, cases, cv) => Switch(cond, cases.map{case x: SwitchCase => SwitchCase(x.expr, rmFunctions(x.instr));
+                                                                    case x: SwitchForGenerate => SwitchForGenerate(x.key, x.provider, SwitchCase(x.instr.expr, rmFunctions(x.instr.instr)));
+                                                                    case x: SwitchForEach => SwitchForEach(x.key, x.provider, SwitchCase(x.instr.expr, rmFunctions(x.instr.instr)));
+                                                                    }, cv)
     })
 
     def fix(name: Either[Identifier, Variable])(implicit context: Context, ignore: Set[Identifier]) = {
@@ -466,7 +503,10 @@ object Utils{
             case Execute(typ, expr, block) => Execute(typ, expr.map(fix(_)), fix(block))
             case With(expr, isAt, cond, block) => With(fix(expr), fix(isAt), fix(cond), fix(block))
 
-            case Switch(cond, cases, cv) => Switch(fix(cond), cases.map(x => SwitchCase(fix(x.expr), fix(x.instr))), cv)
+            case Switch(cond, cases, cv) => Switch(fix(cond), cases.map{case x: SwitchCase => SwitchCase(fix(x.expr), fix(x.instr));
+                                                                        case x: SwitchForGenerate => SwitchForGenerate(x.key, fix(x.provider), SwitchCase(fix(x.instr.expr), fix(x.instr.instr)));
+                                                                        case x: SwitchForEach => SwitchForEach(x.key, fix(x.provider), SwitchCase(fix(x.instr.expr), fix(x.instr.instr)));
+                                                                        }, cv)
     })
     def fix(typ: Type)(implicit context: Context, ignore: Set[Identifier]): Type = {
         typ match

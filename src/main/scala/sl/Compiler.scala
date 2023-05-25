@@ -41,7 +41,7 @@ object Compiler{
                 case FunctionDecl(name, block, typ2, args, typevars, modifier) =>{
                     var fname = context.getFunctionWorkingName(name)
                     if (typevars.length > 0){
-                        val func = new GenericFunction(context, context.getPath()+"."+name, fname, args, typevars, typ2, modifier, block)
+                        val func = new GenericFunction(context, context.getPath()+"."+name, fname, args, typevars, typ2, modifier, block.unBlockify())
                         func.overridedFunction = if modifier.isOverride then context.getFunction(Identifier.fromString(name), args.map(_.typ), List(), typ2, false) else null
                         func.modifiers.isVirtual |= modifier.isOverride
                         context.addFunction(name, func)
@@ -54,7 +54,7 @@ object Compiler{
                         }
                         val clazz = context.getCurrentClass()
                         if (!modifier.isLazy){
-                            val func = new ConcreteFunction(context, context.getPath()+"."+name, fname, args, context.getType(typ), modifier, block, meta.firstPass)
+                            val func = new ConcreteFunction(context, context.getPath()+"."+name, fname, args, context.getType(typ), modifier, block.unBlockify(), meta.firstPass)
                             func.overridedFunction = if modifier.isOverride then context.getFunction(Identifier.fromString(name), args.map(_.typ), List(), typ, false) else null
                             func.modifiers.isVirtual |= modifier.isOverride
                             context.addFunction(name, func)
@@ -75,7 +75,7 @@ object Compiler{
                             case None => null
                             case Some(p) => context.getStruct(p)
                         
-                        context.addStruct(new Struct(context, name, generics, modifier, block, parentStruct))
+                        context.addStruct(new Struct(context, name, generics, modifier, block.unBlockify(), parentStruct))
                     }
                     List()
                 }
@@ -85,7 +85,7 @@ object Compiler{
                             case None => if name != "object" then context.getClass("object") else null
                             case Some(p) => context.getClass(p)
                         
-                        context.addClass(new Class(context, name, generics, modifier, block, parentClass, entity))
+                        context.addClass(new Class(context, name, generics, modifier, block.unBlockify(), parentClass, entity))
                     }
                     List()
                 }
@@ -95,7 +95,7 @@ object Compiler{
                             case None => null
                             case Some(p) => context.getTemplate(p)
                         
-                        context.addTemplate(new Template(context, name, modifier, block, parentTemplate))
+                        context.addTemplate(new Template(context, name, modifier, block.unBlockify(), parentTemplate))
                     }
                     List()
                 }
@@ -124,7 +124,7 @@ object Compiler{
                 case ForGenerate(key, provider, instr) => {
                     val cases = Utils.getForgenerateCases(key, provider)
                     
-                    cases.map(lst => lst.sortBy(0 - _._1.length()).foldLeft(instr)((instr, elm) => Utils.subst(instr, elm._1, elm._2))).flatMap(Compiler.compile(_, meta)).toList
+                    cases.map(lst => lst.sortBy(0 - _._1.length()).foldLeft(instr.unBlockify())((instr, elm) => Utils.subst(instr, elm._1, elm._2))).flatMap(Compiler.compile(_, meta)).toList
                 }
                 case ForEach(key, provider, instr) => {
                     val cases = Utils.getForeachCases(key.toString(), provider)
@@ -138,7 +138,7 @@ object Compiler{
                             val vari = new Variable(ctx, "dummy", Utils.typeof(v._2), mod)
                             ctx.addVariable(Identifier.fromString(v._1), vari)
                             vari.assign("=", v._2)
-                        }):::Compiler.compile(instr)(ctx)
+                        }):::Compiler.compile(instr.unBlockify())(ctx)
                     }).toList
                 }
                 case VariableDecl(names, typ, modifier, op, expr) => {
@@ -211,7 +211,7 @@ object Compiler{
                     if (iden.toString() == "property"){
                         val sub = context.push(name)
 
-                        compile(block, meta.withFirstPass)(sub)
+                        compile(block.unBlockify(), meta.withFirstPass)(sub)
 
                         context.addProperty(Property(name, sub.getFunction("get"), sub.getFunction("set"), null))
                         List()
@@ -223,7 +223,7 @@ object Compiler{
                         sub.inherit(template.getContext())
                         sub.push("this", sub)
                         sub.setTemplateUse()
-                        compile(Utils.fix(template.getBlock())(template.context, Set()), meta.withFirstPass)(sub) ::: compile(block, meta.withFirstPass)(sub)
+                        compile(Utils.fix(template.getBlock())(template.context, Set()), meta.withFirstPass)(sub) ::: compile(block.unBlockify(), meta.withFirstPass)(sub)
                     }
                 }
 
@@ -260,7 +260,10 @@ object Compiler{
                     def indexed(index: Int)={
                         compile(VariableAssigment(List((Left(Identifier.fromString(name.path()+"."+index.toString())), Selector.self)), op, value))
                     }
-                    if (index.length == 1){
+                    if (name == Identifier(List("this"))){
+                        compile(FunctionCall("set", index ::: List(value), List()))
+                    }
+                    else if (index.length == 1){
                         val vari = name.get()
                         val typ = Utils.typeof(LinkedVariableValue(vari))
 
@@ -328,14 +331,15 @@ object Compiler{
                     block.flatMap(inst => compile(inst, meta))
                 }
                 case InstructionBlock(block) => {
-                    block.flatMap(inst => compile(inst, meta))
+                    var ctx = context.getFreshContext()
+                    block.flatMap(inst => compile(inst, meta)(ctx))
                 }
                 case FunctionCall(name, args, typeargs) => {
                     val (fct,cargs) = context.getFunction(name, args, typeargs, VoidType)
                     if (fct != null && fct.modifiers.hasAttributes("compileAtCall")){
                         fct.asInstanceOf[ConcreteFunction].compile()
                     }
-                    (fct,cargs).call()
+                    (fct, cargs).call()
                 }
                 case LinkedFunctionCall(name, args, ret) => {
                     (name, args).call(ret)

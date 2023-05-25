@@ -31,10 +31,11 @@ object Variable {
 }
 class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) extends CObject(context, name, _modifier) with Typed(typ){
 	var tupleVari: List[Variable] = List()
+	var indexedVari: List[(Variable, Expression)] = List()
 	val variName = if modifiers.hasAttributes("versionSpecific")(context) then fullName+"_"+Settings.version.mkString("_") else fullName
 	val tagName = modifiers.getAttributesString("tag", ()=>variName)(context)
 	var wasAssigned = false
-	lazy val scoreboard = if modifiers.isEntity then modifiers.getAttributesString("name", ()=>"s"+context.getScoreboardID(this))(context) else ""
+	lazy val scoreboard = if modifiers.isEntity then modifiers.getAttributesString("name", ()=>context.getScoreboardID(this))(context) else ""
 	lazy val inGameName = modifiers.getAttributesString("name", ()=>variName)(context)
 	lazy val criterion = modifiers.getAttributesString("criterion", ()=>"dummy")(context)
 	var lazyValue: Expression = DefaultValue
@@ -93,7 +94,23 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 						tupleVari = Range(0, size).map(i => ctx.addVariable(new Variable(ctx, f"$i", inner, _modifier))).toList
 						tupleVari.map(_.generate()(ctx))
 
+						indexedVari = tupleVari.zip(Range(0, size).map(i => IntValue(i))).toList
+
 						Array.generate(this)
+					}
+					case TupleValue(values) if values.forall(x => x.isInstanceOf[IntValue])=> {
+						val sizes = values.map(x => x.asInstanceOf[IntValue].value)
+						val size = sizes.reduce(_ * _)
+						val ctx = context.push(name)
+						
+						val indexes = sizes.map(Range(0, _))
+									.foldLeft(List[List[Int]](List()))((acc, b) => b.flatMap(v => acc.map(_ ::: List(v))).toList)
+						tupleVari = Range(0, size).map(i => ctx.addVariable(new Variable(ctx, f"$i", inner, _modifier))).toList
+						tupleVari.map(_.generate()(ctx))
+						
+						indexedVari = tupleVari.zip(indexes.map(i => TupleValue(i.map(IntValue(_))))).toList
+
+						Array.generate(this, indexedVari, values.size)
 					}
 					case other => throw new Exception(f"Cannot have a array with size: $other")
 			}
@@ -257,6 +274,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 									case ArrayType(innter, size) => assignArray(op, value)
 									case EntityType => assignEntity(op, value)
 									case EnumType(enm) => assignEnum(op, value)
+									case StringType => assignString(op, value)
 									case other => throw new Exception(f"Cannot Assign to $fullName of type $other at \n${value.pos.longString}")
 							}
 						}
@@ -398,24 +416,62 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 		}
 	}
 
-	def handleArrayGetValue(op: String, name2: Expression, index: List[Expression])(implicit context: Context):List[IRTree] = {
-		val (prev,name) = Utils.simplifyToVariable(name2)
-		prev ::: (
-		name match{
-			case LinkedVariableValue(vari, sel) => {
-				vari.getType() match
-					case ArrayType(sub, IntValue(size)) => {
-						index.map(Utils.simplify(_)) match
-							case IntValue(i)::Nil => {
-								if (i >= size || i < 0) then throw new Exception(f"Index out of Bound for array $name: $i not in 0..$size at \n${name2.pos.longString}")
-								assign(op, LinkedVariableValue(vari.tupleVari(i)))
-							}
-							case _ => assign(op, FunctionCallValue(VariableValue(vari.fullName+".get"), index, List()))
+	/**
+	 * Assign a value to the string variable
+	 */
+	def assignString(op: String, valueE: Expression)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
+		if (!Settings.target.hasFeature("string"))throw new Exception("Cannot use string without string feature")
+		op match{
+			case "=" =>
+				valueE match{
+					case StringValue(value) => List(StringSet(getIRSelector(), value))
+					case ArrayGetValue(name, List(RangeValue(IntValue(min), IntValue(max), IntValue(1)))) => {
+						val (prev,vari) = Utils.simplifyToVariable(name)
+						prev ::: List(StringCopy(getIRSelector(), vari.vari.getIRSelector(), min, max))
 					}
-					case other => assign(op, FunctionCallValue(VariableValue(vari.fullName+".__get__"), index, List()))
-			}
+					case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
+					case _ => throw new Exception(f"Unknown cast to string: $valueE at \n${valueE.pos.longString}")
+				}
+			case other => throw new Exception(f"Cannot assign use op: $other with int at \n${valueE.pos.longString}")
 		}
-		)
+	}
+
+	def handleArrayGetValue(op: String, name2: Expression, index: List[Expression])(implicit context: Context):List[IRTree] = {
+		if (name2 == VariableValue(Identifier(List("this")), Selector.self)){
+			assign(op, FunctionCallValue(VariableValue("__get__"), index, List()))
+		}
+		else{
+			val (prev,name) = Utils.simplifyToVariable(name2)
+			prev ::: (
+			name match{
+				case LinkedVariableValue(vari, sel) => {
+					vari.getType() match
+						case ArrayType(sub, IntValue(size)) => {
+							index.map(Utils.simplify(_)) match
+								case IntValue(i)::Nil => {
+									if (i >= size || i < 0) then throw new Exception(f"Index out of Bound for array $name: $i not in 0..$size at \n${name2.pos.longString}")
+									assign(op, LinkedVariableValue(vari.tupleVari(i)))
+								}
+								case _ => assign(op, FunctionCallValue(VariableValue(vari.fullName+".get"), index, List()))
+						}
+						case ArrayType(sub, TupleValue(sizes)) => {
+							index.map(Utils.simplify(_)) match
+								case TupleValue(indexes)::Nil if indexes.forall(_.isInstanceOf[IntValue]) => {
+									vari.indexedVari.find(x => x._2 == TupleValue(indexes)) match{
+										case Some((vari, _)) => assign(op, LinkedVariableValue(vari))
+										case None => throw new Exception(f"Index out of Bound for array $name: $indexes not in $sizes at \n${name2.pos.longString}")
+									}
+								}
+								case TupleValue(indexes)::Nil => {
+									assign(op, FunctionCallValue(VariableValue(vari.fullName+".get"), indexes, List()))
+								}
+								case _ => assign(op, FunctionCallValue(VariableValue(vari.fullName+".get"), index, List()))
+						}
+						case other => assign(op, FunctionCallValue(VariableValue(vari.fullName+".__get__"), index, List()))
+				}
+			}
+			)
+		}
 	}
 
 	def assignIntLinkedVariable(op: String, vari: Variable, oselector: Selector)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
@@ -679,10 +735,15 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 	}
 
 	def assignArray(op: String, expr2: Expression)(implicit context: Context, selector: Selector = Selector.self)={
-		val ArrayType(sub, IntValue(size)) = getType().asInstanceOf[ArrayType]: @unchecked
+		val ArrayType(sub, size) = getType().asInstanceOf[ArrayType]: @unchecked
 		val expr = Utils.simplify(expr2)
 		expr match
-			case TupleValue(value) if size == value.size => tupleVari.zip(value).flatMap((t, v) => t.assign(op, v))
+			case TupleValue(value) => {
+				size match
+					case IntValue(size) if size == value.size => tupleVari.zip(value).flatMap((t, v) => t.assign(op, v))
+					case _ if sub == Utils.typeof(expr) => tupleVari.flatMap(t => t.assign(op, expr))
+					case _ => throw new Exception(f"Cannot assign tuple of size ${value.size} to array of size $size at \n${expr2.pos.longString}")
+			}
 			case LinkedVariableValue(vari, sel) => {
 				if (vari.getType().isSubtypeOf(getType())){
 					tupleVari.zip(vari.tupleVari).flatMap((t,v) => t.assign(op, LinkedVariableValue(v, sel)))
@@ -695,14 +756,19 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 				if (array.size != tupleVari.size) throw new Exception(f"Cannot assign array of size ${array.size} to array of size ${tupleVari.size} at \n${expr2.pos.longString}")
 				tupleVari.zip(array).flatMap((t, v) => t.assign(op, Utils.jsonToExpr(v)))
 			}
-			case ConstructorCall(Identifier(List("standard","array","Array")), List(IntValue(n)), typeArg) if op == "=" && List(sub) == typeArg && n == size => {
+			case ConstructorCall(Identifier(List("standard","array","Array")), List(IntValue(n)), typeArg) if op == "=" && List(sub) == typeArg && IntValue(n) == size => {
 				tupleVari.flatMap(t => t.assign("=", DefaultValue))
 			}
 			case ConstructorCall(Identifier(List("standard","array","Array")), List(), typeArg) if op == "=" && List(sub) == typeArg => {
 				tupleVari.flatMap(t => t.assign("=", DefaultValue))
 			}
 			case VariableValue(vari, sel) => assign(op, context.resolveVariable(expr))
-			case FunctionCallValue(fct, args, typeargs, selector) => handleFunctionCall(op, fct, args, typeargs, selector)
+			case FunctionCallValue(fct, args, typeargs, selector) => {
+				Utils.typeof(expr) match{
+					case ArrayType(inner, size) => handleFunctionCall(op, fct, args, typeargs, selector)
+					case other => tupleVari.flatMap(t => t.assign(op, expr))
+				}
+			}
 			case ArrayGetValue(name, index) => handleArrayGetValue(op, name, index)
 			case v => tupleVari.flatMap(t => t.assign(op, v))
 	}

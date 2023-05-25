@@ -710,6 +710,11 @@ object DefaultFunction{
                             val vari = ctx.getFunction(fct)
                             (List(ScheduleCall(Settings.target.getFunctionName(vari.fullName),vari.fullName, time)), NullValue)
                         }
+                        case LambdaValue(args, instr)::IntValue(time)::Nil => {
+                            val block = ctx.getFreshLambda(args, List(), VoidType, instr, false)
+                            block.markAsStringUsed()
+                            (List(ScheduleCall(Settings.target.getFunctionName(block.fullName), block.fullName, time)), NullValue)
+                        }
                         case other => throw new Exception(f"Illegal Arguments $other for schedule")
                     }
                 }

@@ -319,6 +319,12 @@ case class JsonValue(val content: JSONElement) extends Expression{
 trait JSONElement{
     def getString()(implicit context: Context): String
     def getNbt(): String
+    def getStringValue: String = throw new Exception(f"$this is not a string")
+    def getIntValue: Int = throw new Exception(f"$this is not an int")
+    def getFloatValue: Double = throw new Exception(f"$this is not a float")
+    def getBooleanValue: Boolean = throw new Exception(f"$this is not a bool")
+    def getDictionary: JsonDictionary = throw new Exception(f"$this is not a dic")
+    def getArray: JsonArray = throw new Exception(f"$this is not an array")
 }
 
 case class JsonDictionary(val map: Map[String, JSONElement]) extends JSONElement{
@@ -328,6 +334,9 @@ case class JsonDictionary(val map: Map[String, JSONElement]) extends JSONElement
     def getNbt(): String = {
         "{"+map.map((k, v) => f"${k}:${v.getNbt()}").reduceOption(_ +", "+ _).getOrElse("")+"}"
     }
+    def apply(key: String): JSONElement = map(key)
+    override def getDictionary: JsonDictionary = this
+    def contains(key: String): Boolean = map.contains(key)
 }
 case class JsonArray(val content: List[JSONElement]) extends JSONElement{
     def getString()(implicit context: Context): String = {
@@ -336,6 +345,8 @@ case class JsonArray(val content: List[JSONElement]) extends JSONElement{
     def getNbt(): String = {
         "["+content.map(v => f"${v.getNbt()}").reduceOption(_ +", "+ _).getOrElse("")+"]"
     }
+    def apply(key: Int): JSONElement = if (key >= 0){ content(key) }else{ content(content.length + key) }
+    override def getArray: JsonArray = this
 }
 case class JsonString(val value: String) extends JSONElement{
     def getString()(implicit context: Context): String = {
@@ -344,6 +355,7 @@ case class JsonString(val value: String) extends JSONElement{
     def getNbt(): String = {
         Utils.stringify(value)
     }
+    override def getStringValue: String = value
 }
 case class JsonIdentifier(val value: String) extends JSONElement{
     def getString()(implicit context: Context): String = {        
@@ -368,6 +380,7 @@ case object JsonNull extends JSONElement{
     def getNbt(): String = {
         "null"
     }
+    override def getStringValue: String = null
 }
 case class JsonInt(val value: Int) extends JSONElement{
     def getString()(implicit context: Context): String = {
@@ -376,6 +389,7 @@ case class JsonInt(val value: Int) extends JSONElement{
     def getNbt(): String = {
         value.toString()
     }
+    override def getIntValue: Int = value
 }
 case class JsonFloat(val value: Double) extends JSONElement{
     def getString()(implicit context: Context): String = {
@@ -384,6 +398,7 @@ case class JsonFloat(val value: Double) extends JSONElement{
     def getNbt(): String = {
         value.toString()
     }
+    override def getFloatValue: Double = value
 }
 case class JsonBoolean(val value: Boolean) extends JSONElement{
     def getString()(implicit context: Context): String = {
@@ -392,4 +407,5 @@ case class JsonBoolean(val value: Boolean) extends JSONElement{
     def getNbt(): String = {
         if value then "1b" else "0b"
     }
+    override def getBooleanValue: Boolean = value
 }

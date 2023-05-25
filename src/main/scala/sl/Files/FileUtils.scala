@@ -4,6 +4,8 @@ import java.io.File
 import java.io.PrintWriter
 import sl.Utils
 import javax.sound.sampled.AudioSystem
+import java.io.{FileInputStream, FileOutputStream}
+import java.util.zip.ZipInputStream
 
 object FileUtils{
     def deleteDirectory(dir: String): Boolean = deleteDirectory(new File(dir))
@@ -97,6 +99,16 @@ object FileUtils{
             }
             in.close()
             out.close()
+        }
+    }
+    def unzip(source: String, target: String)={
+        val fis = new FileInputStream(source)
+        val zis = new ZipInputStream(fis)
+        Stream.continually(zis.getNextEntry).takeWhile(_ != null).foreach{ file =>
+            createFolderForFiles(new File(target+"/"+file.getName))
+            val fout = new FileOutputStream(target+"/"+file.getName)
+            val buffer = new Array[Byte](1024)
+            Stream.continually(zis.read(buffer)).takeWhile(_ != -1).foreach(fout.write(buffer, 0, _))
         }
     }
 }

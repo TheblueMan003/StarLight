@@ -10,6 +10,7 @@ import java.time.temporal.ChronoUnit
 import sl.files.*
 import sl.files.CacheAST
 import sl.IR.*
+import sl.Library.Downloader
 
 object Main{
   private var lastIR: List[IRFile] = null
@@ -40,11 +41,20 @@ object Main{
       try{
         args(0) match
           case "doc" => {
-            val libraries: List[String] = FileUtils.getListOfFiles("./src/main/resources/libraries").filterNot(_.contains("__init__.sl"))
-            libraries.foreach(f => makeDocumentation(f.dropRight(3).replaceAllLiterally("\\","/").replaceAllLiterally("./src/main/resources/libraries/",""), List(f)))
-            val names = libraries.map(f => f.dropRight(3).replaceAllLiterally("\\","/").replaceAllLiterally("./src/main/resources/libraries/",""))
-            FileUtils.safeWriteFile("docs/index.md", List(DocMaker.makeIndex(names)))
-            Reporter.ok("Documentation Completed!")
+            if (args.length < 2 && lastBuild == null) then {
+              Reporter.error(f"Expected 1 argument got: ${args.length-1}")
+            }
+            else if (args.length == 2) then {
+              val path = args(1)
+              val libraries: List[String] = FileUtils.getListOfFiles(path).filterNot(_.contains("__init__.sl"))
+              libraries.foreach(f => makeDocumentation(f.dropRight(3).replaceAllLiterally("\\","/").replaceAllLiterally(path,""), List(f)))
+              val names = libraries.map(f => f.dropRight(3).replaceAllLiterally("\\","/").replaceAllLiterally(path,""))
+              FileUtils.safeWriteFile("docs/index.md", List(DocMaker.makeIndex(names)))
+              Reporter.ok("Documentation Completed!")
+            }
+            else{
+              Reporter.error(f"Expected 1 argument got: ${args.length-1}")
+            }
           }
           case "build" => {
             if (args.length < 1 && lastBuild == null) then {
@@ -103,10 +113,33 @@ object Main{
             newProject(Array())
             Reporter.ok("Project created!")
           }
+          case "install" => {
+            if (args.length == 1){
+              Library.Downloader.getLibrary(args(1))
+              Reporter.ok("Library Downloaded!")
+            }
+            else if (args.length == 2){
+              Library.Downloader.installLib(args(1), args(2))
+              Reporter.ok(f"Library Downloaded with version ${args(2)}!")
+            }
+            else{
+              Reporter.error(f"Expected 1 or 2 argument got: ${args.length-1}")
+            }
+          }
+          case "update" => {
+            if (args.length != 1) then {
+              Reporter.error(f"Expected 1 argument got: ${args.length-1}")
+            }
+            else{
+              Library.Downloader.updateLib(args(1))
+              Reporter.ok("Library Updated!")
+            }
+          }
           case "clearcache" => {
             FileUtils.deleteDirectory("./bin")
             DataPackBuilder.clearCache()
             ResourcePackBuilder.clearCache()
+            Downloader.clearCache()
             Reporter.ok("Cache cleared!")
           }
           case "help" => {
@@ -115,6 +148,8 @@ object Main{
             println("run <function>: Interpret the function. The .sl must be omited and the internal name must be used. Example: `main.ticking.main`. You must compile the project before.")
             println("debug <function>: Interpret the function in debug mode (print every operation). The .sl must be omited and the internal name must be used. Example: `main.ticking.main`. You must compile the project before.")
             println("help: Show this")
+            println("install <library> [version]: Install a library into the local project. If version is not specified, the latest version will be installed. Note that standard libraries are downloaded automatically when needed.")
+            println("update <library>: Update a library into the local project.")
             println("exit: Close")
           }
           case "exit" => {
@@ -271,7 +306,7 @@ object Main{
     val time3 = ChronoUnit.MILLIS.between(start, LocalDateTime.now())
     Reporter.info(f"Total Time: ${time3}ms")
 
-    //FileUtils.safeWriteFile("vscode/token", Utils.getConfig("blocks.txt"):::Utils.getConfig("sounds/java.csv").map("minecraft:"+_):::Utils.getConfig("particles.txt"))
+    FileUtils.safeWriteFile("vscode/token", Utils.getConfig("blocks.txt"):::Utils.getConfig("sounds/java.csv").map("minecraft:"+_):::Utils.getConfig("particles.txt"):::context.getObjects())
 
     context
   }

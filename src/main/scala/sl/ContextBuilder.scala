@@ -30,14 +30,14 @@ object ContextBuilder{
                     case None => null
                     case Some(p) => context.getStruct(p)
                 
-                context.addStruct(new Struct(context, name, generics, modifier, block, parentStruct))
+                context.addStruct(new Struct(context, name, generics, modifier, block.unBlockify(), parentStruct))
             }
             case ClassDecl(name, generics, block, modifier, parent, entity) => {
                 val parentClass = parent match
                     case None => if name != "object" then context.getClass("object") else null
                     case Some(p) => context.getClass(p)
                 
-                context.addClass(new Class(context, name, generics, modifier, block, parentClass, entity))
+                context.addClass(new Class(context, name, generics, modifier, block.unBlockify(), parentClass, entity))
             }
             case EnumDecl(name, fields, values, modifier) => {
                 val enm = context.addEnum(new Enum(context, name, modifier, fields))
@@ -48,7 +48,7 @@ object ContextBuilder{
                     case None => null
                     case Some(p) => context.getTemplate(p)
                 
-                context.addTemplate(new Template(context, name, modifier, block, parentTemplate))
+                context.addTemplate(new Template(context, name, modifier, block.unBlockify(), parentTemplate))
             }
             case TypeDef(name, typ) => {
                 context.addTypeDef(name, typ)
@@ -58,20 +58,20 @@ object ContextBuilder{
                     if (!meta.isLib){
                         buildRec(Settings.globalImport)(context.root, meta)
                     }
-                    buildRec(block)(context.root, meta)
+                    buildRec(block.unBlockify())(context.root, meta)
                 }
                 else{
                     if (!meta.isLib){
                         buildRec(Settings.globalImport)(context.root.push(name), meta)
                     }
-                    buildRec(block)(context.root.push(name), meta)
+                    buildRec(block.unBlockify())(context.root.push(name), meta)
                 }
             }
             case InstructionList(block) => {
                 block.foreach(p => buildRec(p)(context, meta))
             }
             case InstructionBlock(block) => {
-                block.foreach(p => buildRec(p)(context, meta))
+                ???
             }
             case ForGenerate(key, provider, instr) => {
                 val cases = Utils.getForgenerateCases(key, provider)

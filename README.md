@@ -15,6 +15,8 @@ Once the compiler is open you will have access to the following command.
 - `help`: Show the list of available command
 - `new`: Create a new project in the current directory
 - `build <path_to/build.slconf>`: Compile & Generate the packs. By default, `build java` build a Java Datapack & `build bedrock` build a bedrock Behaviorpack
+- `install <library> [version]`: Install a library into the local project. If version is not specified, the latest version will be installed. Note that standard libraries are downloaded automatically when needed.
+- `update <library>`: Update library to latest version.
 
 ## build arguments
 An alternative is to use the following command:

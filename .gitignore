@@ -33,3 +33,8 @@ metals.sbt
 .idea
 .idea_modules
 /.worksheet/
+
+# StarLight
+/libraries/
+/output/
+/vscode/

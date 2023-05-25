@@ -25,7 +25,9 @@ trait CPositionable extends Positional{
   }
 }
 
-sealed abstract class Instruction extends CPositionable
+sealed abstract class Instruction extends CPositionable{
+  def unBlockify(): Instruction = this
+}
 
 case class Package(val name: String, val block: Instruction) extends Instruction {
   override def toString() = f"package ${name} {${block}}"
@@ -105,10 +107,16 @@ case class Import(val lib: String, val value: String, val alias: String) extends
   override def toString() = f"from $lib import $value as $alias"
 }
 
-case class Switch(val value: Expression, val cases: List[SwitchCase], val copyVariable: Boolean = true) extends Instruction {
+case class Switch(val value: Expression, val cases: List[SwitchElement], val copyVariable: Boolean = true) extends Instruction {
   override def toString() = f"switch($value)"
 }
-case class SwitchCase(val expr: Expression, val instr: Instruction)
+trait SwitchElement{
+}
+case class SwitchCase(val expr: Expression, val instr: Instruction) extends SwitchElement
+case class SwitchForGenerate(val key: String, val provider: Expression, val instr: SwitchCase) extends CPositionable with SwitchElement {
+}
+case class SwitchForEach(val key: Identifier, val provider: Expression, val instr: SwitchCase) extends CPositionable with SwitchElement {
+}
 
 case class WhileLoop(val cond: Expression, val block: Instruction) extends Instruction {
   override def toString() = f"while($cond)$block"
@@ -128,6 +136,7 @@ case class InstructionList(val list: List[Instruction]) extends Instruction {
 }
 case class InstructionBlock(val list: List[Instruction]) extends Instruction {
   override def toString() = f"{${list}}"
+  override def unBlockify(): Instruction = InstructionList(list)
 }
 trait ExecuteType
 case object AtType extends ExecuteType

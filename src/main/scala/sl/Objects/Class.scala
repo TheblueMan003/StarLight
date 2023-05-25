@@ -60,7 +60,7 @@ class Class(context: Context, name: String, val generics: List[String], _modifie
                     vari.assign("=", getEntity())(ctx)
                     ctx.addVariable(vari)
                 }
-                Compiler.compile(block)(ctx)
+                Compiler.compile(block.unBlockify())(ctx)
                 
                 val mod = new Modifier()
                 mod.isEntity = true

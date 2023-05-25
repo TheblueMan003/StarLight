@@ -21,7 +21,7 @@ class ScoreboardReduce(files: List[IRFile], access: mutable.Set[SBLink]){
                 })
             })
             computeState1()
-            if (Settings.optimizeVariableLocal){
+            if (Settings.optimizeVariableLocal && false){
                 reduceState()
             }
             if (Settings.optimizeVariableGlobal){
@@ -36,7 +36,7 @@ class ScoreboardReduce(files: List[IRFile], access: mutable.Set[SBLink]){
                 })
             }
             iteration += 1
-            if (iteration > 100){
+            if (iteration > 10){
                 changed = false
             }
             if (changed){
@@ -620,11 +620,13 @@ class ScoreboardState(sblink: SBLink,forced: Boolean = false){
     var accessed = mutable.Set[IRFile]()
     var modified = mutable.Set[IRFile]()
     var possibleValue: ScoreboardValue = if forced then AnyValue else UnknownValue
+    var accessedValue = mutable.Set[ScoreboardValue]()
     var operation = mutable.Set[SBOperation]()
 
     def addAccessed(file: IRFile): Unit ={
         accessed += file
         file.addScoreboardAccess(sblink)
+        accessedValue.add(possibleValue)
     }
     def addModified(file: IRFile): Unit ={
         modified += file

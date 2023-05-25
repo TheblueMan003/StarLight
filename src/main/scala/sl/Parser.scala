@@ -21,7 +21,7 @@ object Parser extends StandardTokenParsers{
   lexical.reserved   ++= List("true", "false", "if", "then", "else", "return", "switch", "for", "do", "while", "by", "is",
                               "as", "at", "with", "to", "import", "doc", "template", "null", "typedef", "foreach", "in", "not",
                               "def", "package", "struct", "enum", "class", "lazy", "jsonfile", "blocktag", "throw", "try", "catch", "finally",
-                              "public", "protected", "private", "scoreboard", "forgenerate", "from", "rotated", "facing", "align",
+                              "public", "protected", "private", "scoreboard", "forgenerate", "from", "rotated", "facing", "align", "case",
                               "ticking", "loading", "predicate", "extends", "new", "const", "static", "virtual", "abstract", "override")
 
 
@@ -144,13 +144,20 @@ object Parser extends StandardTokenParsers{
   def doWhileLoop: Parser[Instruction] = positioned(("do" ~> instruction <~ "while") ~ ("(" ~> exprNoTuple <~ ")") ^^ (p => DoWhileLoop(p._2, p._1)))
   def whileLoop: Parser[Instruction] = positioned(("while" ~> "(" ~> exprNoTuple <~ ")") ~ instruction ^^ (p => WhileLoop(p._1, p._2)))
   def forLoop: Parser[Instruction] = positioned(((("for" ~> "(" ~> instruction <~ ";") ~ exprNoTuple <~ ";") ~ instruction <~ ")") ~ instruction ^^ 
-    (p => InstructionList(List(p._1._1._1, WhileLoop(p._1._1._2, InstructionList(List(p._2, p._1._2)))))))
+    (p => InstructionBlock(List(p._1._1._1, WhileLoop(p._1._1._2, InstructionList(List(p._2, p._1._2)))))))
   def withInstr: Parser[Instruction] = positioned(
     ("with" ~> "(" ~> exprNoTuple <~ ")") ~ instruction ^^ (p => With(p._1, BoolValue(false), BoolValue(true), p._2))
       | (("with" ~> "(" ~> exprNoTuple <~ ",") ~ exprNoTuple <~ ")") ~ instruction ^^ (p => With(p._1._1, p._1._2, BoolValue(true), p._2))
       | ((("with" ~> "(" ~> exprNoTuple <~ ",") ~ exprNoTuple <~ ",") ~ exprNoTuple <~ ")") ~ instruction ^^ (p => With(p._1._1._1, p._1._1._2, p._1._2, p._2)))
   def switch: Parser[Switch] = positioned(("switch" ~> exprNoTuple <~ "{") ~ rep(switchCase) <~ "}" ^^ (p => Switch(p._1, p._2)))
-  def switchCase: Parser[SwitchCase] = (exprNoTuple <~ "->") ~ instruction ^^ (p => SwitchCase(p._1, p._2))
+        
+  def switchCaseBase: Parser[SwitchCase] = 
+    (exprNoTuple <~ "->") ~ instruction ^^ (p => SwitchCase(p._1, p._2)) |
+    ("case" ~> exprNoTuple <~ ":") ~ instruction ^^ (p => SwitchCase(p._1, p._2))
+  def switchCase: Parser[SwitchElement] = 
+    switchCaseBase
+    | positioned((("foreach" ~ opt("(") ~> ident <~ "in") ~ exprNoTuple <~ opt(")")) ~ (opt("{") ~> switchCaseBase <~ opt("}")) ^^ { case v ~ e ~ i => SwitchForEach(v, e, i) })
+    | positioned((("forgenerate" ~> "(" ~> identLazy <~ ",") ~ exprNoTuple <~ ")") ~ (opt("{") ~> switchCaseBase <~ opt("}")) ^^ (p => SwitchForGenerate(p._1._1, p._1._2, p._2)))
   def rotated1: Parser[Instruction] = positioned("rotated" ~"("~ exprNoTuple ~","~ exprNoTuple~")" ~ instruction ^^ { case _ ~ _ ~ e1 ~ _ ~ e2 ~ _ ~ i => Execute(RotatedType, List(e1, e2), i) })
   def rotated2: Parser[Instruction] = positioned("rotated" ~ exprNoTuple ~ instruction ^^ { case _ ~ e ~ i => Execute(RotatedType, List(e), i) })
   def facing1: Parser[Instruction] = positioned("facing" ~"("~ exprNoTuple ~","~ exprNoTuple~")" ~ instruction ^^ { case _ ~ _ ~ e1 ~ _ ~ e2 ~ _ ~ i => Execute(FacingType, List(e1, e2), i) })
@@ -415,18 +422,18 @@ object Parser extends StandardTokenParsers{
     }
   }
   def parseJson(file: String): JSONElement = {
-    val tokens = new lexical.Scanner(Preparser.parse(file, ""))
+    val preparsed= Preparser.parse("", file)
+    val tokens = new lexical.Scanner(preparsed)
     phrase(json)(tokens) match {
       case Success(trees, _) =>
-        Reporter.ok(f"Parsed: $file")
         trees
       case e =>
-        println(f"Error in file '${file}'': ${e}")
+        println(f"Error in file '${file}': ${e}")
         null
     }
   }
   def parseExpression(file: String): Expression = {
-    val tokens = new lexical.Scanner(Preparser.parse(file, ""))
+    val tokens = new lexical.Scanner(Preparser.parse(file, file))
     phrase(expr)(tokens) match {
       case Success(trees, _) =>
         Reporter.ok(f"Parsed: $file")

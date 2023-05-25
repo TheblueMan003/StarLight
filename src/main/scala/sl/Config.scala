@@ -42,6 +42,7 @@ object ConfigLoader{
                     case ("scoreboard.value", name)    => Settings.valueScoreboard = name
                     case ("scoreboard.const", name)    => Settings.constScoreboard = name
                     case ("scoreboard.tmp", name)      => Settings.tmpScoreboard = name
+                    case ("scoreboard.do_hash", value) => Settings.hashedScoreboard = value == "true"
 
                     case ("mc.java.datapack.path", value)              => Settings.java_datapack_output = value.split(";").toList
                     case ("mc.java.datapack.version", value)           => Settings.java_datapack_version.version = value.toInt
@@ -95,6 +96,7 @@ object ConfigLoader{
             f"scoreboard.value=${Settings.valueScoreboard}",
             f"scoreboard.const=${Settings.constScoreboard}",
             f"scoreboard.tmp=${Settings.tmpScoreboard}",
+            f"scoreboard.do_hash=${Settings.hashedScoreboard}",
 
             f"mc.java.datapack.path=${toCSV(Settings.java_datapack_output)}",
             f"mc.java.datapack.version=${Settings.java_datapack_version.version}",
