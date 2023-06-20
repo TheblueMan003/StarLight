@@ -86,13 +86,17 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
             false
         }
     }
-    def getObjects():List[String]={
+    def getObjects(parent: String= null):List[String]={
         if (this == root){
             child.flatMap(_._2.getObjects()).toList
         }
         else{
-            functions.keys.map(n => name+";"+n+"()").toList :::
-                child.flatMap(c => c._2.functions.keys.map(n => name+";"+c._1+"."+n+"()")).toList
+            functions.keys.map(n => ";"+name+"."+n+"();2").toList :::
+            functions.keys.map(n => name+";"+n+"();2").toList :::
+            child.flatMap(c => c._2.functions.keys.map(n => name+";"+c._1+"."+n+"();2")).toList :::
+            variables.filter{case (k,v) => v.modifiers.protection != Protection.Private}.keys.map(n => ";"+name+"."+n+";5").toList :::
+            variables.filter{case (k,v) => v.modifiers.protection != Protection.Private}.keys.map(n => name+";"+n+";5").toList :::
+            child.flatMap(c => c._2.variables.filter{case (k,v) => v.modifiers.protection != Protection.Private}.keys.map(n => name+";"+c._1+"."+n+";5")).toList
         }
     }
     def addFunctionToCompile(fct: ConcreteFunction) = {
@@ -165,6 +169,10 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
             varId += 1
             varId.toString()
         }
+    }
+    def getFreshLambdaName()= synchronized{
+        varId += 1
+        "lambda_"+varId.toString()
     }
     def getFreshVariable(typ: Type): Variable = {
         synchronized{
@@ -493,11 +501,11 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
             if (identifier.toString().startsWith("@")) return getFunctionTags(mapFunctionTag(identifier))
             val fcts2 = getElementList(_.functions)(identifier)
             val fcts = fcts2.filter(f => !fcts2.exists(g => g.overridedFunction == f))
-            if (fcts.size == 0) throw new ObjectNotFoundException(f"Unknown function: $identifier in context: $path")
+            if (fcts.size == 0) throw new FunctionNotFoundException(f"Unknown function: $identifier in context: $path")
             if (fcts.size == 1) return fcts.head
             val filtered = fcts.filter(fct => args.size >= fct.minArgCount && args.size <= fct.maxArgCount && (fct.isInstanceOf[ConcreteFunction] || !concrete))
             if (filtered.length == 1) return filtered.head
-            if (filtered.size == 0) throw new ObjectNotFoundException(f"Unknown function: $identifier for args: $args in context: $path")
+            if (filtered.size == 0) throw new FunctionNotFoundException(f"Unknown function: $identifier for args: $args in context: $path")
             val ret = filtered.map(f => (f.arguments.zip(args).map((a, v)=> v.getDistance(a.typ)(this)).reduceOption(_ + _).getOrElse(0), f))
                               .groupBy(_._1)
                               .toList
@@ -523,13 +531,13 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
     def getFunction(identifier: Identifier): Function = {
         if (identifier.toString().startsWith("@")) return getFunctionTags(identifier)
         val fcts = getElementList(_.functions)(identifier)
-        if (fcts.size == 0) throw new ObjectNotFoundException(f"Unknown function: $identifier in context: $path")
+        if (fcts.size == 0) throw new FunctionNotFoundException(f"Unknown function: $identifier in context: $path")
         if (fcts.size == 1) return fcts.head
         val minArg = fcts.map(_.minArgCount).min
         val maxArg = fcts.map(_.maxArgCount).max
         val minArg2 = fcts.map(_.minArgCount).max
         val maxArg2 = fcts.map(_.maxArgCount).min
-        if (minArg != minArg2 || maxArg != maxArg2) throw new ObjectNotFoundException(f"Ambiguity for function: $identifier in context: $path ${fcts.map(_.prototype())}")
+        if (minArg != minArg2 || maxArg != maxArg2) throw new FunctionNotFoundException(f"Ambiguity for function: $identifier in context: $path ${fcts.map(_.prototype())}")
         val ret = fcts.sortBy(f => -f.contextName.length).head
         ret
     }
@@ -1028,3 +1036,4 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
     }
 }
 case class ObjectNotFoundException(msg: String) extends Exception(msg)
+case class FunctionNotFoundException(msg: String) extends Exception(msg)

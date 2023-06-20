@@ -231,26 +231,27 @@ class LazyFunction(context: Context, _contextName: String, name: String, argumen
         sub.setLazyCall()
         sub.inherit(context)
         
-        argMap(args).sortBy((a,v) => -a.name.length).foreach((a, v) => {
+        val pref = argMap(args).sortBy((a,v) => -a.name.length).flatMap((a, v) => {
             val vari = Variable(sub, a.name, a.getType(), a.modifiers)
             vari.generate()(sub)
-            sub.addVariable(vari).assign("=", v)
+            val instr = sub.addVariable(vari).assign("=", v)
             block = if a.name.startsWith("$") then Utils.subst(block, a.name, v.getString()) else block
+            instr
         })
 
         if (ret != null) sub.addVariable("_ret", ret)
         if (ret == null){
             sub.addVariable("_ret", new Variable(sub, "_ret", typ, Modifier.newPrivate()))
-            sl.Compiler.compile(block.unBlockify())(if modifiers.hasAttributes("inline") then ctx else sub)
+            pref:::sl.Compiler.compile(block.unBlockify())(if modifiers.hasAttributes("inline") then ctx else sub)
         }
         else if (op == "="){
             block = Utils.substReturn(block, ret)(!modifiers.hasAttributes("__returnCheck__"))
-            sl.Compiler.compile(block.unBlockify())(if modifiers.hasAttributes("inline") then ctx else sub)
+            pref:::sl.Compiler.compile(block.unBlockify())(if modifiers.hasAttributes("inline") then ctx else sub)
         }
         else{
             val vari = ctx.getFreshVariable(getType())
             block = Utils.substReturn(block, vari)(!modifiers.hasAttributes("__returnCheck__"))
-            sl.Compiler.compile(block.unBlockify())(if modifiers.hasAttributes("inline") then ctx else sub) ::: (if ret == null then List() else ret.assign(op, LinkedVariableValue(vari)))
+            pref:::sl.Compiler.compile(block.unBlockify())(if modifiers.hasAttributes("inline") then ctx else sub) ::: (if ret == null then List() else ret.assign(op, LinkedVariableValue(vari)))
         }
     }
     override def generateArgument()(implicit ctx: Context):Unit = {

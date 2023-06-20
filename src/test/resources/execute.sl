@@ -22,3 +22,14 @@ lazy int a = 3
 as(@s[distance=a])./say hi
 as(@s[r=a])./say hi
 as(@s[distance=..a])./say hi
+
+at(1 ~ ~)./say hi
+at(~ 1 ~)./say hi
+at(~ ~ 1)./say hi
+
+at(-1 ~ ~)./say hi
+at(~ -1 ~)./say hi
+at(~ ~ -1)./say hi
+
+at(1 ~ 1)./say hi
+at(-1 ~ -1)./say hi

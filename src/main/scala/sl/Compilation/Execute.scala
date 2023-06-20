@@ -448,6 +448,14 @@ object Execute{
                 val rr = Utils.simplifyToVariable(right)
                 (rr._1, List(IFValueCase(BinaryOperation("in", SelectorValue(v), rr._2))))
             }
+            case BinaryOperation("in", left, JsonValue(content))=> {
+                content match{
+                    case JsonDictionary(map) => {
+                        (List(), List(if (map.contains(left.getString())){IFTrue}else{IFFalse}))
+                    }
+                    case other => throw new Exception("Illegal operation")
+                }
+            }
 
             case BinaryOperation("in", left, right)=> {
                 val op = expr.asInstanceOf[BinaryOperation].op
@@ -531,7 +539,7 @@ object Execute{
                 if Settings.metaVariable.find(_._1 == name.toString()).get._2() then (List(), List(IFTrue)) else (List(), List(IFFalse))
             }
             case FunctionCallValue(name, args, typeargs, sel) if name.toString() == "Compiler.isVariable" => {
-                val check = args.forall(arg =>
+                val check = args.map(Utils.simplify).forall(arg =>
                     arg match
                         case VariableValue(name, sel) => true
                         case LinkedVariableValue(vari, sel) => true
@@ -639,6 +647,7 @@ object Execute{
                 case SwitchForEach(key, provider, SwitchCase(expr, instr)) => {
                     val cases = Utils.getForeachCases(key.toString(), provider)
                     
+                    var index = -1
                     cases.flatMap(v =>{
                         val ctx = context.getFreshContext()
                         v.map(v => {
@@ -647,6 +656,12 @@ object Execute{
                             val vari = new Variable(ctx, "dummy", Utils.typeof(v._2), mod)
                             ctx.addVariable(Identifier.fromString(v._1), vari)
                             vari.assign("=", v._2)
+
+                            val indx = new Variable(ctx, "dummy", IntType, mod)
+                            ctx.push(v._1).addVariable(Identifier.fromString("index"), indx)
+                            index += 1
+                            indx.assign("=", IntValue(index))
+
                             SwitchCase(Utils.fix(expr)(ctx, Set()), Utils.fix(instr)(ctx, Set()))
                         })
                     }).toList
@@ -1002,6 +1017,8 @@ case class IFNotValueCase(val value: IFCase) extends IFCase{
             case IfBlock(value, block, invert) => IfBlock(value, block, !invert)
             case IfBlocks(value, block, invert) => IfBlocks(value, block, !invert)
             case IfLoaded(value, block, invert) => IfLoaded(value, block, !invert)
+            case EmptyIR => EmptyIR
+            case other => other
         }
     }
 }

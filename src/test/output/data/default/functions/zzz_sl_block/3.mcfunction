@@ -1,2 +1,2 @@
-function default:zzz_sl_block/4
-execute unless score default.a.test.enabled tbms.var matches 0 run schedule function default:zzz_sl_block/3 1 append
+scoreboard players set default.fruit.test.onStart-0.0._2 tbms.var 1
+tag @a[tag=default.fruit.test.onStart-0.0._1] add default.fruit.test.objects

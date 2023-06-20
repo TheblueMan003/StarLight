@@ -72,7 +72,8 @@ object Parser extends StandardTokenParsers{
   def arguments: Parser[List[Argument]] = "(" ~> repsep(argument, ",") <~ ")"
 
   def instruction: Parser[Instruction] = positioned(
-      ((((doc ~ ("def" ~> modifier)) ~ identLazy ~ typeArgument)) ~ arguments) ~ instruction ^^ { case doc ~ mod ~ n ~ at ~ a ~i  => FunctionDecl(n, i, VoidType, a, at, mod.withDoc(doc)) }
+    ((((doc ~ ("def" ~> modifier)))) ~ arguments) ~ instruction ^^ { case doc ~ mod ~ a ~i  => FunctionDecl("~", i, VoidType, a, List(), mod.withDoc(doc)) }
+      | ((((doc ~ ("def" ~> modifier)) ~ identLazy ~ typeArgument)) ~ arguments) ~ instruction ^^ { case doc ~ mod ~ n ~ at ~ a ~i  => FunctionDecl(n, i, VoidType, a, at, mod.withDoc(doc)) }
       | ((((doc ~ (opt("def") ~> modifier)) ~ types) ~ identLazy ~ typeArgument) ~ arguments) ~ instruction ^^ { case doc ~ mod ~ t ~ n ~ at ~ a ~i  => FunctionDecl(n, i, t, a, at, mod.withDoc(doc)) }
       | (((identFunction ~ typeVariables <~ "(") ~ repsep(exprNoTuple, ",")) <~ ")") ~ block ^^ {case f ~ t ~ e ~ b => FunctionCall(f, e ::: List(LambdaValue(List(), b)), t)} // Function Call
       | ((identFunction ~ typeVariables <~ "(") ~ repsep(exprNoTuple, ",")) <~ ")" ^^ {case f ~ t ~ e => FunctionCall(f, e, t)} // Function Call
@@ -134,8 +135,10 @@ object Parser extends StandardTokenParsers{
   def structDecl: Parser[Instruction] = positioned(doc ~ (modifier <~ "struct") ~ identLazy ~ typeArgument ~ opt("extends" ~> ident2) ~ block ^^ 
   { case doc ~ mod ~ iden ~ typeargs ~ par ~ block => StructDecl(iden, typeargs, block, mod.withDoc(doc), par) })
   def typedef: Parser[Instruction] = positioned("typedef" ~> types ~ identLazy ^^ { case _1 ~ _2 => TypeDef(_2, _1) })
-  def templateUse: Parser[Instruction] = positioned(ident2 ~ identLazy ~ block ^^ {case iden ~ name ~ instr => TemplateUse(iden, name, instr)})
-  def templateDesc: Parser[Instruction] = positioned(doc ~ (modifier <~ "template") ~ identLazy ~ opt("extends" ~> ident2) ~ instruction ^^ {case doc ~ mod ~ name ~ parent ~ instr => TemplateDecl(name, instr, mod.withDoc(doc), parent)})
+  def templateUse: Parser[Instruction] = positioned(ident2 ~ typeArgumentExpression ~ identLazy ~ block ^^ {case iden ~ values ~ name ~ instr => TemplateUse(iden, name, instr, values)})
+  def templateDesc: Parser[Instruction] = positioned(doc ~ (modifier <~ "template") ~ identLazy ~ typeArgument ~ opt("extends" ~> (ident2 ~ typeArgumentExpression)) ~ instruction ^^ 
+    {case doc ~ mod ~ name ~ generics ~ Some(parent ~ genericsParent) ~ instr => TemplateDecl(name, instr, mod.withDoc(doc), Some(parent), generics, genericsParent);
+     case doc ~ mod ~ name ~ generics ~ None ~ instr => TemplateDecl(name, instr, mod.withDoc(doc), None, generics, List())})
   def importShortInst: Parser[Instruction] = positioned("import"~>ident2 ~ "::" ~ ident2 ~ opt("as" ~> ident2) ^^ {case file ~ _ ~ res ~ alias => Import(file, res, alias.getOrElse(null))})
   def importInst: Parser[Instruction] = positioned("import"~>ident2 ~ opt("as" ~> ident2) ^^ {case file ~ alias => Import(file, null, alias.getOrElse(null))})
   def fromImportInst: Parser[Instruction] = positioned("from"~>ident2 ~ ("import" ~> ident2) ~ opt("as" ~> ident2) ^^ {case file ~ res ~ alias => Import(file, res, alias.getOrElse(null))})
@@ -251,14 +254,15 @@ object Parser extends StandardTokenParsers{
   def frontCoordinateHere: Parser[String] = "^" ^^^ "^"
   def frontCoordinate: Parser[String] = frontCoordinateNumber | frontCoordinateHere
 
-  def relPositionCase1: Parser[String] = relCoordinate2 ~ validCordNumber1 ~ relCoordinate ^^ {case x ~ y ~ z => f"$x $y $z"}
-  def relPositionCase2: Parser[String] = relCoordinate ~ relCoordinate2 ~ validCordNumber1 ^^ {case x ~ y ~ z => f"$x $y $z"}
+  def relPositionCase1: Parser[String] = relCoordinate2 ~ validCordNumber2 ~ relCoordinate ^^ {case x ~ y ~ z => f"$x $y $z"}
+  def relPositionCase2: Parser[String] = relCoordinate ~ relCoordinate2 ~ validCordNumber2 ^^ {case x ~ y ~ z => f"$x $y $z"}
 
   def frontPosition: Parser[String] = frontCoordinate ~ frontCoordinate ~ frontCoordinate ^^ {case x ~ y ~ z => f"$x $y $z"}
   def relPosition: Parser[String] = relCoordinate ~ relCoordinate ~ relCoordinate ^^ {case x ~ y ~ z => f"$x $y $z"}
   def position: Parser[PositionValue] = (frontPosition | relPosition | relPositionCase1 | relPositionCase2) ^^ {case a => PositionValue(a)}
 
   def exprBottom: Parser[Expression] = positioned(
+    
     floatValue ^^ (p => FloatValue(p))
     | numericLit ^^ (p => IntValue(p.toInt))
     | "-" ~> floatValue ^^ (p => FloatValue(-p))
@@ -271,6 +275,8 @@ object Parser extends StandardTokenParsers{
     | "#" ~> ident2 ^^ (TagValue(_))
     | namespacedName
     | stringLit2 ^^ (StringValue(_))
+    | identLazy2 ~ selector ^^ { case id ~ sel => BinaryOperation("in", SelectorValue(sel), VariableValue(id)) }
+    | "new" ~> typeVariables ~ ("(" ~> repsep(exprNoTuple, ",") <~ ")") ^^ { case t ~ a => ConstructorCall("@@@", a, t) }
     | "new" ~> nonRecTypes ~ ("[" ~> repsep(exprNoTuple, ",") <~ "]") ^^ { case t ~ a => ConstructorCall("standard.array.Array", a, List(t)) }
     | "new" ~> identLazy2 ~ typeVariables ~ ("(" ~> repsep(exprNoTuple, ",") <~ ")") ~ block ^^ { case f ~ t ~ a ~ b => ConstructorCall(f, a ::: List(LambdaValue(List(), b)), t) }
     | "new" ~> identLazy2 ~ typeVariables ~ ("(" ~> repsep(exprNoTuple, ",") <~ ")") ^^ { case f ~ t ~ a => ConstructorCall(f, a, t) }
@@ -289,6 +295,7 @@ object Parser extends StandardTokenParsers{
   def typeVariablesForce = "<" ~ repsep(types,",") ~ ">" ^^ {case _ ~ a ~ _ => a}
   def typeVariables = opt(typeVariablesForce) ^^ {case Some(a) => a;case None => List()}
   def typeArgument = opt("<" ~ repsep(ident,",") ~ ">") ^^ {case Some(_ ~ a ~ _) => a;case None => List()}
+  def typeArgumentExpression= opt("<" ~ repsep(exprBottom,",") ~ ">") ^^ {case Some(_ ~ a ~ _) => a;case None => List()}
 
   def exprDot: Parser[Expression] = positioned(rep1sep(exprBottom, ".") ^^ { case e if e.size == 1 => e.head; case e => e.tail.foldLeft(e.head)((p, n) => DotValue(p, n))})
   def exprRange: Parser[Expression] = positioned(exprDot ~ opt(".."~>exprDot ~ opt("by"~>exprDot)) ^^ { case e ~ None => e; case e1 ~ Some(e2 ~ None) => RangeValue(e1, e2, IntValue(1)); case e1 ~ Some(e2 ~ Some(e3)) => RangeValue(e1, e2, e3)})

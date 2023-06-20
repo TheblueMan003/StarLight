@@ -49,7 +49,7 @@ case class PredicateDecl(val name: String, val args: List[Argument], val block: 
 case class FunctionDecl(val name: String, val block: Instruction, val typ: Type, val args: List[Argument], val typeArgs: List[String], val modifier: Modifier) extends Instruction {
   override def toString() = f"def ${name} ${block}"
 }
-case class TemplateDecl(val name: String, val block: Instruction, val modifier: Modifier, val parent: Option[String]) extends Instruction {
+case class TemplateDecl(val name: String, val block: Instruction, val modifier: Modifier, val parent: Option[String], val generics: List[String], val parentGenerics: List[Expression]) extends Instruction {
   override def toString() = f"template ${name} ${block}"
 }
 case class BlocktagDecl(val name: String, val values: List[Expression], val modifier: Modifier) extends Instruction {
@@ -84,7 +84,7 @@ case class CMD(val value: String) extends Instruction{
 case class FunctionCall(val name: Identifier, val args: List[Expression], val typeargs: List[Type]) extends Instruction {
   override def toString() = f"${name}()"
 }
-case class TemplateUse(val template: Identifier, val name: String, val block: Instruction) extends Instruction {
+case class TemplateUse(val template: Identifier, val name: String, val block: Instruction, val values: List[Expression]) extends Instruction {
   override def toString() = f"template ${name}()"
 }
 case class LinkedFunctionCall(val fct: Function, val args: List[Expression], val ret: Variable = null) extends Instruction {

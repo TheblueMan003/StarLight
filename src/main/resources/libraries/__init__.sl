@@ -16,6 +16,37 @@ def @tick __playertick__(){
         }
     }
 }
+int __totalRefCount
+def lazy __addBindEntity__(int variable, entity e){
+    if (variable == null){
+        __totalRefCount++
+        variable = __totalRefCount
+    }
+    int id = variable
+    with(e){
+        variable = id
+    }
+}
+def lazy __clearBindEntity__(int variable){
+    if (variable != null){
+        __totalRefCount++
+        variable = __totalRefCount
+    }
+}
+def lazy __withBindEntity__(int variable, void=>void action){
+    int id = variable
+    with(@e, false, variable == id){
+        action()
+    }
+}
+def lazy entity __getBindEntity__(int variable){
+    int id = variable
+    entity ne = null
+    with(@e, false, variable == id){
+        ne += @s
+    }
+    return ne
+}
 
 def lazy aligned(void=>void fct){
     align("xyz")at(~0.5 ~ ~0.5)fct()
@@ -37,8 +68,6 @@ def lazy __at__(float x, float y, float z, void=>void fct){
         /kill @s
     }
 }
-
-int __totalRefCount
 
 class object{
     private int __ref

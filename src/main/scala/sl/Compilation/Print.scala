@@ -34,12 +34,14 @@ object Print{
             case PositionValue(value) => throw new Exception("Cannot use position inside rawjson")
             case TagValue(value) => throw new Exception("Cannot use tag inside rawjson")
             case StringValue(value) => 
-                val reg = "[a-zA-Z0-9_\\.]+".r
+                val reg = "[a-zA-Z0-9_]+(\\.[a-zA-Z0-9_])+".r
                 reg.findFirstMatchIn(value) match
                     case Some(v) if v.matched == value => {
                         (List(), List(PrintTranslate(f"$value", RawJsonValue(List()), col, mod)))
                     }
-                    case _ => (List(), List(PrintString(f"$value", col, mod)))
+                    case _ => 
+                        val str = value.replace("\\","\\\\")
+                        (List(), List(PrintString(f"$str", col, mod)))
             case NamespacedName(value) => (List(), List(PrintString(f"$value", col, mod)))
             case VariableValue(name, sel) => {
                 ctx.tryGetVariable(name) match
@@ -108,7 +110,7 @@ object Print{
                 val (p2, print) = toRawJson(vari)
                 (p1:::p2,print)
             }
-            case JsonValue(content) => ???
+            case JsonValue(content) => toRawJson(StringValue(content.getString().replace("\"", "\\\"")))
             case TupleValue(values) => {
                 if (top){
                     val (p2, print) = toRawJson(values(0))

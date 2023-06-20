@@ -2,7 +2,7 @@ package sl
 
 import objects.{Context, ConcreteFunction, GenericFunction, LazyFunction, Modifier, Struct, Class, Template, Variable, Enum, EnumField, Predicate, Property}
 import objects.Identifier
-import objects.types.{VoidType, TupleType, IdentifierType, ArrayType}
+import objects.types.{VoidType, TupleType, IdentifierType, ArrayType, IntType}
 import sl.Compilation.Execute
 import sl.Compilation.Selector.Selector
 import objects.types.JsonType
@@ -38,7 +38,8 @@ object Compiler{
     def compile(instruction: Instruction, meta: Meta = Meta(false, false))(implicit context: Context):List[IRTree]={   
         try{
             instruction match{
-                case FunctionDecl(name, block, typ2, args, typevars, modifier) =>{
+                case FunctionDecl(name2, block, typ2, args, typevars, modifier) =>{
+                    val name = if (name2 == "~") then context.getFreshLambdaName() else name2
                     var fname = context.getFunctionWorkingName(name)
                     if (typevars.length > 0){
                         val func = new GenericFunction(context, context.getPath()+"."+name, fname, args, typevars, typ2, modifier, block.unBlockify())
@@ -89,13 +90,13 @@ object Compiler{
                     }
                     List()
                 }
-                case TemplateDecl(name, block, modifier, parent) => {
+                case TemplateDecl(name, block, modifier, parent, generics, parentGenerics) => {
                     if (!meta.firstPass){
                         val parentTemplate = parent match
                             case None => null
                             case Some(p) => context.getTemplate(p)
                         
-                        context.addTemplate(new Template(context, name, modifier, block.unBlockify(), parentTemplate))
+                        context.addTemplate(new Template(context, name, modifier, block.unBlockify(), parentTemplate, generics, parentGenerics))
                     }
                     List()
                 }
@@ -130,6 +131,7 @@ object Compiler{
                     val cases = Utils.getForeachCases(key.toString(), provider)
                     
                     //cases.map(lst => lst.sortBy(0 - _._1.length()).foldLeft(instr)((instr, elm) => Utils.subst(instr, elm._1, elm._2))).flatMap(Compiler.compile(_)).toList
+                    var index = -1
                     cases.flatMap(v =>{
                         val ctx = context.getFreshContext()
                         v.flatMap(v => {
@@ -137,11 +139,18 @@ object Compiler{
                             mod.isLazy = true
                             val vari = new Variable(ctx, "dummy", Utils.typeof(v._2), mod)
                             ctx.addVariable(Identifier.fromString(v._1), vari)
-                            vari.assign("=", v._2)
+
+                            val indx = new Variable(ctx, "dummy", IntType, mod)
+                            ctx.push(v._1).addVariable(Identifier.fromString("index"), indx)
+                            index += 1
+
+                            vari.assign("=", v._2):::
+                            indx.assign("=", IntValue(index))
                         }):::Compiler.compile(instr.unBlockify())(ctx)
                     }).toList
                 }
-                case VariableDecl(names, typ, modifier, op, expr) => {
+                case VariableDecl(names2, typ, modifier, op, expr) => {
+                    val names = names2.map(n => if n == "@@@" then context.getFreshId() else n)
                     if (typ == IdentifierType("val", List()) || typ == IdentifierType("var", List())){
                         if (typ == IdentifierType("val", List())) modifier.isConst = true
                         Utils.simplify(expr) match
@@ -207,7 +216,7 @@ object Compiler{
                     }
                     ret
                 }
-                case TemplateUse(iden, name, block) => {
+                case TemplateUse(iden, name, block, values) => {
                     if (iden.toString() == "property"){
                         val sub = context.push(name)
 
@@ -223,7 +232,7 @@ object Compiler{
                         sub.inherit(template.getContext())
                         sub.push("this", sub)
                         sub.setTemplateUse()
-                        compile(Utils.fix(template.getBlock())(template.context, Set()), meta.withFirstPass)(sub) ::: compile(block.unBlockify(), meta.withFirstPass)(sub)
+                        compile(Utils.fix(template.getBlock(values))(template.context, Set()), meta.withFirstPass)(sub) ::: compile(block.unBlockify(), meta.withFirstPass)(sub)
                     }
                 }
 

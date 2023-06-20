@@ -60,8 +60,8 @@ object StaticAnalyser{
             case StructDecl(name, generics, block, modifier, parent) => StructDecl(name, generics, check(block), modifier, parent)
             case ForEach(key, provider, instr) => ForEach(key, provider, check(instr))
             case ForGenerate(key, provider, instr) => ForGenerate(key, provider, check(instr))
-            case TemplateDecl(name, block, modifier, parent) => TemplateDecl(name, check(block), modifier, parent)
-            case TemplateUse(template, name, block) => TemplateUse(template, name, check(block))
+            case TemplateDecl(name, block, modifier, parent, generics, parentGenerics) => TemplateDecl(name, check(block), modifier, parent, generics, parentGenerics)
+            case TemplateUse(template, name, block, values) => TemplateUse(template, name, check(block), values)
             case _ => instruction
     })
     def hasReturn(instruction: Instruction): ReturnState = {

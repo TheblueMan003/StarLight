@@ -43,12 +43,12 @@ object ContextBuilder{
                 val enm = context.addEnum(new Enum(context, name, modifier, fields))
                 List()
             }
-            case TemplateDecl(name, block, modifier, parent) => {
+            case TemplateDecl(name, block, modifier, parent, generics, parentGenerics) => {
                 val parentTemplate = parent match
                     case None => null
                     case Some(p) => context.getTemplate(p)
                 
-                context.addTemplate(new Template(context, name, modifier, block.unBlockify(), parentTemplate))
+                context.addTemplate(new Template(context, name, modifier, block.unBlockify(), parentTemplate, generics, parentGenerics))
             }
             case TypeDef(name, typ) => {
                 context.addTypeDef(name, typ)
@@ -71,7 +71,7 @@ object ContextBuilder{
                 block.foreach(p => buildRec(p)(context, meta))
             }
             case InstructionBlock(block) => {
-                ???
+                block.foreach(p => buildRec(p)(context, meta))
             }
             case ForGenerate(key, provider, instr) => {
                 val cases = Utils.getForgenerateCases(key, provider)

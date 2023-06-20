@@ -100,8 +100,8 @@ object Utils{
             case InstructionList(list) => InstructionList(list.map(substReturn(_, to)))
             case InstructionBlock(list) => InstructionBlock(list.map(substReturn(_, to)))
 
-            case TemplateDecl(name, block, modifier, parent) => TemplateDecl(name, substReturn(block, to), modifier, parent)
-            case TemplateUse(iden, name, instr) => TemplateUse(iden, name, substReturn(instr, to))
+            case TemplateDecl(name, block, modifier, parent, generics, parentGenerics) => TemplateDecl(name, substReturn(block, to), modifier, parent, generics, parentGenerics)
+            case TemplateUse(iden, name, instr, values) => TemplateUse(iden, name, substReturn(instr, to), values)
             case TypeDef(name, typ) => instr
 
             case ElseIf(cond, ifBlock) => ElseIf(cond, substReturn(ifBlock, to))
@@ -154,8 +154,8 @@ object Utils{
             case InstructionList(list) => InstructionList(list.map(subst(_, from, to)))
             case InstructionBlock(list) => InstructionBlock(list.map(subst(_, from, to)))
 
-            case TemplateDecl(name, block, modifier, parent) => TemplateDecl(name, subst(block, from, to), modifier, parent)
-            case TemplateUse(iden, name, instr) => TemplateUse(iden, name, subst(instr, from, to))
+            case TemplateDecl(name, block, modifier, parent, generics, parentGenerics) => TemplateDecl(name, subst(block, from, to), modifier, parent, generics, parentGenerics.map(subst(_, from, to)))
+            case TemplateUse(iden, name, instr, values) => TemplateUse(iden, name, subst(instr, from, to), values.map(subst(_, from, to)))
             case TypeDef(name, typ) => TypeDef(name, typ)
 
             case ElseIf(cond, ifBlock) => ElseIf(subst(cond, from, to), subst(ifBlock, from, to))
@@ -254,8 +254,8 @@ object Utils{
             case InstructionList(list) => InstructionList(list.map(subst(_, from, to)))
             case InstructionBlock(list) => InstructionBlock(list.map(subst(_, from, to)))
 
-            case TemplateDecl(name, block, modifier, parent) => TemplateDecl(name.replaceAllLiterally(from, to), subst(block, from, to), modifier, parent)
-            case TemplateUse(iden, name, instr) => TemplateUse(iden, name.replaceAllLiterally(from, to), subst(instr, from, to))
+            case TemplateDecl(name, block, modifier, parent, generics, parentGenerics) => TemplateDecl(name.replaceAllLiterally(from, to), subst(block, from, to), modifier, parent, generics, parentGenerics.map(subst(_, from, to)))
+            case TemplateUse(iden, name, instr, values) => TemplateUse(iden, name.replaceAllLiterally(from, to), subst(instr, from, to), values.map(subst(_, from, to)))
             case TypeDef(name, typ) => TypeDef(name.replaceAllLiterally(from, to), typ)
 
             case ElseIf(cond, ifBlock) => ElseIf(subst(cond, from, to), subst(ifBlock, from, to))
@@ -329,7 +329,13 @@ object Utils{
         } 
     }
 
-
+    def subst(typ: Type, from: String, to: Expression): Type = {
+        typ match
+            case FuncType(args, ret) => FuncType(args.map(subst(_, from, to)), subst(ret, from, to))
+            case TupleType(values) => TupleType(values.map(subst(_, from, to)))
+            case ArrayType(value, size) => ArrayType(subst(value, from, to), subst(size, from, to))
+            case other => other
+    }
     def subst(instr: Instruction, from: String, to: Expression): Instruction = positioned(instr, {
         instr match
             case Package(name, block) => Package(name, subst(block, from, to))
@@ -349,7 +355,7 @@ object Utils{
             case ForGenerate(key, provider, instr) => ForGenerate(key, subst(provider, from, to), subst(instr, from, to))
             case ForEach(key, provider, instr) => ForEach(key, subst(provider, from, to), subst(instr, from, to))
             case EnumDecl(name, fields, values, modifier) => EnumDecl(name, fields, values.map(v => EnumValue(v.name, v.fields.map(subst(_, from, to)))), modifier)
-            case VariableDecl(name, _type, modifier, op, expr) => VariableDecl(name, _type, modifier, op, subst(expr, from, to))
+            case VariableDecl(name, _type, modifier, op, expr) => VariableDecl(name, subst(_type, from, to), modifier, op, subst(expr, from, to))
             case Throw(expr) => Throw(subst(expr, from, to))
             case Try(instr, catchBlock, finallyBlock) => Try(subst(instr, from, to), subst(catchBlock, from, to), subst(finallyBlock, from, to))
 
@@ -358,8 +364,8 @@ object Utils{
 
             case TypeDef(name, typ) => TypeDef(name, typ)
 
-            case TemplateDecl(name, block, modifier, parent) => TemplateDecl(name, subst(block, from, to), modifier, parent)
-            case TemplateUse(iden, name, instr) => TemplateUse(iden, name, subst(instr, from, to))
+            case TemplateDecl(name, block, modifier, parent, generics, parentGenerics) => TemplateDecl(name, subst(block, from, to), modifier, parent, generics, parentGenerics.map(subst(_, from, to)))
+            case TemplateUse(iden, name, instr, values) => TemplateUse(iden, name, subst(instr, from, to), values.map(subst(_, from, to)))
 
             case ElseIf(cond, ifBlock) => ElseIf(subst(cond, from, to), subst(ifBlock, from, to))
             case If(cond, ifBlock, elseBlock) => If(subst(cond, from, to), subst(ifBlock, from, to), elseBlock.map(subst(_, from, to).asInstanceOf[ElseIf]))
@@ -402,8 +408,8 @@ object Utils{
             case InstructionBlock(list) => InstructionBlock(list.map(rmFunctions(_)))
             case TypeDef(name, typ) => instr
 
-            case TemplateDecl(name, block, modifier, parent) => TemplateDecl(name, rmFunctions(block), modifier, parent)
-            case TemplateUse(iden, name, instr) => TemplateUse(iden, name, rmFunctions(instr))
+            case TemplateDecl(name, block, modifier, parent, generics, parentGenerics) => TemplateDecl(name, rmFunctions(block), modifier, parent, generics, parentGenerics)
+            case TemplateUse(iden, name, instr, values) => TemplateUse(iden, name, rmFunctions(instr), values)
 
             case ElseIf(cond, ifBlock) => ElseIf(cond, rmFunctions(ifBlock))
             case If(cond, ifBlock, elseBlock) => If(cond, rmFunctions(ifBlock), elseBlock.map(rmFunctions(_).asInstanceOf[ElseIf]))
@@ -472,8 +478,8 @@ object Utils{
                 InstructionList(list.map(fix(_)(context, set2)))
             }
 
-            case TemplateDecl(name, block, modifier, parent) => TemplateDecl(name, fix(block), modifier, parent)
-            case TemplateUse(iden, name, instr) => TemplateUse(iden, name, fix(instr))
+            case TemplateDecl(name, block, modifier, parent, generics, parentGenerics) => TemplateDecl(name, fix(block), modifier, parent, generics, parentGenerics.map(fix(_)(context, ignore ++ generics.map(Identifier.fromString(_)).toSet)))
+            case TemplateUse(iden, name, instr, values) => TemplateUse(iden, name, fix(instr), values.map(fix(_)))
             case TypeDef(name, typ) => TypeDef(name, fix(typ))
 
             case ElseIf(cond, ifBlock) => ElseIf(fix(cond), fix(ifBlock))
@@ -617,6 +623,7 @@ object Utils{
             case RangeValue(min, max, delta) => RangeValue(subst(min, from, to), subst(max, from, to), subst(delta, from, to))
             case LambdaValue(args, instr) => LambdaValue(args, subst(instr, from, to))
             case lk: LinkedVariableValue => lk
+            case null => null
     })
 
 
@@ -667,8 +674,12 @@ object Utils{
             case LinkedVariableValue(name, sel) => (List(), LinkedVariableValue(name, sel))
             case FunctionCallValue(VariableValue(name, sel), args, typeargs, selector) => {
                 val vari = context.getFreshVariable(typeof(expr))
-                vari.modifiers.isLazy = true
-                (context.getFunction(name, args, typeargs, VoidType).call(vari), LinkedVariableValue(vari))
+
+                val fct = context.getFunction(name, args, typeargs, VoidType)
+
+                vari.modifiers.isLazy = !fct._1.modifiers.hasAttributes("requiresVariable")
+
+                (fct.call(vari), LinkedVariableValue(vari))
             }
             case other => {
                 val vari = context.getFreshVariable(typeof(other))
@@ -699,6 +710,8 @@ object Utils{
             case ArrayGetValue(name, index) => {
                 typeof(name) match
                     case ArrayType(inner, size) => inner
+                    case MCObjectType => MCObjectType
+                    case JsonType => JsonType
                     case other => throw new Exception(f"Illegal array access of $name of type $other")
             }
             case LinkedFunctionValue(fct) => FuncType(fct.arguments.map(_.typ), fct.getType())
@@ -830,6 +843,10 @@ object Utils{
                     case (a: Stringifyable, StringValue(b)) => StringValue(combine(op, a.getString(), b))
                     case (JsonValue(a), JsonValue(b)) => JsonValue(combine(op, a, b))
                     case (JsonValue(a), b) => JsonValue(combine(op, a, toJson(b)))
+                    case (SelectorValue(sel1), LinkedVariableValue(right, sel2)) if op == "in" &&  right.getType() == EntityType=> {
+                        val sel = sel1.add("tag", SelectorIdentifier(right.tagName))
+                        SelectorValue(sel)
+                    }
                     case (a, IntValue(b)) if op == "<<" => BinaryOperation("*", a, IntValue(math.pow(2, b).toInt))
                     case (a, IntValue(b)) if op == ">>" => BinaryOperation("/", a, IntValue(math.pow(2, b).toInt))
                     case (a, IntValue(b)) if op == "&" && isPowerOfTwo(b+1) => BinaryOperation("%", a, IntValue(b+1))
@@ -863,10 +880,20 @@ object Utils{
                 val inner = Utils.simplify(name)
                 val index2 = index.map(Utils.simplify(_))
                 (inner, index2) match
+                    case (TagValue(tag), List(IntValue(n))) => {
+                        val blt = context.tryGetBlockTag(tag)
+                        blt match
+                            case Some(value) => value.content(n)
+                            case None => throw new Exception(s"Unknown block tag $tag")
+                    }
+                    case (TagValue(tag), List(_)) => {
+                        throw new Exception(s"Block tag $tag can only be indexed with an integer")
+                    }
                     case (JsonValue(JsonArray(content)), List(IntValue(n))) => jsonToExpr(content(n))
                     case (JsonValue(JsonDictionary(content)), List(StringValue(n))) => jsonToExpr(content(n))
                     case (_, _) => ArrayGetValue(inner, index2)
             }
+            case TupleValue(values) => TupleValue(values.map(Utils.simplify(_)))
             case RangeValue(min, max, delta) => RangeValue(simplify(min), simplify(max), simplify(delta))
             case other => other
             
@@ -1094,8 +1121,16 @@ object Utils{
         simplify(provider) match
             case RangeValue(IntValue(min), IntValue(max), IntValue(delta)) => Range(min, max+1, delta).map(elm => List((key, elm.toString())))
             case TupleValue(lst) => lst.map(elm => List((key, elm.toString())))
+            case LinkedVariableValue(vari, sel) if vari.modifiers.isLazy => getForgenerateCases(key, vari.lazyValue)
             case VariableValue(iden, sel) if iden.toString().startsWith("@") => {
                 context.getFunctionTags(iden).getCompilerFunctionsName().map(name => List((key, name)))
+            }
+            case TagValue(iden) => {
+                val blt = context.tryGetBlockTag(iden)
+                blt match
+                    case Some(value) => return value.content.par.map(v => List((key, v.toString()))).toList
+                    case None => {}
+                throw new Exception(f"Unknown Generator: $iden")
             }
             case VariableValue(iden, sel) => {
                 val enm = context.tryGetEnum(iden)
@@ -1108,13 +1143,18 @@ object Utils{
                     case Some(value) => return value.content.par.map(v => List((key, v.toString()))).toList
                     case None => {}
 
+                val vari = context.tryGetVariable(iden)
+                vari match
+                    case Some(vri) if vri.modifiers.isLazy => getForgenerateCases(key, vri.lazyValue)
+                    case _ => {}
+
                 throw new Exception(f"Unknown Generator: $iden")
             }
             case JsonValue(content) => {
                 content match{
                     case JsonArray(content) => content.map(v => List((key, JsonValue(v).getString())))
                     case JsonDictionary(map) => map.map(v => List((key+"."+v._1, JsonValue(v._2).getString())))
-                    throw new Exception(f"JSON Generator Not supported: $provider")
+                    throw new Exception(f"JSON Generator Not supported: $provider $content")
                 }
             }
             case FunctionCallValue(iden, args, typeargs, selector) =>{
@@ -1181,6 +1221,14 @@ object Utils{
             case VariableValue(iden, sel) if iden.toString().startsWith("@") => {
                 context.getFunctionTags(iden).getCompilerFunctionsName().map(name => List((key, VariableValue(name))))
             }
+            case TagValue(iden) => {
+                val blt = context.tryGetBlockTag(iden)
+                blt match
+                    case Some(value) => return value.content.par.map(v => List((key, v))).toList
+                    case None => {}
+                throw new Exception(f"Unknown Generator: $iden")
+            }
+            case LinkedVariableValue(vari, sel) if vari.modifiers.isLazy => getForeachCases(key, vari.lazyValue)
             case VariableValue(iden, sel) => {
                 val enm = context.tryGetEnum(iden)
                 enm match
@@ -1191,12 +1239,17 @@ object Utils{
                     case Some(value) => return value.content.par.map(v => List((key, v))).toList
                     case None => {}
 
+                val vari = context.tryGetVariable(iden)
+                vari match
+                    case Some(vri) if vri.modifiers.isLazy => return getForeachCases(key, vri.lazyValue)
+                    case _ => {}
+
                 throw new Exception(f"Unknown Generator: $iden")
             }
             case JsonValue(content) => {
                 content match{
                     case JsonArray(content) => content.map(v => List((key, JsonValue(v))))
-                    throw new Exception(f"JSON Generator Not supported: $provider")
+                    case _ => throw new Exception(f"JSON Generator Not supported: $provider $content")
                 }
             }
             case FunctionCallValue(name, args, typeargs, selector) => {
@@ -1275,13 +1328,24 @@ object Utils{
             case VariableValue(name, sel) => {
                 context.tryGetClass(name) match
                     case None => getSelector(context.resolveVariable(expr))
-                    case Some(value) => {
+                    case Some(value) if !value.modifiers.isEntity => {
                         (List(),JavaSelector("@e", List(("tag", SelectorIdentifier(value.getTag())))))
                     }
+                    case Some(value) if value.modifiers.isEntity => {
+                        val e = context.getFreshVariable(EntityType)
+                        (context.getFunction("__getBindEntity__", List(VariableValue(Identifier.fromString(value.fullName+".binding"))), List(), VoidType, false).call(e), 
+                        JavaSelector("@e", List(("tag", SelectorIdentifier(e.tagName)))))
+                    }
+                    case Some(value) => throw new Exception(f"Not a selector: $expr")
             }
             case LinkedVariableValue(vari, sel) => 
                 vari.getType() match
-                    case EntityType => (List(),JavaSelector("@e", List(("tag", SelectorIdentifier(vari.tagName)))))
+                    case EntityType if !vari.modifiers.isEntity => (List(),JavaSelector("@e", List(("tag", SelectorIdentifier(vari.tagName)))))
+                    case EntityType if vari.modifiers.isEntity => {
+                        val e = context.getFreshVariable(EntityType)
+                        (context.getFunction("__getBindEntity__", List(VariableValue(Identifier.fromString(vari.fullName+".binding"))), List(), VoidType, false).call(e), 
+                        JavaSelector("@e", List(("tag", SelectorIdentifier(e.tagName)))))
+                    }
                     case _ => throw new Exception(f"Not a selector: $expr")
             case TupleValue(values) => ???
             case SelectorValue(value) => (List(), value)

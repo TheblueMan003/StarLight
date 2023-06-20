@@ -44,8 +44,8 @@ object DocMaker{
                     ContentMaker.h1(modifier.schema()+" class "+name + generics.mkString("<", ",", ">"))+
                     ContentMaker.p(modifier.doc)+"\n\n"
                  + make2(block)+"\n\n"
-            case TemplateDecl(name, block, modifier, parent) if modifier.protection != Private => 
-                    ContentMaker.h1(modifier.schema()+" template "+name)+
+            case TemplateDecl(name, block, modifier, parent, generics, parentGenerics) if modifier.protection != Private => 
+                    ContentMaker.h1(modifier.schema()+" template "+name + generics.mkString("<", ",", ">"))+
                     ContentMaker.p(modifier.doc)+"\n\n"
                  + make2(block)+"\n\n"
             case ForEach(key, provider, instr) => make2(instr)

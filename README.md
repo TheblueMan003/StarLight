@@ -65,7 +65,7 @@ Protected allow the variable to be accessed anywhere.
 Public allow the variable to be accessed anywhere & are exported to the interface for other datapack.
 By default variable start with `protected`.
 
-### Lazy
+### Lazy Variable
 Variable that are mark as `lazy` will have there value computed during the compilation.
 ```
 lazy int a = 5
@@ -422,6 +422,23 @@ jsonfile advancements.name{
     <json content>
 }
 ```
+
+Jsonfile can also take a lazy variable containing a json object:
+```
+lazy json jsonObj = {
+    "a": 0
+}
+jsonfile advancements.name jsonObj
+```
+
+Jsonfile can also take a mix of json object and json variable:
+```
+lazy int a = 0
+jsonfile advancements.name{
+    "a": a
+}
+```
+
 ### Attributes
 Attributes can be added to jsonfile to specify thing to the compiler.
 ```
@@ -576,20 +593,22 @@ example2 foo{
 }
 ```
 
-## Struct
-Struct allow you to create new type. Note that every time copy a struct to another a copy of the inner states is perform.
+### Generic Template
+Template can also accept type parameters with the following syntax:
 ```
-struct typ{
-    int a
-    int b
-    
-    def fct(){
-        a += b
+template example<T, U>{
+    T vari = U
+
+    def __init__(T value){
+        vari = value
     }
 }
 ```
-
-This allow to do static string & json manipulation.
+The value can be either a type or a value and can be use in the template body.
+When Instantiating the template, the type parameter can be given with the following syntax:
+```
+example<int, 0> instance
+```
 
 ### Lazy Functions
 Lazy functions are also not exported into the output code. Instead when they are called, there content is replace at the call site.
@@ -603,7 +622,10 @@ Will be the same as
 ```
 int b = 0
 ```
+Every argument of the function will be a lazy variable. If the variable start with a `$` it will be replace literally instead of being replace by it's value.
 Every call for function that are not mark as inline is done in a sub context meaning that variable inside it won't be usable after the call.
+
+Note: Lazy function can be recursive, but you must be careful to not create infinite loop, or the compiler will crash.
 
 ### Generic Functions
 Function can also support type parameters with the following syntax:
@@ -652,5 +674,93 @@ if (a is int){
 if (a is float){
     print("Is float")
 }
+if ("key" in dict){
+    print("Is dict")
+}
 ```
 This is computed at compile time and not runtime.
+
+## Foreach
+The foreach statement allow to iterate over a list of value and generate code for each of them.
+```
+foreach (i in (0, 1, 2)){
+    print(i)
+}
+```
+Will generate:
+```
+print(0)
+print(1)
+print(2)
+```
+Note that forgenerate "copy paste" the code inside the loop for each value. This mean that there is no loop at runtime.
+
+The allowed generators are:
+* `<start>..<end>`: Generate a range of number
+* `#<blocktag>`: Generate all the block inside the tag
+* `@<functiontag>`: Generate all the function inside the tag
+* `<json array>`: Generate all the value inside the array
+* `<json object>`: Generate all the key inside the object
+
+## Forgenerate
+Forgenerate is a legacy syntax that is not recommended to use. You can use foreach instead.
+Forgenerate can be used to generate code but work by replacing literal value inside the code. For instance:
+```
+forgenerate ($i, (0, 1, 2)){
+    /say $i
+}
+```
+Will generate:
+```
+/say 0
+/say 1
+/say 2
+```
+
+However, it is not possible to use the following syntax:
+```
+forgenerate ($i, (0, 1, 2)){
+    a = $i
+}
+```
+In this case the compiler will think that $i is a variable and not a literal value.
+
+## Compiler Function
+The compiler offer some function that can be used to generate code. They are: 
+* `Compiler.insert(<$name>, <value>){<code>}`: Insert the value inside the code. The value can be used with the syntax `$name`:
+```
+Compiler.insert($i, i){
+    /say $i
+}
+```
+Mutliple value can be insert at the same time:
+```
+Compiler.insert(($i, $j), (i, j)){
+    /say $i $j
+}
+```
+* `Compiler.readJson(<path>)`: Read a json file and return it as a lazy json object
+* `Compiler.random()`: Return a random number (At compile time)
+* `Compiler.variableExists(<name>)`: Return true if the variable exist
+* `Compiler.getTemplateName()`: Return the name of the current template
+* `Compiler.sqrt(<value>)`: Return the square root of the value
+* `Compiler.pow(<value>, <power>)`: Return the value to the power of the power
+* `Compiler.powInt(<value1>, <value2>)`: Return the value1 to the power of the value2
+* `Compiler.hash(<value1>)`: Return the hash of the value
+* `Compiler.getObjective(<variable>)`: Return the objective of the variable
+* `Compiler.getSelector(<variable>)`: Return the selector of the variable
+* `Compiler.getContextName()`: Return the name of the current context
+* `Compiler.getVariableTag()`: Return the tag of the current variable (for variable of type entity)
+* `Compiler.toNBT(<value>)`: Return the nbt of the json value
+* `Compiler.getProjectVersionType()`: Return the version type of the project alpha, beta, release
+* `Compiler.getProjectVersionMajor()`: Return the major version of the project
+* `Compiler.getProjectVersionMinor()`: Return the minor version of the project
+* `Compiler.getProjectFullName()`: Return the full name of the project
+* `Compiler.getProjectName()`: Return the name of the project
+* `Compiler.print()`: Print a message in the console
+* `Compiler.replace(<src>, <from>, <to>)`: Replace all the occurence of from by to in src string
+* `Compiler.toRadians(<value>)`: Convert the value to radians
+* `Compiler.toDegrees(<value>)`: Convert the value to degrees
+* `Compiler.makeUnique(<selector>)`: Return a selector that is unique
+* `Compiler.interpreterException(<message>)`: Throw an exception with the message in the interpreter
+* `Compiler.cmdstore(<variable>){<code>}`: Store the result of the code inside the variable

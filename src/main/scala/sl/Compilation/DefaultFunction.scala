@@ -9,10 +9,24 @@ import sys.process._
 import java.nio.file.Files
 import java.nio.file.Paths
 import sl.IR.*
+import scala.io.Source
 
 object DefaultFunction{
     def get()(implicit context: Context) = {
         val ctx = context.root.push("Compiler")
+        ctx.addFunction("readJson", CompilerFunction(ctx, "readJson", 
+                    List(Argument("path", StringType, None)),
+                    JsonType,
+                    Modifier.newPublic(),
+                    (args: List[Expression],ctx: Context) => {
+                        args match{
+                            case StringValue(path)::Nil => {
+                                (List(), JsonValue(Parser.parseJson(Source.fromFile(path).mkString)))
+                            }
+                            case other => throw new Exception(f"Illegal Arguments $other for readJson")
+                        }
+                    }
+                ))
         ctx.addFunction("random", CompilerFunction(ctx, "random", 
                     List(),
                     IntType,
@@ -532,6 +546,15 @@ object DefaultFunction{
                     args match{
                         case VariableValue(name, sel1):: s ::LambdaValue(arg, instr)::Nil => {
                             val ret = Compiler.compile(Utils.subst(instr, name.toString(), s.getString()))(ctx)
+                            (ret, NullValue)
+                        }
+                        case TupleValue(names):: TupleValue(replaces) ::LambdaValue(arg, instr)::Nil => {
+                            val substed = names.zip(replaces).foldLeft(instr){
+                                case (instr, (VariableValue(name, sel1), replace)) => 
+                                    Utils.subst(instr, name.toString(), replace.getString());
+                                case _ => throw new Exception("Illegal Arguments")}
+
+                            val ret = Compiler.compile(substed)(ctx)
                             (ret, NullValue)
                         }
                         case other => throw new Exception(f"Illegal Arguments $other for insert")

@@ -31,6 +31,12 @@ case class SBLink(entity: String, objective: String) extends IRTree{
 case class CommandIR(statement: String) extends IRTree{
     def getString(): String = statement
 }
+/* 
+case class CommandInsertIR(link: SBLink, vari: String, statement: String) extends IRTree{
+    def getString(): String = {
+        Range(-10, 10).map(i => "execute if score "+link.getString()+" matches "+i+" run "+statement.replace(vari, i.toString())).mkString("\n")
+    }
+}*/
 case class IfScoreboard(left: SBLink, op: String, right: SBLink, statement: IRTree, invert: Boolean = false) extends IRTree with IRExecute{
     def condition={
         if invert then 
@@ -231,7 +237,7 @@ case class ScoreboardSet(target: SBLink, value: Int) extends IRTree{
     def getString(): String = s"scoreboard players set $target $value"
 }
 case class ScoreboardAdd(target: SBLink, value: Int) extends IRTree{
-    def getString(): String = s"scoreboard players add $target $value"
+    def getString(): String = if (value >= 0){s"scoreboard players add $target $value"}else{s"scoreboard players remove $target ${-value}"}
 }
 case class StringSet(target: SBLink, value: String) extends IRTree{
     def getString(): String = s"data modify storage ${target.getStorage()} set value $value"
@@ -253,7 +259,7 @@ case class StringCopy(target: SBLink, value: SBLink, start: Int = Int.MinValue, 
     }
 }
 case class ScoreboardRemove(target: SBLink, value: Int) extends IRTree{
-    def getString(): String = s"scoreboard players remove $target $value"
+    def getString(): String = if (value >= 0){s"scoreboard players remove $target $value"}else{s"scoreboard players add $target ${-value}"}
 }
 case class ScoreboardReset(target: SBLink) extends IRTree{
     def getString(): String = s"scoreboard players reset $target"

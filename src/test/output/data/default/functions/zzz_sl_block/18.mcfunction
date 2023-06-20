@@ -1,3 +1,3 @@
-execute unless score default.a.test.enabled tbms.var = default.a.test.enabled tbms.var run scoreboard players set default.a.test.enabled tbms.var 0
-execute unless score default.a.test.crashCount tbms.var = default.a.test.crashCount tbms.var run scoreboard players set default.a.test.crashCount tbms.var 0
-execute unless score default.a.test.callback tbms.var = default.a.test.callback tbms.var run scoreboard players set default.a.test.callback tbms.var 0
+scoreboard players set @s default.fruit.test.room.IN 0
+function default:fruit/test/room/on-exit
+execute if score default.fruit.test.room.counting tbms.var matches 0 run function default:zzz_sl_block/16
