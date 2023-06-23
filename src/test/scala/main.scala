@@ -16,8 +16,8 @@ import sl.files.FileUtils
 import sl.Settings
 
 class ListFunSuite extends AnyFlatSpec with should.Matchers with BeforeAndAfterAll {
-    val testFiles: List[String] = List()//FileUtils.getListOfFiles("./src/test/resources/").filterNot(_.contains("__init__.sl"))
-    val compileTests: List[String] = List()//FileUtils.getListOfFiles("./src/main/resources/libraries").filterNot(_.contains("__init__.sl")) ::: FileUtils.getListOfFiles("./src/test/resources/").filterNot(_.contains("__init__.sl"))
+    val testFiles: List[String] = FileUtils.getListOfFiles("./src/test/resources/").filterNot(_.contains("__init__.sl"))
+    val compileTests: List[String] = FileUtils.getListOfFiles("./src/main/resources/libraries").filterNot(_.contains("__init__.sl")) ::: FileUtils.getListOfFiles("./src/test/resources/").filterNot(_.contains("__init__.sl"))
 
 
     def deleteDirectory(directoryToBeDeleted: File):Boolean= {

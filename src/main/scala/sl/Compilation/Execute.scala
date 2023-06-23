@@ -973,7 +973,7 @@ case class IFValueCase(val value: Expression) extends IFCase{
                             case other if other.isSubtypeOf(sub) => {
                                 IfScoreboard(
                                     SBLink(right.tupleVari(0).getSelectorName()(sel2), right.tupleVari(0).getSelectorObjective()(sel2)),
-                                    ">=",
+                                    "<=",
                                     SBLink(left.getSelectorName()(sel1), left.getSelectorObjective()(sel1)),
                                     IfScoreboard(
                                         SBLink(left.getSelectorName()(sel1), left.getSelectorObjective()(sel1)),
@@ -984,7 +984,7 @@ case class IFValueCase(val value: Expression) extends IFCase{
                             case RangeType(sub2) => {
                                 IfScoreboard(
                                     SBLink(right.tupleVari(0).getSelectorName()(sel2), right.tupleVari(0).getSelectorObjective()(sel2)),
-                                    ">=",
+                                    "<=",
                                     SBLink(left.tupleVari(0).getSelectorName()(sel1), left.tupleVari(0).getSelectorObjective()(sel1)),
                                     IfScoreboard(
                                         SBLink(left.tupleVari(1).getSelectorName()(sel1), left.tupleVari(1).getSelectorObjective()(sel1)),

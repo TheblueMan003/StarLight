@@ -1,2 +1,2 @@
-scoreboard players set default.main.main._0._0._0._2 tbms.var 1
-scoreboard players set default.main.main._0._0.stopped tbms.var 1
+function default:__itemtick__
+function default:__playertick__
