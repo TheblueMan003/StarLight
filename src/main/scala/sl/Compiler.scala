@@ -7,6 +7,8 @@ import sl.Compilation.Execute
 import sl.Compilation.Selector.Selector
 import objects.types.JsonType
 import sl.IR.*
+import objects.types.RangeType
+import objects.types.StructType
 
 object Compiler{
     def compile(context: Context):List[IRFile] = {
@@ -128,26 +130,37 @@ object Compiler{
                     cases.map(lst => lst.sortBy(0 - _._1.length()).foldLeft(instr.unBlockify())((instr, elm) => Utils.subst(instr, elm._1, elm._2))).flatMap(Compiler.compile(_, meta)).toList
                 }
                 case ForEach(key, provider, instr) => {
-                    val cases = Utils.getForeachCases(key.toString(), provider)
+                    Utils.simplify(provider) match{
+                        case LinkedVariableValue(vari, sel) if vari.getType().isInstanceOf[RangeType] && !vari.modifiers.isLazy => {
+                            val RangeType(subtype) = vari.getType(): @unchecked
+                            val keystr = key.toString()
+                            compile(InstructionBlock(List(VariableDecl(List(keystr), subtype, Modifier.newPrivate(), "=", LinkedVariableValue(vari.tupleVari(0), sel)), 
+                            WhileLoop(BinaryOperation("<=", VariableValue(keystr), LinkedVariableValue(vari.tupleVari(0), sel)), 
+                            InstructionList(List(instr, VariableAssigment(List((Left(key), Selector.self)), "+=", IntValue(1))))))))
+                        }
+                        case other => {
+                            val cases = Utils.getForeachCases(key.toString(), provider)
                     
-                    //cases.map(lst => lst.sortBy(0 - _._1.length()).foldLeft(instr)((instr, elm) => Utils.subst(instr, elm._1, elm._2))).flatMap(Compiler.compile(_)).toList
-                    var index = -1
-                    cases.flatMap(v =>{
-                        val ctx = context.getFreshContext()
-                        v.flatMap(v => {
-                            val mod = Modifier.newPrivate()
-                            mod.isLazy = true
-                            val vari = new Variable(ctx, "dummy", Utils.typeof(v._2), mod)
-                            ctx.addVariable(Identifier.fromString(v._1), vari)
+                            //cases.map(lst => lst.sortBy(0 - _._1.length()).foldLeft(instr)((instr, elm) => Utils.subst(instr, elm._1, elm._2))).flatMap(Compiler.compile(_)).toList
+                            var index = -1
+                            cases.flatMap(v =>{
+                                val ctx = context.getFreshContext()
+                                v.flatMap(v => {
+                                    val mod = Modifier.newPrivate()
+                                    mod.isLazy = true
+                                    val vari = new Variable(ctx, "dummy", Utils.typeof(v._2), mod)
+                                    ctx.addVariable(Identifier.fromString(v._1), vari)
 
-                            val indx = new Variable(ctx, "dummy", IntType, mod)
-                            ctx.push(v._1).addVariable(Identifier.fromString("index"), indx)
-                            index += 1
+                                    val indx = new Variable(ctx, "dummy", IntType, mod)
+                                    ctx.push(v._1).addVariable(Identifier.fromString("index"), indx)
+                                    index += 1
 
-                            vari.assign("=", v._2):::
-                            indx.assign("=", IntValue(index))
-                        }):::Compiler.compile(instr.unBlockify())(ctx)
-                    }).toList
+                                    vari.assign("=", v._2):::
+                                    indx.assign("=", IntValue(index))
+                                }):::Compiler.compile(instr.unBlockify())(ctx)
+                            }).toList
+                        }
+                    }
                 }
                 case VariableDecl(names2, typ, modifier, op, expr) => {
                     val names = names2.map(n => if n == "@@@" then context.getFreshId() else n)
@@ -344,11 +357,17 @@ object Compiler{
                     block.flatMap(inst => compile(inst, meta)(ctx))
                 }
                 case FunctionCall(name, args, typeargs) => {
-                    val (fct,cargs) = context.getFunction(name, args, typeargs, VoidType)
-                    if (fct != null && fct.modifiers.hasAttributes("compileAtCall")){
-                        fct.asInstanceOf[ConcreteFunction].compile()
+                    context.tryGetVariable(name) match
+                        case Some(vari) if vari.getType().isInstanceOf[StructType] => {
+                            Compiler.compile(FunctionCall(name.child("__apply__"), args, typeargs))
+                        }
+                        case other => {
+                            val (fct,cargs) = context.getFunction(name, args, typeargs, VoidType)
+                            if (fct != null && fct.modifiers.hasAttributes("compileAtCall")){
+                                fct.asInstanceOf[ConcreteFunction].compile()
+                            }
+                            (fct, cargs).call()
                     }
-                    (fct, cargs).call()
                 }
                 case LinkedFunctionCall(name, args, ret) => {
                     (name, args).call(ret)

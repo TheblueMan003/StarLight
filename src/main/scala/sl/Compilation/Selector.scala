@@ -23,7 +23,7 @@ object Selector{
 
     def self = {
         JavaSelector("@s",List())
-    }
+    }    
 }
 trait Selector{
     def getString()(implicit context: Context): String
@@ -66,6 +66,8 @@ trait Selector{
     }
 
     def withPrefix(prefix: String): Selector
+    def fix(implicit context: Context, ignore: Set[Identifier]): Selector
+    def subst(from: String, to: String): Selector
 }
 val EmptySelector = JavaSelector("@s", List(("tag", SelectorIdentifier("sl_empty"))))
 
@@ -83,6 +85,12 @@ case class BedrockSelector(val prefix: String, val filters: List[(String, Select
         else{
             throw new Exception(f"Unsupported target: ${Settings.target}")
         }
+    }
+    override def fix(implicit context: Context, ignore: Set[Identifier]): Selector ={
+        BedrockSelector(prefix, filters.map((k,v) => (k, v.fix(context, ignore))))
+    }
+    override def subst(from: String, to: String): Selector = {
+        BedrockSelector(prefix, filters.map((k,v) => (k, v.subst(from, to))))
     }
     def filterToJava(key: String, value: SelectorFilterValue, lst: List[(String, SelectorFilterValue)]): List[(String, SelectorFilterValue)] = {
         key match{
@@ -187,7 +195,12 @@ case class JavaSelector(val prefix: String, val filters: List[(String, SelectorF
             throw new Exception(f"Unsupported target: ${Settings.target}")
         }
     }
-
+    override def fix(implicit context: Context, ignore: Set[Identifier]): Selector ={
+        JavaSelector(prefix, filters.map((k,v) => (k, v.fix(context, ignore))))
+    }
+    override def subst(from: String, to: String): Selector = {
+        JavaSelector(prefix, filters.map((k,v) => (k, v.subst(from, to))))
+    }
     def filterToBedrock(key: String, value: SelectorFilterValue, lst: List[(String, SelectorFilterValue)]): List[(String, SelectorFilterValue)] = {
         key match{
             case "limit" => {
@@ -275,23 +288,35 @@ case class JavaSelector(val prefix: String, val filters: List[(String, SelectorF
 
 trait SelectorFilterValue{
     def getString()(implicit context: Context): String
+    def fix(implicit context: Context, ignore: Set[Identifier]): SelectorFilterValue
+    def subst(from: String, to: String): SelectorFilterValue
 }
 case class SelectorRange(val min: SelectorFilterValue, val max: SelectorFilterValue) extends SelectorFilterValue{
     override def getString()(implicit context: Context): String = f"${min.getString()}..${max.getString()}"
+    override def fix(implicit context: Context, ignore: Set[Identifier]): SelectorFilterValue = SelectorRange(min.fix, max.fix)
+    override def subst(from: String, to: String): SelectorFilterValue = SelectorRange(min.subst(from, to), max.subst(from, to))
 }
 case class SelectorLowerRange(val max: SelectorFilterValue) extends SelectorFilterValue{
     override def getString()(implicit context: Context): String = f"..${max.getString()}"
+    override def fix(implicit context: Context, ignore: Set[Identifier]): SelectorFilterValue = SelectorLowerRange(max.fix)
+    override def subst(from: String, to: String): SelectorFilterValue = SelectorLowerRange(max.subst(from, to))
 }
 case class SelectorGreaterRange(val min: SelectorFilterValue) extends SelectorFilterValue{
     override def getString()(implicit context: Context): String = f"${min.getString()}.."
+    override def fix(implicit context: Context, ignore: Set[Identifier]): SelectorFilterValue = SelectorLowerRange(min.fix)
+    override def subst(from: String, to: String): SelectorFilterValue = SelectorLowerRange(min.subst(from, to))
 }
 case class SelectorNumber(val value: Double) extends SelectorFilterValue{
     override def getString()(implicit context: Context): String = 
         val int = value.toInt
         if int == value then f"$int" else f"$value"
+    override def fix(implicit context: Context, ignore: Set[Identifier]): SelectorFilterValue = this
+    override def subst(from: String, to: String): SelectorFilterValue = this
 }
 case class SelectorString(val value: String) extends SelectorFilterValue{
     override def getString()(implicit context: Context): String = f"\"${value.replaceAll("\\\\","\\\\")}\""
+    override def fix(implicit context: Context, ignore: Set[Identifier]): SelectorFilterValue = this
+    override def subst(from: String, to: String): SelectorFilterValue = SelectorString(value.replaceAll(from, to))
 }
 case class SelectorIdentifier(val value: String) extends SelectorFilterValue{
     override def getString()(implicit context: Context): String = {
@@ -307,16 +332,36 @@ case class SelectorIdentifier(val value: String) extends SelectorFilterValue{
             }
             case _ => value
     }
+    override def fix(implicit context: Context, ignore: Set[Identifier]): SelectorFilterValue = {
+        context.tryGetVariable(value) match
+            case Some(vari) if vari.modifiers.isLazy => {
+                vari.lazyValue match
+                    case IntValue(n) => SelectorNumber(n)
+                    case FloatValue(n) => SelectorNumber(n)
+                    case NamespacedName(n) => SelectorString(n)
+                    case StringValue(value) => SelectorString(value)
+                    case JsonValue(value) => SelectorNbt(value)
+                    case other => throw new Exception(f"Lazy value not supported: $other")
+            }
+            case _ => this
+    }
+    override def subst(from: String, to: String): SelectorFilterValue = SelectorIdentifier(value.replaceAll(from, to))
 }
 
 case class SelectorNbt(val value: JSONElement) extends SelectorFilterValue{
     override def getString()(implicit context: Context): String = value.getNbt()
+    override def fix(implicit context: Context, ignore: Set[Identifier]): SelectorFilterValue = this
+    override def subst(from: String, to: String): SelectorFilterValue = SelectorNbt(Utils.subst(value, from, to))
 }
 
 case class SelectorInvert(val value: SelectorFilterValue) extends SelectorFilterValue{
     override def getString()(implicit context: Context): String = f"!${value.getString()}"
+    override def fix(implicit context: Context, ignore: Set[Identifier]): SelectorFilterValue = SelectorInvert(value.fix)
+    override def subst(from: String, to: String): SelectorFilterValue = SelectorInvert(value.subst(from, to))
 }
 
 case class SelectorComposed(val value: Map[String, SelectorFilterValue]) extends SelectorFilterValue{
     override def getString()(implicit context: Context): String = "{" + value.map((k,v) => f"$k=${v.getString()}").reduce(_ +", "+_) + "}"
+    override def fix(implicit context: Context, ignore: Set[Identifier]): SelectorFilterValue = SelectorComposed(value.map((k,v) => (k, v.fix)))
+    override def subst(from: String, to: String): SelectorFilterValue = SelectorComposed(value.map((k,v) => (k, v.subst(from, to))))
 }

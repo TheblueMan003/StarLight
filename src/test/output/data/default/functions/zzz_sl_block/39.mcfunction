@@ -1,10 +1,8 @@
-scoreboard players set default.fruit.test.room.particule.__hasFunctionReturned__ tbms.var 0
-scoreboard players operation default.fruit.test.room.particule._0 tbms.var = default.fruit.test.room.color tbms.var
-execute if score default.fruit.test.room.particule._0 tbms.var matches 1 run particle minecraft:dust 1 0 0 1 ~ ~ ~ 0 0 0 0 1
-execute if score default.fruit.test.room.particule._0 tbms.var matches 2 run particle minecraft:dust 1 0.5 0 1 ~ ~ ~ 0 0 0 0 1
-execute if score default.fruit.test.room.particule._0 tbms.var matches 3 run particle minecraft:dust 1 1 0 1 ~ ~ ~ 0 0 0 0 1
-execute if score default.fruit.test.room.particule._0 tbms.var matches 4 run particle minecraft:dust 0 1 0 1 ~ ~ ~ 0 0 0 0 1
-execute if score default.fruit.test.room.particule._0 tbms.var matches 5 run particle minecraft:dust 0 1 1 1 ~ ~ ~ 0 0 0 0 1
-execute if score default.fruit.test.room.particule._0 tbms.var matches 6 run particle minecraft:dust 0 0 1 1 ~ ~ ~ 0 0 0 0 1
-execute if score default.fruit.test.room.particule._0 tbms.var matches 7 run particle minecraft:dust 1 0 1 1 ~ ~ ~ 0 0 0 0 1
-execute if score default.fruit.test.room.particule._0 tbms.var matches 0 run particle minecraft:dust 1 1 1 1 ~ ~ ~ 0 0 0 0 1
+summon item ~ ~2 ~ {Tags:["newTag","slitted"],Item:{id:"minecraft:enchanted_book", Count:1, tag:{StoredEnchantments:[]}}}
+data modify entity @e[tag=newTag,limit=1] Item.tag.StoredEnchantments append from entity @s Item.tag.StoredEnchantments[9]
+execute as @e[tag=newTag,limit=1] run tag @s remove newTag
+execute unless score default.main.main._0._0._9.c tbms.var = default.main.main._0._0._9.c tbms.var run scoreboard players set default.main.main._0._0._9.c tbms.var 0
+execute store result score default.main.main._0._0._9.c tbms.var run CommandIR(kill @e[tag=slitted,type=item,nbt={Item:{id:"minecraft:enchanted_book", tag:{StoredEnchantments:[]}}}])
+scoreboard players set default.main.main._0._0._9._2 tbms.var 0
+execute if score default.main.main._0._0._9.c tbms.var matches 1.. run function default:zzz_sl_block/37
+execute if score default.main.main._0._0._9._2 tbms.var matches 0 run scoreboard players add default.main.main._0._0.count tbms.var 1

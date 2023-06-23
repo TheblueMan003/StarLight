@@ -8,6 +8,7 @@ import sl.IR.*
 case class PackInfo(var version: Int, var description: String, var min_engine_version: List[Int])
 class SettingsContext(){
     var name = "default"
+    var author = "user"
     var version = List(1,0,0)
     var variableScoreboard = "tbms.var"
     var valueScoreboard = "tbms.value"
@@ -44,6 +45,9 @@ class SettingsContext(){
     var optimizeVariableValue = true
     var optimizeVariableGlobal = true
     var optimizeVariableLocal = true
+    var optimizeAllowRemoveProtected = false
+
+    var optimizeMaxInlining = 10
 
     var globalImport: Instruction = InstructionList(List())
 

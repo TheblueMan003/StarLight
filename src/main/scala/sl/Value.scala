@@ -214,7 +214,7 @@ case class TupleValue(val values: List[Expression]) extends Expression with Smal
     override def getString()(implicit context: Context): String = "("+values.map(_.getString()).reduce(_ + ", " + _)+")"
 }
 
-case class LambdaValue(val args: List[String], val instr: Instruction) extends Expression with SmallValue{
+case class LambdaValue(val args: List[String], val instr: Instruction, val context: Context) extends Expression with SmallValue{
     override def toString() = f"($args)=>$instr"
     override def getIntValue(): Int = ???
     override def hasIntValue(): Boolean = false
@@ -382,21 +382,31 @@ case object JsonNull extends JSONElement{
     }
     override def getStringValue: String = null
 }
-case class JsonInt(val value: Int) extends JSONElement{
+case class JsonInt(val value: Int, val typ: String) extends JSONElement{
     def getString()(implicit context: Context): String = {
         value.toString()
     }
     def getNbt(): String = {
-        value.toString()
+        if (typ != null){
+            value.toString() + typ
+        }
+        else{
+            value.toString() 
+        }
     }
     override def getIntValue: Int = value
 }
-case class JsonFloat(val value: Double) extends JSONElement{
+case class JsonFloat(val value: Double, val typ: String) extends JSONElement{
     def getString()(implicit context: Context): String = {
         value.toString()
     }
     def getNbt(): String = {
-        value.toString()
+        if (typ != null){
+            value.toString() + typ
+        }
+        else{
+            value.toString() 
+        }
     }
     override def getFloatValue: Double = value
 }

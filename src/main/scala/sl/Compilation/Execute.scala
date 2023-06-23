@@ -307,7 +307,8 @@ object Execute{
                     if right == right.toInt then (List(), List(IFValueCase(BinaryOperation(op, IntValue(right.toInt), LinkedVariableValue(left, sel))))) else (List(), List(IFTrue))
 
             
-
+            case BinaryOperation("in", value, LinkedVariableValue(vari, sel)) if vari.getType().isInstanceOf[RangeType] =>
+                (List(), List(IFValueCase(BinaryOperation("in", value, LinkedVariableValue(vari, sel)))))
 
             case BinaryOperation("==", LinkedVariableValue(left, sel), right) 
                 if right.hasIntValue() && left.getType().isDirectComparable() => 
@@ -615,7 +616,7 @@ object Execute{
                 val v = Utils.simplifyToVariable(expr)
                 (v._1, List(IFValueCase(v._2)))
             }
-            case LambdaValue(args, instr) => (List(), List(IFTrue))
+            case LambdaValue(args, instr, ctx) => (List(), List(IFTrue))
             case StringValue(string) => throw new Exception("Can't use if with string")
             case JsonValue(json) => throw new Exception("Can't use if with json")
             case RangeValue(min, max, delta) => throw new Exception("Can't use if with range")
@@ -966,11 +967,54 @@ case class IFValueCase(val value: Expression) extends IFCase{
             }
 
             case BinaryOperation("in", LinkedVariableValue(left, sel1), LinkedVariableValue(right, sel2)) => {
-                IfScoreboard(
-                    SBLink(left.getSelectorName()(sel1), left.getSelectorObjective()(sel1)),
-                    "=",
-                    SBLink(right.getSelectorName()(sel2), right.getSelectorObjective()(sel2)),
-                    block)
+                right.getType() match
+                    case RangeType(sub) => {
+                        left.getType() match{
+                            case other if other.isSubtypeOf(sub) => {
+                                IfScoreboard(
+                                    SBLink(right.tupleVari(0).getSelectorName()(sel2), right.tupleVari(0).getSelectorObjective()(sel2)),
+                                    ">=",
+                                    SBLink(left.getSelectorName()(sel1), left.getSelectorObjective()(sel1)),
+                                    IfScoreboard(
+                                        SBLink(left.getSelectorName()(sel1), left.getSelectorObjective()(sel1)),
+                                        "<=",
+                                        SBLink(right.tupleVari(1).getSelectorName()(sel2), right.tupleVari(1).getSelectorObjective()(sel2)),
+                                        block))
+                            }
+                            case RangeType(sub2) => {
+                                IfScoreboard(
+                                    SBLink(right.tupleVari(0).getSelectorName()(sel2), right.tupleVari(0).getSelectorObjective()(sel2)),
+                                    ">=",
+                                    SBLink(left.tupleVari(0).getSelectorName()(sel1), left.tupleVari(0).getSelectorObjective()(sel1)),
+                                    IfScoreboard(
+                                        SBLink(left.tupleVari(1).getSelectorName()(sel1), left.tupleVari(1).getSelectorObjective()(sel1)),
+                                        "<=",
+                                        SBLink(right.tupleVari(1).getSelectorName()(sel2), right.tupleVari(1).getSelectorObjective()(sel2)),
+                                        block))
+                            }
+                            case other => throw new Exception(f"ERROR: $other is not a subtype of $sub")
+                        }
+                    }
+                    case other => throw new Exception(f"Unsupported operation: $value")
+            }
+
+            case BinaryOperation("in", IntValue(left), LinkedVariableValue(right, sel2)) => {
+                right.getType() match
+                    case RangeType(sub) => {
+                        if (!IntType.isSubtypeOf(sub)){
+                            throw new Exception(f"ERROR: int is not a subtype of $sub")
+                        }
+                        IfScoreboardMatch(
+                            SBLink(right.tupleVari(0).getSelectorName()(sel2), right.tupleVari(0).getSelectorObjective()(sel2)),
+                            left,
+                            Int.MaxValue,
+                            IfScoreboardMatch(
+                                SBLink(right.tupleVari(1).getSelectorName()(sel2), right.tupleVari(1).getSelectorObjective()(sel2)),
+                                Int.MinValue,
+                                left,
+                                block))
+                    }
+                    case other => throw new Exception(f"Unsupported operation: $value")
             }
 
             case BinaryOperation("in", SelectorValue(sel1), LinkedVariableValue(right, sel2)) if right.getType() == EntityType => {

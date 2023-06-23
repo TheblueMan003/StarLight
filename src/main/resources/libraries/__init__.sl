@@ -16,6 +16,13 @@ def @tick __playertick__(){
         }
     }
 }
+def @tick __itemtick__(){
+    if (@itemtick){
+        with(@e[type=item], true){
+            @itemtick()
+        }
+    }
+}
 int __totalRefCount
 def lazy __addBindEntity__(int variable, entity e){
     if (variable == null){

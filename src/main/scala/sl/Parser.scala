@@ -28,7 +28,7 @@ object Parser extends StandardTokenParsers{
   def block: Parser[Instruction] = positioned("{" ~> rep(instruction <~ opt(";")) <~ "}" ^^ (p => InstructionBlock(p)))
   def assignmentOp: Parser[String] = ("=" | "+=" | "-=" | "*=" | "/=" | ":=" | "%=" | "^=" | "|=" | "&=" | "<<=" | ">>=")
 
-  def ident2: Parser[String] = rep1sep(ident, ".") ^^ { p => p.reduce(_ + "." + _) }
+  def ident2: Parser[String] = rep1sep(subident, ".") ^^ { p => p.reduce(_ + "." + _) }
   def subident: Parser[String] = opt("$") ~ ident ^^ { case _1 ~ _2 => _1.getOrElse("") + _2 }
   def subident2: Parser[String] = "$" ~ ident ^^ { case _1 ~ _2 => _1 + _2 }
   def identLazy: Parser[String] = subident ~ rep(subident2) ^^ { p => (p._1 :: p._2).reduce(_ + _) }
@@ -48,10 +48,10 @@ object Parser extends StandardTokenParsers{
   def jsonStr: Parser[String] = "{" ~> rep1sep(jsonKeypairStr, ",") <~ "}" ^^ { p => "{" + p.reduce(_ + ","+ _) + "}" }
 
 
-  def jsonValue: Parser[JSONElement] = floatValue ^^ { p => JsonFloat(p) } 
-                                    | numericLit ^^ { p => JsonInt(p.toInt) } 
-                                    | "-" ~> floatValue ^^ { p => JsonFloat(-p) } 
-                                    | "-" ~> numericLit ^^ { p => JsonInt(f"-$p".toInt) } 
+  def jsonValue: Parser[JSONElement] = floatValue ~ opt(ident) ^^ { case p ~ t => JsonFloat(p, t.getOrElse(null)) } 
+                                    | numericLit ~ opt(ident) ^^ { case p ~ t => JsonInt(p.toInt, t.getOrElse(null)) } 
+                                    | "-" ~> floatValue ~ opt(ident) ^^ { case p ~ t => JsonFloat(-p, t.getOrElse(null)) } 
+                                    | "-" ~> numericLit ~ opt(ident) ^^ { case p ~ t => JsonInt(f"-$p".toInt, t.getOrElse(null)) } 
                                     | stringLit2 ^^ { p => JsonString(p) }
                                     | jsonCall
                                     | identLazy2 ^^ { p => JsonIdentifier(p) }
@@ -75,7 +75,7 @@ object Parser extends StandardTokenParsers{
     ((((doc ~ ("def" ~> modifier)))) ~ arguments) ~ instruction ^^ { case doc ~ mod ~ a ~i  => FunctionDecl("~", i, VoidType, a, List(), mod.withDoc(doc)) }
       | ((((doc ~ ("def" ~> modifier)) ~ identLazy ~ typeArgument)) ~ arguments) ~ instruction ^^ { case doc ~ mod ~ n ~ at ~ a ~i  => FunctionDecl(n, i, VoidType, a, at, mod.withDoc(doc)) }
       | ((((doc ~ (opt("def") ~> modifier)) ~ types) ~ identLazy ~ typeArgument) ~ arguments) ~ instruction ^^ { case doc ~ mod ~ t ~ n ~ at ~ a ~i  => FunctionDecl(n, i, t, a, at, mod.withDoc(doc)) }
-      | (((identFunction ~ typeVariables <~ "(") ~ repsep(exprNoTuple, ",")) <~ ")") ~ block ^^ {case f ~ t ~ e ~ b => FunctionCall(f, e ::: List(LambdaValue(List(), b)), t)} // Function Call
+      | (((identFunction ~ typeVariables <~ "(") ~ repsep(exprNoTuple, ",")) <~ ")") ~ block ^^ {case f ~ t ~ e ~ b => FunctionCall(f, e ::: List(LambdaValue(List(), b, null)), t)} // Function Call
       | ((identFunction ~ typeVariables <~ "(") ~ repsep(exprNoTuple, ",")) <~ ")" ^^ {case f ~ t ~ e => FunctionCall(f, e, t)} // Function Call
       | packageInstr
       | structDecl
@@ -168,7 +168,7 @@ object Parser extends StandardTokenParsers{
   def align: Parser[Instruction] = positioned("align" ~ exprNoTuple ~ instruction ^^ { case _ ~ e ~ i => Execute(AlignType, List(e), i) })
 
   def blocktag: Parser[Instruction] = positioned(doc ~ modifier ~ "blocktag" ~ identLazy2 ~ "{" ~ repsep(tagentry, ",") ~ "}" ^^ { case d ~ m ~ _ ~ n ~ _ ~ c ~ _ => BlocktagDecl(n, c, m.withDoc(d))})
-  def tagentry: Parser[Expression] = positioned(namespacedName | (identLazy2 ^^ (VariableValue(_))))
+  def tagentry: Parser[Expression] = positioned(namespacedName | (identLazy2 ^^ (VariableValue(_))) | tagValue )
 
 
   def enumInstr: Parser[EnumDecl] = positioned((doc ~ modifier ~ ("enum" ~> identLazy) ~ opt("("~>repsep(enumField,",")<~")") <~ "{") ~ repsep(enumValue, ",") <~ "}" ^^ 
@@ -208,8 +208,8 @@ object Parser extends StandardTokenParsers{
 
 
 
-  def lambda1: Parser[Expression] = positioned((identLazy2 <~ "=>") ~ instruction ^^ (p => LambdaValue(List(p._1), p._2)))
-  def lambda2: Parser[Expression] = positioned(("(" ~> repsep(identLazy2, ",") <~ ")" <~ "=>") ~ instruction ^^ (p => LambdaValue(p._1, p._2)))
+  def lambda1: Parser[Expression] = positioned((identLazy2 <~ "=>") ~ instruction ^^ (p => LambdaValue(List(p._1), p._2, null)))
+  def lambda2: Parser[Expression] = positioned(("(" ~> repsep(identLazy2, ",") <~ ")" <~ "=>") ~ instruction ^^ (p => LambdaValue(p._1, p._2, null)))
   def lambda = lambda1 | lambda2
 
   def sfField: Parser[(String, SelectorFilterValue)] = ident ~ "=" ~ selectorFilterInnerValue ^^ {case n ~ _ ~ v => (n, v)}
@@ -261,6 +261,8 @@ object Parser extends StandardTokenParsers{
   def relPosition: Parser[String] = relCoordinate ~ relCoordinate ~ relCoordinate ^^ {case x ~ y ~ z => f"$x $y $z"}
   def position: Parser[PositionValue] = (frontPosition | relPosition | relPositionCase1 | relPositionCase2) ^^ {case a => PositionValue(a)}
 
+  def tagValue: Parser[TagValue] = "#" ~> ident2 ~ opt(":" ~ ident2) ^^ {case a ~ Some(_ ~ b) => TagValue(a+":"+b); case a ~ None => TagValue(a)}
+
   def exprBottom: Parser[Expression] = positioned(
     
     floatValue ^^ (p => FloatValue(p))
@@ -272,15 +274,15 @@ object Parser extends StandardTokenParsers{
     | "true" ^^^ BoolValue(true)
     | "false" ^^^ BoolValue(false)
     | "null" ^^^ NullValue
-    | "#" ~> ident2 ^^ (TagValue(_))
+    | tagValue
     | namespacedName
     | stringLit2 ^^ (StringValue(_))
     | identLazy2 ~ selector ^^ { case id ~ sel => BinaryOperation("in", SelectorValue(sel), VariableValue(id)) }
     | "new" ~> typeVariables ~ ("(" ~> repsep(exprNoTuple, ",") <~ ")") ^^ { case t ~ a => ConstructorCall("@@@", a, t) }
     | "new" ~> nonRecTypes ~ ("[" ~> repsep(exprNoTuple, ",") <~ "]") ^^ { case t ~ a => ConstructorCall("standard.array.Array", a, List(t)) }
-    | "new" ~> identLazy2 ~ typeVariables ~ ("(" ~> repsep(exprNoTuple, ",") <~ ")") ~ block ^^ { case f ~ t ~ a ~ b => ConstructorCall(f, a ::: List(LambdaValue(List(), b)), t) }
+    | "new" ~> identLazy2 ~ typeVariables ~ ("(" ~> repsep(exprNoTuple, ",") <~ ")") ~ block ^^ { case f ~ t ~ a ~ b => ConstructorCall(f, a ::: List(LambdaValue(List(), b, null)), t) }
     | "new" ~> identLazy2 ~ typeVariables ~ ("(" ~> repsep(exprNoTuple, ",") <~ ")") ^^ { case f ~ t ~ a => ConstructorCall(f, a, t) }
-    | identLazy2 ~ typeVariables ~ ("(" ~> repsep(exprNoTuple, ",") <~ ")") ~ block ^^ { case f ~ t ~ a ~ b => FunctionCallValue(VariableValue(f), a ::: List(LambdaValue(List(), b)), t) }
+    | identLazy2 ~ typeVariables ~ ("(" ~> repsep(exprNoTuple, ",") <~ ")") ~ block ^^ { case f ~ t ~ a ~ b => FunctionCallValue(VariableValue(f), a ::: List(LambdaValue(List(), b, null)), t) }
     | identLazy2 ~ rep1((typeVariables <~"(") ~ repsep(exprNoTuple, ",") <~ ")") ^^ { case f ~ a => a.foldLeft[Expression](VariableValue(f))((b, a) => FunctionCallValue(b, a._2, a._1)) }
     | identLazy2 ^^ (VariableValue(_))
     | selector ~ "." ~ identLazy2 ^^ { case s ~ _ ~ n => VariableValue(n, s) }
@@ -348,7 +350,7 @@ object Parser extends StandardTokenParsers{
   def nonRecTypes: Parser[Type] = 
     ident2 ~ typeVariablesForce ^^ { case n ~ t => IdentifierType(n, t) } |
     ident2 ^^ { identifierType(_) } |
-    (("(" ~> types) ~ rep1("," ~> types)) <~ ")" ^^ (p => if p._2.length > 0 then TupleType(p._1 :: p._2) else p._1)
+    (("(" ~> types) ~ rep("," ~> types)) <~ ")" ^^ (p => if p._2.length > 0 then TupleType(p._1 :: p._2) else p._1)
 
   def types: Parser[Type] = ("(" ~> repsep(nonRecTypes, ",") <~ ")"<~ "=>") ~ types ^^ (p => FuncType(p._1, p._2)) |
                             (nonRecTypes <~ "=>") ~ types ^^ (p => FuncType(List(p._1), p._2)) |

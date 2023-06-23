@@ -13,6 +13,7 @@ import sl.IR.*
 import sl.Library.Downloader
 
 object Main{
+  var version = List(0, 7, 0)
   private var lastIR: List[IRFile] = null
   private var lastContxt: Context = null
   private var interpreter: Interpreter = null
@@ -114,11 +115,11 @@ object Main{
             Reporter.ok("Project created!")
           }
           case "install" => {
-            if (args.length == 1){
+            if (args.length == 2){
               Library.Downloader.getLibrary(args(1))
               Reporter.ok("Library Downloaded!")
             }
-            else if (args.length == 2){
+            else if (args.length == 3){
               Library.Downloader.installLib(args(1), args(2))
               Reporter.ok(f"Library Downloaded with version ${args(2)}!")
             }
@@ -127,7 +128,7 @@ object Main{
             }
           }
           case "update" => {
-            if (args.length != 1) then {
+            if (args.length != 2) then {
               Reporter.error(f"Expected 1 argument got: ${args.length-1}")
             }
             else{
@@ -189,13 +190,17 @@ object Main{
   def newProject(args: Array[String]): Unit = {
     println("Project Name: ")
     val name = scala.io.StdIn.readLine()
+    println("Project Namespace: ")
+    val namespace = scala.io.StdIn.readLine()
+    println("Author: ")
+    val author = scala.io.StdIn.readLine()
     val p = getArg(args, "-p")
     val directory = if p == "default" then "." else p
     
     ConfigLoader.newProjectPath.map(name => FileUtils.createDirectory(directory+"/"+ name))
     
-    FileUtils.safeWriteFile(directory+"/java.slconf", ConfigLoader.get("java", name))
-    FileUtils.safeWriteFile(directory+"/bedrock.slconf", ConfigLoader.get("bedrock", name))
+    FileUtils.safeWriteFile(directory+"/java.slconf", ConfigLoader.get("java", name, namespace, author))
+    FileUtils.safeWriteFile(directory+"/bedrock.slconf", ConfigLoader.get("bedrock", name, namespace, author))
     FileUtils.safeWriteFile(directory+"/src/main.sl", List("package main", "","def ticking main(){","","}"))
 
     FileUtils.copyFromResourcesToFolder("icon/64.png", directory+"/java_resourcepack/pack.png")

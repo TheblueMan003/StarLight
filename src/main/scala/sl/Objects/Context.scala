@@ -60,10 +60,12 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
     private var function: Function = null
     private var variable: Variable = null
     private var templateUse: String = null
+    private var structUse: String = null
     private var clazz: Class = null
     private var inLazyCall: Boolean = false
 
     def setTemplateUse() = templateUse = path
+    def setStructUse() = structUse = path
 
     def getPath(): String ={
         return path
@@ -374,6 +376,16 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
             null
         }
     }
+    def getCurrentStructUse():String={
+        if structUse == null && parent != null then parent.getCurrentStructUse() else structUse
+    }
+    def getCurrentParentStructUse()(implicit count: Int):String={
+        if count == 0 then getCurrentStructUse() else {
+            if structUse != null && parent != null then parent.getCurrentParentStructUse()(count-1) else
+            if parent != null then parent.getCurrentParentStructUse() else
+            null
+        }
+    }
     def setLazyCall()={
         inLazyCall = true
     }
@@ -456,12 +468,24 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
         property
     }
 
-    def resolveVariable(vari: Expression) = {
-		val VariableValue(name, sel) = vari: @unchecked
-		tryGetProperty(name) match
-			case Some(Property(_, getter, setter, variable)) => FunctionCallValue(LinkedFunctionValue(getter), List(), List(), sel)
-			case _ => LinkedVariableValue(getVariable(name), sel)
-	}
+    def resolveVariable(value: Expression) = {
+        val VariableValue(name, sel) = value: @unchecked
+        tryGetProperty(name) match{
+            case Some(Property(_, getter, setter, variable)) => FunctionCallValue(LinkedFunctionValue(getter), List(), List(), sel)
+            case _ => {
+                val vari = tryGetVariable(name)
+                vari match{
+                    case Some(vari) => LinkedVariableValue(vari, sel)
+                    case None if Utils.typeof(value)(this).isInstanceOf[FuncType] =>{
+                        val typ = Utils.typeof(value)(this).asInstanceOf[FuncType]
+                        val fct = getFunction(name, typ.sources, List(), typ.output, true).asInstanceOf[ConcreteFunction]
+                        LinkedFunctionValue(fct)
+                    }
+                    case other => throw new Exception(f"Unknown variable: $name in context: $path")
+                }
+            }
+        }
+    }
 
 
 
@@ -476,8 +500,8 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
                 case Some(vari) if vari.getType().isInstanceOf[FuncType] => {
                     if (vari.modifiers.isLazy){
                         vari.lazyValue match
-                            case LambdaValue(args2, instr) => {
-                                (getFreshLambda(args2, args.map(Utils.typeof(_)(this)), output, instr, false), args)
+                            case LambdaValue(args2, instr, context) => {
+                                (context.getFreshLambda(args2, args.map(Utils.typeof(_)(this)), output, instr, false), args)
                             }
                             case VariableValue(name, sel) => getFunction(name, args, typeargs, output, concrete)
                             case LinkedVariableValue(vari, selector) => {
@@ -546,6 +570,13 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
             val parentCount = tag.drop().values.count(_ == "parent")
             val dropped = tag.drop(parentCount + 1)
             val parent = getCurrentParentTemplateUse()(parentCount)
+            if (parent == null) tag else
+            Identifier("@"+parent :: dropped.values)
+        }
+        else if (tag.head() == "@structs" && getCurrentStructUse() != null) {
+            val parentCount = tag.drop().values.count(_ == "parent")
+            val dropped = tag.drop(parentCount + 1)
+            val parent = getCurrentParentStructUse()(parentCount)
             if (parent == null) tag else
             Identifier("@"+parent :: dropped.values)
         }

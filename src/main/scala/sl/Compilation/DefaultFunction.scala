@@ -27,6 +27,28 @@ object DefaultFunction{
                         }
                     }
                 ))
+        ctx.addFunction("mergeSelector", CompilerFunction(ctx, "mergeSelector", 
+                    List(Argument("selector1", EntityType, None), Argument("selector2", EntityType, None)),
+                    EntityType,
+                    Modifier.newPublic(),
+                    (args: List[Expression],ctx: Context) => {
+                        args match{
+                            case SelectorValue(sel1)::SelectorValue(sel2)::Nil => {
+                                (List(), SelectorValue(sel1.merge(sel2)))
+                            }
+                            case SelectorValue(sel1)::LinkedVariableValue(sel2, _)::Nil => {
+                                (List(), SelectorValue(sel1.merge(sel2.getEntityVariableSelector())))
+                            }
+                            case LinkedVariableValue(sel1, _)::SelectorValue(sel2)::Nil => {
+                                (List(), SelectorValue(sel1.getEntityVariableSelector().merge(sel2)))
+                            }
+                            case LinkedVariableValue(sel1, _)::LinkedVariableValue(sel2, _)::Nil => {
+                                (List(), SelectorValue(sel1.getEntityVariableSelector().merge(sel2.getEntityVariableSelector())))
+                            }
+                            case other => throw new Exception(f"Illegal Arguments $other for mergeSelector")
+                        }
+                    }
+                ))
         ctx.addFunction("random", CompilerFunction(ctx, "random", 
                     List(),
                     IntType,
@@ -319,7 +341,7 @@ object DefaultFunction{
                             (List(), StringValue("alpha"))
                         }else if (Settings.version(0) == -1){
                             (List(), StringValue("beta"))
-                        }else if (Settings.version(0) == -1){
+                        }else if (Settings.version(0) == 0){
                             (List(), StringValue("pre-release"))
                         }else{
                             (List(), StringValue("release"))
@@ -386,6 +408,20 @@ object DefaultFunction{
             }
         ))
 
+        ctx.addFunction("getProjectAuthor", CompilerFunction(ctx, "getProjectAuthor", 
+            List(),
+            StringType,
+            Modifier.newPublic(),
+            (args: List[Expression],ctx: Context) => {
+                args match{
+                    case Nil => {
+                        (List(), StringValue(Settings.author))
+                    }
+                    case other => throw new Exception(f"Illegal Arguments $other for getProjectAuthor")
+                }
+            }
+        ))
+
         ctx.addFunction("getProjectName", CompilerFunction(ctx, "getProjectName", 
             List(),
             StringType,
@@ -396,6 +432,48 @@ object DefaultFunction{
                         (List(), StringValue(Settings.name))
                     }
                     case other => throw new Exception(f"Illegal Arguments $other for getProjectName")
+                }
+            }
+        ))
+
+        ctx.addFunction("getCompilerVersionMajor", CompilerFunction(ctx, "getCompilerVersionMajor", 
+            List(),
+            IntType,
+            Modifier.newPublic(),
+            (args: List[Expression],ctx: Context) => {
+                args match{
+                    case Nil => {
+                        (List(), IntValue(Main.version(0)))
+                    }
+                    case other => throw new Exception(f"Illegal Arguments $other for getCompilerVersionMajor")
+                }
+            }
+        ))
+
+        ctx.addFunction("getCompilerVersionMinor", CompilerFunction(ctx, "getCompilerVersionMinor", 
+            List(),
+            IntType,
+            Modifier.newPublic(),
+            (args: List[Expression],ctx: Context) => {
+                args match{
+                    case Nil => {
+                        (List(), IntValue(Main.version(1)))
+                    }
+                    case other => throw new Exception(f"Illegal Arguments $other for getCompilerVersionMinor")
+                }
+            }
+        ))
+
+        ctx.addFunction("getCompilerVersionPatch", CompilerFunction(ctx, "getCompilerVersionPatch", 
+            List(),
+            IntType,
+            Modifier.newPublic(),
+            (args: List[Expression],ctx: Context) => {
+                args match{
+                    case Nil => {
+                        (List(), IntValue(Main.version(2)))
+                    }
+                    case other => throw new Exception(f"Illegal Arguments $other for getCompilerVersionPatch")
                 }
             }
         ))
@@ -544,17 +622,17 @@ object DefaultFunction{
                 Modifier.newPublic(),
                 (args: List[Expression],ctx: Context) => {
                     args match{
-                        case VariableValue(name, sel1):: s ::LambdaValue(arg, instr)::Nil => {
-                            val ret = Compiler.compile(Utils.subst(instr, name.toString(), s.getString()))(ctx)
+                        case VariableValue(name, sel1):: s ::LambdaValue(arg, instr, ctx2)::Nil => {
+                            val ret = Compiler.compile(Utils.subst(instr, name.toString(), s.getString()))(ctx2)
                             (ret, NullValue)
                         }
-                        case TupleValue(names):: TupleValue(replaces) ::LambdaValue(arg, instr)::Nil => {
+                        case TupleValue(names):: TupleValue(replaces) ::LambdaValue(arg, instr, ctx2)::Nil => {
                             val substed = names.zip(replaces).foldLeft(instr){
                                 case (instr, (VariableValue(name, sel1), replace)) => 
                                     Utils.subst(instr, name.toString(), replace.getString());
                                 case _ => throw new Exception("Illegal Arguments")}
 
-                            val ret = Compiler.compile(substed)(ctx)
+                            val ret = Compiler.compile(substed)(ctx2)
                             (ret, NullValue)
                         }
                         case other => throw new Exception(f"Illegal Arguments $other for insert")
@@ -643,7 +721,7 @@ object DefaultFunction{
                         case VariableValue(vari, sel)::Nil => {
                             (List(), SelectorValue(ctx.getVariable(vari).getEntityVariableSelector().makeUnique()))
                         }
-                        case other => throw new Exception(f"Illegal Arguments $other for cmdstore")
+                        case other => throw new Exception(f"Illegal Arguments $other for makeUnique")
                     }
                 }
             ))
@@ -653,8 +731,8 @@ object DefaultFunction{
             Modifier.newPublic(),
             (args: List[Expression],ctx: Context) => {
                 args match{
-                    case LambdaValue(arg, instr)::Nil => {
-                        val ret = Compiler.compile(instr)(ctx)
+                    case LambdaValue(arg, instr, ctx2)::Nil => {
+                        val ret = Compiler.compile(instr)(ctx2)
                         (List(), JsonValue(JsonArray(ret.map(v => JsonString(v.getString())))))
                     }
                     case VariableValue(vari, sel)::Nil => {
@@ -705,16 +783,16 @@ object DefaultFunction{
                     Modifier.newPublic(),
                     (args: List[Expression],ctx: Context) => {
                         args match{
-                            case LinkedVariableValue(vari, sel)::LambdaValue(arg, instr)::Nil => {
-                                val ret = Compiler.compile(instr)(ctx)
+                            case LinkedVariableValue(vari, sel)::LambdaValue(arg, instr, ctx2)::Nil => {
+                                val ret = Compiler.compile(instr)(ctx2)
                                 ctx.addScoreboardUsedForce(vari.getIRSelector())
-                                (ret.take(ret.length - 1) ::: List(CommandIR(f"execute store result score ${vari.getSelector()(sel)} run "+ret.last)), NullValue)
+                                (ret.take(ret.length - 1) ::: List(CommandIR(f"execute store result score ${vari.getSelector()(sel)} run "+ret.last.getString())), NullValue)
                             }
-                            case VariableValue(vari, sel)::LambdaValue(arg, instr)::Nil => {
-                                val ret = Compiler.compile(instr)(ctx)
+                            case VariableValue(vari, sel)::LambdaValue(arg, instr, ctx2)::Nil => {
+                                val ret = Compiler.compile(instr)(ctx2)
                                 val varj = ctx.getVariable(vari)
                                 ctx.addScoreboardUsedForce(varj.getIRSelector())
-                                (ret.take(ret.length - 1) ::: List(CommandIR(f"execute store result score ${varj.getSelector()(sel)} run "+ret.last)), NullValue)
+                                (ret.take(ret.length - 1) ::: List(CommandIR(f"execute store result score ${varj.getSelector()(sel)} run "+ret.last.getString())), NullValue)
                             }
                             case other => throw new Exception(f"Illegal Arguments $other for cmdstore")
                         }
@@ -733,8 +811,8 @@ object DefaultFunction{
                             val vari = ctx.getFunction(fct)
                             (List(ScheduleCall(Settings.target.getFunctionName(vari.fullName),vari.fullName, time)), NullValue)
                         }
-                        case LambdaValue(args, instr)::IntValue(time)::Nil => {
-                            val block = ctx.getFreshLambda(args, List(), VoidType, instr, false)
+                        case LambdaValue(args, instr, ctx2)::IntValue(time)::Nil => {
+                            val block = ctx2.getFreshLambda(args, List(), VoidType, instr, false)
                             block.markAsStringUsed()
                             (List(ScheduleCall(Settings.target.getFunctionName(block.fullName), block.fullName, time)), NullValue)
                         }

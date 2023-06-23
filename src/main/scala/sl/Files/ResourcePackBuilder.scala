@@ -35,8 +35,12 @@ object ResourcePackBuilder{
         .map((source, file) =>{
             val copied = Paths.get(target+file);
             val originalPath = Paths.get(source+"/"+file)
-            FileUtils.createFolderForFiles(File(target+file))
-            Files.copy(originalPath, copied, StandardCopyOption.REPLACE_EXISTING);
+            try{
+                FileUtils.createFolderForFiles(File(target+file))
+                Files.copy(originalPath, copied, StandardCopyOption.REPLACE_EXISTING);
+            }catch{
+                case e: Exception => Reporter.error(f"Failed to copy file: $file")
+            }
         })
         jsonFiles.map(irfile => {
             val file = irfile.getPath()

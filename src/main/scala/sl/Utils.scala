@@ -213,7 +213,7 @@ object Utils{
             case FunctionCallValue(name, args, typeargs, selector) => FunctionCallValue(subst(name, from, to), args.map(subst(_, from, to)), typeargs, selector)
             case ConstructorCall(name, args, generics) => ConstructorCall(name, args.map(subst(_, from, to)), generics)
             case RangeValue(min, max, delta) => RangeValue(subst(min, from, to), subst(max, from, to), subst(delta, from, to))
-            case LambdaValue(args, instr) => LambdaValue(args, subst(instr, from, to))
+            case LambdaValue(args, instr, ctx) => LambdaValue(args, subst(instr, from, to), ctx)
             case lk: LinkedVariableValue => lk
     })
 
@@ -290,7 +290,7 @@ object Utils{
             case IntValue(value) => instr
             case FloatValue(value) => instr
             case BoolValue(value) => instr
-            case SelectorValue(content) => instr
+            case SelectorValue(content) => SelectorValue(content.subst(from,to))
             case NamespacedName(value) => NamespacedName(value.replaceAllLiterally(from, to))
             case StringValue(value) => StringValue(value.replaceAllLiterally(from, to))
             case PositionValue(value) => PositionValue(value.replaceAllLiterally(from, to))
@@ -311,7 +311,7 @@ object Utils{
             case FunctionCallValue(name, args, typeargs, selector) => FunctionCallValue(subst(name, from, to), args.map(subst(_, from, to)), typeargs, selector)
             case ConstructorCall(name, args, generics) => ConstructorCall(name, args.map(subst(_, from, to)), generics)
             case RangeValue(min, max, delta) => RangeValue(subst(min, from, to), subst(max, from, to), subst(delta, from, to))
-            case LambdaValue(args, instr) => LambdaValue(args.map(_.replaceAllLiterally(from, to)), subst(instr, from, to))
+            case LambdaValue(args, instr, ctx) => LambdaValue(args.map(_.replaceAllLiterally(from, to)), subst(instr, from, to), ctx)
             case lk: LinkedVariableValue => lk
             case null => null
     })
@@ -322,8 +322,8 @@ object Utils{
             case JsonDictionary(map) => JsonDictionary(map.map((k,v) => (k.replaceAllLiterally(from, to), subst(v, from, to))))
             case JsonString(value) => JsonString(value.replaceAllLiterally(from, to))
             case JsonBoolean(value) => JsonBoolean(value)
-            case JsonInt(value) => JsonInt(value)
-            case JsonFloat(value) => JsonFloat(value)
+            case JsonInt(value, t) => JsonInt(value, t)
+            case JsonFloat(value, t) => JsonFloat(value, t)
             case JsonIdentifier(value) => JsonIdentifier(value.replaceAllLiterally(from, to))
             case JsonCall(value, args, typeargs) => JsonCall(value.replaceAllLiterally(from, to), args.map(subst(_, from, to)), typeargs)
         } 
@@ -532,7 +532,7 @@ object Utils{
             case IntValue(value) => instr
             case FloatValue(value) => instr
             case BoolValue(value) => instr
-            case SelectorValue(content) => instr
+            case SelectorValue(content) => SelectorValue(content.fix)
             case NamespacedName(value) => instr
             case StringValue(value) => instr
             case RawJsonValue(value) => instr
@@ -566,7 +566,7 @@ object Utils{
                     case ClassType(clazz, generics) => ConstructorCall(clazz.fullName, args.map(fix(_)), generics.map(fix(_)))
                     case other => throw new Exception(f"Cannot constructor call $other")
             case RangeValue(min, max, delta) => RangeValue(fix(min), fix(max), fix(delta))
-            case LambdaValue(args, instr) => LambdaValue(args, fix(instr))
+            case LambdaValue(args, instr, ctx) => LambdaValue(args, fix(instr), ctx)
             case lk: LinkedVariableValue => lk
             case null => null
     })
@@ -576,8 +576,8 @@ object Utils{
             case JsonDictionary(map) => JsonDictionary(map.map((k,v) => (k, fix(v))))
             case JsonString(value) => JsonString(value)
             case JsonBoolean(value) => JsonBoolean(value)
-            case JsonInt(value) => JsonInt(value)
-            case JsonFloat(value) => JsonFloat(value)
+            case JsonInt(value, t) => JsonInt(value, t)
+            case JsonFloat(value, t) => JsonFloat(value, t)
             case JsonIdentifier(value) => {
                 if ignore.contains(Identifier.fromString(value)) then JsonIdentifier(value) else
                 context.tryGetVariable(Identifier.fromString(value)) match{
@@ -621,7 +621,7 @@ object Utils{
             case FunctionCallValue(name, args, typeargs, selector) => FunctionCallValue(name, args.map(subst(_, from, to)), typeargs, selector)
             case ConstructorCall(name, args, generics) => ConstructorCall(name, args.map(subst(_, from, to)), generics)
             case RangeValue(min, max, delta) => RangeValue(subst(min, from, to), subst(max, from, to), subst(delta, from, to))
-            case LambdaValue(args, instr) => LambdaValue(args, subst(instr, from, to))
+            case LambdaValue(args, instr, ctx) => LambdaValue(args, subst(instr, from, to), ctx)
             case lk: LinkedVariableValue => lk
             case null => null
     })
@@ -697,7 +697,7 @@ object Utils{
             case RawJsonValue(value) => RawJsonType
             case JsonValue(content) => JsonType
             case SelectorValue(content) => EntityType
-            case LambdaValue(args, instr) => LambdaType(args.length)
+            case LambdaValue(args, instr, ctx) => LambdaType(args.length)
             case EnumIntValue(value) => IntType
             case NamespacedName(value) => MCObjectType
             case PositionValue(value) => MCPositionType
@@ -800,8 +800,8 @@ object Utils{
 
     def jsonToExpr(json: JSONElement)(implicit context: Context): Expression = {
         json match
-            case JsonInt(value) => IntValue(value)
-            case JsonFloat(value) => FloatValue(value)
+            case JsonInt(value, t) => IntValue(value)
+            case JsonFloat(value, t) => FloatValue(value)
             case JsonBoolean(value) => BoolValue(value)
             case JsonString(value) => StringValue(value)
             case JsonNull => NullValue
@@ -811,9 +811,10 @@ object Utils{
 
     def simplify(expr: Expression)(implicit context: Context): Expression = positioned(expr, {
         expr match
+            case LambdaValue(args, instr, ctx) => LambdaValue(args, instr, if ctx == null then context else ctx)
+            case SelectorValue(value) => Utils.fix(expr)(context, Set())
             case IsType(left, typ) if Utils.typeof(simplify(left)) == context.getType(typ) =>BoolValue(true)
             case IsType(left, typ) => BoolValue(false)
-
             case BinaryOperation("<" | "<=" | "==" | "!=" | ">=" | ">", left, right) => {
                 val op = expr.asInstanceOf[BinaryOperation].op
                 val nl = simplify(left)
@@ -905,8 +906,8 @@ object Utils{
                 elm2 match
                     case JsonArray(content2) => JsonArray(content1 ::: content2)
                     case JsonString(value) => JsonArray(content1 ::: List(JsonString(value)))
-                    case JsonInt(value) => JsonArray(content1 ::: List(JsonInt(value)))
-                    case JsonFloat(value) => JsonArray(content1 ::: List(JsonFloat(value)))
+                    case JsonInt(value, t) => JsonArray(content1 ::: List(JsonInt(value, t)))
+                    case JsonFloat(value, t) => JsonArray(content1 ::: List(JsonFloat(value, t)))
                     case JsonDictionary(value) => JsonArray(content1 ::: List(JsonDictionary(value)))
                     case JsonIdentifier(value) => JsonArray(content1 ::: List(JsonIdentifier(value)))
                     case JsonCall(value, arg, typeargs) => JsonArray(content1 ::: List(elm2))
@@ -924,8 +925,8 @@ object Utils{
         expr match
             case JsonValue(content) => compileJson(content)
             case StringValue(value) => JsonString(value)
-            case IntValue(value) => JsonInt(value)
-            case FloatValue(value) => JsonFloat(value)
+            case IntValue(value) => JsonInt(value, null)
+            case FloatValue(value) => JsonFloat(value, null)
             case BoolValue(value) => JsonBoolean(value)
             case NamespacedName(value) => JsonString(value)
             case FunctionCallValue(VariableValue(name, sel), args, typeargs, selector) => {
@@ -997,8 +998,8 @@ object Utils{
                             vari.lazyValue match
                                 case JsonValue(content) => compileJson(content)
                                 case StringValue(value) => JsonString(value)
-                                case IntValue(value) => JsonInt(value)
-                                case FloatValue(value) => JsonFloat(value)
+                                case IntValue(value) => JsonInt(value, null)
+                                case FloatValue(value) => JsonFloat(value, null)
                                 case BoolValue(value) => JsonBoolean(value)
                                 case v => throw new Exception(f"Cannot cast $v (from variable: ${vari.fullName}) to json")
                         }
@@ -1014,8 +1015,8 @@ object Utils{
                     case Some(value) => {
                         if (value.modifiers.isLazy){
                             value.lazyValue match
-                                case IntValue(value) => JsonInt(value)
-                                case FloatValue(value) => JsonFloat(value)
+                                case IntValue(value) => JsonInt(value, null)
+                                case FloatValue(value) => JsonFloat(value, null)
                                 case BoolValue(value) => JsonBoolean(value)
                                 case StringValue(value) => JsonString(value)
                                 case NamespacedName(value) => JsonString(value)
@@ -1032,9 +1033,9 @@ object Utils{
                         throw new Exception(f"No value for $value in ${context.fullPath}")
                     }
             }
-            case JsonFloat(value) => elm
+            case JsonFloat(value, t) => elm
             case JsonBoolean(value) => elm
-            case JsonInt(value) => elm
+            case JsonInt(value, t) => elm
             case JsonString(value) => elm
         
     }
@@ -1120,6 +1121,7 @@ object Utils{
     def getForgenerateCases(key: String, provider: Expression)(implicit context: Context): IterableOnce[List[(String, String)]] = {
         simplify(provider) match
             case RangeValue(IntValue(min), IntValue(max), IntValue(delta)) => Range(min, max+1, delta).map(elm => List((key, elm.toString())))
+            case RangeValue(FloatValue(min), FloatValue(max), FloatValue(delta)) => (BigDecimal(min) to BigDecimal(max) by BigDecimal(delta)).map(elm => List((key, elm.toString())))
             case TupleValue(lst) => lst.map(elm => List((key, elm.toString())))
             case LinkedVariableValue(vari, sel) if vari.modifiers.isLazy => getForgenerateCases(key, vari.lazyValue)
             case VariableValue(iden, sel) if iden.toString().startsWith("@") => {
@@ -1217,6 +1219,7 @@ object Utils{
     def getForeachCases(key: String, provider: Expression)(implicit context: Context): IterableOnce[List[(String, Expression)]] = {
         Utils.simplify(provider) match
             case RangeValue(IntValue(min), IntValue(max), IntValue(delta)) => Range(min, max+1, delta).map(elm => List((key,IntValue(elm))))
+            case RangeValue(FloatValue(min), FloatValue(max), FloatValue(delta)) => (BigDecimal(min) to BigDecimal(max) by BigDecimal(delta)).map(elm => List((key, FloatValue(elm.toDouble))))
             case TupleValue(lst) => lst.map(elm => List((key, elm)))
             case VariableValue(iden, sel) if iden.toString().startsWith("@") => {
                 context.getFunctionTags(iden).getCompilerFunctionsName().map(name => List((key, VariableValue(name))))
@@ -1229,6 +1232,11 @@ object Utils{
                 throw new Exception(f"Unknown Generator: $iden")
             }
             case LinkedVariableValue(vari, sel) if vari.modifiers.isLazy => getForeachCases(key, vari.lazyValue)
+            case LinkedVariableValue(vari, sel) =>
+                vari.getType() match
+                    case ArrayType(inner, sub) => vari.tupleVari.map(elm => List((key, LinkedVariableValue(elm))))
+                    case TupleType(inners) => vari.tupleVari.map(elm => List((key, LinkedVariableValue(elm))))
+                    case _ => throw new Exception(f"Unknown Generator: $vari")
             case VariableValue(iden, sel) => {
                 val enm = context.tryGetEnum(iden)
                 enm match
@@ -1249,6 +1257,7 @@ object Utils{
             case JsonValue(content) => {
                 content match{
                     case JsonArray(content) => content.map(v => List((key, JsonValue(v))))
+                    case JsonDictionary(map) => map.map(v => List((key, StringValue(v._1)))).toList
                     case _ => throw new Exception(f"JSON Generator Not supported: $provider $content")
                 }
             }
@@ -1305,7 +1314,6 @@ object Utils{
                         (0 to rjson.length()).map(i => List((key, rjson.substring(i)))).toList
                     }
                     case (vari, args) => throw new Exception(f"Unknown generator: $provider $args")
-                
             }
             case _ => throw new Exception(f"Unknown generator: $provider")
     }

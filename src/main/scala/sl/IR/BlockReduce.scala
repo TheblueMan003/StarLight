@@ -90,16 +90,16 @@ class BlockReduce(var files: List[IRFile]){
     }
 
     def reduceBlockCall() ={
-        def applyTop(instr: IRTree)(implicit parent: IRFile): List[IRTree] = {
+        def applyTop(instr: IRTree)(implicit parent: IRFile, inliningSet: Set[String] = Set()): List[IRTree] = {
             instr match {
                 case BlockCall(function, fullName) => {
                     map.get(fullName) match {
                         case Some(file) => {
                             val size = file.getContents().length
-                            if (file.callByCount() == 1 && !file.hasSelfCall() && !parent.deleted){
+                            if (file.callByCount() == 1 && !file.hasSelfCall() && !parent.deleted && !inliningSet.contains(fullName)){
                                 //file.delete()
                                 //if (debug){println("delete " + file.getName() + " because it is only called once by "+ file.calledBy)}
-                                file.getContents().flatMap(c => applyTop(c)(file))
+                                file.getContents().flatMap(c => applyTop(c)(file, inliningSet + fullName))
                             }
                             else if (size == 0){
                                 List()
@@ -114,19 +114,19 @@ class BlockReduce(var files: List[IRFile]){
                 case other => List(other)
             }
         }
-        def apply(instr: IRTree)(implicit parent: IRFile): IRTree = {
+        def apply(instr: IRTree)(implicit parent: IRFile, inliningSet: Set[String] = Set()): IRTree = {
             instr match {
                 case BlockCall(function, fullName) => {
                     map.get(fullName) match {
                         case Some(file) => {
                             val size = file.getContents().length
-                            if (file.callByCount() == 1 && size == 1 && !file.hasSelfCall() && !parent.deleted){
+                            if (file.callByCount() == 1 && size == 1 && !file.hasSelfCall() && !parent.deleted && !inliningSet.contains(fullName)){
                                 //file.delete()
                                 //if (debug){println("delete " + file.getName() + " because it is only 1 line and called once by "+ file.calledBy+" in "+parent.getName())}
-                                apply(file.getContents().head)(file)
+                                apply(file.getContents().head)(file, inliningSet + fullName)
                             }
-                            else if (size == 1 && !file.hasSelfCall()){
-                                apply(file.getContents().head)(file)
+                            else if (size == 1 && !file.hasSelfCall() && !inliningSet.contains(fullName)){
+                                apply(file.getContents().head)(file, inliningSet + fullName)
                             }
                             else if (size == 0 || file.deleted){
                                 EmptyIR
@@ -152,7 +152,7 @@ class BlockReduce(var files: List[IRFile]){
                 apply(instr)(f)
             }).filterNot(_ == EmptyIR))
         })
-
+        
         files.filter(_.getContents().length == 0).map(f=>
             if (debug){println("delete " + f.getName() + " because it is empty")}
             f.delete()

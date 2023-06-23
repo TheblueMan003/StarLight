@@ -131,7 +131,13 @@ abstract class Function(context: Context, val contextName: String, name: String,
     def getContent(): List[IRTree]
     def getFunctionType() = FuncType(arguments.map(a => a.typ), typ)
     def getIRFile(): IRFile ={
-        IRFile(getName(), fullName, getContent(), false, !(modifiers.isTicking || modifiers.isLoading || modifiers.protection == Protection.Public || stringUsed))
+        IRFile(getName(), fullName, getContent(), false, 
+        !(modifiers.isTicking ||
+          modifiers.isLoading || 
+          modifiers.protection == Protection.Public || 
+          stringUsed || 
+          (!Settings.optimizeAllowRemoveProtected && modifiers.protection == Protection.Protected))
+        )
     }
 }
 

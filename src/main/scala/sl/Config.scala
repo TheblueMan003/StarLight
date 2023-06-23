@@ -36,6 +36,7 @@ object ConfigLoader{
                 (splitted(0), splitted(1)) match{
                     case ("name", name)                => Settings.outputName = name
                     case ("namespace", name)           => Settings.name = name
+                    case ("author", name)              => Settings.author = name
                     case ("target", "bedrock")         => Settings.target = MCBedrock
                     case ("target", "java")            => Settings.target = MCJava
                     case ("scoreboard.variable", name) => Settings.variableScoreboard = name
@@ -70,6 +71,7 @@ object ConfigLoader{
                     case ("optimization.variable", value) => Settings.optimizeVariableValue = value == "true"
                     case ("optimization.variable.local", value) => Settings.optimizeVariableLocal = value == "true"
                     case ("optimization.variable.global", value) => Settings.optimizeVariableGlobal = value == "true"
+                    case ("optimization.allowRemoveProtected", value) => Settings.optimizeAllowRemoveProtected = value == "true"
 
 
                     case ("obfuscate", value)          => Settings.obfuscate = value == "true"
@@ -87,10 +89,11 @@ object ConfigLoader{
         })
     }
 
-    def get(target: String, name: String):List[String] = {
+    def get(target: String, name: String, namespace: String, author: String):List[String] = {
         List(
             f"name=$name",
-            f"namespace=${name.toLowerCase().replaceAllLiterally("[^a-zA-Z0-9]", "_")}",
+            f"namespace=${namespace.toLowerCase().replaceAllLiterally("[^a-zA-Z0-9]", "_")}",
+            f"author=${author}",
             f"target=$target",
             f"scoreboard.variable=${Settings.variableScoreboard}",
             f"scoreboard.value=${Settings.valueScoreboard}",
@@ -132,7 +135,8 @@ object ConfigLoader{
             f"optimization.variable=${Settings.optimizeVariableValue}",
             f"optimization.variable.local=${Settings.optimizeVariableLocal}",
             f"optimization.variable.global=${Settings.optimizeVariableGlobal}",
-
+            f"optimization.allowRemoveProtected=${Settings.optimizeAllowRemoveProtected}",
+            
             f"meta.debug=true",
         )
     }
