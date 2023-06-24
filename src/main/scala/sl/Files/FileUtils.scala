@@ -6,6 +6,7 @@ import sl.Utils
 import javax.sound.sampled.AudioSystem
 import java.io.{FileInputStream, FileOutputStream}
 import java.util.zip.ZipInputStream
+import scala.io.BufferedSource
 
 object FileUtils{
     def deleteDirectory(dir: String): Boolean = deleteDirectory(new File(dir))
@@ -19,6 +20,14 @@ object FileUtils{
     def deleteFile(file: String): Boolean = deleteFile(new File(file))
     def deleteFile(file: File):Boolean= {
         file.delete()
+    }
+    def getListOfTopDirectories(dir: String):List[String] = {
+        val d = new File(dir)
+        if (d.exists && d.isDirectory) {
+            d.listFiles.filter(_.isDirectory()).map(_.getName()).toList
+        } else {
+            List[String]()
+        }
     }
     def listSubdir(dir: String):List[String] = listSubdir(File(dir))
     def listSubdir(dir: File):List[String] = {
@@ -59,16 +68,7 @@ object FileUtils{
 
     def safeWriteFile(filename: String, content: List[String]):Unit = {
         val file = new File(filename)
-        try{
-        val directory = new File(file.getParent())
-
-        // Create Directory
-        if (!directory.exists()){
-            directory.mkdirs()
-        }
-        }catch{
-        case _ => {}
-        }
+        createFolderForFiles(file)
 
         // Write all files
         val out = new PrintWriter(file, "UTF-8")
@@ -89,6 +89,13 @@ object FileUtils{
     def copyFromResourcesToFolder(resource: String, target: String):Unit={
         val file = new File(target)
         if (!file.exists()){
+            val directory = new File(file.getParent())
+
+            // Create Directory
+            if (!directory.exists()){
+                directory.mkdirs()
+            }
+            
             val in = getClass().getResourceAsStream("/" + resource)
             val out = new java.io.FileOutputStream(file)
             val buffer = new Array[Byte](1024)
@@ -101,14 +108,32 @@ object FileUtils{
             out.close()
         }
     }
-    def unzip(source: String, target: String)={
-        val fis = new FileInputStream(source)
-        val zis = new ZipInputStream(fis)
-        Stream.continually(zis.getNextEntry).takeWhile(_ != null).foreach{ file =>
-            createFolderForFiles(new File(target+"/"+file.getName))
-            val fout = new FileOutputStream(target+"/"+file.getName)
-            val buffer = new Array[Byte](1024)
-            Stream.continually(zis.read(buffer)).takeWhile(_ != -1).foreach(fout.write(buffer, 0, _))
+    def unzip(zipFile: String, destination: String): Unit = {
+        val buffer = new Array[Byte](1024)
+        val zipInputStream = new ZipInputStream(new FileInputStream(zipFile))
+        var zipEntry = zipInputStream.getNextEntry
+
+        while (zipEntry != null) {
+        val newFile = new File(destination, zipEntry.getName)
+        if (zipEntry.isDirectory)
+            newFile.mkdirs()
+        else {
+            createFolderForFiles(newFile)
+            val outputStream = new FileOutputStream(newFile)
+
+            try {
+            var len = zipInputStream.read(buffer)
+            while (len > 0) {
+                outputStream.write(buffer, 0, len)
+                len = zipInputStream.read(buffer)
+            }
+            } finally {
+            outputStream.close()
+            }
         }
+        zipEntry = zipInputStream.getNextEntry
+        }
+        zipInputStream.closeEntry()
+        zipInputStream.close()
     }
 }

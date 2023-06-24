@@ -324,7 +324,14 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 
 	def defaultAssign(expr: Expression)(implicit context: Context, selector: Selector = Selector.self) = {
 		if (Settings.target == MCBedrock){
-			List()
+			if (modifiers.isEntity){
+				Compiler.compile(If(BinaryOperation("!=", LinkedVariableValue(this, selector), NullValue), 
+				InstructionList(List()),
+				List(ElseIf(BoolValue(true), VariableAssigment(List((Right(this), selector)), "=", expr)))))
+			}
+			else{
+				List()
+			}
 		}
 		else if (Settings.target == MCJava){
 			Execute.makeExecute(checkNull, assign("=", expr))

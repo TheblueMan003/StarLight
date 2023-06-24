@@ -681,6 +681,13 @@ object Utils{
 
                 (fct.call(vari), LinkedVariableValue(vari))
             }
+            case FunctionCallValue(LinkedFunctionValue(fct), args, typeargs, selector) => {
+                val vari = context.getFreshVariable(typeof(expr))
+
+                vari.modifiers.isLazy = !fct.modifiers.hasAttributes("requiresVariable")
+
+                ((fct,args).call(vari), LinkedVariableValue(vari))
+            }
             case other => {
                 val vari = context.getFreshVariable(typeof(other))
                 vari.modifiers.isLazy = true

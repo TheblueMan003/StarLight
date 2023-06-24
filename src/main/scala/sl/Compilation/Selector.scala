@@ -240,6 +240,7 @@ case class JavaSelector(val prefix: String, val filters: List[(String, SelectorF
                     case SelectorLowerRange(value) => List(("l", value))
                     case SelectorIdentifier(value) => List(("l", SelectorIdentifier(value)), ("lm", SelectorIdentifier(value)))
             }
+            case "sort" if value == SelectorIdentifier("nearest") => List()
             case "predicate" | "advancements‌" | "sort" => {
                 throw new Exception(f"$key not Supported for bedrock")
             }

@@ -1,2 +1,0 @@
-function default:__itemtick__
-function default:__playertick__

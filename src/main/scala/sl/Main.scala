@@ -206,6 +206,9 @@ object Main{
     FileUtils.copyFromResourcesToFolder("icon/64.png", directory+"/java_resourcepack/pack.png")
     FileUtils.copyFromResourcesToFolder("icon/256.png", directory+"/bedrock_resourcepack/pack_icon.png")
 
+    FileUtils.copyFromResourcesToFolder("configs/blockmap.csv", directory+"/configs/blockmap.csv")
+    FileUtils.copyFromResourcesToFolder("configs/color.csv", directory+"/configs/color.csv")
+
     ConfigLoader.saveProject(directory+"/")
   }
   def build(args: String): Unit = {
@@ -213,15 +216,15 @@ object Main{
     ConfigLoader.loadProject()
     Settings.version=List(Settings.version(0), Settings.version(1), Settings.version(2)+1)
 
-    val libs = FileUtils.getListOfFiles("./lib").map(l => "./lib/"+l+"/src")
+    val libs = FileUtils.getListOfTopDirectories("./lib").map(l => "./lib/"+l+"/src")
     val datpack = if (Settings.target == MCJava)
-                FileUtils.getListOfFiles("./lib").map(l => "./lib/"+l+"/java_datapack")
+                FileUtils.getListOfTopDirectories("./lib").map(l => "./lib/"+l+"/java_datapack")
               else
-                FileUtils.getListOfFiles("./lib").map(l => "./lib/"+l+"/bedrock_datapack")
+                FileUtils.getListOfTopDirectories("./lib").map(l => "./lib/"+l+"/bedrock_datapack")
     val respack = if (Settings.target == MCJava)
-                FileUtils.getListOfFiles("./lib").map(l => "./lib/"+l+"/java_resourcepack")
+                FileUtils.getListOfTopDirectories("./lib").map(l => "./lib/"+l+"/java_resourcepack")
               else
-                FileUtils.getListOfFiles("./lib").map(l => "./lib/"+l+"/bedrock_resourcepack")
+                FileUtils.getListOfTopDirectories("./lib").map(l => "./lib/"+l+"/bedrock_resourcepack")
 
     if (Settings.target == MCJava){
       compile(args, "./src"::libs, "./java_datapack"::datpack, "./java_resourcepack"::respack, Settings.java_datapack_output)

@@ -49,6 +49,23 @@ object DefaultFunction{
                         }
                     }
                 ))
+        ctx.addFunction("rgb", CompilerFunction(ctx, "rgb", 
+                    List(Argument("r", EntityType, None), Argument("g", EntityType, None), Argument("b", EntityType, None)),
+                    EntityType,
+                    Modifier.newPublic(),
+                    (args: List[Expression],ctx: Context) => {
+                        args match{
+                            case IntValue(r)::IntValue(g)::IntValue(b)::Nil => {
+                                val red = Math.min(255, Math.max(0, r))
+                                val green = Math.min(255, Math.max(0, g))
+                                val blue = Math.min(255, Math.max(0, b))
+                                
+                                (List(), StringValue(f"#${red}%02X${green}%02X${blue}%02X"))
+                            }
+                            case other => throw new Exception(f"Illegal Arguments $other for rgb")
+                        }
+                    }
+                ))
         ctx.addFunction("random", CompilerFunction(ctx, "random", 
                     List(),
                     IntType,

@@ -6,20 +6,43 @@ import sl.Reporter
 import java.io.File
 import sl.Utils
 import scala.util.Random
+import java.io._
+import java.net.URL
+import java.nio.file.{Files, Paths}
 
 object Downloader{
     val urlbases = List(("https://raw.githubusercontent.com/TheblueMan003/StarLightLibraries/main/published/", "github.com"), ("https://theblueman003.com/StarLightLibraries/published", "theblueman.com"))
     var index = 0
     var hasDownloadedIndex = false
+
+    def downloadFile(url: String, destination: String): Unit = {
+        val connection = new URL(url).openConnection()
+        val inputStream = connection.getInputStream
+        val outputStream = new FileOutputStream(destination)
+
+        try {
+        val buffer = new Array[Byte](4096)
+        var bytesRead = 0
+
+        while (bytesRead != -1) {
+            bytesRead = inputStream.read(buffer)
+            if (bytesRead != -1)
+            outputStream.write(buffer, 0, bytesRead)
+        }
+        } finally {
+        inputStream.close()
+        outputStream.close()
+        }
+    }
     def download(fileToDownload: String, location: String) = {
-        val src = scala.io.Source.fromURL(fileToDownload)
         if (fileToDownload.endsWith(".zip")){
             val tmp = f"tmp_${Random.between(0,1000000)}}.zip"
-            FileUtils.safeWriteFile(tmp, src.getLines.toList)
+            downloadFile(fileToDownload, tmp)
             FileUtils.unzip(tmp, location)
             FileUtils.deleteFile(tmp)
         }
         else{
+            val src = scala.io.Source.fromURL(fileToDownload)
             FileUtils.safeWriteFile(location, src.getLines.toList)
         }
     }

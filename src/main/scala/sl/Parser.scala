@@ -240,7 +240,7 @@ object Parser extends StandardTokenParsers{
 
   def stringLit2: Parser[String] = stringLit ^^ {p => p.replaceAllLiterally("◘", "\\\"")}
   def anyWord = lexical.reserved.foldLeft(ident2){(a, b) => a | b} | ident
-  def blockDataField = anyWord ~ "=" ~ expr ^^ {case n ~ _ ~ v => n +"="+v }
+  def blockDataField = anyWord ~ "=" ~ exprNoTuple ^^ {case n ~ _ ~ v => n +"="+v }
   def blockData = "[" ~> rep1sep(blockDataField, ",") <~ "]" ^^ {case fields => fields.mkString("[", ",", "]")}
   def namespacedName = ident ~ ":" ~ ident2 ~ opt(blockData) ~ opt(json) ^^ { case a ~ b ~ c ~ d ~ j=> NamespacedName(a+b+c+d.getOrElse("")+j.map(_.getNbt()).getOrElse("")) }
   def namespacedName2 = opt(identLazy <~ ":") ~ identLazy2 ^^ { case a ~ c => if a.isEmpty then NamespacedName(c) else NamespacedName(a.get+":"+c)}
