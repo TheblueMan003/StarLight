@@ -962,6 +962,8 @@ object Utils{
                 }
             }
             case LinkedFunctionValue(fct) => JsonString(Settings.target.getFunctionName(fct.fullName))
+            case LinkedVariableValue(vari, selector) if vari.modifiers.isLazy => toJson(vari.lazyValue)
+            case LinkedVariableValue(vari, selector) => JsonString(vari.fullName)
             
             case v => throw new Exception(f"Cannot cast value: $v of type ${typeof(v)} to json")
     }
@@ -1002,13 +1004,7 @@ object Utils{
                             var vari = context.getFreshVariable(fct._1.getType())
                             vari.modifiers.isLazy = true
                             val call = context.getFunction(value, args, typeargs, VoidType).call(vari)
-                            vari.lazyValue match
-                                case JsonValue(content) => compileJson(content)
-                                case StringValue(value) => JsonString(value)
-                                case IntValue(value) => JsonInt(value, null)
-                                case FloatValue(value) => JsonFloat(value, null)
-                                case BoolValue(value) => JsonBoolean(value)
-                                case v => throw new Exception(f"Cannot cast $v (from variable: ${vari.fullName}) to json")
+                            toJson(vari.lazyValue)
                         }
                         else{
                             fct.markAsStringUsed()

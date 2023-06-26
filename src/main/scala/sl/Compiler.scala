@@ -31,7 +31,7 @@ object Compiler{
         context.getTags().foreach(x => x.compile())
 
 
-        context.getAllFunction().filter(_.exists()).map(_.getIRFile()) ::: 
+        context.getAllFunction().map(_._2).filter(_.exists()).map(_.getIRFile()) ::: 
             context.getAllJsonFiles().filter(f => f.exists() && f.isDatapack()).map(fct => (fct.getIRFile())):::
             context.getAllBlockTag().filter(_.exists()).map(fct => (fct.getIRFile())):::
             context.getAllPredicates().flatMap(_.getIRFiles()):::

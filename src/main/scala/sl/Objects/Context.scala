@@ -681,11 +681,12 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
             hash
         }
     }
-    def getAllFunction(set: mutable.Set[Context] = mutable.Set()):List[Function] = {
+    def getAllFunction(set: mutable.Set[Context] = mutable.Set()):List[(String, Function)] = {
         if set.contains(this) then return List()
         set.add(this)
-        (if inheritted != null && !set.contains(inheritted) then inheritted.getAllFunction(set) else List()) ::: functions.values.flatten.toList :::
-        child.filter(_._2.parent == this).map(_._2.getAllFunction(set)).foldLeft(List[Function]())(_.toList ::: _.toList)
+        (if inheritted != null && !set.contains(inheritted) then inheritted.getAllFunction(set) else List()) ::: 
+            functions.toList.flatMap((k, v) => v.map(f => (k, f))) :::
+        child.filter(_._2.parent == this).map(_._2.getAllFunction(set)).foldLeft(List[(String, Function)]())(_.toList ::: _.toList)
     }
 
 

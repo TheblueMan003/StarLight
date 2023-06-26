@@ -90,14 +90,14 @@ case object MCJava extends Target{
         "/assets/minecraft/" + path.replaceAllLiterally(".","/")+ ".json"
     }
     def getExtraFiles(context: Context): List[IRFile] = {
-        val ticks = context.getAllFunction()
+        val ticks = context.getAllFunction().map(_._2)
                         .filter(_.modifiers.isTicking)
                         .map(f => getFunctionName(f.fullName))
                         .map(Utils.stringify(_))
                         .reduceOption(_ +","+_)
                         .getOrElse("")
 
-        val loads = context.getAllFunction()
+        val loads = context.getAllFunction().map(_._2)
                         .filter(_.modifiers.isLoading)
                         .sortBy(f => f.modifiers.getAttributesFloat("tag.order", ()=> 0)(f.context))
                         .map(f => getFunctionName(f.fullName))
@@ -163,7 +163,7 @@ case object MCBedrock extends Target{
         "/" + path.replaceAllLiterally(".","/")+ ".json"
     }
     def getExtraFiles(context: Context): List[IRFile] = {
-        val ticks = context.getAllFunction()
+        val ticks = context.getAllFunction().map(_._2)
                         .filter(_.modifiers.isTicking)
                         .map(f => getFunctionName(f.fullName))
                         .map(Utils.stringify(_))

@@ -14,11 +14,11 @@ class Interpreter(var files: List[IRFile], val context: Context){
         })
     }
     def run(turn: Int, name: String):Unit = {
-        val ticks = context.getAllFunction()
+        val ticks = context.getAllFunction().map(_._2)
                         .filter(_.modifiers.isTicking)
                         .map(f => f.fullName)
 
-        val loads = context.getAllFunction()
+        val loads = context.getAllFunction().map(_._2)
                         .filter(_.modifiers.isLoading)
                         .sortBy(f => f.modifiers.getAttributesFloat("tag.order", ()=> 0)(f.context))
                         .map(f => f.fullName)

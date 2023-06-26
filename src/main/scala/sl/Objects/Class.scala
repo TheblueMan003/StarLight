@@ -82,11 +82,11 @@ class Class(context: Context, name: String, val generics: List[String], _modifie
                 )
 
                 getAllFunctions()
-                .filter(!_.modifiers.isStatic)
-                .filter(_.modifiers.isVirtual)
-                .filter(f => !f.modifiers.isOverride)
-                .filter(f => f.context == ctx)
-                .map(fct => {
+                .filter(!_._2.modifiers.isStatic)
+                .filter(_._2.modifiers.isVirtual)
+                .filter(f => !f._2.modifiers.isOverride)
+                .filter(f => f._2.context == ctx)
+                .map((name,fct) => {
                     val typ = fct.getFunctionType()
                     val vari = Variable(ctx, f"---${fct.name}", typ, Modifier.newPrivate())
                     ctx.addVariable(vari)
@@ -103,8 +103,8 @@ class Class(context: Context, name: String, val generics: List[String], _modifie
                         if (fct.getType() == VoidType) FunctionCall(vari.fullName,fct.arguments.map(arg => VariableValue(arg.name)), List())
                         else Return(FunctionCallValue(LinkedVariableValue(vari),fct.arguments.map(arg => VariableValue(arg.name)), List(), Selector.self)), false)
                     fct2.generateArgument()(ctx)
-                    virutalFunction = (fct.name, fct2) :: virutalFunction
-                    ctx.addFunction(f"--${fct.name}", fct2)
+                    virutalFunction = (name, fct2) :: virutalFunction
+                    ctx.addFunction(f"--${name}", fct2)
                 })
 
                 getAllVariables().filter(!_.wasGenerated).map(_.generate(false, true)(ctx))
@@ -116,16 +116,16 @@ class Class(context: Context, name: String, val generics: List[String], _modifie
             generate()
             val ctx = ctx2.push(vari.name, vari)
             getAllFunctions()
-                .filter(!_.modifiers.isStatic)
-                .filter(!_.modifiers.isVirtual)
-                .filter(isNotClassFunction)
-                .filter(f => f.context == context.push(name) || context.push(name).isInheriting(f.context))
-                .map(fct => {
-                    val deco = ClassFunction(ctx.getPath()+"."+fct.name, vari, fct)
-                    ctx.addFunction(fct.name, deco)
+                .filter(!_._2.modifiers.isStatic)
+                .filter(!_._2.modifiers.isVirtual)
+                .filter(x => isNotClassFunction(x._2))
+                .filter(f => f._2.context == context.push(name) || context.push(name).isInheriting(f._2.context))
+                .map((name, fct) => {
+                    val deco = ClassFunction(ctx.getPath()+"."+name, vari, fct)
+                    ctx.addFunction(name, deco)
                 })
             virutalFunction.map((name, fct) => {
-                val deco = ClassFunction(ctx.getPath()+"."+fct.name, vari, fct)
+                val deco = ClassFunction(ctx.getPath()+"."+name, vari, fct)
                 ctx.addFunction(name, deco)
             })
             getAllVariables()
@@ -147,7 +147,7 @@ class Class(context: Context, name: String, val generics: List[String], _modifie
             implemented(typevar).generateForVariable(vari, List())
         }
     }
-    def getAllFunctions():List[Function] = {
+    def getAllFunctions():List[(String,Function)] = {
         context.push(name).getAllFunction()
     }
     def getAllVariables():List[Variable] = {
