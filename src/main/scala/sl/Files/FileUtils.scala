@@ -50,11 +50,15 @@ object FileUtils{
         }
     }
     def createFolderForFiles(file: File)={
-        val directory = new File(file.getParent())
+        try{
+            val directory = new File(file.getParent())
 
-        // Create Directory
-        if (!directory.exists()){
-            directory.mkdirs()
+            // Create Directory
+            if (!directory.exists()){
+                directory.mkdirs()
+            }
+        }catch{
+            case e: Exception => {}
         }
     }
     def createDirectory(filename: String):Unit = {

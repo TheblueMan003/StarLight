@@ -76,6 +76,9 @@ def lazy __at__(float x, float y, float z, void=>void fct){
     }
 }
 
+template Template{
+}
+
 class object{
     private int __ref
     private int __refCount
@@ -83,7 +86,7 @@ class object{
     def __addRef(){
         __refCount++
     }
-    def __destroy__(){
+    def virtual __destroy__(){
     }
     def __remRef(){
         __refCount--
@@ -99,7 +102,7 @@ class object{
             if (namespaceName == "blockbench"){
                 /tag @e[tag=!object.__tagged] add object.__tagged
                 Compiler.blockbenchSummon(entity)
-                with(@e[tag=!object.__tagged,type=marker]){
+                with(@e[tag=!object.__tagged]){
                     object.__ref = __totalRefCount
                     object.__refCount = 1
                     /tag @s add __class__
@@ -119,6 +122,9 @@ class object{
             }
         }
         if (Compiler.isBedrock()){
+            if (entity == minecraft:marker){
+                entity = sl:marker
+            }
             /tag @e[tag=!object.__tagged] add object.__tagged
             def lazy summon_(mcobject $entity){
                 /summon $entity

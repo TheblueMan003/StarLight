@@ -1,6 +1,6 @@
 package sl.IR
 
-class IRFile(path: String, name: String, contents: List[IRTree], isJson: Boolean = false, canDelete: Boolean = true) {
+class IRFile(val path: String, val name: String, val contents: List[IRTree], val isJson: Boolean = false, val canDelete: Boolean = true) {
     var calledBy: List[String] = List()
     var calling = List[String]()
 
@@ -77,4 +77,12 @@ class IRFile(path: String, name: String, contents: List[IRTree], isJson: Boolean
     }
 
     override def toString(): String = name
+
+    def printName()={
+        println("File: " + name)
+    }
+    def print()={
+        println("File: " + name)
+        println(getContents().map("\t" + _.getString()).mkString("\n"))
+    }
 }

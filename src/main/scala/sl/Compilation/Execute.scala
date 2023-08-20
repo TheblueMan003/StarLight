@@ -12,6 +12,7 @@ import sl.Compilation.Selector.*
 import scala.collection.parallel.CollectionConverters._
 import sl.IR.*
 import objects.Modifier
+import objects.ConcreteFunction
 
 object Execute{
     def ifs(ifb: If)(implicit context: Context): List[IRTree] = {
@@ -74,47 +75,72 @@ object Execute{
         ifs(If(whl.cond, LinkedFunctionCall(block, List(), null), List()))
     }
     def withInstr(ass: With)(implicit context: Context):List[IRTree] = {
-        def apply(keyword: IRTree=>IRTree)={
-            val (pref2, cases) = getIfCase(ass.cond)
+        def apply(keyword: IRTree=>IRTree, ctx: Context)={
+            val (pref2, cases) = getIfCase(Utils.simplify(ass.cond))
             val tail = getListCase(cases)
+
+            val block = if (ctx == null){Compiler.compile(ass.block)}else{
+                ass.block match
+                    case bb: InstructionBlock => {
+                            val id = context.getFreshId()
+                            val sub = context.push(id)
+                            sub.inherit(ctx)
+                            Compiler.compile(bb.unBlockify())(sub)
+                    }
+                    case other => {
+                        val id = context.getFreshId()
+                        val sub = context.push(id)
+                        sub.inherit(ctx)
+                        Compiler.compile(other)(sub)
+                    }
+            }
+            
+
             Utils.simplify(ass.isat) match
-                case BoolValue(true) => pref2:::makeExecute(keyword, makeExecute(x => AtIR("@s", x), makeExecute(tail, Compiler.compile(ass.block))))
-                case BoolValue(false) => pref2:::makeExecute(keyword, makeExecute(tail, Compiler.compile(ass.block)))
+                case BoolValue(true) => pref2:::makeExecute(keyword, makeExecute(x => AtIR("@s", x), makeExecute(tail, block)))
+                case BoolValue(false) => pref2:::makeExecute(keyword, makeExecute(tail, block))
                 case other => {
                     val (pref, vari) = Utils.simplifyToVariable(other)
-                    pref2:::pref ::: makeExecute(getListCase(List(IFValueCase(vari))), makeExecute(keyword, makeExecute(x => AtIR("@s", x), makeExecute(tail, Compiler.compile(ass.block)))))
-                            ::: makeExecute(getListCase(List(IFNotValueCase(IFValueCase(vari)))), makeExecute(keyword, makeExecute(tail, Compiler.compile(ass.block))))
+                    pref2:::pref ::: makeExecute(getListCase(List(IFValueCase(vari))), makeExecute(keyword, makeExecute(x => AtIR("@s", x), makeExecute(tail, block))))
+                            ::: makeExecute(getListCase(List(IFNotValueCase(IFValueCase(vari)))), makeExecute(keyword, makeExecute(tail, block)))
                 }
         }
 
-        ass.expr match{
-            case VariableValue(Identifier(List("@attacker")), selector) if Settings.target.hasFeature("execute on") => apply(x => OnIR("attacker", x))
-            case VariableValue(Identifier(List("@controller")), selector) if Settings.target.hasFeature("execute on") => apply(x => OnIR("controller", x))
-            case VariableValue(Identifier(List("@leasher")), selector) if Settings.target.hasFeature("execute on") => apply(x => OnIR("leasher", x))
-            case VariableValue(Identifier(List("@origin")), selector) if Settings.target.hasFeature("execute on") => apply(x => OnIR("origin", x))
-            case VariableValue(Identifier(List("@owner")), selector) if Settings.target.hasFeature("execute on") => apply(x => OnIR("owner", x))
-            case VariableValue(Identifier(List("@passengers")), selector) if Settings.target.hasFeature("execute on") => apply(x => OnIR("passengers", x))
-            case VariableValue(Identifier(List("@target")), selector) if Settings.target.hasFeature("execute on") => apply(x => OnIR("target", x))
-            case VariableValue(Identifier(List("@vehicle")), selector) if Settings.target.hasFeature("execute on") => apply(x => OnIR("vehicle", x))
+        Utils.simplify(ass.expr) match{
+            case VariableValue(Identifier(List("@attacker")), selector) if Settings.target.hasFeature("execute on") => apply(x => OnIR("attacker", x), null)
+            case VariableValue(Identifier(List("@controller")), selector) if Settings.target.hasFeature("execute on") => apply(x => OnIR("controller", x), null)
+            case VariableValue(Identifier(List("@leasher")), selector) if Settings.target.hasFeature("execute on") => apply(x => OnIR("leasher", x), null)
+            case VariableValue(Identifier(List("@origin")), selector) if Settings.target.hasFeature("execute on") => apply(x => OnIR("origin", x), null)
+            case VariableValue(Identifier(List("@owner")), selector) if Settings.target.hasFeature("execute on") => apply(x => OnIR("owner", x), null)
+            case VariableValue(Identifier(List("@passengers")), selector) if Settings.target.hasFeature("execute on") => apply(x => OnIR("passengers", x), null)
+            case VariableValue(Identifier(List("@target")), selector) if Settings.target.hasFeature("execute on") => apply(x => OnIR("target", x), null)
+            case VariableValue(Identifier(List("@vehicle")), selector) if Settings.target.hasFeature("execute on") => apply(x => OnIR("vehicle", x), null)
             case VariableValue(variName, selector) => {
-                val vari = context.getVariable(variName)
-                vari.getType() match{
-                    case EntityType if !vari.modifiers.isLazy => {
-                        val (prefix, selector) = Utils.getSelector(ass.expr)
-                        vari.tupleVari(0)
-                        
-                        prefix ::: makeExecute(f => IfScoreboardMatch(vari.tupleVari(0).getIRSelector(), 1, 1, f), apply(x => AsIR(selector.withPrefix("@a").getString(), x)))
-                               ::: makeExecute(f => IfScoreboardMatch(vari.tupleVari(0).getIRSelector(), 0, 0, f), apply(x => AsIR(selector.getString(), x)))
-                    }
-                    case _ => {
-                        val (prefix, selector) = Utils.getSelector(ass.expr)
-                        prefix:::apply(x => AsIR(selector.getString(), x))
+                val variOpt = context.tryGetVariable(variName)
+                variOpt match{
+                    case Some(vari) =>
+                        vari.getType() match{
+                            case EntityType if !vari.modifiers.isLazy => {
+                                val (prefix, ctx, selector) = Utils.getSelector(ass.expr)
+                                vari.tupleVari(0)
+                                
+                                prefix ::: makeExecute(f => IfScoreboardMatch(vari.tupleVari(0).getIRSelector(), 1, 1, f), apply(x => AsIR(selector.withPrefix("@a").getString(), x), ctx))
+                                    ::: makeExecute(f => IfScoreboardMatch(vari.tupleVari(0).getIRSelector(), 0, 0, f), apply(x => AsIR(selector.getString(), x), ctx))
+                            }
+                            case _ => {
+                                val (prefix, ctx, selector) = Utils.getSelector(ass.expr)
+                                prefix:::apply(x => AsIR(selector.getString(), x), ctx)
+                            }
+                        }
+                    case other => {
+                        val (prefix, ctx, selector) = Utils.getSelector(ass.expr)
+                        prefix:::apply(x => AsIR(selector.getString(), x), ctx)
                     }
                 }
             }
             case other => {
-                val (prefix, selector) = Utils.getSelector(ass.expr)
-                prefix:::apply(x => AsIR(selector.getString(), x))
+                val (prefix, ctx, selector) = Utils.getSelector(ass.expr)
+                prefix:::apply(x => AsIR(selector.getString(), x), ctx)
             }
         }
     }
@@ -122,9 +148,9 @@ object Execute{
         exec.typ match
             case AtType => {
                 Utils.simplify(exec.exprs.head) match
-                    case PositionValue(value) => makeExecute(x => PositionedIR(value, x), Compiler.compile(exec.block))
+                    case value: PositionValue => makeExecute(x => PositionedIR(value.getString(), x), Compiler.compile(exec.block))
                     case SelectorValue(value) => {
-                        val (prefix, selector) = Utils.getSelector(exec.exprs.head)
+                        val (prefix, _, selector) = Utils.getSelector(exec.exprs.head)
                         prefix:::makeExecute(x => AtIR(selector.getString(), x), Compiler.compile(exec.block))
                     }
                     case VariableValue(Identifier(List("@world_surface")), selector) if Settings.target.hasFeature("execute positioned over") => makeExecute(x => PositionedOverIR(f"world_surface", x), Compiler.compile(exec.block))
@@ -133,7 +159,7 @@ object Execute{
                     case VariableValue(Identifier(List("@ocean_floor")), selector) if Settings.target.hasFeature("execute positioned over") => makeExecute(x => PositionedOverIR(f"ocean_floor", x), Compiler.compile(exec.block))
                     case VariableValue(vari, selector) => {
                         try{
-                            val (prefix, selector) = Utils.getSelector(exec.exprs.head)
+                            val (prefix, _, selector) = Utils.getSelector(exec.exprs.head)
                             prefix:::makeExecute(x => AtIR(selector.getString(), x), Compiler.compile(exec.block))
                         }
                         catch{
@@ -141,7 +167,7 @@ object Execute{
                         }
                     }
                     case LinkedVariableValue(vari, selector) if vari.getType() == EntityType => {
-                        val (prefix, selector) = Utils.getSelector(exec.exprs.head)
+                        val (prefix, _, selector) = Utils.getSelector(exec.exprs.head)
                         prefix:::makeExecute(x => AtIR(selector.getString(), x), Compiler.compile(exec.block))
                     }
                     case other => {
@@ -152,16 +178,16 @@ object Execute{
                 if (exec.exprs.length > 1){
                     val a = Utils.simplify(exec.exprs(0))
                     val b = Utils.simplify(exec.exprs(1))
-                    makeExecute(x => RotatedIR(f"${a.getFloatValue()} ${b.getFloatValue()}", x), Compiler.compile(exec.block))
+                    makeExecute(x => RotatedIR(f"${a.getString()} ${b.getString()}", x), Compiler.compile(exec.block))
                 }
                 else{
-                    val (prefix, selector) = Utils.getSelector(exec.exprs.head)
+                    val (prefix, _, selector) = Utils.getSelector(exec.exprs.head)
                     prefix:::makeExecute(x => RotatedEntityIR(selector.getString(), x), Compiler.compile(exec.block))
                 }
             }
             case FacingType => {
                 if (exec.exprs.length > 1){
-                    val (prefix, selector) = Utils.getSelector(exec.exprs.head)
+                    val (prefix, _, selector) = Utils.getSelector(exec.exprs.head)
                     val anchor = 
                         Utils.simplify(exec.exprs(1)) match{
                             case StringValue("eyes") => "eyes"
@@ -172,9 +198,9 @@ object Execute{
                 }
                 else{
                     Utils.simplify(exec.exprs.head) match
-                        case PositionValue(value) => makeExecute(x => FacingIR(value, x), Compiler.compile(exec.block))
+                        case value: PositionValue => makeExecute(x => FacingIR(value.getString(), x), Compiler.compile(exec.block))
                         case _ => {
-                            val (prefix, selector) = Utils.getSelector(exec.exprs.head)
+                            val (prefix, _, selector) = Utils.getSelector(exec.exprs.head)
                             prefix:::makeExecute(x => FacingEntityIR(selector.getString(), "eyes", x), Compiler.compile(exec.block))
                         }
                 }
@@ -242,7 +268,7 @@ object Execute{
                 }
             }
             case LinkedVariableValue(vari, sel) => {
-                if (vari.modifiers.isLazy){
+                if (vari.canBeReduceToLazyValue){
                     getIfCase(vari.lazyValue)
                 }
                 else{
@@ -343,6 +369,7 @@ object Execute{
             // Directly Equilable Value (int, float, bool, function, etc...)
             case BinaryOperation("==" | "!=", LinkedVariableValue(left, sel), LinkedVariableValue(right, sel2)) 
                 if left.getType().isDirectEqualitable() && checkComparaison(left.getType(), right.getType()) => 
+
                     (List(), List(IFValueCase(expr)))
 
             case BinaryOperation("==" | "!=", LinkedVariableValue(left, sel), right) 
@@ -415,6 +442,24 @@ object Execute{
                     val (p, c) = getIfCase(BinaryOperation(op, left, LinkedVariableValue(right, sel)))
                     (p1:::p,c)
             
+
+            // Special Case for Function
+            case BinaryOperation("==", LinkedVariableValue(left, sel), LinkedFunctionValue(right: ConcreteFunction))
+                if !left.getType().isEqualitySupported() && !left.getType().isComparaisonSupported() => 
+                    (List(), List(IFValueCase(BinaryOperation("==", LinkedVariableValue(left, sel), IntValue(right.getMuxID())))))
+
+            case BinaryOperation("!=", LinkedVariableValue(left, sel), LinkedFunctionValue(right: ConcreteFunction))
+                if !left.getType().isEqualitySupported() && !left.getType().isComparaisonSupported() => 
+                    (List(), List(IFNotValueCase(IFValueCase(BinaryOperation("==", LinkedVariableValue(left, sel), IntValue(right.getMuxID()))))))
+
+            case BinaryOperation("==", LinkedFunctionValue(left: ConcreteFunction), LinkedVariableValue(right, sel))
+                if !right.getType().isEqualitySupported() && !right.getType().isComparaisonSupported() => 
+                    (List(), List(IFValueCase(BinaryOperation("==", LinkedVariableValue(right, sel), IntValue(left.getMuxID())))))
+
+            case BinaryOperation("!=", LinkedFunctionValue(left: ConcreteFunction), LinkedVariableValue(right, sel))
+                if !right.getType().isEqualitySupported() && !right.getType().isComparaisonSupported() => 
+                    (List(), List(IFNotValueCase(IFValueCase(BinaryOperation("==", LinkedVariableValue(right, sel), IntValue(left.getMuxID()))))))
+
             // Error Cases
             case BinaryOperation(">" | "<" | ">=" | "<=" | "==" | "!=", LinkedVariableValue(left, sel), right) 
                 if !left.getType().isEqualitySupported() && !left.getType().isComparaisonSupported() => 
@@ -445,6 +490,10 @@ object Execute{
                 (ll._1:::rr._1, List(IFValueCase(BinaryOperation(op, ll._2, rr._2))))
             }
 
+            case BinaryOperation("in", SelectorValue(v), clz: ClassValue)=> {
+                val (p, ctx, sel) = Utils.getSelector(clz)
+                (p, List(IFValueCase(BinaryOperation("in", SelectorValue(v), SelectorValue(sel)))))
+            }
             case BinaryOperation("in", SelectorValue(v), right)=> {
                 val rr = Utils.simplifyToVariable(right)
                 (rr._1, List(IFValueCase(BinaryOperation("in", SelectorValue(v), rr._2))))
@@ -511,11 +560,11 @@ object Execute{
                         }
                     }
                     case "not in" => {
-                        val (p, s) = Utils.getSelector(expr)
+                        val (p, _, s) = Utils.getSelector(expr)
                         (p, List(IFValueCase(SelectorValue(s))))
                     }
                     case "in" => {
-                        val (p, s) = Utils.getSelector(expr)
+                        val (p, _, s) = Utils.getSelector(expr)
                         (p, List(IFValueCase(SelectorValue(s))))
                     }
                     case _ => {
@@ -551,7 +600,7 @@ object Execute{
             case FunctionCallValue(name, args, typeargs, sel) if name.toString() == "loaded" && args.length > 0 => {
                 if (Settings.target == MCJava){
                     args.map(Utils.simplify(_)) match
-                        case PositionValue(pos)::Nil => (List(), List(IFLoaded(pos)))
+                        case (pos: PositionValue) :: Nil => (List(), List(IFLoaded(pos.getString())))
                         case other => throw new Exception(f"Invalid argument to loaded: $other")
                 }
                 else{
@@ -561,24 +610,36 @@ object Execute{
             case FunctionCallValue(name, args, typeargs, sel) if name.toString() == "block" && args.length > 0 => {
                 if (Settings.target == MCJava){
                     args.map(Utils.simplify(_)) match
-                        case PositionValue(pos)::NamespacedName(block)::Nil => (List(), List(IFBlock(pos+" "+block)))
-                        case NamespacedName(block)::Nil => (List(), List(IFBlock("~ ~ ~ "+block)))
-                        case PositionValue(pos)::TagValue(block)::Nil => (List(), List(IFBlock(pos+" "+context.getBlockTag(block).getTag())))
+                        case (pos:PositionValue)::(block: NamespacedName)::Nil => (List(), List(IFBlock(pos.getString()+" "+block.getString())))
+                        case (block: NamespacedName)::Nil => (List(), List(IFBlock("~ ~ ~ "+block.getString())))
+                        case (pos:PositionValue)::TagValue(block)::Nil => (List(), List(IFBlock(pos.getString()+" "+context.getBlockTag(block).getTag())))
                         case TagValue(block)::Nil => (List(), List(IFBlock("~ ~ ~ "+context.getBlockTag(block).getTag())))
+                        case (pos:PositionValue)::LinkedTagValue(block)::Nil => (List(), List(IFBlock(pos.getString()+" "+block.getTag())))
+                        case LinkedTagValue(block)::Nil => (List(), List(IFBlock("~ ~ ~ "+block.getTag())))
                         case other => throw new Exception(f"Invalid argument to block: $other")
                 }
                 else if (Settings.target == MCBedrock){
                     args.map(Utils.simplify(_)) match
-                        case PositionValue(pos)::NamespacedName(block)::Nil => (List(), List(IFBlock(pos+" "+BlockConverter.getBlockName(block)+" "+BlockConverter.getBlockID(block))))
-                        case NamespacedName(block)::Nil => (List(), List(IFBlock("~ ~ ~ "+BlockConverter.getBlockName(block)+" "+BlockConverter.getBlockID(block))))
-                        case PositionValue(pos)::TagValue(block)::Nil => {
+                        case (pos:PositionValue)::(block: NamespacedName)::Nil => (List(), List(IFBlock(pos.getString()+" "+BlockConverter.getBlockName(block.getString())+" "+BlockConverter.getBlockID(block.getString()))))
+                        case (block: NamespacedName)::Nil => (List(), List(IFBlock("~ ~ ~ "+BlockConverter.getBlockName(block.getString())+" "+BlockConverter.getBlockID(block.getString()))))
+                        case (pos:PositionValue)::TagValue(block)::Nil => {
                             val tag = context.getBlockTag(block)
-                            val prev = makeExecute(f => PositionedIR(pos, f), tag.testFunction.call(List(), null, "="))
+                            val prev = makeExecute(f => PositionedIR(pos.getString(), f), tag.testFunction.call(List(), null, "="))
                             val (p, c) = getIfCase(LinkedVariableValue(tag.testFunction.returnVariable))
                             (prev ::: p, c)
                         }
                         case TagValue(block)::Nil => {
                             val tag = context.getBlockTag(block)
+                            val prev = tag.testFunction.call(List(), null, "=")
+                            val (p, c) = getIfCase(LinkedVariableValue(tag.testFunction.returnVariable))
+                            (prev ::: p, c)
+                        }
+                        case (pos:PositionValue)::LinkedTagValue(tag)::Nil => {
+                            val prev = makeExecute(f => PositionedIR(pos.getString(), f), tag.testFunction.call(List(), null, "="))
+                            val (p, c) = getIfCase(LinkedVariableValue(tag.testFunction.returnVariable))
+                            (prev ::: p, c)
+                        }
+                        case LinkedTagValue(tag)::Nil => {
                             val prev = tag.testFunction.call(List(), null, "=")
                             val (p, c) = getIfCase(LinkedVariableValue(tag.testFunction.returnVariable))
                             (prev ::: p, c)
@@ -591,8 +652,8 @@ object Execute{
             }
             case FunctionCallValue(name, args, typeargs, sel) if name.toString() == "blocks" && args.length > 0 => {
                 args.map(Utils.simplify(_)) match
-                    case PositionValue(pos1)::PositionValue(pos2)::PositionValue(pos3)::StringValue(mask)::Nil => (List(), List(IFBlocks(pos1+" "+pos2+" "+pos3+" "+mask)))
-                    case PositionValue(pos1)::PositionValue(pos2)::PositionValue(pos3)::Nil => (List(), List(IFBlocks(pos1+" "+pos2+" "+pos3+" all")))
+                    case (pos1: PositionValue)::(pos2: PositionValue)::(pos3: PositionValue)::StringValue(mask)::Nil => (List(), List(IFBlocks(pos1.getString()+" "+pos2.getString()+" "+pos3.getString()+" "+mask)))
+                    case (pos1: PositionValue)::(pos2: PositionValue)::(pos3: PositionValue)::Nil => (List(), List(IFBlocks(pos1.getString()+" "+pos2.getString()+" "+pos3.getString()+" all")))
                     case other => throw new Exception(f"Invalid argument to blocks: $other")
             }
             case FunctionCallValue(VariableValue(name, sel), args, typeargs, _) => {
@@ -616,16 +677,30 @@ object Execute{
                 val v = Utils.simplifyToVariable(expr)
                 (v._1, List(IFValueCase(v._2)))
             }
+            case clz : ClassValue => {
+                val (p, ctx, sel) = Utils.getSelector(clz)
+                val (p2, c) = getIfCase(SelectorValue(sel))
+                (p:::p2, c)
+            }
             case LambdaValue(args, instr, ctx) => (List(), List(IFTrue))
             case StringValue(string) => throw new Exception("Can't use if with string")
             case JsonValue(json) => throw new Exception("Can't use if with json")
             case RangeValue(min, max, delta) => throw new Exception("Can't use if with range")
             case TupleValue(values) => throw new Exception("Can't use if with tuple")
             case RawJsonValue(value) => throw new Exception("Can't use if with rawjson")
-            case NamespacedName(value) => throw new Exception("Can't use if with mcobject")
+            case NamespacedName(value, json) => throw new Exception("Can't use if with mcobject")
             case ConstructorCall(name, args, generics) => throw new Exception("Can't use if with constructor call")
-            case PositionValue(value) => throw new Exception("Can't use if with position")
+            case pos: PositionValue => {
+                if (Settings.target == MCJava){
+                    (List(), List(IFLoaded(pos.getString())))
+                }
+                else{
+                    throw new Exception(f"unsupported if position for target: ${Settings.target}")
+                }
+            }
             case TagValue(value) => throw new Exception("Can't use if with tag")
+            case LinkedTagValue(value) => throw new Exception("Can't use if with tag")
+            case other => throw new Exception(f"unsupported if value: $other")
     }
     catch{
         e => {
@@ -654,11 +729,11 @@ object Execute{
                         v.map(v => {
                             val mod = Modifier.newPrivate()
                             mod.isLazy = true
-                            val vari = new Variable(ctx, "dummy", Utils.typeof(v._2), mod)
+                            val vari = new Variable(ctx, v._1, Utils.typeof(v._2), mod)
                             ctx.addVariable(Identifier.fromString(v._1), vari)
                             vari.assign("=", v._2)
 
-                            val indx = new Variable(ctx, "dummy", IntType, mod)
+                            val indx = new Variable(ctx, "index", IntType, mod)
                             ctx.push(v._1).addVariable(Identifier.fromString("index"), indx)
                             index += 1
                             indx.assign("=", IntValue(index))
@@ -670,19 +745,25 @@ object Execute{
             }
         )
     }
+    def switchComp(left: Expression, right: Expression)(implicit context: Context): Expression = {
+        Utils.typeof(right) match{
+            case RangeType(_) => BinaryOperation("in", left, right)
+            case _ => BinaryOperation("==", left, right)
+        }
+    }
     def switch(swit: Switch)(implicit context: Context):List[IRTree] = {
         val expr = Utils.simplify(swit.value)
         Utils.typeof(expr) match
-            case IntType | FloatType | BoolType | FuncType(_, _) | EnumType(_) => {
+            case IntType | FloatType | BoolType | FuncType(_, _) | EnumType(_) | StructType(_, _) | ClassType(_, _) => {
                 val cases = flattenSwitchCase(swit.cases).map(c => SwitchCase(Utils.simplify(c.expr), c.instr))
                 expr match{
                     case VariableValue(name, sel) if !swit.copyVariable=> {
                         makeTree(context.getVariable(name), cases.par.filter(_.expr.hasIntValue()).map(x => (x.expr.getIntValue(), x.instr)).toList):::
-                        cases.par.filter(!_.expr.hasIntValue()).flatMap(x => ifs(If(BinaryOperation("in", VariableValue(name), x.expr), x.instr, List()))).toList
+                        cases.par.filter(!_.expr.hasIntValue()).flatMap(x => ifs(If(switchComp(VariableValue(name), x.expr), x.instr, List()))).toList
                     }
                     case LinkedVariableValue(vari, sel) if !swit.copyVariable=> {
                         makeTree(vari, cases.par.filter(_.expr.hasIntValue()).map(x => (x.expr.getIntValue(), x.instr)).toList):::
-                        cases.par.filter(!_.expr.hasIntValue()).flatMap(x => ifs(If(BinaryOperation("in", LinkedVariableValue(vari), x.expr), x.instr, List()))).toList
+                        cases.par.filter(!_.expr.hasIntValue()).flatMap(x => ifs(If(switchComp(LinkedVariableValue(vari), x.expr), x.instr, List()))).toList
                     }
                     case IntValue(value) => {
                         val tail = cases.par.filter(!_.expr.hasIntValue()).toList
@@ -693,7 +774,7 @@ object Execute{
                         else{
                             val vari = context.getFreshVariable(Utils.typeof(swit.value))
                             vari.assign("=", swit.value) ::: head ::: 
-                            tail.flatMap(x => ifs(If(BinaryOperation("in", LinkedVariableValue(vari), x.expr), x.instr, List())))
+                            tail.flatMap(x => ifs(If(switchComp(LinkedVariableValue(vari), x.expr), x.instr, List())))
                         }
                     }
                     case FloatValue(value) => {
@@ -705,7 +786,7 @@ object Execute{
                         else{
                             val vari = context.getFreshVariable(Utils.typeof(swit.value))
                             vari.assign("=", swit.value) ::: head ::: 
-                            tail.flatMap(x => ifs(If(BinaryOperation("in", LinkedVariableValue(vari), x.expr), x.instr, List())))
+                            tail.flatMap(x => ifs(If(switchComp(LinkedVariableValue(vari), x.expr), x.instr, List())))
                         }
                     }
                     case EnumIntValue(value) => {
@@ -717,21 +798,24 @@ object Execute{
                         else{
                             val vari = context.getFreshVariable(Utils.typeof(swit.value))
                             vari.assign("=", swit.value) ::: head ::: 
-                            tail.flatMap(x => ifs(If(BinaryOperation("in", LinkedVariableValue(vari), x.expr), x.instr, List())))
+                            tail.flatMap(x => ifs(If(switchComp(LinkedVariableValue(vari), x.expr), x.instr, List())))
                         }
                     }
                     case _ => {
                         val vari = context.getFreshVariable(Utils.typeof(swit.value))
                         vari.assign("=", swit.value) ::: makeTree(vari, cases.filter(_.expr.hasIntValue()).map(x => (x.expr.getIntValue(), x.instr)))::: 
-                        cases.filter(!_.expr.hasIntValue()).flatMap(x => ifs(If(BinaryOperation("in", LinkedVariableValue(vari), x.expr), x.instr, List())))
+                        cases.filter(!_.expr.hasIntValue()).flatMap(x => ifs(If(switchComp(LinkedVariableValue(vari), x.expr), x.instr, List())))
                     }
                 }
             }
             case TupleType(sub) => {
                 def getHead(expr: Expression): Expression = {
                     expr match
-                        case TupleValue(values) => values.head
+                        case TupleValue(values) if values.isDefinedAt(0) => values.head
                         case VariableValue(name, selector) => getHead(LinkedVariableValue(context.getVariable(name), selector))
+                        case LinkedVariableValue(vari, selector) if vari.canBeReduceToLazyValue => {
+                            getHead(vari.lazyValue)
+                        }
                         case LinkedVariableValue(vari, selector) => {
                             LinkedVariableValue(vari.tupleVari.head)
                         }
@@ -741,6 +825,9 @@ object Execute{
                     expr match
                         case TupleValue(values) => TupleValue(values.tail)
                         case VariableValue(name, selector) => getTail(LinkedVariableValue(context.getVariable(name), selector))
+                        case LinkedVariableValue(vari, selector) if vari.canBeReduceToLazyValue => {
+                            getTail(vari.lazyValue)
+                        }
                         case LinkedVariableValue(vari, selector) => {
                             val TupleType(inner) = vari.getType(): @unchecked
                             val fake = Variable(vari.context, vari.name, TupleType(inner.tail), vari.modifiers)
@@ -770,17 +857,18 @@ object Execute{
             )
         }
         else{
-            val length = values.length
-            val subTree = values.zipWithIndex.groupBy(_._2 * Settings.treeSize / length).map((g,l)=>l).toList.sortBy(_.head._2)
+            val values2 = values.sortBy(_._1)
+            val length = values2.length
+            val subTree = values2.zipWithIndex.groupBy(_._2 * Settings.treeSize / length).map((g,l)=>l).toList.sortBy(_.head._2)
             subTree.flatMap(x => {
                 if (x.length > 1){
                     val block = context.getFreshBlock(makeTree(cond, x.map(p => p._1).sortBy(_._1)))
                     val min = x.map(p => p._1).head._1
                     val max = x.map(p => p._1).last._1
-                    makeExecute(getListCase(List(IFValueCase(BinaryOperation("in", LinkedVariableValue(cond), RangeValue(IntValue(min), IntValue(max), IntValue(1)))))), block.call(List()))
+                    makeExecute(getListCase(List(IFValueCase(switchComp(LinkedVariableValue(cond), RangeValue(IntValue(min), IntValue(max), IntValue(1)))))), block.call(List()))
                 }
                 else{
-                    makeExecute(getListCase(List(IFValueCase(BinaryOperation("==", LinkedVariableValue(cond), IntValue(x.head._1._1))))), Compiler.compile(x.head._1._2))
+                    makeExecute(getListCase(List(IFValueCase(switchComp(LinkedVariableValue(cond), IntValue(x.head._1._1))))), Compiler.compile(x.head._1._2))
                 }
             }
             ).toList
@@ -1020,6 +1108,9 @@ case class IFValueCase(val value: Expression) extends IFCase{
             case BinaryOperation("in", SelectorValue(sel1), LinkedVariableValue(right, sel2)) if right.getType() == EntityType => {
                 val sel = sel1.add("tag", SelectorIdentifier(right.tagName))
                 IfEntity(sel.getString(), block)
+            }
+            case BinaryOperation("in", SelectorValue(sel1), SelectorValue(sel2)) => {
+                IfEntity(sel1.merge(sel2).getString(), block)
             }
             
 

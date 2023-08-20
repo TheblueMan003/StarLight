@@ -7,13 +7,30 @@ import sl.Compilation.Selector.Selector
 import scala.collection.mutable
 import sl.IR.*
 
-class Class(context: Context, name: String, val generics: List[String], _modifier: Modifier, val block: Instruction, val parent: Class, val entities: Map[String, Expression]) extends CObject(context, name, _modifier){
+class Class(context: Context, name: String, val generics: List[String], _modifier: Modifier, val block: Instruction, val parentName: Identifier, val entities: Map[String, Expression]) extends CObject(context, name, _modifier){
+    lazy val parent = if (parentName == null) {if (name != "object") {context.getClass("object")} else null} else context.getClass(parentName)
     var implemented = mutable.Map[List[Type], Class]()
     var virutalFunction: List[(String, Function)] = List()
     var virutalFunctionVariable: List[Variable] = List()
     var virutalFunctionBase: List[Function] = List()
     var definingType = ClassType(this, List())
     private var wasGenerated = false
+
+    lazy val cacheGVFunctions = getAllFunctions()
+                .filter(!_._2.modifiers.isStatic)
+                .filter(!_._2.modifiers.isVirtual)
+                .filter(!_._2.isVirtualOverride)
+                .filter(x => isNotClassFunction(x._2))
+                .filter(f => f._2.context == context.push(name) || context.push(name).isInheriting(f._2.context))
+                .toList
+
+    lazy val cacheGVVariables = getAllVariables()
+                .filter(!_.modifiers.isStatic)
+                .filter(!_.isFunctionArgument)
+                .filter(_.modifiers.protection == Protection.Public)
+                .filter(_.getter != null)
+                .filter(_.setter != null)
+                .toList
 
     def get(typevars2: List[Type]) ={
         val typevars = typevars2.map(context.push(name).getType(_))
@@ -33,7 +50,7 @@ class Class(context: Context, name: String, val generics: List[String], _modifie
             generics.zip(typevars).foreach(pair => {
                 ctx.addTypeDef(pair._1, pair._2)
             })
-            val cls = ctx.addClass(new Class(ctx, "impl", List(), modifiers, block, parent, entities))
+            val cls = ctx.addClass(new Class(ctx, "impl", List(), modifiers, block, parentName, entities))
             cls.definingType = ClassType(this, typevars)
             implemented(typevars) = cls
             cls.generate()
@@ -50,6 +67,7 @@ class Class(context: Context, name: String, val generics: List[String], _modifie
                 val ctx = context.push(name, this)
                 ctx.push("this", ctx)
                 if (parent != null){
+                    ctx.push("super", parent.context.push(parent.name))
                     ctx.inherit(parent.context.push(parent.name))
                 }
 
@@ -64,7 +82,7 @@ class Class(context: Context, name: String, val generics: List[String], _modifie
                 
                 val mod = new Modifier()
                 mod.isEntity = true
-                ctx.getAllVariable().filter(!_.isFunctionArgument).foreach(vari => vari.modifiers = vari.modifiers.combine(mod))
+                getAllVariables().filter(!_.isFunctionArgument).foreach(vari => vari.modifiers = vari.modifiers.combine(mod))
 
                 getAllVariables()
                 .filter(!_.isFunctionArgument)
@@ -88,7 +106,9 @@ class Class(context: Context, name: String, val generics: List[String], _modifie
                 .filter(f => f._2.context == ctx)
                 .map((name,fct) => {
                     val typ = fct.getFunctionType()
-                    val vari = Variable(ctx, f"---${fct.name}", typ, Modifier.newPrivate())
+                    val vmod = Modifier.newPrivate()
+                    vmod.isEntity = true
+                    val vari = Variable(ctx, f"---${fct.name}", typ, vmod)
                     ctx.addVariable(vari)
                     vari.generate()(ctx)
 
@@ -103,38 +123,33 @@ class Class(context: Context, name: String, val generics: List[String], _modifie
                         if (fct.getType() == VoidType) FunctionCall(vari.fullName,fct.arguments.map(arg => VariableValue(arg.name)), List())
                         else Return(FunctionCallValue(LinkedVariableValue(vari),fct.arguments.map(arg => VariableValue(arg.name)), List(), Selector.self)), false)
                     fct2.generateArgument()(ctx)
+                    fct2.overridedFunction = fct
+                    fct2.isVirtualDispatch = true
                     virutalFunction = (name, fct2) :: virutalFunction
-                    ctx.addFunction(f"--${name}", fct2)
+                    ctx.addFunction(name, fct2)
                 })
 
                 getAllVariables().filter(!_.wasGenerated).map(_.generate(false, true)(ctx))
             }
         }
     }
+    def getVirtualFunction():List[(String, Function)] = {
+        if (parent != null){
+            parent.getVirtualFunction() ++ virutalFunction
+        }
+        else{
+            virutalFunction
+        }
+    }
     def generateForVariable(vari: Variable, typevar: List[Type])(implicit ctx2: Context):Unit={
         if (generics.length == 0){
             generate()
             val ctx = ctx2.push(vari.name, vari)
-            getAllFunctions()
-                .filter(!_._2.modifiers.isStatic)
-                .filter(!_._2.modifiers.isVirtual)
-                .filter(x => isNotClassFunction(x._2))
-                .filter(f => f._2.context == context.push(name) || context.push(name).isInheriting(f._2.context))
-                .map((name, fct) => {
+            cacheGVFunctions.map((name, fct) => {
                     val deco = ClassFunction(ctx.getPath()+"."+name, vari, fct)
                     ctx.addFunction(name, deco)
                 })
-            virutalFunction.map((name, fct) => {
-                val deco = ClassFunction(ctx.getPath()+"."+name, vari, fct)
-                ctx.addFunction(name, deco)
-            })
-            getAllVariables()
-                .filter(!_.modifiers.isStatic)
-                .filter(!_.isFunctionArgument)
-                .filter(_.modifiers.protection == Protection.Public)
-                .filter(_.getter != null)
-                .filter(_.setter != null)
-                .map(vari => {
+            cacheGVVariables.map(vari => {
                     val getter = ClassFunction(ctx.getPath()+"."+vari.getter.name, vari, vari.getter)
                     ctx.addFunction(vari.getter.name, getter)
                     val setter = ClassFunction(ctx.getPath()+"."+vari.setter.name, vari, vari.setter)
@@ -150,8 +165,14 @@ class Class(context: Context, name: String, val generics: List[String], _modifie
     def getAllFunctions():List[(String,Function)] = {
         context.push(name).getAllFunction()
     }
+    def isVariableOwned(vari: Variable):Boolean = {
+        vari.context == context.push(name) || parent != null && parent.isVariableOwned(vari)
+    }
     def getAllVariables():List[Variable] = {
-        context.push(name).getAllVariable()
+        context.push(name).getAllVariable().filter(isVariableOwned(_)).flatMap(getAllVariablesFrom)
+    }
+    def getAllVariablesFrom(vari: Variable):List[Variable] = {
+        vari :: vari.tupleVari.flatMap(getAllVariablesFrom)
     }
     def getBlock(): Instruction = {
         if (parent != null){
@@ -174,10 +195,34 @@ class Class(context: Context, name: String, val generics: List[String], _modifie
             false
         }
     }
-    def addClassTags():List[IRTree] = {
-        virutalFunctionVariable.zip(virutalFunctionBase).flatMap((vari, fct) => vari.assign("=", LinkedFunctionValue(fct))(context.push(name))) :::
+    def getMostRecentFunction(function: Function)(implicit ctx: Context): Function = {
+        val found = ctx.getAllFunction().filter(_._2.overridedFunction == function)
+        if (found.length == 0){
+            if (virutalFunctionBase.contains(function.overridedFunction)){
+                function.overridedFunction
+            }
+            else{
+                function
+            }
+        }
+        else{
+            getMostRecentFunction(found.head._2)
+        }
+    }
+    def addVariableDefaultAssign():List[IRTree] = {
+        getAllVariables()
+            .filter(!_.modifiers.isStatic)
+            .filter(!_.isFunctionArgument)
+            .filter(!_.modifiers.isLazy)
+            .filter(f => f.modifiers.protection == Protection.Public || f.modifiers.protection == Protection.Protected)
+            .filter(_.modifiers.isEntity)
+            .flatMap(_.assign("=", DefaultValue)(context))
+    }
+    def addClassTags(context: Option[Context] = None):List[IRTree] = {
+        val ctx = context.getOrElse(this.context.push(name))
+        virutalFunctionVariable.zip(virutalFunctionBase).flatMap((vari, fct) => vari.assign("=", LinkedFunctionValue(getMostRecentFunction(fct)(ctx)))(ctx)) :::
         List(CommandIR(f"tag @s add ${getTag()}")) ::: (if (parent != null){
-            parent.addClassTags()
+            parent.addClassTags(Some(ctx))
         }
         else{
             Nil

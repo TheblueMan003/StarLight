@@ -39,13 +39,22 @@ abstract class Function(context: Context, val contextName: String, name: String,
     val parentFunction = context.getCurrentFunction()
     val parentVariable = context.getCurrentVariable()
     val parentClass = context.getCurrentClass()
-    override lazy val fullName: String = if (context.isInLazyCall() || parentFunction != null || parentVariable != null || modifiers.protection==Protection.Private || Settings.obfuscate) then context.fctCtx.getFreshId() else context.getPath() + "." + name
+    var age = 0
+    val wasMovedToBlock = context.isInLazyCall() || parentFunction != null || parentVariable != null || modifiers.protection==Protection.Private || Settings.obfuscate
+    override lazy val fullName: String = if (wasMovedToBlock) then context.fctCtx.getFreshId() else context.getPath() + "." + name
     val minArgCount = getMinArgCount(arguments)
     val maxArgCount = getMaxArgCount(arguments)
     var argumentsVariables: List[Variable] = List()
     val clazz = context.getCurrentClass()
     var overridedFunction: Function = null
     var stringUsed = false
+    var isVirtualDispatch = false
+
+    def hasVirtualOverride: Boolean = modifiers.isVirtual || isVirtualDispatch || (overridedFunction != null && overridedFunction.hasVirtualOverride)
+
+    def isVirtualOverride = {
+        modifiers.isOverride && (overridedFunction != null && overridedFunction.hasVirtualOverride)
+    }
 
     if (modifiers.isVirtual){
 
@@ -136,7 +145,7 @@ abstract class Function(context: Context, val contextName: String, name: String,
           modifiers.isLoading || 
           modifiers.protection == Protection.Public || 
           stringUsed || 
-          (!Settings.optimizeAllowRemoveProtected && modifiers.protection == Protection.Protected))
+          (!Settings.optimizeAllowRemoveProtected && modifiers.protection == Protection.Protected && !wasMovedToBlock))
         )
     }
 }
@@ -232,16 +241,17 @@ class BlockFunction(context: Context, _contextName: String, name: String, argume
 
 class LazyFunction(context: Context, _contextName: String, name: String, arguments: List[Argument], typ: Type, _modifier: Modifier, val body: Instruction) extends Function(context, _contextName, name, arguments, typ, _modifier){
     def call(args: List[Expression], ret: Variable = null, op: String = "=")(implicit ctx: Context): List[IRTree] = {
+        //var block = Utils.fix(body)(context, arguments.map(a => Identifier.fromString(a.name)).toSet)
         var block = body
-        val sub = ctx.push(ctx.getLazyCallId())
+        val sub = context.push(context.getLazyCallId())
         sub.setLazyCall()
-        sub.inherit(context)
         
         val pref = argMap(args).sortBy((a,v) => -a.name.length).flatMap((a, v) => {
             val vari = Variable(sub, a.name, a.getType(), a.modifiers)
             vari.generate()(sub)
+            vari.isFunctionArgument = true
             val instr = sub.addVariable(vari).assign("=", v)
-            block = if a.name.startsWith("$") then Utils.subst(block, a.name, v.getString()) else block
+            block = if a.name.startsWith("$") then Utils.subst(block, a.name, Utils.simplify(v).getString()) else block
             instr
         })
 
@@ -332,8 +342,8 @@ class TagFunction(context: Context, _contextName: String, name: String, argument
     }
 
     override def compile(): Unit = {
-        val normal: List[Instruction] = getFunctions().filter(_.clazz == null).map(LinkedFunctionCall(_, argumentsVariables.map(LinkedVariableValue(_)))).toList
-        val clazz: List[Instruction] = getFunctions().filter(_.clazz != null).map(f => {
+        val normal: List[Instruction] = getFunctions().filter(f => f.clazz == null && f.arguments.size == 0).map(LinkedFunctionCall(_, argumentsVariables.map(LinkedVariableValue(_)))).toList
+        val clazz: List[Instruction] = getFunctions().filter(f => f.clazz != null && f.arguments.size == 0).map(f => {
             With(SelectorValue(JavaSelector("@e",List(("tag", SelectorIdentifier(f.clazz.getTag()))))), BoolValue(true), BoolValue(true),
             LinkedFunctionCall(f, argumentsVariables.map(LinkedVariableValue(_))))}).toList
 
@@ -349,13 +359,28 @@ class ClassFunction(_contextName: String, variable: Variable, function: Function
 
     def call(args2: List[Expression], ret: Variable = null, op: String = "=")(implicit ctx: Context): List[IRTree] = {
         val selector = SelectorValue(JavaSelector("@e", List(("tag", SelectorIdentifier("__class__")))))
-
+        def isScoreboard(expr: Expression) = {
+            expr match
+                case LinkedVariableValue(vari, selector) => vari.modifiers.isEntity
+                case _ => false
+        }
+        def noScoreboardArg(expr: Expression): (List[IRTree], Expression) = {
+            if (Utils.contains(expr, isScoreboard)){
+                val tmp = ctx.getFreshVariable(Utils.typeof(expr))
+                (tmp.assign("=", expr), LinkedVariableValue(tmp))
+            }
+            else{
+                (List(), expr)
+            }
+        }
         def callNoEntity(comp: Variable, ret: Variable = null) = {
-            Compiler.compile(With(
+            val tmp = args2.map(a => noScoreboardArg(a))
+            val args3 = tmp.map(a => a._2)
+            tmp.flatMap(a => a._1) ::: Compiler.compile(With(
                 selector, 
                 BoolValue(false), 
                 BinaryOperation("==", LinkedVariableValue(comp), LinkedVariableValue(ctx.root.push("object").getVariable("__ref"))),
-                LinkedFunctionCall(function, args2, ret)
+                LinkedFunctionCall(function, args3, ret)
                 ))
         }
 
@@ -380,7 +405,7 @@ class ClassFunction(_contextName: String, variable: Variable, function: Function
 }
 
 
-class CompilerFunction(context: Context, name: String, arguments: List[Argument], typ: Type, _modifier: Modifier, val body: (List[Expression], Context)=>(List[IRTree],Expression)) extends Function(context, context.getPath()+"."+name, name, arguments, typ, _modifier){
+class CompilerFunction(context: Context, name: String, arguments: List[Argument], typ: Type, _modifier: Modifier, val body: (List[Expression], Context)=>(List[IRTree],Expression), val isValue: Boolean = true) extends Function(context, context.getPath()+"."+name, name, arguments, typ, _modifier){
     generateArgument()(context.push(name, this))
     argumentsVariables.foreach(_.modifiers.isLazy = true)
     override def exists()= false

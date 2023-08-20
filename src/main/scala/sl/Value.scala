@@ -9,6 +9,7 @@ import objects.types.*
 import sl.Compilation.*
 import objects.Function
 import sl.Compilation.Printable
+import objects.Tag
 
 trait Expression extends CPositionable{
     def hasIntValue(): Boolean
@@ -107,12 +108,12 @@ case class RawJsonValue(val value: List[Printable]) extends Expression with Smal
     def padLeft(finalSize: Int)(implicit ctx: Context): RawJsonValue = {
         val length = this.length()
         if length >= finalSize then this
-        else RawJsonValue(value ::: List(new PrintString(" " * (finalSize - length), Namecolor("white"), TextModdifier(false, false, false, false, false))))
+        else RawJsonValue(value ::: List(new PrintString(" " * (finalSize - length), Namecolor("white"), TextModdifier(false, false, false, false, false, null))))
     }
     def padRight(finalSize: Int)(implicit ctx: Context): RawJsonValue = {
         val length = this.length()
         if length >= finalSize then this
-        else RawJsonValue(List(new PrintString(" " * (finalSize - length), Namecolor("white"), TextModdifier(false, false, false, false, false))) ::: value)
+        else RawJsonValue(List(new PrintString(" " * (finalSize - length), Namecolor("white"), TextModdifier(false, false, false, false, false, null))) ::: value)
     }
     def padCenter(finalSize: Int)(implicit ctx: Context): RawJsonValue = {
         val length = this.length()
@@ -120,17 +121,23 @@ case class RawJsonValue(val value: List[Printable]) extends Expression with Smal
         else {
             val left = (finalSize - length) / 2
             val right = finalSize - length - left
-            RawJsonValue(List(new PrintString(" " * left, Namecolor("white"), TextModdifier(false, false, false, false, false))) ::: value ::: List(new PrintString(" " * right, Namecolor("white"), TextModdifier(false, false, false, false, false))))
+            RawJsonValue(List(new PrintString(" " * left, Namecolor("white"), TextModdifier(false, false, false, false, false, null))) ::: value ::: List(new PrintString(" " * right, Namecolor("white"), TextModdifier(false, false, false, false, false, null))))
         }
     }
 }
-case class NamespacedName(val value: String) extends Expression with SmallValue with Stringifyable{
+case class NamespacedName(val value: String, val json: Expression = JsonValue(JsonNull)) extends Expression with SmallValue with Stringifyable{
     override def toString(): String = value
     override def getIntValue(): Int = ???
     override def hasIntValue(): Boolean = false
     override def hasFloatValue(): Boolean = false
     override def getFloatValue(): Double = ???
-    override def getString()(implicit context: Context): String = value
+    override def getString()(implicit context: Context): String = {
+        json match
+            case JsonValue(JsonNull) => value
+            case JsonExpression(NullValue, _) => value
+            case NullValue => value
+            case _ => value + json.getString()
+    }
 }
 case class TagValue(val value: String) extends Expression with SmallValue{
     override def toString(): String = "#"+value
@@ -139,6 +146,14 @@ case class TagValue(val value: String) extends Expression with SmallValue{
     override def hasFloatValue(): Boolean = false
     override def getFloatValue(): Double = ???
     override def getString()(implicit context: Context): String = "#"+value
+}
+case class LinkedTagValue(val value: Tag) extends Expression with SmallValue{
+    override def toString(): String = "#"+value.fullName
+    override def getIntValue(): Int = ???
+    override def hasIntValue(): Boolean = false
+    override def hasFloatValue(): Boolean = false
+    override def getFloatValue(): Double = ???
+    override def getString()(implicit context: Context): String = "#"+value.fullName
 }
 case class VariableValue(val name: Identifier, val selector: Selector = Selector.self) extends Expression with SmallValue{
     override def toString(): String = name.toString()
@@ -269,13 +284,18 @@ case class SelectorValue(val value: Selector) extends Expression{
     override def getFloatValue(): Double = ???
     override def getString()(implicit context: Context): String = value.getString()
 }
-case class PositionValue(val value: String) extends Expression{
-    override def toString(): String = value.toString()
+case class PositionValue(val x: Expression, val y: Expression, val z: Expression) extends Expression{
+    override def toString(): String = f"($x, $y, $z)"
     override def getIntValue(): Int = ???
     override def hasIntValue(): Boolean = false
     override def hasFloatValue(): Boolean = false
     override def getFloatValue(): Double = ???
-    override def getString()(implicit context: Context): String = value
+    override def getString()(implicit context: Context): String = 
+        val px = Utils.forceString(x)
+        val py = Utils.forceString(y)
+        val pz = Utils.forceString(z)
+        
+        f"${px} ${py} ${pz}"
 }
 
 
@@ -308,13 +328,34 @@ case class IsType(val left: Expression, val right: Type) extends Expression{
     override def getString()(implicit context: Context): String = f"(${left.getString()} is ${right})"
 }
 
-case class JsonValue(val content: JSONElement) extends Expression{
+case class ClassValue(val left: objects.Class) extends Expression{
+    override def toString(): String = f"(class::$left)"
+    override def getIntValue(): Int = ???
+    override def hasIntValue(): Boolean = false
+    override def hasFloatValue(): Boolean = false
+    override def getFloatValue(): Double = ???
+    override def getString()(implicit context: Context): String = f"(${left.fullName})"
+}
+
+case class CastValue(val left: Expression, val right: Type) extends Expression{
+    override def toString(): String = f"(${left} as ${right})"
+    override def getIntValue(): Int = ???
+    override def hasIntValue(): Boolean = false
+    override def hasFloatValue(): Boolean = false
+    override def getFloatValue(): Double = ???
+    override def getString()(implicit context: Context): String = f"(${left} as ${right})"
+}
+
+case class JsonValue(val content: JSONElement) extends Expression with Stringifyable{
     override def toString(): String = f"$content"
     override def getIntValue(): Int = ???
     override def hasIntValue(): Boolean = false
     override def hasFloatValue(): Boolean = false
     override def getFloatValue(): Double = ???
-    override def getString()(implicit context: Context): String = content.getString()
+    override def getString()(implicit context: Context): String = 
+        content match
+            case JsonString(s) => s
+            case _ => content.getString()
 }
 trait JSONElement{
     def getString()(implicit context: Context): String
@@ -357,16 +398,8 @@ case class JsonString(val value: String) extends JSONElement{
     }
     override def getStringValue: String = value
 }
-case class JsonIdentifier(val value: String) extends JSONElement{
+case class JsonIdentifier(val value: String, val typ: String) extends JSONElement{
     def getString()(implicit context: Context): String = {        
-        Utils.stringify(value)
-    }
-    def getNbt(): String = {
-        Utils.stringify(value)
-    }
-}
-case class JsonCall(val value: String, val args: List[Expression], val typeargs: List[Type]) extends JSONElement{
-    def getString()(implicit context: Context): String = {
         Utils.stringify(value)
     }
     def getNbt(): String = {
@@ -418,4 +451,13 @@ case class JsonBoolean(val value: Boolean) extends JSONElement{
         if value then "1b" else "0b"
     }
     override def getBooleanValue: Boolean = value
+}
+
+case class JsonExpression(val value: Expression, val typ: String) extends JSONElement{
+    def getString()(implicit context: Context): String = {
+        Utils.compileJson(this).getString()
+    }
+    def getNbt(): String = {
+        ???
+    }
 }

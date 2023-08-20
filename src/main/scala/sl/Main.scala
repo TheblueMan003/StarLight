@@ -11,13 +11,15 @@ import sl.files.*
 import sl.files.CacheAST
 import sl.IR.*
 import sl.Library.Downloader
+import sys.process._
 
 object Main{
-  var version = List(0, 7, 0)
+  var version = List(0, 9, 0)
   private var lastIR: List[IRFile] = null
   private var lastContxt: Context = null
   private var interpreter: Interpreter = null
   private var lastBuild: String = null
+  private var lastExecption: Throwable = null
 
   def main(args: Array[String]): Unit = {
     if (args.length == 0){
@@ -136,12 +138,32 @@ object Main{
               Reporter.ok("Library Updated!")
             }
           }
-          case "clearcache" => {
+          case "clearcache" | "clearcaches" | "cacheclear"| "cachesclear" | "cc" => {
             FileUtils.deleteDirectory("./bin")
             DataPackBuilder.clearCache()
             ResourcePackBuilder.clearCache()
             Downloader.clearCache()
             Reporter.ok("Cache cleared!")
+          }
+          case ">" | "show" => {
+            if (args.length != 2) then {
+              Reporter.error(f"Expected 1 argument got: ${args.length-1}")
+            }
+            else{
+              lazy val name = args(1).replaceAll("/",".").replaceAll(":",".")
+              if (name.contains("*")){
+                lastIR.filter(f => f.name.contains(name.replaceAllLiterally("*",""))).foreach{f => f.print()}
+              }
+              else{
+                lastIR.filter(f => f.name == name).headOption match
+                  case Some(value) => {
+                    value.print()
+                  }
+                  case None => {
+                    lastIR.filter(f => f.name.contains(name)).foreach{f => f.print()}
+                  }
+              }
+            }
           }
           case "help" => {
             println("build <config_name>: Build the project with the config contains in the file config_name. The .slconf must be omited.")
@@ -151,15 +173,33 @@ object Main{
             println("help: Show this")
             println("install <library> [version]: Install a library into the local project. If version is not specified, the latest version will be installed. Note that standard libraries are downloaded automatically when needed.")
             println("update <library>: Update a library into the local project.")
+            println("clearcache: Clear the caches of the compiler")
+            println("tree: Print the tree of the last compilation")
             println("exit: Close")
           }
           case "exit" => {
             FileUtils.deleteDirectory("./bin")
             ended = true
           }
+          case "stacktrace" => {
+            Reporter.error(lastExecption.getStackTrace().mkString("\n"))
+          }
+          case "py" => {
+            Process("python "+args.drop(1).mkString(" ")).!!
+          }
+          case "tree" => {
+            FileUtils.safeWriteFile("tree.txt", List(lastContxt.asPrettyString("")))
+            println("tree written to tree.txt")
+          }
+          case other => {
+            Reporter.error(f"Unknown command: $other")
+          }
       }
       catch{
-        case e => Reporter.error(e.getMessage())
+        case e => {
+          Reporter.error(e.getMessage())
+          lastExecption = e
+        }
       }
       if (argsOri != null){
         ended = true
@@ -207,6 +247,7 @@ object Main{
     FileUtils.copyFromResourcesToFolder("icon/256.png", directory+"/bedrock_resourcepack/pack_icon.png")
 
     FileUtils.copyFromResourcesToFolder("configs/blockmap.csv", directory+"/configs/blockmap.csv")
+    FileUtils.copyFromResourcesToFolder("configs/soundmap.csv", directory+"/configs/soundmap.csv")
     FileUtils.copyFromResourcesToFolder("configs/color.csv", directory+"/configs/color.csv")
 
     ConfigLoader.saveProject(directory+"/")
@@ -245,9 +286,10 @@ object Main{
     Reporter.phase(f"===========[Parsing]==========")
     var tokenized = files.par.map(f => Parser.parseFromFile(f, ()=>Utils.getFile(f))).toList
 
-    Reporter.phase(f"===========[Compiling]==========")
+    Reporter.phase(f"===========[Context Building]==========")
     if (tokenized.contains(None)) throw new Exception("Failled to Parse")
-    val context = ContextBuilder.build(Settings.name, InstructionList(tokenized))
+    val context = ContextBuilder.build(Settings.name, tokenized)
+    Reporter.phase(f"===========[Compiling]==========")
     var output = Compiler.compile(context)
 
     val time = ChronoUnit.MILLIS.between(start, LocalDateTime.now())
@@ -272,6 +314,12 @@ object Main{
         if (Settings.optimizeVariableValue){
           Reporter.info(f">> Optimizing variable")
           val (a, b) = sl.IR.ScoreboardReduce(output, context.getScoreboardUsedForce()).run()
+          output = a
+          changed |= b
+        }
+        if (Settings.optimizeFold){
+          Reporter.info(f">> Optimizing fold")
+          val (a, b) = sl.IR.FoldReduce(output).run()
           output = a
           changed |= b
         }

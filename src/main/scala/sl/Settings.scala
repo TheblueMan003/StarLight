@@ -21,8 +21,8 @@ class SettingsContext(){
     var outputName = "default"
     var hashedScoreboard = false
 
-    var java_datapack_version = PackInfo(10, "Made With StarLight", List(1,19,3))
-    var java_resourcepack_version = PackInfo(10, "Made With StarLight", List(1,19,3))
+    var java_datapack_version = PackInfo(15, "Made With StarLight", List(1,19,3))
+    var java_resourcepack_version = PackInfo(15, "Made With StarLight", List(1,19,3))
 
     var bedrock_behaviorpack_version = PackInfo(2, "Made With StarLight", List(1,19,50))
     var bedrock_resourcepack_version = PackInfo(2, "Made With StarLight", List(1,19,50))
@@ -39,13 +39,16 @@ class SettingsContext(){
     var debug = false
     var allFunction = true
 
-    var optimize = false
+    var optimize = true
     var optimizeInlining = true
     var optimizeDeduplication = true
     var optimizeVariableValue = true
     var optimizeVariableGlobal = true
     var optimizeVariableLocal = true
+    var optimizeFold = true
     var optimizeAllowRemoveProtected = false
+
+    var experimentalMultithread = false
 
     var optimizeMaxInlining = 10
 

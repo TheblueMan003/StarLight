@@ -50,6 +50,23 @@ case class Identifier(values: List[String]) {
         }
         rec(values, other.values)
     }
+    def isSufixedBy(other: Identifier): Boolean ={
+        def rec(l1: List[String], l2: List[String]): Boolean = {
+            l1 match
+                case head :: next => {
+                    l2 match
+                        case h1 :: n2 => h1 == head && rec(next, n2)
+                        case Nil => true
+                }
+                case Nil => {
+                    l2 match
+                        case h1 :: n2 => false
+                        case Nil => true
+                }
+            
+        }
+        rec(values.reverse, other.values.reverse)
+    }
     def getSufixOf(other: Identifier): List[String] ={
         def rec(l1: List[String], l2: List[String]): List[String] = {
             l1 match
@@ -88,5 +105,35 @@ case class Identifier(values: List[String]) {
 
     override def toString(): String = {
         values.reduce(_ + "." + _)
+    }
+    def startsWith(other: String): Boolean = {
+        values(0).startsWith(other)
+    }
+    def contains(other: String): Boolean = {
+        values.contains(other)
+    }
+    def distanceTo(other: Identifier): Int = {
+        def rec(l1: List[String], l2: List[String]): Int = {
+            l1 match
+                case head :: next => {
+                    l2 match
+                        case h1 :: n2 => {
+                            if (h1 == head) {
+                                rec(next, n2)
+                            }
+                            else{
+                                1 + rec(next, l2)
+                            }
+                        }
+                        case Nil => l1.size
+                }
+                case Nil => {
+                    l2 match
+                        case h1 :: n2 => l2.size
+                        case Nil => 0
+                }
+            
+        }
+        rec(values, other.values)
     }
 }

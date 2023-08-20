@@ -304,8 +304,8 @@ case class SelectorLowerRange(val max: SelectorFilterValue) extends SelectorFilt
 }
 case class SelectorGreaterRange(val min: SelectorFilterValue) extends SelectorFilterValue{
     override def getString()(implicit context: Context): String = f"${min.getString()}.."
-    override def fix(implicit context: Context, ignore: Set[Identifier]): SelectorFilterValue = SelectorLowerRange(min.fix)
-    override def subst(from: String, to: String): SelectorFilterValue = SelectorLowerRange(min.subst(from, to))
+    override def fix(implicit context: Context, ignore: Set[Identifier]): SelectorFilterValue = SelectorGreaterRange(min.fix)
+    override def subst(from: String, to: String): SelectorFilterValue = SelectorGreaterRange(min.subst(from, to))
 }
 case class SelectorNumber(val value: Double) extends SelectorFilterValue{
     override def getString()(implicit context: Context): String = 
@@ -326,7 +326,7 @@ case class SelectorIdentifier(val value: String) extends SelectorFilterValue{
                 vari.lazyValue match
                     case IntValue(n) => SelectorNumber(n).getString()
                     case FloatValue(n) => SelectorNumber(n).getString()
-                    case NamespacedName(n) => n
+                    case n: NamespacedName => n.getString()
                     case StringValue(value) => SelectorString(value).getString()
                     case JsonValue(value) => SelectorNbt(value).getString()
                     case _ => value
@@ -339,7 +339,7 @@ case class SelectorIdentifier(val value: String) extends SelectorFilterValue{
                 vari.lazyValue match
                     case IntValue(n) => SelectorNumber(n)
                     case FloatValue(n) => SelectorNumber(n)
-                    case NamespacedName(n) => SelectorString(n)
+                    case n: NamespacedName => SelectorString(n.getString())
                     case StringValue(value) => SelectorString(value)
                     case JsonValue(value) => SelectorNbt(value)
                     case other => throw new Exception(f"Lazy value not supported: $other")

@@ -9,33 +9,65 @@ import objects.types.JsonType
 import sl.IR.*
 import objects.types.RangeType
 import objects.types.StructType
+import scala.collection.parallel.CollectionConverters._
+import scala.collection.mutable.ArrayBuffer
 
 object Compiler{
     def compile(context: Context):List[IRFile] = {
-        var fct = context.getFunctionToCompile()
-
-        while(fct != null){
-            try{
-                fct.compile()
-                fct = context.getFunctionToCompile()
-            }
-            catch{
-                e => {
-                    Reporter.error(f"Error in ${fct.fullName}")
-                    throw e
-                }
-            }
-        }
+        compileInner(context)
 
         context.getMuxes().foreach(x => x.compile())
         context.getTags().foreach(x => x.compile())
 
+        val buffer = new ArrayBuffer[IRFile]()
 
-        context.getAllFunction().map(_._2).filter(_.exists()).map(_.getIRFile()) ::: 
-            context.getAllJsonFiles().filter(f => f.exists() && f.isDatapack()).map(fct => (fct.getIRFile())):::
-            context.getAllBlockTag().filter(_.exists()).map(fct => (fct.getIRFile())):::
-            context.getAllPredicates().flatMap(_.getIRFiles()):::
-            Settings.target.getExtraFiles(context)
+        context.getAllFunction().map(_._2).filter(_.exists()).foreach(fct => buffer += fct.getIRFile())
+        context.getAllJsonFiles().filter(f => f.exists() && f.isDatapack()).foreach(fct => buffer += fct.getIRFile())
+        context.getAllBlockTag().filter(_.exists()).foreach(fct => buffer += fct.getIRFile())
+        context.getAllPredicates().flatMap(_.getIRFiles()).foreach(fct => buffer += fct)
+        Settings.target.getExtraFiles(context).foreach(fct => buffer += fct)
+
+        buffer.toList
+    }
+    private def compileInner(context: Context) = {
+        if (Settings.experimentalMultithread){
+            var fct = context.getFunctionToCompile()
+
+            while(fct != null){
+                try{
+                    var more = context.getFunctionToCompile(
+                    Utils.simplify(fct.modifiers.attributes.getOrElse("compile.order", IntValue(0)))(fct.context) match {
+                                case IntValue(n) => n
+                                case FloatValue(n) => n.toInt
+                                case _ => 0
+                            })
+                    (fct :: more).par.foreach(f => f.compile())
+                    fct = context.getFunctionToCompile()
+                }
+                catch{
+                    e => {
+                        Reporter.error(f"Error in ${fct.fullName}")
+                        throw e
+                    }
+                }
+            }
+        }
+        else{
+            var fct = context.getFunctionToCompile()
+
+            while(fct != null){
+                try{
+                    fct.compile()
+                    fct = context.getFunctionToCompile()
+                }
+                catch{
+                    e => {
+                        Reporter.error(f"Error in ${fct.fullName}")
+                        throw e
+                    }
+                }
+            }
+        }
     }
     def compile(instruction: Instruction, meta: Meta = Meta(false, false))(implicit context: Context):List[IRTree]={   
         try{
@@ -43,10 +75,10 @@ object Compiler{
                 case FunctionDecl(name2, block, typ2, args, typevars, modifier) =>{
                     val name = if (name2 == "~") then context.getFreshLambdaName() else name2
                     var fname = context.getFunctionWorkingName(name)
+                    modifier.simplify()
                     if (typevars.length > 0){
                         val func = new GenericFunction(context, context.getPath()+"."+name, fname, args, typevars, typ2, modifier, block.unBlockify())
-                        func.overridedFunction = if modifier.isOverride then context.getFunction(Identifier.fromString(name), args.map(_.typ), List(), typ2, false) else null
-                        func.modifiers.isVirtual |= modifier.isOverride
+                        func.overridedFunction = if modifier.isOverride then context.getFunction(Identifier.fromString(name), args.map(_.typ), List(), typ2, false, false) else null
                         context.addFunction(name, func)
                     }
                     else{
@@ -56,16 +88,16 @@ object Compiler{
                             modifier.tags.addOne("@__loading__")
                         }
                         val clazz = context.getCurrentClass()
+
                         if (!modifier.isLazy){
                             val func = new ConcreteFunction(context, context.getPath()+"."+name, fname, args, context.getType(typ), modifier, block.unBlockify(), meta.firstPass)
-                            func.overridedFunction = if modifier.isOverride then context.getFunction(Identifier.fromString(name), args.map(_.typ), List(), typ, false) else null
-                            func.modifiers.isVirtual |= modifier.isOverride
+                            func.overridedFunction = if modifier.isOverride then context.getFunction(Identifier.fromString(name), args.map(_.typ), List(), typ, false, false) else null
                             context.addFunction(name, func)
                             func.generateArgument()(context)
                         }
                         else{
                             val func = new LazyFunction(context, context.getPath()+"."+name, fname, args, context.getType(typ), modifier, Utils.fix(block)(context, args.map(a => Identifier.fromString(a.name)).toSet))
-                            func.overridedFunction = if modifier.isOverride then context.getFunction(Identifier.fromString(name), args.map(_.typ), List(), typ, false) else null
+                            func.overridedFunction = if modifier.isOverride then context.getFunction(Identifier.fromString(name), args.map(_.typ), List(), typ, false, false) else null
                             context.addFunction(name, func)
                             func.generateArgument()(context)
                         }
@@ -73,48 +105,62 @@ object Compiler{
                     List()
                 }
                 case StructDecl(name, generics, block, modifier, parent) => {
+                    modifier.simplify()
                     if (!meta.firstPass){
-                        val parentStruct = parent match
+                        val parentName = parent match
                             case None => null
-                            case Some(p) => context.getStruct(p)
+                            case Some(p) => Identifier.fromString(p)
                         
-                        context.addStruct(new Struct(context, name, generics, modifier, block.unBlockify(), parentStruct))
+                        context.addStruct(new Struct(context, name, generics, modifier, block.unBlockify(), parentName))
                     }
                     List()
                 }
                 case ClassDecl(name, generics, block, modifier, parent, entity) => {
+                    modifier.simplify()
                     if (!meta.firstPass){
-                        val parentClass = parent match
-                            case None => if name != "object" then context.getClass("object") else null
-                            case Some(p) => context.getClass(p)
+                        val parentName = parent match
+                            case None => null
+                            case Some(p) => Identifier.fromString(p)
                         
-                        context.addClass(new Class(context, name, generics, modifier, block.unBlockify(), parentClass, entity))
+                        context.addClass(new Class(context, name, generics, modifier, block.unBlockify(), parentName, entity))
                     }
                     List()
                 }
                 case TemplateDecl(name, block, modifier, parent, generics, parentGenerics) => {
+                    modifier.simplify()
                     if (!meta.firstPass){
-                        val parentTemplate = parent match
+                        val parentName = parent match
                             case None => null
-                            case Some(p) => context.getTemplate(p)
+                            case Some(p) => Identifier.fromString(p)
                         
-                        context.addTemplate(new Template(context, name, modifier, block.unBlockify(), parentTemplate, generics, parentGenerics))
+                        context.addTemplate(new Template(context, name, modifier, block.unBlockify(), parentName, generics, parentGenerics))
                     }
                     List()
                 }
                 case PredicateDecl(name, args, block, modifier) => {
+                    modifier.simplify()
                     val fname = context.getFunctionWorkingName(name)
                     val pred = context.addPredicate(name, new Predicate(context, fname, args, modifier, block))
                     pred.generateArgument()(context)
                     List()
                 }
-                case TypeDef(name, typ) => {
+                case TypeDef(defs) => {
                     if (!meta.firstPass){
-                        context.addTypeDef(name, typ)
+                        defs.foreach{
+                            case (name, typ, ver) => {
+                                ver match{
+                                    case "" => context.addTypeDef(name, typ)
+                                    case "mcbedrock" if Settings.target == MCBedrock => context.addTypeDef(name, typ)
+                                    case "mcjava" if Settings.target == MCJava => context.addTypeDef(name, typ)
+                                    case _ => List()
+                                }
+                            }
+                        }
                     }
                     List()
                 }
                 case EnumDecl(name, fields, values, modifier) => {
+                    modifier.simplify()
                     if (!meta.firstPass){
                         val enm = context.addEnum(new Enum(context, name, modifier, fields.map(x => EnumField(x.name, context.getType(x.typ)))))
                         enm.addValues(values)
@@ -148,10 +194,10 @@ object Compiler{
                                 v.flatMap(v => {
                                     val mod = Modifier.newPrivate()
                                     mod.isLazy = true
-                                    val vari = new Variable(ctx, "dummy", Utils.typeof(v._2), mod)
+                                    val vari = new Variable(ctx, v._1, Utils.typeof(v._2), mod)
                                     ctx.addVariable(Identifier.fromString(v._1), vari)
 
-                                    val indx = new Variable(ctx, "dummy", IntType, mod)
+                                    val indx = new Variable(ctx, "index", IntType, mod)
                                     ctx.push(v._1).addVariable(Identifier.fromString("index"), indx)
                                     index += 1
 
@@ -163,6 +209,7 @@ object Compiler{
                     }
                 }
                 case VariableDecl(names2, typ, modifier, op, expr) => {
+                    modifier.simplify()
                     val names = names2.map(n => if n == "@@@" then context.getFreshId() else n)
                     if (typ == IdentifierType("val", List()) || typ == IdentifierType("var", List())){
                         if (typ == IdentifierType("val", List())) modifier.isConst = true
@@ -245,7 +292,7 @@ object Compiler{
                         sub.inherit(template.getContext())
                         sub.push("this", sub)
                         sub.setTemplateUse()
-                        compile(Utils.fix(template.getBlock(values))(template.context, Set()), meta.withFirstPass)(sub) ::: compile(block.unBlockify(), meta.withFirstPass)(sub)
+                        compile(Utils.fix(template.getBlock(values.map(Utils.simplify(_))))(template.context, Set()), meta.withFirstPass)(sub) ::: compile(block.unBlockify(), meta.withFirstPass)(sub)
                     }
                 }
 
@@ -362,7 +409,8 @@ object Compiler{
                             Compiler.compile(FunctionCall(name.child("__apply__"), args, typeargs))
                         }
                         case other => {
-                            val (fct,cargs) = context.getFunction(name, args, typeargs, VoidType)
+                            val uargs = args.map(Utils.simplify)
+                            val (fct,cargs) = context.getFunction(name, uargs, typeargs, VoidType)
                             if (fct != null && fct.modifiers.hasAttributes("compileAtCall")){
                                 fct.asInstanceOf[ConcreteFunction].compile()
                             }
@@ -370,7 +418,12 @@ object Compiler{
                     }
                 }
                 case LinkedFunctionCall(name, args, ret) => {
-                    (name, args).call(ret)
+                    val uargs = args.map(Utils.simplify)
+                    (name, uargs).call(ret)
+                }
+                case FreeConstructorCall(call) => {
+                    val vari = context.getFreshVariable(Utils.typeof(call))
+                    vari.assign("nullPointerAssign", call)
                 }
                 case If(BinaryOperation("||", left, right), ifBlock, elseBlock) => {
                     compile(If(left, ifBlock, ElseIf(right, ifBlock) :: elseBlock), meta)

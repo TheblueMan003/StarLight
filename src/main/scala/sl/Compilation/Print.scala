@@ -21,9 +21,9 @@ object Print{
         (prefix, RawJsonValue(json1))
     }
     def toRawJson(expr: Expression, top: Boolean = false)(implicit ctx: Context): (List[IRTree], List[Printable])= {
-        var mod = TextModdifier(false, false, false, false, false)
+        var mod = TextModdifier(false, false, false, false, false, null)
         var col = Namecolor("white")
-        expr match
+        Utils.simplify(expr) match
             case DefaultValue => (List(), List(PrintString("default", col, mod)))
             case NullValue => (List(), List(PrintString("null", col, mod)))
             case IntValue(value) => (List(), List(PrintString(f"$value", col, mod)))
@@ -31,18 +31,20 @@ object Print{
             case FloatValue(value) => (List(), List(PrintString(f"$value", col, mod)))
             case BoolValue(value) => (List(), List(PrintString(f"$value", col, mod)))
             case LinkedFunctionValue(fct)=> (List(), List(PrintString(f"${fct.fullName}", col, mod)))
-            case PositionValue(value) => throw new Exception("Cannot use position inside rawjson")
-            case TagValue(value) => throw new Exception("Cannot use tag inside rawjson")
+            case PositionValue(x, y, z) => toRawJson(JsonValue(JsonArray(List(JsonExpression(x, null), JsonExpression(y, null), JsonExpression(z, null)))))
+            case TagValue(value) => (List(), List(PrintString(f"#$value", col, mod)))
+            case LinkedTagValue(value) => (List(), List(PrintString(f"#$value", col, mod)))
             case StringValue(value) => 
-                val reg = "[a-zA-Z0-9_]+(\\.[a-zA-Z0-9_])+".r
-                reg.findFirstMatchIn(value) match
+                val reg = "[a-zA-Z0-9_]+(\\.[a-zA-Z0-9_]+)+".r
+                val matched = reg.findFirstMatchIn(value) 
+                matched match
                     case Some(v) if v.matched == value => {
                         (List(), List(PrintTranslate(f"$value", RawJsonValue(List()), col, mod)))
                     }
                     case _ => 
                         val str = value.replace("\\","\\\\")
                         (List(), List(PrintString(f"$str", col, mod)))
-            case NamespacedName(value) => (List(), List(PrintString(f"$value", col, mod)))
+            case value: NamespacedName => (List(), List(PrintString(f"${value.getString()}", col, mod)))
             case VariableValue(name, sel) => {
                 ctx.tryGetVariable(name) match
                     case Some(vari) => {
@@ -128,6 +130,7 @@ object Print{
                                     case StringValue("obfuscated") => mod.obfuscated = true
                                     case StringValue("underlined") => mod.underlined = true
                                     case StringValue(color) if colorMap.contains(color) => col = Namecolor(color)
+                                    case StringValue(link) if link.startsWith("http") => mod.link = link
                                     case other => throw new Exception(f"Arugment for rawJson not support: $other")
                             }
                             def convert(print: Printable) = {
@@ -165,7 +168,7 @@ trait Printable{
     def sub(size: Int)(implicit ctx: Context): Printable
 }
 object Printable{
-    val empty = new PrintString("", Namecolor("white"), TextModdifier(false, false, false, false, false))
+    val empty = new PrintString("", Namecolor("white"), TextModdifier(false, false, false, false, false, null))
 }
 trait PrintColor{
     def toBedrock()(implicit ctx: Context): String
@@ -179,13 +182,16 @@ case class Namecolor(val color: String) extends PrintColor{
         colorMap(color)(1)
     }
 }
-case class TextModdifier(var bold: Boolean, var obfuscated: Boolean, var strikethrough: Boolean, var underlined: Boolean, var italic: Boolean){
+case class TextModdifier(var bold: Boolean, var obfuscated: Boolean, var strikethrough: Boolean, var underlined: Boolean, var italic: Boolean, var link: String){
     def toJava()(implicit ctx: Context): String = {
         var ret = ""
         ret += f"\"bold\":\"$bold\","
         ret += f"\"obfuscated\":\"$obfuscated\","
         ret += f"\"strikethrough\":\"$strikethrough\","
         ret += f"\"underlined\":\"$underlined\","
+        if (link != null && link != ""){
+            ret += f"\"clickEvent\":{\"action\":\"open_url\",\"value\":\"$link\"},"
+        }
         ret += f"\"italic\":\"$italic\""
         ret
     }

@@ -26,6 +26,8 @@ case class SBLink(entity: String, objective: String) extends IRTree{
         if entity.startsWith("@") then ???
         else entity+" "+objective
     }
+
+    def isEntity() = entity.startsWith("@")
 }
 
 case class CommandIR(statement: String) extends IRTree{

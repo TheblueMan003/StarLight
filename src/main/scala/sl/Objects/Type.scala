@@ -433,7 +433,8 @@ case class FuncType(sources: List[Type], output: Type) extends Type{
     }
     override def isSubtypeOf(other: Type)(implicit context: Context): Boolean = {
         other match
-            case FuncType(s,o) => sources.filter(_ != VoidType).size == s.filter(_ != VoidType).size && s.filter(_ != VoidType).zip(sources.filter(_ != VoidType)).forall((a,b)=>a.isSubtypeOf(b)) && output.isSubtypeOf(o)
+            case FuncType(s,o) => sources.filter(_ != VoidType).size == s.filter(_ != VoidType).size && 
+                s.filter(_ != VoidType).zip(sources.filter(_ != VoidType)).forall((a,b)=>a.isSubtypeOf(b)) && output.isSubtypeOf(o)
             case LambdaType(nb) => true
             case AnyType => true
             case MCObjectType => true
@@ -514,6 +515,21 @@ case class ClassType(clazz: Class, sub: List[Type]) extends Type{
     override def isDirectEqualitable(): Boolean = true
     override def isComparaisonSupported(): Boolean = true
     override def isEqualitySupported(): Boolean = true
+}
+case object TypeType extends Type{
+    override def toString(): String = "type"
+    override def allowAdditionSimplification(): Boolean = false
+    override def getDistance(other: Type)(implicit context: Context): Int = {
+        other match
+            case TypeType => 0
+            case _ => outOfBound
+    }
+    override def isSubtypeOf(other: Type)(implicit context: Context): Boolean = other == this
+    override def getName()(implicit context: Context): String = "type"
+    override def isDirectComparable(): Boolean = false
+    override def isDirectEqualitable(): Boolean = false
+    override def isComparaisonSupported(): Boolean = false
+    override def isEqualitySupported(): Boolean = false
 }
 case class EnumType(enm: objects.Enum) extends Type{
     override def toString(): String = enm.fullName

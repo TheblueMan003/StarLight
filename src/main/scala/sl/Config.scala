@@ -71,7 +71,10 @@ object ConfigLoader{
                     case ("optimization.variable", value) => Settings.optimizeVariableValue = value == "true"
                     case ("optimization.variable.local", value) => Settings.optimizeVariableLocal = value == "true"
                     case ("optimization.variable.global", value) => Settings.optimizeVariableGlobal = value == "true"
+                    case ("optimization.fold", value) => Settings.optimizeFold = value == "true"
                     case ("optimization.allowRemoveProtected", value) => Settings.optimizeAllowRemoveProtected = value == "true"
+
+                    case ("experimental.multi_thread", value) => Settings.experimentalMultithread = value == "true"
 
 
                     case ("obfuscate", value)          => Settings.obfuscate = value == "true"
@@ -135,7 +138,10 @@ object ConfigLoader{
             f"optimization.variable=${Settings.optimizeVariableValue}",
             f"optimization.variable.local=${Settings.optimizeVariableLocal}",
             f"optimization.variable.global=${Settings.optimizeVariableGlobal}",
+            f"optimization.fold=${Settings.optimizeFold}",
             f"optimization.allowRemoveProtected=${Settings.optimizeAllowRemoveProtected}",
+
+            f"experimental.multi_thread=${Settings.experimentalMultithread}",
             
             f"meta.debug=true",
         )

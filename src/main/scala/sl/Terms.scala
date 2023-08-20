@@ -56,8 +56,8 @@ case class BlocktagDecl(val name: String, val values: List[Expression], val modi
   override def toString() = f"blocktag $name"
 }
 
-case class TypeDef(val name: String, val typ: Type) extends Instruction {
-  override def toString() = f"typedef ${typ} ${name}"
+case class TypeDef(val defs: List[(String, Type, String)]) extends Instruction {
+  override def toString() = f"typedef ${defs}"
 }
 
 case class ForGenerate(val key: String, val provider: Expression, val instr: Instruction) extends Instruction {
@@ -137,6 +137,9 @@ case class InstructionList(val list: List[Instruction]) extends Instruction {
 case class InstructionBlock(val list: List[Instruction]) extends Instruction {
   override def toString() = f"{${list}}"
   override def unBlockify(): Instruction = InstructionList(list)
+}
+case class FreeConstructorCall(val expr: Expression) extends Instruction{
+    override def toString() = f"new ${expr}()"
 }
 trait ExecuteType
 case object AtType extends ExecuteType

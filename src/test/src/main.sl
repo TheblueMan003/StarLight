@@ -1,13 +1,85 @@
-package main
+package test
 
-import mc.java.resourcespack.models as models
-import mc.java.display.DisplayItem
+import game.score
 
-if (Compiler.isJava()){
-    models.make(minecraft:birch_boat, ("item/screen_background", 1))
+import math.raycast as r
+enum B{
+    a,b,c
 }
-def summon(){
-    DisplayItem background = new DisplayItem()
-    background.setItem("minecraft:birch_boat", {CustomModelData: 1})
-    background.setScale(3,3,3)
+class A{
+    def lazy __init__(int a){
+
+    }
+    def virtual B test(){
+
+    }
+}
+
+A a = new A(1)
+a.__init__(1)
+blocktag floor{
+    minecraft:stone,
+    minecraft:grass
+}
+def test(){
+    r.shoot(10,1,block(minecraft:stone)){
+        /say hi
+    }
+}
+
+package c
+
+def test(void=>void a){
+    a()
+}
+
+def test2(){
+    test(){
+        /say lol
+    }
+}
+
+package a
+
+def test(void=>void a){
+    a()
+}
+
+def test2(){
+    test(){
+        /say lol
+    }
+}
+
+package b
+
+def test(void=>void a){
+    a()
+}
+
+def test2(){
+    test(){
+        /say lol
+    }
+}
+
+package d
+
+import standard
+
+int lol(int a){
+    if (a > 0){
+        return 0
+    }
+    if (a <= 0){
+        return 1
+    }
+}
+
+public void test(){
+    int b = lol(1)
+    standard.print(b)
+
+    int c = lol(0)
+    standard.print(c)
 }

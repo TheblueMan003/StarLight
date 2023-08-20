@@ -45,6 +45,8 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 	var setter: Function = null
 	var wasGenerated = false
 
+	def canBeReduceToLazyValue = modifiers.isLazy && !getType().isInstanceOf[StructType]
+
 	def generate(isStructFunctionArgument: Boolean = false, skipClassCheck: Boolean = false)(implicit context: Context):Unit = {
 		val parent = context.getCurrentVariable()
 		val parentClass = context.getCurrentClass()
@@ -141,24 +143,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 		val ret = if (modifiers.isLazy){
 			getType() match{
 				case StructType(struct, sub) => {
-					value match
-						case VariableValue(name, sel) => {
-							val vari = context.getVariable(name)
-							if (vari.getType() == StructType(struct, sub)){
-								tupleVari.zip(vari.tupleVari).map((a,v) => a.assign(op, LinkedVariableValue(v, sel)))
-							}
-							else{
-								val (prev, LinkedVariableValue(vari, sel))=Utils.simplifyToVariable(value)
-								prev:::tupleVari.zip(vari.tupleVari).map((a,v) => a.assign(op, LinkedVariableValue(v, sel)))
-							}
-						}
-						case LinkedVariableValue(vari, sel) if vari.getType() == StructType(struct, sub) => {
-							tupleVari.zip(vari.tupleVari).map((a,v) => a.assign(op, LinkedVariableValue(v, sel)))
-						}
-						case a => {
-							val (prev, LinkedVariableValue(vari, sel))=Utils.simplifyToVariable(value)
-							prev:::tupleVari.zip(vari.tupleVari).map((a,v) => a.assign(op, LinkedVariableValue(v, sel)))
-						}
+					assignStruct(op, Utils.simplify(value))
 				}
 				case RawJsonType => {
 					Utils.typeof(value) match
@@ -196,7 +181,28 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 						case LambdaValue(args, body, ctx) if args.size == 0 => {
 							getType() match{
 								case FuncType(sources, output) if sources.filter(_ != VoidType).size > 0 => {
-									return assign(op, LambdaValue(sources.filter(_ != VoidType).zipWithIndex.map("_"+_._2), body, ctx))
+									val filtered = sources.filter(_ != VoidType)
+									if (filtered.size == 1){
+										val block = ctx.getFreshLambda(filtered.map(x => "_"), filtered, output, body, false)
+										return assign(op, LinkedFunctionValue(block))
+									}
+									else{
+										val block = ctx.getFreshLambda(filtered.zipWithIndex.map("_."+_._2), filtered, output, body, false)
+										return assign(op, LinkedFunctionValue(block))
+									}
+								}
+								case FuncType(sources, output) => {
+									val block = ctx.getFreshLambda(args, List(), output, body, false)
+									return assign(op, LinkedFunctionValue(block))
+								}
+								case other => {}
+							}
+						}
+						case LambdaValue(args, body, ctx) => {
+							getType() match{
+								case FuncType(sources, output) => {
+									val block = ctx.getFreshLambda(args, List(), output, body, false)
+									return assign(op, LinkedFunctionValue(block))
 								}
 								case other => {}
 							}
@@ -245,29 +251,91 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 										return List()
 									}
 								}
+								case JsonArray(lst) => {
+									val key = Utils.simplify(index.head)
+									val value = lst(key.asInstanceOf[IntValue].value)
+									
+									assign(op, JsonValue(value))
+									return List()
+								}
+								case other => throw new Exception(f"${other} is not a Dictionary or an Array")
+							}
+						}
+						case ArrayGetValue(JsonValue(value), index) => {
+							value match{
+								case JsonDictionary(map) => {
+									val key = Utils.simplify(index.head)
+									val value = map.get(key.getString())
+									if (value.isDefined){
+										assign(op, JsonValue(value.get))
+										return List()
+									}
+									else{
+										return List()
+									}
+								}
+								case JsonArray(lst) => {
+									val key = Utils.simplify(index.head)
+									val value = lst(key.asInstanceOf[IntValue].value)
+									
+									assign(op, JsonValue(value))
+									return List()
+								}
+								case other => throw new Exception(f"${other} is not a Dictionary or an Array")
 							}
 						}
 						case ArrayGetValue(a, index) => {
-							val (prev, LinkedVariableValue(vari, sl))=Utils.simplifyToVariable(a)
-							return prev:::assign(op, ArrayGetValue(LinkedVariableValue(vari, sl), index))
-						}
-						case _ => {
-						}
-					}
-					val fixed = Utils.fix(value)(context, Set())
+							a match{
+								case LinkedVariableValue(vari, sl) if vari.modifiers.isLazy => {
+									vari.lazyValue match{
+										case JsonValue(JsonDictionary(map)) => {
+											val key = Utils.simplify(index.head)
+											val value = map.get(key.getString())
+											if (value.isDefined){
+												assign(op, JsonValue(value.get))
+												return List()
+											}
+											else{
+												return List()
+											}
+										}
+										case JsonValue(JsonArray(lst)) => {
+											val key = Utils.simplify(index.head)
+											val value = lst(key.asInstanceOf[IntValue].value)
+											
+											assign(op, JsonValue(value))
+											return List()
+										}
+										case _ =>{
+										}
+									}
+								}
+								case LinkedVariableValue(vari, sl) => {
 
-					op match{
-						case "=" => lazyValue = Utils.simplify(fixed)
-						case "+=" => lazyValue = Utils.simplify(BinaryOperation("+", LinkedVariableValue(this), fixed))
-						case "-=" => lazyValue = Utils.simplify(BinaryOperation("-", LinkedVariableValue(this), fixed))
-						case "/=" => lazyValue = Utils.simplify(BinaryOperation("/", LinkedVariableValue(this), fixed))
-						case "*=" => lazyValue = Utils.simplify(BinaryOperation("*", LinkedVariableValue(this), fixed))
-						case "%=" => lazyValue = Utils.simplify(BinaryOperation("%", LinkedVariableValue(this), fixed))
-						case "&=" => lazyValue = Utils.simplify(BinaryOperation("&", LinkedVariableValue(this), fixed))
-						case "|=" => lazyValue = Utils.simplify(BinaryOperation("|", LinkedVariableValue(this), fixed))
-						case "^=" => lazyValue = Utils.simplify(BinaryOperation("^", LinkedVariableValue(this), fixed))
-						case ":=" => {}
-						case other => throw new Exception(f"Unsupported operation: $fullName $op $value at \n${value.pos.longString}")
+								}
+								case _ => {
+									val (prev, LinkedVariableValue(vari, sl))=Utils.simplifyToVariable(a)
+									return prev:::assign(op, ArrayGetValue(LinkedVariableValue(vari, sl), index))
+								}
+							}
+						}
+						case value => {
+							val fixed = Utils.fix(value)(context, Set())
+
+							op match{
+								case "=" => lazyValue = Utils.simplify(fixed)
+								case "+=" => lazyValue = Utils.simplify(BinaryOperation("+", LinkedVariableValue(this), fixed))
+								case "-=" => lazyValue = Utils.simplify(BinaryOperation("-", LinkedVariableValue(this), fixed))
+								case "/=" => lazyValue = Utils.simplify(BinaryOperation("/", LinkedVariableValue(this), fixed))
+								case "*=" => lazyValue = Utils.simplify(BinaryOperation("*", LinkedVariableValue(this), fixed))
+								case "%=" => lazyValue = Utils.simplify(BinaryOperation("%", LinkedVariableValue(this), fixed))
+								case "&=" => lazyValue = Utils.simplify(BinaryOperation("&", LinkedVariableValue(this), fixed))
+								case "|=" => lazyValue = Utils.simplify(BinaryOperation("|", LinkedVariableValue(this), fixed))
+								case "^=" => lazyValue = Utils.simplify(BinaryOperation("^", LinkedVariableValue(this), fixed))
+								case ":=" => {}
+								case other => throw new Exception(f"Unsupported operation: $fullName $op $value at \n${value.pos.longString}")
+							}
+						}
 					}
 				}
 			}
@@ -278,6 +346,10 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 				case ":=" => defaultAssign(value)
 				case _ => {
 					Utils.simplify(value) match{
+						case CastValue(left, right) if op == "=" => {
+							val (prefix, vari) = Utils.simplifyToVariable(left)
+							prefix ::: assignUnchecked(vari)
+						}
 						case VariableValue(nm, sel) if op == "=" && context.tryGetVariable(nm) == Some(this) && sel == selector =>{
 							List()
 						}
@@ -285,26 +357,26 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 							val (lst,upacked) = Utils.unpackDotValue(dot)
 							lst ::: assign(op, upacked)
 						}
-						case _ => {
+						case other => {
 							if (isPresentIn(value) && value.isInstanceOf[BinaryOperation]){
 								val tmp = context.getFreshVariable(getType())
 								tmp.assign("=", value) ::: assign(op, LinkedVariableValue(tmp))
 							}
 							else{
 								typ match
-									case IntType => assignInt(op, value)
-									case FloatType => assignFloat(op, value)
-									case BoolType => assignBool(op, value)
-									case TupleType(sub) => assignTuple(op, value)	
-									case JsonType => assignJson(op, value)									
-									case FuncType(source, out) => assignFunc(op, value)
-									case StructType(struct, sub) => assignStruct(op, value)
-									case ClassType(clazz, sub) => assignClass(op, value)
-									case ArrayType(innter, size) => assignArray(op, value)
-									case EntityType => assignEntity(op, value)
-									case EnumType(enm) => assignEnum(op, value)
-									case StringType => assignString(op, value)
-									case RangeType(sub) => assignRange(op, value)
+									case IntType => assignInt(op, other)
+									case FloatType => assignFloat(op, other)
+									case BoolType => assignBool(op, other)
+									case TupleType(sub) => assignTuple(op, other)	
+									case JsonType => assignJson(op, other)									
+									case FuncType(source, out) => assignFunc(op, other)
+									case StructType(struct, sub) => assignStruct(op, other)
+									case ClassType(clazz, sub) => assignClass(op, other)
+									case ArrayType(innter, size) => assignArray(op, other)
+									case EntityType => assignEntity(op, other)
+									case EnumType(enm) => assignEnum(op, other)
+									case StringType => assignString(op, other)
+									case RangeType(sub) => assignRange(op, other)
 									case other => throw new Exception(f"Cannot Assign to $fullName of type $other at \n${value.pos.longString}")
 							}
 						}
@@ -341,6 +413,10 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 		}
 	}
 
+	def assignUnchecked(vari: LinkedVariableValue)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
+		val LinkedVariableValue(v, sl) = vari
+		List(ScoreboardOperation(getIRSelector(), "=", v.getIRSelector()(sl)))
+	}
 
 	/**
 	 * Assign the value to a tmp variable then apply op with the variable.
@@ -697,8 +773,11 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 				}
 			case UnaryOperation("!", value) => {
 				op match{
-					case "=" =>
-						assignBool("=", BoolValue(true)) ::: Compiler.compile(If(value, VariableAssigment(List((Right(this), selector)), "=", BoolValue(true)), List()))
+					case _ if isPresentIn(value )=> {
+						val vari = context.getFreshVariable(BoolType)
+						vari.assign("=", UnaryOperation("!", value)) ::: assign(op, LinkedVariableValue(vari))
+					}
+					case "=" => assignBool("=", BoolValue(true)) ::: Compiler.compile(If(value, VariableAssigment(List((Right(this), selector)), "=", BoolValue(true)), List()))
 					case other => 
 						val (prev, vari) = Utils.simplifyToVariable(value)
 						prev ::: assignBool(op, vari)
@@ -870,7 +949,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					case Some(vari) => List(ScoreboardOperation(getIRSelector(), op, vari.getIRSelector()(sel)))
 					case None =>{
 						val typ = getType().asInstanceOf[FuncType]
-						val fct = context.getFunction(name, typ.sources, List(), typ.output, true).asInstanceOf[ConcreteFunction]
+						val fct = context.getFunction(name, typ.sources, List(), typ.output, true, false).asInstanceOf[ConcreteFunction]
 						fct.markAsUsed()
 						context.addFunctionToMux(typ.sources, typ.output, fct)
 						List(ScoreboardSet(getIRSelector(), fct.getMuxID()))
@@ -878,7 +957,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 			}
 			case LinkedVariableValue(vari, sel) => {
 				vari.getType() match
-					case other if other.isSubtypeOf(getType()) => List(ScoreboardOperation(getIRSelector(), op, vari.getIRSelector()(sel)))
+					case other if Utils.fix(other)(context, Set()).isSubtypeOf(Utils.fix(getType())(context, Set())) => List(ScoreboardOperation(getIRSelector(), op, vari.getIRSelector()(sel)))
 					case IntType => List(ScoreboardOperation(getIRSelector(), op, vari.getIRSelector()(sel)))
 					case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()} at \n${expr.pos.longString}")
 			}
@@ -909,11 +988,11 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 	def assignEntity(op: String, expr: Expression)(implicit context: Context, selector: Selector = Selector.self):List[IRTree]={
 		expr match{
 			case BinaryOperation("not in", left, right) => {
-				val (p, s) = Utils.getSelector(expr)
+				val (p, _, s) = Utils.getSelector(expr)
 				return p:::assignEntity(op, SelectorValue(s))
 			}
 			case BinaryOperation("in", left, right) => {
-				val (p, s) = Utils.getSelector(expr)
+				val (p, _, s) = Utils.getSelector(expr)
 				return p:::assignEntity(op, SelectorValue(s))
 			}
 			case _ => {}
@@ -1111,13 +1190,13 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 						assignStruct(op, context.resolveVariable(value))
 					}
 					case ConstructorCall(name2, args, typeArg) if name2.toString() == "@@@" => 
-						context.getFunction(name + ".__init__", args, List(), getType(), false).call()
+						context.getFunction(fullName + ".__init__", args, List(), getType(), false).call()
 					case ConstructorCall(name2, args, typevars) => {
 						context.getType(IdentifierType(name2.toString(), typevars)) match
-							case ClassType(clazz, sub) => context.getFunction(this.name + ".__set__", List(value), List(), getType(), false).call()
+							case ClassType(clazz, sub) => context.getFunction(fullName + ".__set__", List(value), List(), getType(), false).call()
 							case typ@StructType(struct, sub) => {
 								if (typ == getType()){
-									context.getFunction(name + ".__init__", args, List(), getType(), false).call()
+									context.getFunction(fullName + ".__init__", args, List(), getType(), false).call()
 								}
 								else{
 									val vari = context.getFreshVariable(typ)
@@ -1129,13 +1208,13 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					}
 					case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 					case BinaryOperation(op, left, right) => assignBinaryOperator("=", BinaryOperation(op, left, right))
-					case _ => context.getFunction(name + ".__set__", List(value), List(), getType(), false).call()
+					case _ => context.getFunction(fullName + ".__set__", List(value), List(), getType(), false).call()
 			}
 			case op => 
 				value match
 					case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 					case BinaryOperation(op2, left, right) => assignBinaryOperator(op, BinaryOperation(op2, left, right))
-					case _ => context.getFunction(name + "." + Utils.getOpFunctionName(op),  List(value), List(), getType(), false).call()
+					case _ => context.getFunction(fullName + "." + Utils.getOpFunctionName(op),  List(value), List(), getType(), false).call()
 	}
 
 	def deref()(implicit context: Context) = 
@@ -1151,6 +1230,32 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 	def assignClass(op: String, value: Expression)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		if value == DefaultValue then return List()
 		op match
+			case "nullPointerAssign" => {
+				value match
+					case ConstructorCall(name2, args, typevars) => {
+						context.getType(IdentifierType(name2.toString(), typevars)) match
+							case typ@ClassType(clazz2, sub) => {
+								val clazz = clazz2.get(sub)
+								try{
+									val entity = clazz.getEntity()
+									val initarg = List(StringValue(clazz.fullName))::: (if entity != null then List(entity) else List())
+									
+									assign("=", FunctionCallValue(VariableValue("object.__initInstance"), initarg, List()))
+									::: context.getFunction(name + ".__init__", args, List(), getType(), false).call()
+								}
+								catch{
+									case e: FunctionNotFoundException => {
+										throw e
+									}
+									case e: ObjectNotFoundException =>{
+										val (pre,vari) =  Utils.simplifyToVariable(value)
+										pre ::: assign("=", vari)
+									}
+								}
+							}
+							case other => throw new Exception(f"Cannot constructor call $other at \n${value.pos.longString}")
+					}
+			}
 			case "=" => {
 				value match
 					case LinkedVariableValue(vari, sel) if vari.getType().isSubtypeOf(getType()) || vari.getType() == getType()=> {
@@ -1232,12 +1337,14 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 			case DefaultValue => false
 			case NullValue => false
 			case EnumIntValue(value) => false
-			case NamespacedName(value) => false
+			case NamespacedName(value, json) => false
 			case LinkedFunctionValue(fct) => false
-			case PositionValue(value) => false
+			case PositionValue(x, y, z) => isPresentIn(x) || isPresentIn(y) || isPresentIn(z)
+			case ClassValue(value) => false
 			case DotValue(left, right) => isPresentIn(left) || isPresentIn(right)
 			case ArrayGetValue(name, index) => isPresentIn(name)
 			case TagValue(value) => false
+			case LinkedTagValue(tag) => false
 			case LambdaValue(args, instr, ctx) => false
 			case VariableValue(name1, sel) => context.tryGetVariable(name1) == Some(this) && sel == selector
 			case LinkedVariableValue(vari, sel) => vari == this && sel == selector
@@ -1248,6 +1355,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 			case FunctionCallValue(name, args, typeargs, selector) => args.exists(isPresentIn(_)) || isPresentIn(name)
 			case ConstructorCall(name, args, typevars) => args.exists(isPresentIn(_))
 			case RangeValue(min, max, delta) => isPresentIn(min) || isPresentIn(max) || isPresentIn(delta)
+			case CastValue(left, right) => isPresentIn(left)
 		}
 
 

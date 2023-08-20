@@ -14,6 +14,7 @@ import scala.io.Source
 object DefaultFunction{
     def get()(implicit context: Context) = {
         val ctx = context.root.push("Compiler")
+
         ctx.addFunction("readJson", CompilerFunction(ctx, "readJson", 
                     List(Argument("path", StringType, None)),
                     JsonType,
@@ -66,7 +67,7 @@ object DefaultFunction{
                         }
                     }
                 ))
-        ctx.addFunction("random", CompilerFunction(ctx, "random", 
+        ctx.addFunction("randomCompileTime", CompilerFunction(ctx, "randomCompileTime", 
                     List(),
                     IntType,
                     Modifier.newPublic(),
@@ -75,7 +76,7 @@ object DefaultFunction{
                             case Nil => {
                                 (List(), IntValue(Random().nextInt()))
                             }
-                            case other => throw new Exception(f"Illegal Arguments $other for random")
+                            case other => throw new Exception(f"Illegal Arguments $other for randomCompileTime")
                         }
                     }
                 ))
@@ -103,11 +104,13 @@ object DefaultFunction{
                 (args: List[Expression],ctx: Context) => {
                     args match{
                         case StringValue(vari)::Nil => {
-                            (ctx.getClass(vari).addClassTags(), NullValue)
+                            val clzz = ctx.getClass(vari)
+                            (clzz.addClassTags() ::: clzz.addVariableDefaultAssign(), NullValue)
                         }
                         case other => throw new Exception(f"Illegal Arguments $other for addClassTags")
                     }
-                }
+                },
+                false
             ))
         ctx.addFunction("getTemplateName", CompilerFunction(ctx, "getTemplateName", 
                 List(),
@@ -275,7 +278,7 @@ object DefaultFunction{
                             ctx.requestConstant(sv.getIntValue())
                             (List(), NamespacedName(Settings.constScoreboard))
                         }
-                        case other => throw new Exception(f"Illegal Arguments $other for random")
+                        case other => throw new Exception(f"Illegal Arguments $other for getObjective")
                     }
                 }
             ))
@@ -299,6 +302,20 @@ object DefaultFunction{
                         (List(), NamespacedName(sv.getIntValue().toString))
                     }
                     case other => throw new Exception(f"Illegal Arguments $other for getSelector")
+                }
+            }
+        ))
+        ctx.addFunction("getEntitySelector", CompilerFunction(ctx, "getEntitySelector", 
+            List(Argument("vari", MCObjectType, None)),
+            MCObjectType,
+            Modifier.newPublic(),
+            (args: List[Expression],ctx: Context) => {
+                args match{
+                    case value::Nil => {
+                        val (ir, _, sel) = Utils.getSelector(value)(ctx)
+                        (ir, SelectorValue(sel))
+                    }
+                    case other => throw new Exception(f"Illegal Arguments $other for getEntitySelector")
                 }
             }
         ))
@@ -338,7 +355,7 @@ object DefaultFunction{
             (args: List[Expression],ctx: Context) => {
                 args match{
                     case JsonValue(value)::Nil => {
-                        (List(), StringValue(value.getNbt()))
+                        (List(), StringValue(Utils.compileJson(value).getNbt()))
                     }
                     case other => throw new Exception(f"Illegal Arguments $other for toNBT")
                 }
@@ -501,8 +518,8 @@ object DefaultFunction{
             Modifier.newPublic(),
             (args: List[Expression],ctx: Context) => {
                 args match{
-                    case NamespacedName(block) :: Nil => {
-                        (List(), NamespacedName(block))
+                    case NamespacedName(block, json) :: Nil => {
+                        (List(), NamespacedName(block, json))
                     }
                     case StringValue(block) :: Nil => {
                         (List(), NamespacedName(block))
@@ -518,8 +535,8 @@ object DefaultFunction{
             Modifier.newPublic(),
             (args: List[Expression],ctx: Context) => {
                 args match{
-                    case NamespacedName(block) :: Nil => {
-                        (List(), NamespacedName(BlockConverter.getBlockName(block)))
+                    case (block: NamespacedName) :: Nil => {
+                        (List(), NamespacedName(BlockConverter.getBlockName(block.getString())))
                     }
                     case StringValue(block) :: Nil => {
                         (List(), NamespacedName(BlockConverter.getBlockName(block)))
@@ -535,13 +552,30 @@ object DefaultFunction{
             Modifier.newPublic(),
             (args: List[Expression],ctx: Context) => {
                 args match{
-                    case NamespacedName(block) :: Nil => {
-                        (List(), IntValue(BlockConverter.getBlockID(block)))
+                    case (block: NamespacedName) :: Nil => {
+                        (List(), StringValue(BlockConverter.getBlockID(block.getString())))
                     }
                     case StringValue(block) :: Nil => {
-                        (List(), IntValue(BlockConverter.getBlockID(block)))
+                        (List(), StringValue(BlockConverter.getBlockID(block)))
                     }
                     case other => throw new Exception(f"Illegal Arguments $other for getBedrockBlockID")
+                }
+            }
+        ))
+
+        ctx.addFunction("getBedrockItemID", CompilerFunction(ctx, "getBedrockItemID", 
+            List(Argument("block", MCObjectType, None)),
+            MCObjectType,
+            Modifier.newPublic(),
+            (args: List[Expression],ctx: Context) => {
+                args match{
+                    case (block: NamespacedName) :: Nil => {
+                        (List(), StringValue(BlockConverter.getItemID(block.getString())))
+                    }
+                    case StringValue(block) :: Nil => {
+                        (List(), StringValue(BlockConverter.getItemID(block)))
+                    }
+                    case other => throw new Exception(f"Illegal Arguments $other for getBedrockItemID")
                 }
             }
         ))
@@ -553,7 +587,7 @@ object DefaultFunction{
             Modifier.newPublic(),
             (args: List[Expression],ctx: Context) => {
                 args match{
-                    case NamespacedName(sound) :: Nil => {
+                    case NamespacedName(sound, _) :: Nil => {
                         (List(), NamespacedName(Sounds.getJava(sound.split(":")(1))))
                     }
                     case StringValue(sound) :: Nil => {
@@ -575,7 +609,7 @@ object DefaultFunction{
             Modifier.newPublic(),
             (args: List[Expression],ctx: Context) => {
                 args match{
-                    case NamespacedName(sound) :: Nil => {
+                    case NamespacedName(sound, _) :: Nil => {
                         (List(), NamespacedName(Sounds.getBedrock(sound.split(":")(1))))
                     }
                     case StringValue(sound) :: Nil => {
@@ -597,7 +631,7 @@ object DefaultFunction{
             Modifier.newPublic(),
             (args: List[Expression],ctx: Context) => {
                 args match{
-                    case NamespacedName(name) :: Nil => {
+                    case NamespacedName(name, _) :: Nil => {
                         (List(), StringValue(name.split(":")(0)))
                     }
                     case other => throw new Exception(f"Illegal Arguments $other for getNamespace")
@@ -610,10 +644,23 @@ object DefaultFunction{
             Modifier.newPublic(),
             (args: List[Expression],ctx: Context) => {
                 args match{
-                    case NamespacedName(name) :: Nil => {
+                    case NamespacedName(name, _) :: Nil => {
                         (List(), StringValue(name.split(":")(1)))
                     }
                     case other => throw new Exception(f"Illegal Arguments $other for getNamespaceName")
+                }
+            }
+        ))
+        ctx.addFunction("getNamespaceJson", CompilerFunction(ctx, "getNamespaceJson", 
+            List(Argument("name", MCObjectType, None)),
+            JsonType,
+            Modifier.newPublic(),
+            (args: List[Expression],ctx: Context) => {
+                args match{
+                    case NamespacedName(name, json) :: Nil => {
+                        (List(), json)
+                    }
+                    case other => throw new Exception(f"Illegal Arguments $other for getNamespaceJson")
                 }
             }
         ))
@@ -654,7 +701,8 @@ object DefaultFunction{
                         }
                         case other => throw new Exception(f"Illegal Arguments $other for insert")
                     }
-                }
+                },
+                false
             ))
         ctx.addFunction("print", CompilerFunction(ctx, "print", 
                 List(Argument("name", MCObjectType, None)),
@@ -663,6 +711,20 @@ object DefaultFunction{
                 (args: List[Expression],ctx: Context) => {
                     Reporter.debug(args)
                     (List(), NullValue)
+                },
+                false
+            ))
+        ctx.addFunction("toString", CompilerFunction(ctx, "toString", 
+                List(Argument("value", MCObjectType, None)),
+                StringType,
+                Modifier.newPublic(),
+                (args: List[Expression],ctx: Context) => {
+                    args match{
+                        case value::Nil => {
+                            (List(), StringValue(value.getString()))
+                        }
+                        case other => throw new Exception(f"Illegal Arguments $other for toString")
+                    }
                 }
             ))
         ctx.addFunction("stringify", CompilerFunction(ctx, "stringify", 
@@ -756,6 +818,10 @@ object DefaultFunction{
                         val ret = Compiler.compile(FunctionCall(vari, List(), List()))(ctx)
                         (List(), JsonValue(JsonArray(ret.map(v => JsonString(v.getString())))))
                     }
+                    case LinkedFunctionValue(func)::Nil => {
+                        val ret = Compiler.compile(LinkedFunctionCall(func, List(), null))(ctx)
+                        (List(), JsonValue(JsonArray(ret.map(v => JsonString(v.getString())))))
+                    }
                     case other => throw new Exception(f"Illegal Arguments $other for callToArray")
                 }
             }
@@ -771,7 +837,8 @@ object DefaultFunction{
                         }
                         case other => throw new Exception(f"Illegal Arguments $other for interpreterException")
                     }
-                }
+                },
+                false
             ))
         if (Settings.target == MCJava){
             ctx.addFunction("blockbenchSummon", CompilerFunction(ctx, "blockbenchSummon", 
@@ -780,7 +847,7 @@ object DefaultFunction{
                 Modifier.newPublic(),
                 (args: List[Expression],ctx: Context) => {
                     args match{
-                        case NamespacedName(name) :: Nil => {
+                        case NamespacedName(name, _) :: Nil => {
                             val e = name.split(":")(1)
                             val splitted = e.split("\\.")
                             if (splitted.length == 1){
@@ -792,7 +859,8 @@ object DefaultFunction{
                         }
                         case other => throw new Exception(f"Illegal Arguments $other for blockbenchSummon")
                     }
-                }
+                },
+                false
             ))
             ctx.addFunction("cmdstore", CompilerFunction(ctx, "cmdstore", 
                     List(Argument("vari", MCObjectType, None), Argument("cmd", FuncType(List(), VoidType), None)),
@@ -813,7 +881,8 @@ object DefaultFunction{
                             }
                             case other => throw new Exception(f"Illegal Arguments $other for cmdstore")
                         }
-                    }
+                    },
+                false
                 ))
             ctx.addFunction("schedule", CompilerFunction(ctx, "schedule", 
                 List(Argument("fct", MCObjectType, None), Argument("time", IntType, None)),
@@ -835,7 +904,8 @@ object DefaultFunction{
                         }
                         case other => throw new Exception(f"Illegal Arguments $other for schedule")
                     }
-                }
+                },
+                false
             ))
             ctx.addFunction("scheduleClear", CompilerFunction(ctx, "scheduleClear", 
                 List(Argument("fct", MCObjectType, None)),
@@ -852,7 +922,8 @@ object DefaultFunction{
                         }
                         case other => throw new Exception(f"Illegal Arguments $other for scheduleClear")
                     }
-                }
+                },
+                false
             ))
         }
         if (Settings.target == MCBedrock){
@@ -873,9 +944,52 @@ object DefaultFunction{
                             }
                             case other => throw new Exception(f"Illegal Arguments $other for random")
                         }
-                    }
+                    },
+                false
                 ))
         }
+        ctx.addFunction("runPython", CompilerFunction(ctx, "runPython", 
+            List(Argument("file", StringType, None), Argument("arguments", StringType, None)),
+            StringType,
+            Modifier.newPublic(),
+            (args: List[Expression],ctx: Context) => {
+                args match{
+                    case StringValue(file) :: StringValue(args) :: Nil => {
+                        (List(), StringValue(Process("python "+file+" "+args).!!))
+                    }
+                    case other => throw new Exception(f"Illegal Arguments $other for exists")
+                }
+            }
+        ))
+        ctx.addFunction("length", CompilerFunction(ctx, "length", 
+            List(Argument("value", MCObjectType, None)),
+            IntType,
+            Modifier.newPublic(),
+            (args: List[Expression],ctx: Context) => {
+                args match{
+                    case StringValue(value) :: Nil => {
+                        (List(), IntValue(value.length))
+                    }
+                    case JsonValue(JsonArray(value)) :: Nil => {
+                        (List(), IntValue(value.length))
+                    }
+                    case JsonValue(JsonDictionary(value)) :: Nil => {
+                        (List(), IntValue(value.size))
+                    }
+                    case TupleValue(value) :: Nil => {
+                        (List(), IntValue(value.length))
+                    }
+                    case PositionValue(px, py, pz)::Nil => {
+                        val x = px.getFloatValue()
+                        val y = py.getFloatValue()
+                        val z = pz.getFloatValue()
+                        (List(), FloatValue(Math.sqrt(x*x+y*y+z*z).toFloat))
+                    }
+                    case other => throw new Exception(f"Illegal Arguments $other for length")
+                }
+            }
+        ))
+        getFile()
     }
     def getFile()(implicit context: Context)={
         val ctx = context.root.push("File")

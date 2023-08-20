@@ -37,6 +37,11 @@ class Modifier() extends Serializable{
     var attributes = Map[String,Expression]()
     var doc: String = ""
 
+    def simplify()(implicit context: Context) = {
+        attributes = attributes.map(pair => (pair._1, Utils.simplify(pair._2)(context)))
+        this
+    }
+
     def combine(other: Modifier): Modifier = {
         val ret = Modifier()
         ret.protection = protection
