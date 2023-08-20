@@ -1,0 +1,17 @@
+java;bedrock
+minecraft:block.note_block.banjo;note.banjo
+minecraft:block.note_block.basedrum;note.basedrum
+minecraft:block.note_block.bell;note.bell
+minecraft:block.note_block.bit;note.bit
+minecraft:block.note_block.chime;note.chime
+minecraft:block.note_block.cow_bell;note.cow_bell
+minecraft:block.note_block.didgeridoo;note.didgeridoo
+minecraft:block.note_block.flute;note.flute
+minecraft:block.note_block.guitar;note.guitar
+minecraft:block.note_block.harp;note.harp
+minecraft:block.note_block.hat;note.hat
+minecraft:block.note_block.iron_xylophone;note.iron_xylophone
+minecraft:block.note_block.pling;note.pling
+minecraft:block.note_block.snare;note.snare
+minecraft:block.note_block.xylophone;note.xylophone
+minecraft:entity.item.pickup;block.itemframe.add_item
