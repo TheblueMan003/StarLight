@@ -1,3 +1,5 @@
+# Libraries
+This is the repo for the main compiler. The Libraries are located here: https://github.com/TheblueMan003/StarLightLibraries/
 # Notation
 Here are some notion used in this ReadMe:
 
