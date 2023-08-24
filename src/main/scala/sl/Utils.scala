@@ -935,6 +935,9 @@ object Utils{
                 (nl, nr) match
                     case (PositionValue(x1, y1, z1), PositionValue(x2, y2, z2)) if op == "+" => PositionValue(simplify(BinaryOperation("+", x1, x2)), simplify(BinaryOperation("+", y1, y2)), simplify(BinaryOperation("+", z1, z2)))
                     case (StringValue(a), JsonValue(JsonDictionary(dic))) if op == "in" => BoolValue(dic.contains(a))
+                    case (StringValue(a), JsonValue(JsonArray(arr))) if op == "in" => BoolValue(arr.contains(StringValue(a)))
+                    case (StringValue(a), StringValue(b)) if op == "in" => BoolValue(b.contains(a))
+                    case (StringValue(a), IntValue(b)) if op == "*" => StringValue(a * b)
                     case (StringValue(a), JsonValue(JsonString(b))) => StringValue(combine(op, a, b))
                     case (JsonValue(JsonString(a)), StringValue(b)) => StringValue(combine(op, a, b))
                     case (JsonValue(a), JsonValue(b)) => JsonValue(combine(op, a, b))

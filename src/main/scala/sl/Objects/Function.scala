@@ -153,6 +153,7 @@ abstract class Function(context: Context, val contextName: String, name: String,
 class ConcreteFunction(context: Context, _contextName: String, name: String, arguments: List[Argument], typ: Type, _modifier: Modifier, val body: Instruction, topLevel: Boolean) extends Function(context, _contextName, name, arguments, typ, _modifier){
     private var _needCompiling = topLevel || Settings.allFunction
     private var wasCompiled = false
+    private var isFunctionMacro = false
     
     protected var content = List[IRTree]()
     val returnVariable = {
@@ -171,7 +172,14 @@ class ConcreteFunction(context: Context, _contextName: String, name: String, arg
     override def generateArgument()(implicit ctx: Context): Unit = {
         arguments.foreach(a => {
             if (a.name.contains("$")){
-                throw new Exception(f"Illegal Arguement Name: ${a.name} in $fullName. Missing lazy key word?")
+                if (Settings.target.hasFeature("macro")){
+                    isFunctionMacro = true
+                    var sub = context.push(name, this)
+                    sub.addVariable("__macro_args__", new Variable(sub, "__macro_args__", JsonType, Modifier.newPrivate()))
+                }
+                else{
+                    throw new Exception(f"Illegal Arguement Name: ${a.name} in $fullName. Macro are not supported on your target. Missing lazy key word?")
+                }
             }
         })
         super.generateArgument()

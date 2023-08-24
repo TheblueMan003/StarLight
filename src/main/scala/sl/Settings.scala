@@ -74,7 +74,7 @@ trait Target{
     def hasFeature(feature: String): Boolean
 }
 case object MCJava extends Target{
-    val features = List("execute on", "execute positioned over", "string")
+    val features = List("execute on", "execute positioned over", "string", "macro")
     def hasFeature(feature: String): Boolean = features.exists(x => x == feature)
 
     def getFunctionPath(path: String): String = {

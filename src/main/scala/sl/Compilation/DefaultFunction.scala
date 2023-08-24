@@ -979,6 +979,9 @@ object DefaultFunction{
                     case TupleValue(value) :: Nil => {
                         (List(), IntValue(value.length))
                     }
+                    case (value: RawJsonValue) :: Nil => {
+                        (List(), IntValue(value.length()(ctx)))
+                    }
                     case PositionValue(px, py, pz)::Nil => {
                         val x = px.getFloatValue()
                         val y = py.getFloatValue()
