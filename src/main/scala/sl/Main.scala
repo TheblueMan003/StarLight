@@ -14,7 +14,7 @@ import sl.Library.Downloader
 import sys.process._
 
 object Main{
-  var version = List(0, 9, 0)
+  var version = List(0, 10, 0)
   private var lastIR: List[IRFile] = null
   private var lastContxt: Context = null
   private var interpreter: Interpreter = null

@@ -148,7 +148,14 @@ object Execute{
         exec.typ match
             case AtType => {
                 Utils.simplify(exec.exprs.head) match
-                    case value: PositionValue => makeExecute(x => PositionedIR(value.getString(), x), Compiler.compile(exec.block))
+                    case value: PositionValue => 
+                        if (value.isRanged()){
+                            var block = Compiler.compile(exec.block)
+                            value.getAllPosition().flatMap(pos => makeExecute(x => PositionedIR(pos.getString(), x), block))
+                        }
+                        else{
+                            makeExecute(x => PositionedIR(value.getString(), x), Compiler.compile(exec.block))
+                        }
                     case SelectorValue(value) => {
                         val (prefix, _, selector) = Utils.getSelector(exec.exprs.head)
                         prefix:::makeExecute(x => AtIR(selector.getString(), x), Compiler.compile(exec.block))

@@ -10,6 +10,7 @@ import sl.Compilation.*
 import objects.Function
 import sl.Compilation.Printable
 import objects.Tag
+import scala.quoted.Expr
 
 trait Expression extends CPositionable{
     def hasIntValue(): Boolean
@@ -308,6 +309,33 @@ case class PositionValue(val x: Expression, val y: Expression, val z: Expression
         val pz = Utils.forceString(z)
         
         f"${px} ${py} ${pz}"
+    def isRanged(): Boolean = {
+        List(x,y,z).map(p =>{
+            p match{
+                case RangeValue(_, _, _) => true
+                case BinaryOperation(op, left, RangeValue(_, _, _)) => true
+                case _ => false
+            }
+        }
+        ).exists(p=>p)
+    }
+    private def getRanged(expr: Expression)(implicit context: Context):List[Expression] = {
+        expr match{
+            case rg: RangeValue => Utils.getForeachCases("_", rg).flatMap(f => f.filter(_._1 == "_").map(_._2)).toList
+            case BinaryOperation(op, left, rg: RangeValue) => Utils.getForeachCases("_", rg).flatMap(f => f.filter(_._1 == "_").map(g => BinaryOperation(op, left, g._2))).toList
+            case _ => List(expr)
+        }
+    }
+    def getAllPosition()(implicit context: Context) = {
+        val px = getRanged(x)
+        val py = getRanged(y)
+        val pz = getRanged(z)
+        for{
+            x <- px
+            y <- py
+            z <- pz
+        } yield PositionValue(x, y, z)
+    }
 }
 
 

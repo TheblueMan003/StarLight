@@ -601,7 +601,8 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
     def tryGetFunctionFromType(identifier: Identifier, args: List[Type], typeargs: List[Type], output: Type, concrete: Boolean, silent: Boolean): Option[Function] = {
         def inner():Option[Function]={
             if (identifier.toString().startsWith("@")) return Some(getFunctionTags(mapFunctionTag(identifier)))
-            val fcts2 = handleSuper(identifier, getElementList(_.functions)(identifier))
+            val fcts3 = getElementList(_.functions)(identifier)
+            val fcts2 = handleSuper(identifier, fcts3)
             //println(fcts2.map(_.fullName))
             val fcts = fcts2.filter(f => !fcts2.exists(g => g.overridedFunction == f))
             if (fcts.size == 0) return None

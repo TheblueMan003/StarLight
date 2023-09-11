@@ -24,6 +24,7 @@ class Class(context: Context, name: String, val generics: List[String], _modifie
                 .filter(!_._2.isVirtualOverride)
                 .filter(x => isNotClassFunction(x._2))
                 .filter(f => f._2.context == context.push(name) || context.push(name).isInheriting(f._2.context))
+                .filter(f => f._2.parentVariable == null)
                 .filterNot(f => f._1 == "__init__" && f._2.clazz != this && hasOwnInnit)
                 .toList
 
@@ -129,10 +130,14 @@ class Class(context: Context, name: String, val generics: List[String], _modifie
                     fct2.overridedFunction = fct
                     fct2.isVirtualDispatch = true
                     virutalFunction = (name, fct2) :: virutalFunction
+                    
                     ctx.addFunction(name, fct2)
                 })
 
-                getAllVariables().filter(!_.wasGenerated).map(_.generate(false, true)(ctx))
+                val a = cacheGVFunctions
+                val b = cacheGVVariables
+                
+                context.push(name).getAllVariable().filter(!_.wasGenerated).map(vari => vari.generate(false, true)(vari.context))
             }
         }
     }
@@ -148,6 +153,7 @@ class Class(context: Context, name: String, val generics: List[String], _modifie
         if (generics.length == 0){
             generate()
             val ctx = ctx2.push(vari.name, vari)
+            
             cacheGVFunctions.map((name, fct) => {
                     val deco = ClassFunction(ctx.getPath()+"."+name, vari, fct)
                     ctx.addFunction(name, deco)

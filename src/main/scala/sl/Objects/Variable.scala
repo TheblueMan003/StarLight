@@ -48,12 +48,15 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 	def canBeReduceToLazyValue = modifiers.isLazy && !getType().isInstanceOf[StructType]
 
 	def generate(isStructFunctionArgument: Boolean = false, skipClassCheck: Boolean = false)(implicit context: Context):Unit = {
+		if (wasGenerated)return
 		val parent = context.getCurrentVariable()
 		val parentClass = context.getCurrentClass()
 
-		//if (parentClass!=null && getType() == parentClass.definingType && !skipClassCheck) return
-
+		if (context.getCurrentFunction() == null || isFunctionArgument){
+			if (parentClass != null && getType() == parentClass.definingType && !skipClassCheck) return
+		}
 		wasGenerated = true
+		
 
 		if (parent != null){
 			if (!isFunctionArgument){
@@ -1297,7 +1300,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 									}
 									catch{
 										case e: FunctionNotFoundException => {
-											throw new Exception(f"Cannot find constructor for class ${clazz.fullName} at \n${value.pos.longString}")
+											throw new Exception(f"Cannot find constructor for class ${clazz.fullName} at \n${value.pos.longString} ${e.getMessage()}")
 										}
 										case e: ObjectNotFoundException => {
 											val (pre,vari) =  Utils.simplifyToVariable(value)

@@ -1,4 +1,21 @@
-scoreboard players set default.test.1._0.i tbms.var 0
-function default:zzz_sl_block/1
-scoreboard players set default.test.1._1.i tbms.var 0
-function default:zzz_sl_block/3
+execute positioned ~-10 0 0 run summon creeper
+execute positioned ~-9 0 0 run summon creeper
+execute positioned ~-8 0 0 run summon creeper
+execute positioned ~-7 0 0 run summon creeper
+execute positioned ~-6 0 0 run summon creeper
+execute positioned ~-5 0 0 run summon creeper
+execute positioned ~-4 0 0 run summon creeper
+execute positioned ~-3 0 0 run summon creeper
+execute positioned ~-2 0 0 run summon creeper
+execute positioned ~-1 0 0 run summon creeper
+execute positioned ~0 0 0 run summon creeper
+execute positioned ~1 0 0 run summon creeper
+execute positioned ~2 0 0 run summon creeper
+execute positioned ~3 0 0 run summon creeper
+execute positioned ~4 0 0 run summon creeper
+execute positioned ~5 0 0 run summon creeper
+execute positioned ~6 0 0 run summon creeper
+execute positioned ~7 0 0 run summon creeper
+execute positioned ~8 0 0 run summon creeper
+execute positioned ~9 0 0 run summon creeper
+execute positioned ~10 0 0 run summon creeper

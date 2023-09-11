@@ -148,6 +148,8 @@ abstract class Function(context: Context, val contextName: String, name: String,
           (!Settings.optimizeAllowRemoveProtected && modifiers.protection == Protection.Protected && !wasMovedToBlock))
         )
     }
+
+    override def toString(): String = f"$fullName(${arguments.map(_.typ.toString()).foldRight("")(_ +","+_)})"
 }
 
 class ConcreteFunction(context: Context, _contextName: String, name: String, arguments: List[Argument], typ: Type, _modifier: Modifier, val body: Instruction, topLevel: Boolean) extends Function(context, _contextName, name, arguments, typ, _modifier){

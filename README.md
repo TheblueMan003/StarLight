@@ -291,6 +291,11 @@ Instructions can be executed **at** a position with:
 at(~ ~1 ~){
     do_stuff()
 }
+Instructions can also be executed in a ranged position:
+```
+at({~, ~0..10, ~}){
+    do_stuff()
+}
 ```
 Instructions can be executed **as** an entity with:
 ```
