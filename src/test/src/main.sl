@@ -1,36 +1,27 @@
-package test
+package AnimatedEntity
 
-enum DamageType{
-    Fire,
-    Water
-}
+import mc.Entity
 
-struct DamageData(DamageType type, int amount)
-
-class A{
-    int hp
-    int[10] last
-    def __init__(){
-
-    }
-    def damage(DamageData dmg){
-        last[hp] = 1
-        if (dmg.type == DamageType.Fire){
-            hp -= dmg.amount * 2
+class AnimatedEntity extends Entity{
+    void=>void animationClear
+    def lazy playAnimation(string animation){
+        lazy var name = Compiler.getBlockbenchEntityName()
+        animationClear()
+        Compiler.insert(($name, $animation), (name, animation)){
+            /function animated_java:$name/animations/$animation/play
         }
-        hp -= dmg.amount
+        animationClear = () => {
+            Compiler.insert(($name, $animation), (name, animation)){
+                /function animated_java:$name/animations/$animation/stop
+            }
+        }
     }
-}
-class B extends A{
-
+    def lazy stopAnimation(){
+        animationClear()
+    }
 }
 
 def test(){
-    with(@e[type=pig]){
-        /say there is a pig
-    }
-    else{
-        /say there is no pig
-    }
+    AnimatedEntity a = new AnimatedEntity()
+    a.playAnimation("walk")
 }
-

@@ -864,6 +864,24 @@ object DefaultFunction{
                 },
                 false
             ))
+            ctx.addFunction("getBlockbenchEntityName", CompilerFunction(ctx, "getBlockbenchEntityName", 
+                List(),
+                EntityType,
+                Modifier.newPublic(),
+                (args: List[Expression],ctx: Context) => {
+                    args match{
+                        case Nil => {
+                            val name = ctx.getCurrentClass().getEntity().getString()
+                            val e = name.split(":")(1)
+                            val splitted = e.split("\\.")
+                            
+                            (List(), (StringValue(splitted(0))))
+                        }
+                        case other => throw new Exception(f"Illegal Arguments $other for getBlockbenchEntityName")
+                    }
+                },
+                false
+            ))
             ctx.addFunction("cmdstore", CompilerFunction(ctx, "cmdstore", 
                     List(Argument("vari", MCObjectType, None), Argument("cmd", FuncType(List(), VoidType), None)),
                     VoidType,
