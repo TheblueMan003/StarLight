@@ -22,7 +22,7 @@ object Parser extends StandardTokenParsers{
                               "as", "at", "with", "to", "import", "doc", "template", "null", "typedef", "foreach", "in", "not",
                               "def", "package", "struct", "enum", "class", "lazy", "jsonfile", "blocktag", "throw", "try", "catch", "finally",
                               "public", "protected", "private", "scoreboard", "forgenerate", "from", "rotated", "facing", "align", "case",
-                              "ticking", "loading", "predicate", "extends", "new", "const", "static", "virtual", "abstract", "override")
+                              "ticking", "loading", "predicate", "extends", "new", "const", "static", "virtual", "abstract", "override", "repeat")
 
 
   def block: Parser[Instruction] = positioned("{" ~> rep(instruction <~ opt(";")) <~ "}" ^^ (p => InstructionBlock(p)))
@@ -81,7 +81,7 @@ object Parser extends StandardTokenParsers{
       | ifs
       | "return" ~> expr ^^ (Return(_))
       | block
-      | switch | whileLoop | doWhileLoop | forLoop | jsonFile
+      | switch | whileLoop | doWhileLoop | forLoop | repeatLoop | jsonFile
       | "as" ~"("~> exprNoTuple ~")"~ instruction ^^ {case e ~ _ ~ i => With(e, BoolValue(false), BoolValue(true), i)}
       | "at" ~"(" ~> repsep(exprNoTuple, ",") ~ ")"~ instruction ^^ {case e ~ _ ~ i => Execute(AtType, e, i)}
       | rotated1
@@ -140,6 +140,8 @@ object Parser extends StandardTokenParsers{
   def whileLoop: Parser[Instruction] = positioned(("while" ~> "(" ~> exprNoTuple <~ ")") ~ instruction ^^ (p => WhileLoop(p._1, p._2)))
   def forLoop: Parser[Instruction] = positioned(((("for" ~> "(" ~> instruction <~ ";") ~ exprNoTuple <~ ";") ~ instruction <~ ")") ~ instruction ^^ 
     (p => InstructionBlock(List(p._1._1._1, WhileLoop(p._1._1._2, InstructionList(List(p._2, p._1._2)))))))
+  def repeatLoop: Parser[Instruction] = positioned(("repeat" ~> "(" ~> exprNoTuple <~ ")") ~ instruction ^^ 
+    {case value ~ intr => FunctionCall(Identifier.fromString("__repeat__"), List(value, LambdaValue(List(), intr, null)), List())})
   def withInstr: Parser[Instruction] = positioned(
     ("with" ~> "(" ~> exprNoTuple <~ ")") ~ instruction ^^ (p => With(p._1, BoolValue(false), BoolValue(true), p._2))
       | (("with" ~> "(" ~> exprNoTuple <~ ",") ~ exprNoTuple <~ ")") ~ instruction ^^ (p => With(p._1._1, p._1._2, BoolValue(true), p._2))
@@ -338,12 +340,17 @@ object Parser extends StandardTokenParsers{
   def exprAnd: Parser[Expression] = positioned(exprBitwiseOr ~ rep("&&" ~> exprAnd) ^^ {unpack("&&", _)})
   def exprOr: Parser[Expression] = positioned(exprAnd ~ rep("||" ~> exprOr) ^^ {unpack("||", _)})
   def exprAs: Parser[Expression] = positioned(exprOr ~ rep(":>" ~> types) ^^ {unpackCast(_)})
-  def exprNoTuple = position | exprAs | lambda | positionExpr
+  def exprForSelect: Parser[Expression] = positioned(exprAs ~ rep("for" ~> ident2 ~ "in" ~ exprNoTuple) ^^ {unpackForSelect(_)})
+  def exprNoTuple = lambda | position | exprForSelect | positionExpr
   def expr: Parser[Expression] = positioned(rep1sep(exprNoTuple, ",") ^^ (p => if p.length == 1 then p.head else TupleValue(p)))
 
 
   def unpackCast(p: (Expression ~ List[Type])): Expression = {
     if p._2.isEmpty then p._1 else CastValue(p._1, p._2.last)
+  }
+
+  def unpackForSelect(p: (Expression ~ List[String ~ String ~ Expression])): Expression = {
+    if p._2.isEmpty then p._1 else p._2.foldLeft(p._1)((e, p) => ForSelect(e, p._1._1, p._2))
   }
 
   def unpack(op: String, p: (Expression ~ List[Expression])): Expression = {

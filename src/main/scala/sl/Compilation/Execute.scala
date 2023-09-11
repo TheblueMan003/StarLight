@@ -700,6 +700,29 @@ object Execute{
             }
             case TagValue(value) => throw new Exception("Can't use if with tag")
             case LinkedTagValue(value) => throw new Exception("Can't use if with tag")
+            case ForSelect(expr, filter, selector) => {
+                filter match{
+                    case "all" => {
+                        val vari = context.getFreshVariable(BoolType)
+                        val prev = vari.assign("=", BoolValue(true)) ::: Compiler.compile(With(selector, BoolValue(true), BoolValue(true), If(UnaryOperation("!", expr), VariableAssigment(List((Right(vari), Selector.self)), "=", BoolValue(false)), List())))(context)
+                        val (p, c) = getIfCase(LinkedVariableValue(vari))
+                        (prev ::: p, c)
+                    }
+                    case "none" => {
+                        val vari = context.getFreshVariable(BoolType)
+                        val prev = vari.assign("=", BoolValue(false)) ::: Compiler.compile(With(selector, BoolValue(true), BoolValue(true), If(expr, VariableAssigment(List((Right(vari), Selector.self)), "=", BoolValue(true)), List())))(context)
+                        val (p, c) = getIfCase(LinkedVariableValue(vari))
+                        (prev ::: p, c)
+                    }
+                    case "any" => {
+                        val vari = context.getFreshVariable(BoolType)
+                        val prev = vari.assign("=", BoolValue(false)) ::: Compiler.compile(With(selector, BoolValue(true), BoolValue(true), If(expr, VariableAssigment(List((Right(vari), Selector.self)), "=", BoolValue(true)), List())))(context)
+                        val (p, c) = getIfCase(LinkedVariableValue(vari))
+                        (prev ::: p, c)
+                    }
+                }
+                
+            }
             case other => throw new Exception(f"unsupported if value: $other")
     }
     catch{

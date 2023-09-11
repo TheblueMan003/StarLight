@@ -10,6 +10,7 @@ import java.nio.file.Files
 import java.nio.file.Paths
 import sl.IR.*
 import scala.io.Source
+import Selector._
 
 object DefaultFunction{
     def get()(implicit context: Context) = {
@@ -22,7 +23,7 @@ object DefaultFunction{
                     (args: List[Expression],ctx: Context) => {
                         args match{
                             case StringValue(path)::Nil => {
-                                (List(), JsonValue(Parser.parseJson(Source.fromFile(path).mkString)))
+                                (List(), JsonValue(Parser.parseJson(Source.fromFile(path, "UTF-8").mkString)))
                             }
                             case other => throw new Exception(f"Illegal Arguments $other for readJson")
                         }
@@ -843,18 +844,19 @@ object DefaultFunction{
         if (Settings.target == MCJava){
             ctx.addFunction("blockbenchSummon", CompilerFunction(ctx, "blockbenchSummon", 
                 List(Argument("name", MCObjectType, None)),
-                VoidType,
+                EntityType,
                 Modifier.newPublic(),
                 (args: List[Expression],ctx: Context) => {
                     args match{
                         case NamespacedName(name, _) :: Nil => {
                             val e = name.split(":")(1)
                             val splitted = e.split("\\.")
+                            
                             if (splitted.length == 1){
-                                (List(CommandIR(f"function ${splitted(0)}:summon/default")), (NullValue))
+                                (List(CommandIR(f"function animated_java:${splitted(0)}/summon")), (SelectorValue(JavaSelector("@e", List(("tag", SelectorIdentifier(f"aj.${splitted(0)}.root")))))))
                             }
                             else{
-                                (List(CommandIR(f"function ${splitted(0)}:summon/${splitted(1)}")), (NullValue))
+                                (List(CommandIR(f"function animated_java:${splitted(0)}/summon/${splitted(1)}")), (SelectorValue(JavaSelector("@e", List(("tag", SelectorIdentifier(f"aj.${splitted(0)}.root")))))))
                             }
                         }
                         case other => throw new Exception(f"Illegal Arguments $other for blockbenchSummon")

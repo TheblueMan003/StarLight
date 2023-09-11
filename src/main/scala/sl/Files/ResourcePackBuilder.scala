@@ -12,7 +12,12 @@ import sl.IR.*
 
 object ResourcePackBuilder{
     var previous = Map[String, List[String]]()
+    
     def clearCache() = previous = Map[String, List[String]]()
+
+    def isIgnored(path: String) = {
+        path.endsWith(".py")
+    }
     def build(source: List[String], target: String, jsonFiles: List[IRFile])={
         Reporter.ok(f"Building Resource Pack: $target")
         if (target.endsWith(".zip/")){
@@ -32,6 +37,7 @@ object ResourcePackBuilder{
         .groupBy(_._2)
         .toList
         .map((k,v) => v.sortBy(_._1.length()).head)
+        .filterNot((source, file) => isIgnored(file))
         .map((source, file) =>{
             val copied = Paths.get(target+file);
             val originalPath = Paths.get(source+"/"+file)
@@ -60,6 +66,7 @@ object ResourcePackBuilder{
         .filterNot(x => jsonFiles.exists(f => f.getPath() == x._1))
         .toList
         .map((k,v) => v.sortBy(_._1.length()).head)
+        .filterNot((source, file) => isIgnored(file))
         .map((source, name) =>{
             zip.putNextEntry(new ZipEntry(name))
             val in = new BufferedInputStream(new FileInputStream(source+"/"+name), Buffer)

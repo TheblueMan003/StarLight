@@ -11,7 +11,7 @@ import java.io.File
 import sys.process._
 import sl.IR.*
 import objects.CompilerFunction
-
+import java.nio.charset.StandardCharsets
 
 object Utils{
     val libaries = sl.files.FileUtils.getListOfFiles("./src/main/resources/libraries")
@@ -19,11 +19,11 @@ object Utils{
             .map(f => (f.toLowerCase -> f))
             .toMap
     def getFile(path: String): String = {
-        val source = scala.io.Source.fromFile(path)
+        val source = scala.io.Source.fromFile(path, "UTF-8")
         source.getLines mkString "\n"
     }
     def getFileLines(path: String): List[String] = {
-        val source = scala.io.Source.fromFile(path)
+        val source = scala.io.Source.fromFile(path, "UTF-8")
         source.getLines.toList
     }
     def getLibPath(path: String)={
@@ -207,6 +207,7 @@ object Utils{
             case ConstructorCall(name, args, generics) => ConstructorCall(name, args.map(subst(_, from, to)), generics)
             case RangeValue(min, max, delta) => RangeValue(subst(min, from, to), subst(max, from, to), subst(delta, from, to))
             case LambdaValue(args, instr, ctx) => LambdaValue(args, subst(instr, from, to), ctx)
+            case ForSelect(expr, filter, selector) => ForSelect(subst(expr, from, to), filter, subst(selector, from, to))
             case lk: LinkedVariableValue => lk
     })
 
@@ -310,6 +311,7 @@ object Utils{
             case RangeValue(min, max, delta) => RangeValue(subst(min, from, to), subst(max, from, to), subst(delta, from, to))
             case LambdaValue(args, instr, ctx) => LambdaValue(args.map(_.replaceAllLiterally(from, to)), subst(instr, from, to), ctx)
             case lk: LinkedVariableValue => lk
+            case ForSelect(expr, filter, selector) => ForSelect(subst(expr, from, to), filter.replaceAllLiterally(from, to), subst(selector, from, to))
             case null => null
     })
 
@@ -566,14 +568,21 @@ object Utils{
             case UnaryOperation(op, left) => UnaryOperation(op, fix(left))
             case TupleValue(values) => TupleValue(values.map(fix(_)))
             case FunctionCallValue(name, args, typeargs, sel) => FunctionCallValue(fix(name), args.map(fix(_)), typeargs.map(fix(_)), sel)
-            case ConstructorCall(name, args, generics) => if ignore.contains(name) then ConstructorCall(name, args.map(fix(_)), generics) else
+            case ConstructorCall(name, args, generics) => 
+                try{
+                if ignore.contains(name) then ConstructorCall(name, args.map(fix(_)), generics) else
                 context.getType(IdentifierType(name.toString(), generics)) match
                     case StructType(struct, generics) => ConstructorCall(struct.fullName, args.map(fix(_)), generics.map(fix(_)))
                     case ClassType(clazz, generics) => ConstructorCall(clazz.fullName, args.map(fix(_)), generics.map(fix(_)))
                     case other => throw new Exception(f"Cannot constructor call $other")
+                }
+                catch{
+                    case e: Exception => ConstructorCall(name, args.map(fix(_)), generics)
+                }
             case RangeValue(min, max, delta) => RangeValue(fix(min), fix(max), fix(delta))
             case LambdaValue(args, instr, ctx) => LambdaValue(args, fix(instr), ctx)
             case lk: LinkedVariableValue => lk
+            case ForSelect(expr, filter, selector) => ForSelect(fix(expr), filter, fix(selector))
             case null => null
     })
     def fix(json: JSONElement)(implicit context: Context, ignore: Set[Identifier]): JSONElement = {
@@ -634,6 +643,7 @@ object Utils{
             case RangeValue(min, max, delta) => RangeValue(subst(min, from, to), subst(max, from, to), subst(delta, from, to))
             case LambdaValue(args, instr, ctx) => LambdaValue(args, subst(instr, from, to), ctx)
             case lk: LinkedVariableValue => lk
+            case ForSelect(expr, filter, selector) => ForSelect(subst(expr, from, to), filter, subst(selector, from, to))
             case null => null
     })
 
@@ -774,6 +784,7 @@ object Utils{
             }
             case RangeValue(min, max, delta) => RangeType(typeof(min))
             case LinkedVariableValue(vari, sel) => vari.getType()
+            case ForSelect(expr, filter, selector) => BoolType
     }
     def forceString(expr: Expression)(implicit context: Context): String = {
         expr match
@@ -879,6 +890,7 @@ object Utils{
 
     def simplify(expr: Expression)(implicit context: Context): Expression = positioned(expr, {
         expr match
+            case VariableValue(name, selector) if name == Identifier.fromString("this") => simplify(CastValue(VariableValue("__ref", selector), ClassType(context.getCurrentClass(), List())))
             case NamespacedName(value, json) => NamespacedName(value, simplify(json))
             case PositionValue(x, y, z) => PositionValue(simplify(x), simplify(y), simplify(z))
             case JsonValue(JsonString(value)) => StringValue(value)
@@ -895,8 +907,8 @@ object Utils{
             }
             case LambdaValue(args, instr, ctx) => LambdaValue(args, instr, if ctx == null then context else ctx)
             case SelectorValue(value) => Utils.fix(expr)(context, Set())
-            case IsType(left, typ) if Utils.typeof(simplify(left)) == context.getType(typ) =>BoolValue(true)
-            case IsType(left, typ) => BoolValue(false)
+            case IsType(left, typ) if Utils.typeof(simplify(left)) == context.getType(typ) => BoolValue(true)
+            case IsType(left, typ) if Utils.typeof(simplify(left)) != AnyType => BoolValue(false)
             case UnaryOperation(op, left) => {
                 val inner = Utils.simplify(left)
                 (op,inner) match {
@@ -937,6 +949,8 @@ object Utils{
                     case (StringValue(a), JsonValue(JsonDictionary(dic))) if op == "in" => BoolValue(dic.contains(a))
                     case (StringValue(a), JsonValue(JsonArray(arr))) if op == "in" => BoolValue(arr.contains(StringValue(a)))
                     case (StringValue(a), StringValue(b)) if op == "in" => BoolValue(b.contains(a))
+                    //case (sel: SelectorValue, other) if op == "in" => SelectorValue(getSelector(BinaryOperation(op, nl, nr), true)._3)
+                    //case (sel: SelectorValue, other) if op == "not in" => SelectorValue(getSelector(BinaryOperation(op, nl, nr), true)._3)
                     case (StringValue(a), IntValue(b)) if op == "*" => StringValue(a * b)
                     case (StringValue(a), JsonValue(JsonString(b))) => StringValue(combine(op, a, b))
                     case (JsonValue(JsonString(a)), StringValue(b)) => StringValue(combine(op, a, b))
@@ -1552,14 +1566,14 @@ object Utils{
             }
             case _ => throw new Exception(f"Unknown generator: $provider")
     }
-    def getSelector(expr: Expression)(implicit context: Context): (List[IRTree], Context, Selector) = {
+    def getSelector(expr: Expression, noSimplification: Boolean = false)(implicit context: Context): (List[IRTree], Context, Selector) = {
         def apply(selector: Expression): (List[IRTree], Context, Selector) = {
             val vari = context.getFreshVariable(EntityType)
             val (prefix, ctx, sel) = getSelector(LinkedVariableValue(vari))
             (sl.Compilation.Execute.withInstr(With(selector, BoolValue(false), BoolValue(true), 
                 VariableAssigment(List((Right(vari), Selector.self)), "=", SelectorValue(Selector.self)))):::prefix, ctx, sel)
         }
-        Utils.simplify(expr) match
+        (if noSimplification then expr else Utils.simplify(expr)) match
             case VariableValue(Identifier(List("@attacker")), selector) if Settings.target.hasFeature("execute on") => apply(expr)
             case VariableValue(Identifier(List("@controller")), selector) if Settings.target.hasFeature("execute on") => apply(expr)
             case VariableValue(Identifier(List("@leasher")), selector) if Settings.target.hasFeature("execute on") => apply(expr)

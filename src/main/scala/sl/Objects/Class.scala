@@ -16,12 +16,15 @@ class Class(context: Context, name: String, val generics: List[String], _modifie
     var definingType = ClassType(this, List())
     private var wasGenerated = false
 
+    lazy val hasOwnInnit = getAllFunctions().exists(f => f._1 == "__init__" && f._2.clazz == this)
+
     lazy val cacheGVFunctions = getAllFunctions()
                 .filter(!_._2.modifiers.isStatic)
                 .filter(!_._2.modifiers.isVirtual)
                 .filter(!_._2.isVirtualOverride)
                 .filter(x => isNotClassFunction(x._2))
                 .filter(f => f._2.context == context.push(name) || context.push(name).isInheriting(f._2.context))
+                .filterNot(f => f._1 == "__init__" && f._2.clazz != this && hasOwnInnit)
                 .toList
 
     lazy val cacheGVVariables = getAllVariables()

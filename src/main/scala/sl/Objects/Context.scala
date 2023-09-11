@@ -532,7 +532,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
     def getFunction(identifier: Identifier, args: List[Expression], typeargs: List[Type], output: Type, concrete: Boolean = false, silent: Boolean = false): (Function, List[Expression]) = {
         tryGetFunction(identifier, args, typeargs, output, concrete, silent) match{
             case Some(value) => value
-            case None => throw new ObjectNotFoundException(f"Unknown function: $identifier in context: $path")
+            case None => throw new FunctionNotFoundException(f"Unknown function: $identifier in context: $path")
         }
     }
     def tryGetFunction(identifier: Identifier, args: List[Expression], typeargs: List[Type], output: Type, concrete: Boolean = false, silent: Boolean = false): Option[(Function, List[Expression])] = {

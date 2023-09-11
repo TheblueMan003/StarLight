@@ -208,6 +208,18 @@ case class LinkedVariableValue(val vari: Variable, val selector: Selector = Sele
         }
     }
 }
+case class ForSelect(val expr: Expression, val filter: String, val selector: Expression) extends Expression {
+    override def toString(): String = f"$expr for $filter in $selector"
+    override def getIntValue(): Int = ???
+    override def hasIntValue(): Boolean = false
+    override def hasFloatValue(): Boolean = false
+    override def getFloatValue(): Double = ???
+    override def getString()(implicit context: Context): String = {
+        val expr = Utils.forceString(this.expr)
+        val selector = Utils.forceString(this.selector)
+        f"$expr for $filter in $selector"
+    }
+}
 case class LinkedFunctionValue(val fct: Function) extends Expression with SmallValue{
     override def toString(): String = fct.fullName
     override def getIntValue(): Int = ???

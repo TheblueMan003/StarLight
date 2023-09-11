@@ -1297,9 +1297,9 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 									}
 									catch{
 										case e: FunctionNotFoundException => {
-											throw e
+											throw new Exception(f"Cannot find constructor for class ${clazz.fullName} at \n${value.pos.longString}")
 										}
-										case e: ObjectNotFoundException =>{
+										case e: ObjectNotFoundException => {
 											val (pre,vari) =  Utils.simplifyToVariable(value)
 											pre ::: assign("=", vari)
 										}
@@ -1356,6 +1356,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 			case ConstructorCall(name, args, typevars) => args.exists(isPresentIn(_))
 			case RangeValue(min, max, delta) => isPresentIn(min) || isPresentIn(max) || isPresentIn(delta)
 			case CastValue(left, right) => isPresentIn(left)
+			case ForSelect(expr, filter, selector) => isPresentIn(expr) || isPresentIn(selector)
 		}
 
 

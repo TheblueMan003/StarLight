@@ -54,6 +54,11 @@ def lazy entity __getBindEntity__(int variable){
     }
     return ne
 }
+def lazy __repeat__(int variable, void=>void action){
+    for (int i = 0; i < variable; i++){
+        action()
+    }
+}
 
 def lazy aligned(void=>void fct){
     align("xyz")at(~0.5 ~ ~0.5)fct()
@@ -101,8 +106,8 @@ class object{
             lazy string namespaceName = Compiler.getNamespace(entity)
             if (namespaceName == "blockbench"){
                 /tag @e[tag=!object.__tagged] add object.__tagged
-                Compiler.blockbenchSummon(entity)
-                with(@e[tag=!object.__tagged]){
+                lazy var e = Compiler.blockbenchSummon(entity)
+                with(@e[tag=!object.__tagged] in e){
                     object.__ref = __totalRefCount
                     object.__refCount = 1
                     /tag @s add __class__
