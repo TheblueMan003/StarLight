@@ -775,102 +775,108 @@ object Execute{
         }
     }
     def switch(swit: Switch)(implicit context: Context):List[IRTree] = {
-        val expr = Utils.simplify(swit.value)
-        Utils.typeof(expr) match
-            case IntType | FloatType | BoolType | FuncType(_, _) | EnumType(_) | StructType(_, _) | ClassType(_, _) => {
-                val cases = flattenSwitchCase(swit.cases).map(c => SwitchCase(Utils.simplify(c.expr), c.instr))
-                expr match{
-                    case VariableValue(name, sel) if !swit.copyVariable=> {
-                        makeTree(context.getVariable(name), cases.par.filter(_.expr.hasIntValue()).map(x => (x.expr.getIntValue(), x.instr)).toList):::
-                        cases.par.filter(!_.expr.hasIntValue()).flatMap(x => ifs(If(switchComp(VariableValue(name), x.expr), x.instr, List()))).toList
-                    }
-                    case LinkedVariableValue(vari, sel) if !swit.copyVariable=> {
-                        makeTree(vari, cases.par.filter(_.expr.hasIntValue()).map(x => (x.expr.getIntValue(), x.instr)).toList):::
-                        cases.par.filter(!_.expr.hasIntValue()).flatMap(x => ifs(If(switchComp(LinkedVariableValue(vari), x.expr), x.instr, List()))).toList
-                    }
-                    case IntValue(value) => {
-                        val tail = cases.par.filter(!_.expr.hasIntValue()).toList
-                        val head = cases.par.filter(c => c.expr.hasIntValue() && c.expr.getIntValue() == value).flatMap(x => Compiler.compile(x.instr)).toList
-                        if (tail.isEmpty){
-                            head
-                        }
-                        else{
-                            val vari = context.getFreshVariable(Utils.typeof(swit.value))
-                            vari.assign("=", swit.value) ::: head ::: 
-                            tail.flatMap(x => ifs(If(switchComp(LinkedVariableValue(vari), x.expr), x.instr, List())))
-                        }
-                    }
-                    case FloatValue(value) => {
-                        val tail = cases.filter(!_.expr.hasFloatValue())
-                        val head = cases.filter(c => c.expr.hasFloatValue() && c.expr.getFloatValue() == value).flatMap(x => Compiler.compile(x.instr))
-                        if (tail.isEmpty){
-                            head
-                        }
-                        else{
-                            val vari = context.getFreshVariable(Utils.typeof(swit.value))
-                            vari.assign("=", swit.value) ::: head ::: 
-                            tail.flatMap(x => ifs(If(switchComp(LinkedVariableValue(vari), x.expr), x.instr, List())))
-                        }
-                    }
-                    case EnumIntValue(value) => {
-                        val tail = cases.filter(!_.expr.hasIntValue())
-                        val head = cases.filter(c => c.expr.hasIntValue() && c.expr.getIntValue() == value).flatMap(x => Compiler.compile(x.instr))
-                        if (tail.isEmpty){
-                            head
-                        }
-                        else{
-                            val vari = context.getFreshVariable(Utils.typeof(swit.value))
-                            vari.assign("=", swit.value) ::: head ::: 
-                            tail.flatMap(x => ifs(If(switchComp(LinkedVariableValue(vari), x.expr), x.instr, List())))
-                        }
-                    }
-                    case _ => {
-                        val vari = context.getFreshVariable(Utils.typeof(swit.value))
-                        vari.assign("=", swit.value) ::: makeTree(vari, cases.filter(_.expr.hasIntValue()).map(x => (x.expr.getIntValue(), x.instr)))::: 
-                        cases.filter(!_.expr.hasIntValue()).flatMap(x => ifs(If(switchComp(LinkedVariableValue(vari), x.expr), x.instr, List())))
-                    }
-                }
+        swit.value match
+            case ForSelect(expr, filter, selector) => {
+                switch(Switch(expr, swit.cases.map(c => SwitchForEach(Identifier.fromString(filter), selector, c.asInstanceOf[SwitchCase]))))
             }
-            case TupleType(sub) => {
-                def getHead(expr: Expression): Expression = {
-                    expr match
-                        case TupleValue(values) if values.isDefinedAt(0) => values.head
-                        case VariableValue(name, selector) => getHead(LinkedVariableValue(context.getVariable(name), selector))
-                        case LinkedVariableValue(vari, selector) if vari.canBeReduceToLazyValue => {
-                            getHead(vari.lazyValue)
+            case other => {        
+                val expr = Utils.simplify(swit.value)
+                Utils.typeof(expr) match
+                    case IntType | FloatType | BoolType | FuncType(_, _) | EnumType(_) | StructType(_, _) | ClassType(_, _) => {
+                        val cases = flattenSwitchCase(swit.cases).map(c => SwitchCase(Utils.simplify(c.expr), c.instr))
+                        expr match{
+                            case VariableValue(name, sel) if !swit.copyVariable=> {
+                                makeTree(context.getVariable(name), cases.par.filter(_.expr.hasIntValue()).map(x => (x.expr.getIntValue(), x.instr)).toList):::
+                                cases.par.filter(!_.expr.hasIntValue()).flatMap(x => ifs(If(switchComp(VariableValue(name), x.expr), x.instr, List()))).toList
+                            }
+                            case LinkedVariableValue(vari, sel) if !swit.copyVariable=> {
+                                makeTree(vari, cases.par.filter(_.expr.hasIntValue()).map(x => (x.expr.getIntValue(), x.instr)).toList):::
+                                cases.par.filter(!_.expr.hasIntValue()).flatMap(x => ifs(If(switchComp(LinkedVariableValue(vari), x.expr), x.instr, List()))).toList
+                            }
+                            case IntValue(value) => {
+                                val tail = cases.par.filter(!_.expr.hasIntValue()).toList
+                                val head = cases.par.filter(c => c.expr.hasIntValue() && c.expr.getIntValue() == value).flatMap(x => Compiler.compile(x.instr)).toList
+                                if (tail.isEmpty){
+                                    head
+                                }
+                                else{
+                                    val vari = context.getFreshVariable(Utils.typeof(swit.value))
+                                    vari.assign("=", swit.value) ::: head ::: 
+                                    tail.flatMap(x => ifs(If(switchComp(LinkedVariableValue(vari), x.expr), x.instr, List())))
+                                }
+                            }
+                            case FloatValue(value) => {
+                                val tail = cases.filter(!_.expr.hasFloatValue())
+                                val head = cases.filter(c => c.expr.hasFloatValue() && c.expr.getFloatValue() == value).flatMap(x => Compiler.compile(x.instr))
+                                if (tail.isEmpty){
+                                    head
+                                }
+                                else{
+                                    val vari = context.getFreshVariable(Utils.typeof(swit.value))
+                                    vari.assign("=", swit.value) ::: head ::: 
+                                    tail.flatMap(x => ifs(If(switchComp(LinkedVariableValue(vari), x.expr), x.instr, List())))
+                                }
+                            }
+                            case EnumIntValue(value) => {
+                                val tail = cases.filter(!_.expr.hasIntValue())
+                                val head = cases.filter(c => c.expr.hasIntValue() && c.expr.getIntValue() == value).flatMap(x => Compiler.compile(x.instr))
+                                if (tail.isEmpty){
+                                    head
+                                }
+                                else{
+                                    val vari = context.getFreshVariable(Utils.typeof(swit.value))
+                                    vari.assign("=", swit.value) ::: head ::: 
+                                    tail.flatMap(x => ifs(If(switchComp(LinkedVariableValue(vari), x.expr), x.instr, List())))
+                                }
+                            }
+                            case _ => {
+                                val vari = context.getFreshVariable(Utils.typeof(swit.value))
+                                vari.assign("=", swit.value) ::: makeTree(vari, cases.filter(_.expr.hasIntValue()).map(x => (x.expr.getIntValue(), x.instr)))::: 
+                                cases.filter(!_.expr.hasIntValue()).flatMap(x => ifs(If(switchComp(LinkedVariableValue(vari), x.expr), x.instr, List())))
+                            }
                         }
-                        case LinkedVariableValue(vari, selector) => {
-                            LinkedVariableValue(vari.tupleVari.head)
+                    }
+                    case TupleType(sub) => {
+                        def getHead(expr: Expression): Expression = {
+                            expr match
+                                case TupleValue(values) if values.isDefinedAt(0) => values.head
+                                case VariableValue(name, selector) => getHead(LinkedVariableValue(context.getVariable(name), selector))
+                                case LinkedVariableValue(vari, selector) if vari.canBeReduceToLazyValue => {
+                                    getHead(vari.lazyValue)
+                                }
+                                case LinkedVariableValue(vari, selector) => {
+                                    LinkedVariableValue(vari.tupleVari.head)
+                                }
+                                case other => throw new Exception(f"Not a valid tupple: $other for a switch")
                         }
-                        case other => throw new Exception(f"Not a valid tupple: $other for a switch")
-                }
-                def getTail(expr: Expression): Expression = {
-                    expr match
-                        case TupleValue(values) => TupleValue(values.tail)
-                        case VariableValue(name, selector) => getTail(LinkedVariableValue(context.getVariable(name), selector))
-                        case LinkedVariableValue(vari, selector) if vari.canBeReduceToLazyValue => {
-                            getTail(vari.lazyValue)
+                        def getTail(expr: Expression): Expression = {
+                            expr match
+                                case TupleValue(values) => TupleValue(values.tail)
+                                case VariableValue(name, selector) => getTail(LinkedVariableValue(context.getVariable(name), selector))
+                                case LinkedVariableValue(vari, selector) if vari.canBeReduceToLazyValue => {
+                                    getTail(vari.lazyValue)
+                                }
+                                case LinkedVariableValue(vari, selector) => {
+                                    val TupleType(inner) = vari.getType(): @unchecked
+                                    val fake = Variable(vari.context, vari.name, TupleType(inner.tail), vari.modifiers)
+                                    fake.tupleVari = vari.tupleVari.tail
+                                    LinkedVariableValue(fake)
+                                }
+                                case other => throw new Exception(f"Not a valid tupple: $other for a switch")
                         }
-                        case LinkedVariableValue(vari, selector) => {
-                            val TupleType(inner) = vari.getType(): @unchecked
-                            val fake = Variable(vari.context, vari.name, TupleType(inner.tail), vari.modifiers)
-                            fake.tupleVari = vari.tupleVari.tail
-                            LinkedVariableValue(fake)
+                        
+                        if (sub.size == 1){
+                            switch(Switch(getHead(expr), flattenSwitchCase(swit.cases).map(c => SwitchCase(getHead(c.expr), c.instr))))
                         }
-                        case other => throw new Exception(f"Not a valid tupple: $other for a switch")
+                        else{
+                            val cases = flattenSwitchCase(swit.cases).groupBy(c => getHead(c.expr))
+                                                .map((g, cases) => SwitchCase(g, Switch(getTail(expr), cases.map(c => SwitchCase(getTail(c.expr), c.instr)))))
+                                                .toList
+                                                
+                            switch(Switch(getHead(expr), cases))
+                        }
+                    }
                 }
-                
-                if (sub.size == 1){
-                    switch(Switch(getHead(expr), flattenSwitchCase(swit.cases).map(c => SwitchCase(getHead(c.expr), c.instr))))
-                }
-                else{
-                    val cases = flattenSwitchCase(swit.cases).groupBy(c => getHead(c.expr))
-                                          .map((g, cases) => SwitchCase(g, Switch(getTail(expr), cases.map(c => SwitchCase(getTail(c.expr), c.instr)))))
-                                          .toList
-                                          
-                    switch(Switch(getHead(expr), cases))
-                }
-            }
     }
 
     def makeTree(cond: Variable, values: List[(Int, Instruction)])(implicit context: Context):List[IRTree] = {

@@ -1,0 +1,21 @@
+scoreboard players operation default.test.array.get._0 tbms.var = default.test.array.get.index tbms.var
+execute if score default.test.array.get._0 tbms.var matches 0..2 run function default:zzz_sl_block/26
+execute if score default.test.array.get._0 tbms.var matches 3..5 run function default:zzz_sl_block/27
+execute if score default.test.array.get._0 tbms.var matches 6..7 run function default:zzz_sl_block/28
+execute if score default.test.array.get._0 tbms.var matches 8..10 run function default:zzz_sl_block/29
+execute if score default.test.array.get._0 tbms.var matches 11..12 run function default:zzz_sl_block/30
+execute if score default.test.array.get._0 tbms.var matches 13..15 run function default:zzz_sl_block/31
+execute if score default.test.array.get._0 tbms.var matches 16..18 run function default:zzz_sl_block/32
+execute if score default.test.array.get._0 tbms.var matches 19..20 run function default:zzz_sl_block/33
+execute if score default.test.array.get._0 tbms.var matches 21..23 run function default:zzz_sl_block/34
+execute if score default.test.array.get._0 tbms.var matches 24..25 run function default:zzz_sl_block/35
+execute if score default.test.array.get._0 tbms.var matches 26..28 run function default:zzz_sl_block/36
+execute if score default.test.array.get._0 tbms.var matches 29..31 run function default:zzz_sl_block/37
+execute if score default.test.array.get._0 tbms.var matches 32..33 run function default:zzz_sl_block/38
+execute if score default.test.array.get._0 tbms.var matches 34..36 run function default:zzz_sl_block/39
+execute if score default.test.array.get._0 tbms.var matches 37..38 run function default:zzz_sl_block/40
+execute if score default.test.array.get._0 tbms.var matches 39..41 run function default:zzz_sl_block/41
+execute if score default.test.array.get._0 tbms.var matches 42..44 run function default:zzz_sl_block/42
+execute if score default.test.array.get._0 tbms.var matches 45..46 run function default:zzz_sl_block/43
+execute if score default.test.array.get._0 tbms.var matches 47..49 run function default:zzz_sl_block/44
+execute if score default.test.array.get._0 tbms.var matches 50..51 run function default:zzz_sl_block/45

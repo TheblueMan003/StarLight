@@ -88,18 +88,21 @@ class object{
     private int __ref
     private int __refCount
 
+    def __init__(){
+    }
     def __addRef(){
-        __refCount++
+        if (__refCount >= 0)__refCount++
     }
     def virtual __destroy__(){
     }
     def __remRef(){
-        __refCount--
-        if (__refCount <= 0){
+        if (__refCount > 0) __refCount--
+        if (__refCount == 0){
             __destroy__()
             /kill
         }
     }
+
     static lazy object __initInstance(mcobject clazz, mcobject entity = minecraft:marker){
         __totalRefCount++
         if (Compiler.isJava()){
@@ -138,6 +141,51 @@ class object{
             with(@e[tag=!object.__tagged]){
                 object.__ref = __totalRefCount
                 object.__refCount = 1
+                /tag @s add __class__
+                Compiler.addClassTags(clazz)
+            }
+        }
+        return __totalRefCount
+    }
+
+    static lazy object __initUnbounded(mcobject clazz, mcobject entity = minecraft:marker){
+        __totalRefCount++
+        if (Compiler.isJava()){
+            lazy string namespaceName = Compiler.getNamespace(entity)
+            if (namespaceName == "blockbench"){
+                /tag @e[tag=!object.__tagged] add object.__tagged
+                lazy var e = Compiler.blockbenchSummon(entity)
+                with(@e[tag=!object.__tagged] in e){
+                    object.__ref = __totalRefCount
+                    object.__refCount = -1
+                    /tag @s add __class__
+                    Compiler.addClassTags(clazz)
+                }
+            }
+            else{
+                Compiler.insert($entity, entity){
+                    /summon $entity ~ ~ ~ {Tags:["__class__","cls_trg"]}
+                }
+                with(@e[tag=cls_trg]){
+                    object.__ref = __totalRefCount
+                    object.__refCount = -1
+                    /tag @s remove cls_trg
+                    Compiler.addClassTags(clazz)
+                }
+            }
+        }
+        if (Compiler.isBedrock()){
+            if (entity == minecraft:marker){
+                entity = sl:marker
+            }
+            /tag @e[tag=!object.__tagged] add object.__tagged
+            def lazy summon_(mcobject $entity){
+                /summon $entity
+            }
+            summon_(entity)
+            with(@e[tag=!object.__tagged]){
+                object.__ref = __totalRefCount
+                object.__refCount = -1
                 /tag @s add __class__
                 Compiler.addClassTags(clazz)
             }

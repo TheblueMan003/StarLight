@@ -51,7 +51,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 		val parent = context.getCurrentVariable()
 		val parentClass = context.getCurrentClass()
 
-		if (parentClass!=null && getType() == parentClass.definingType && !skipClassCheck) return
+		//if (parentClass!=null && getType() == parentClass.definingType && !skipClassCheck) return
 
 		wasGenerated = true
 
@@ -1240,7 +1240,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 									val entity = clazz.getEntity()
 									val initarg = List(StringValue(clazz.fullName))::: (if entity != null then List(entity) else List())
 									
-									assign("=", FunctionCallValue(VariableValue("object.__initInstance"), initarg, List()))
+									assign("=", FunctionCallValue(VariableValue("object.__initUnbounded"), initarg, List()))
 									::: context.getFunction(name + ".__init__", args, List(), getType(), false).call()
 								}
 								catch{

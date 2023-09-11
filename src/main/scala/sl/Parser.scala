@@ -340,7 +340,7 @@ object Parser extends StandardTokenParsers{
   def exprAnd: Parser[Expression] = positioned(exprBitwiseOr ~ rep("&&" ~> exprAnd) ^^ {unpack("&&", _)})
   def exprOr: Parser[Expression] = positioned(exprAnd ~ rep("||" ~> exprOr) ^^ {unpack("||", _)})
   def exprAs: Parser[Expression] = positioned(exprOr ~ rep(":>" ~> types) ^^ {unpackCast(_)})
-  def exprForSelect: Parser[Expression] = positioned(exprAs ~ rep("for" ~> ident2 ~ "in" ~ exprNoTuple) ^^ {unpackForSelect(_)})
+  def exprForSelect: Parser[Expression] = positioned(exprAs ~ rep("for" ~> (ident2 | stringLit) ~ "in" ~ exprNoTuple) ^^ {unpackForSelect(_)})
   def exprNoTuple = lambda | position | exprForSelect | positionExpr
   def expr: Parser[Expression] = positioned(rep1sep(exprNoTuple, ",") ^^ (p => if p.length == 1 then p.head else TupleValue(p)))
 

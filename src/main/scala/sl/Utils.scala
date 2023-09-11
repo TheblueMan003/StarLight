@@ -477,7 +477,7 @@ object Utils{
             }
             case InstructionBlock(list) => {
                 val set2 = getFreeVar(instr) ++ ignore
-                InstructionList(list.map(fix(_)(context, set2)))
+                InstructionBlock(list.map(fix(_)(context, set2)))
             }
 
             case TemplateDecl(name, block, modifier, parent, generics, parentGenerics) => TemplateDecl(name, fix(block), modifier, parent, generics, parentGenerics.map(fix(_)(context, ignore ++ generics.map(Identifier.fromString(_)).toSet)))

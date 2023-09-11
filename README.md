@@ -204,6 +204,26 @@ else{
 ```
 If a case is always true if will be remove the other following cases in the output code. If a case is always false it will be removed from the output code.
 
+The compiler allow a special expression to test condition on multiple entities at once.
+The following code will only say hi if value is true for all player.
+```
+if (value for all in @a){
+    /say hi
+}
+```
+The following code will only say hi if value is true for any player.
+```
+if (value for any in @a){
+    /say hi
+}
+```
+The following code will only say hi if value is false for all player.
+```
+if (value for none in @a){
+    /say hi
+}
+```
+
 ### Switch
 A more simplier way of having multiple if is to use a switch statement:
 ```
@@ -233,6 +253,15 @@ switch(a){
 }
 ```
 In that case it will build nested trees.
+
+You can also an auto generated switch with the following format:
+```
+int value
+switch(value for t in 0..10){
+    t -> print(t)
+}
+```
+Note: This is used to precompute operation that cannot be computed in Minecraft. Example: String concatenation with a number, Getting value from lazy json variable, etc.
 
 ### Loop
 The language also support the following loop: for, while, do while with a c like syntax:
