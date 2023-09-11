@@ -313,6 +313,12 @@ with(@a, true, a == 0){
 with(@a, false, a == 0){
     do_stuff()
 }
+with(@e){
+    do_stuff()
+}
+else{
+    do_stuff_if_no_entity()
+}
 ```
 
 (Java Only)

@@ -83,7 +83,7 @@ object Parser extends StandardTokenParsers{
       | "return" ~> expr ^^ (Return(_))
       | block
       | switch | whileLoop | doWhileLoop | forLoop | repeatLoop | jsonFile
-      | "as" ~"("~> exprNoTuple ~")"~ instruction ^^ {case e ~ _ ~ i => With(e, BoolValue(false), BoolValue(true), i)}
+      | "as" ~"("~> exprNoTuple ~")"~ instruction ^^ {case e ~ _ ~ i => With(e, BoolValue(false), BoolValue(true), i, null)}
       | "at" ~"(" ~> repsep(exprNoTuple, ",") ~ ")"~ instruction ^^ {case e ~ _ ~ i => Execute(AtType, e, i)}
       | rotated1
       | rotated2
@@ -158,9 +158,9 @@ object Parser extends StandardTokenParsers{
   def repeatLoop: Parser[Instruction] = positioned(("repeat" ~> "(" ~> exprNoTuple <~ ")") ~ instruction ^^ 
     {case value ~ intr => FunctionCall(Identifier.fromString("__repeat__"), List(value, LambdaValue(List(), intr, null)), List())})
   def withInstr: Parser[Instruction] = positioned(
-    ("with" ~> "(" ~> exprNoTuple <~ ")") ~ instruction ^^ (p => With(p._1, BoolValue(false), BoolValue(true), p._2))
-      | (("with" ~> "(" ~> exprNoTuple <~ ",") ~ exprNoTuple <~ ")") ~ instruction ^^ (p => With(p._1._1, p._1._2, BoolValue(true), p._2))
-      | ((("with" ~> "(" ~> exprNoTuple <~ ",") ~ exprNoTuple <~ ",") ~ exprNoTuple <~ ")") ~ instruction ^^ (p => With(p._1._1._1, p._1._1._2, p._1._2, p._2)))
+    ("with" ~> "(" ~> exprNoTuple <~ ")") ~ instruction ~ opt("else" ~> instruction) ^^ {case sel ~ intr ~ elze => With(sel, BoolValue(false), BoolValue(true), intr, elze.getOrElse(null))}
+      | (("with" ~> "(" ~> exprNoTuple <~ ",") ~ exprNoTuple <~ ")") ~ instruction ~ opt("else" ~> instruction) ^^ {case sel ~ isat ~ intr ~ elze => With(sel, isat, BoolValue(true), intr, elze.getOrElse(null))}
+      | ((("with" ~> "(" ~> exprNoTuple <~ ",") ~ exprNoTuple <~ ",") ~ exprNoTuple <~ ")") ~ instruction ~ opt("else" ~> instruction) ^^ {case sel ~ isat ~ cond ~ intr ~ elze => With(sel, isat, cond, intr, elze.getOrElse(null))})
   def switch: Parser[Switch] = positioned(("switch" ~> exprNoTuple <~ "{") ~ rep(switchCase) <~ "}" ^^ (p => Switch(p._1, p._2)))
         
   def switchCaseBase: Parser[SwitchCase] = 

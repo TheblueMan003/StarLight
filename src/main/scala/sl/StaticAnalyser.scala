@@ -40,7 +40,7 @@ object StaticAnalyser{
                                                                     case x: SwitchForEach => SwitchForEach(x.key, x.provider, SwitchCase(x.instr.expr, check(x.instr.instr)));
                                                                     })
             case Execute(typ, exprs, block) => Execute(typ, exprs, check(block))
-            case With(expr, isat, cond, block) => With(expr, isat, cond, check(block))
+            case With(expr, isat, cond, block, elze) => With(expr, isat, cond, check(block), check(elze))
             case Try(block, except, finallyBlock) => Try(check(block), check(except), check(finallyBlock))
             case FunctionDecl(name, block, typ, args, typeArgs, modifier) => 
                 val newBlock = check(block)
@@ -87,7 +87,7 @@ object StaticAnalyser{
                                                     case x: SwitchForEach => hasReturn(x.instr.instr);
                                                     }.foldLeft(ReturnState.None)(ReturnState.combine)
             case Execute(typ, exprs, block) => hasReturn(block)
-            case With(expr, isat, cond, block) => hasReturn(block)
+            case With(expr, isat, cond, block, elze) => ReturnState.combine(hasReturn(block), hasReturn(elze))
             case ForEach(key, provider, instr) => hasReturn(instr)
             case ForGenerate(key, provider, instr) => hasReturn(instr)
             case _ => ReturnState.None
@@ -116,7 +116,7 @@ object StaticAnalyser{
                 Switch(value, newCases, default)
             }
             case Execute(typ, exprs, block) => Execute(typ, exprs, returnOne(block))
-            case With(expr, isat, cond, block) => With(expr, isat, cond, returnOne(block))
+            case With(expr, isat, cond, block, elze) => With(expr, isat, cond, returnOne(block), returnOne(elze))
             case ForEach(key, provider, instr) => 
                 hasReturn(instr) match
                     case ReturnState.None => ForEach(key, provider, instr)

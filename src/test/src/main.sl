@@ -26,8 +26,11 @@ class B extends A{
 }
 
 def test(){
-    A a = new A()
-    DamageData dmg = new DamageData(DamageType.Fire, 10)
-    a.damage(dmg)
+    with(@e[type=pig]){
+        /say there is a pig
+    }
+    else{
+        /say there is no pig
+    }
 }
 

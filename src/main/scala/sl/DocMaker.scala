@@ -59,7 +59,7 @@ object DocMaker{
             case PredicateDecl(name, args, block, modifier) if modifier.protection != Private => 
                 ContentMaker.h2(modifier.schema()+" predicate "+name)+
                 ContentMaker.p(modifier.doc)+"\n\n"
-            case With(expr, isat, cond, block) => make2(block)
+            case With(expr, isat, cond, block, elze) => make2(block) + "\n\n" + make2(elze)
             case _ => ""
     }
 }

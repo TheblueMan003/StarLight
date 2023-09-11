@@ -546,7 +546,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 			pref ::: assign(op, vari)
 		}
 		else if (sel != Selector.self){
-			Compiler.compile(With(SelectorValue(sel), BoolValue(true), BoolValue(true), VariableAssigment(List((Right(this),selector)), op, FunctionCallValue(name, args, List(), Selector.self))))
+			Compiler.compile(With(SelectorValue(sel), BoolValue(true), BoolValue(true), VariableAssigment(List((Right(this),selector)), op, FunctionCallValue(name, args, List(), Selector.self)), null))
 		}
 		else{
 			name match
@@ -1426,7 +1426,7 @@ class PropertySetVariable(context: Context, getter: Function, setter: Function, 
 		if (op == ":=") throw new Exception("Operator not supported for Properties")
 		if (op == "="){
 			if (selector != Selector.self){
-				Compiler.compile(With(SelectorValue(selector), BoolValue(true), BoolValue(true), LinkedFunctionCall(setter, List(value))))
+				Compiler.compile(With(SelectorValue(selector), BoolValue(true), BoolValue(true), LinkedFunctionCall(setter, List(value)), null))
 			}
 			else{
 				(setter,List(value)).call()

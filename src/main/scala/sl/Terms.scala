@@ -150,8 +150,8 @@ case object AlignType extends ExecuteType
 case class Execute(val typ: ExecuteType, val exprs: List[Expression], val block: Instruction) extends Instruction {
   override def toString() = f"$typ $exprs $block"
 }
-case class With(val expr: Expression, val isat: Expression, val cond: Expression, val block: Instruction) extends Instruction {
-  override def toString() = f"with($expr, $isat, $cond) $block"
+case class With(val expr: Expression, val isat: Expression, val cond: Expression, val block: Instruction, val elze: Instruction) extends Instruction {
+  override def toString() = f"with($expr, $isat, $cond) $block else $elze"
 }
 
 case class JSONFile(val name: String, val json: Expression, val modifier: Modifier) extends Instruction {

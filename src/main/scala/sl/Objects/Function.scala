@@ -355,7 +355,7 @@ class TagFunction(context: Context, _contextName: String, name: String, argument
         val normal: List[Instruction] = getFunctions().filter(f => f.clazz == null && f.arguments.size == 0).map(LinkedFunctionCall(_, argumentsVariables.map(LinkedVariableValue(_)))).toList
         val clazz: List[Instruction] = getFunctions().filter(f => f.clazz != null && f.arguments.size == 0).map(f => {
             With(SelectorValue(JavaSelector("@e",List(("tag", SelectorIdentifier(f.clazz.getTag()))))), BoolValue(true), BoolValue(true),
-            LinkedFunctionCall(f, argumentsVariables.map(LinkedVariableValue(_))))}).toList
+            LinkedFunctionCall(f, argumentsVariables.map(LinkedVariableValue(_))), null)}).toList
 
         content = sl.Compiler.compile(InstructionList(normal ::: clazz))(context.push(name, this))
     }
@@ -390,7 +390,8 @@ class ClassFunction(_contextName: String, variable: Variable, function: Function
                 selector, 
                 BoolValue(false), 
                 BinaryOperation("==", LinkedVariableValue(comp), LinkedVariableValue(ctx.root.push("object").getVariable("__ref"))),
-                LinkedFunctionCall(function, args3, ret)
+                LinkedFunctionCall(function, args3, ret),
+                null
                 ))
         }
 

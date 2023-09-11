@@ -75,6 +75,13 @@ object Execute{
         ifs(If(whl.cond, LinkedFunctionCall(block, List(), null), List()))
     }
     def withInstr(ass: With)(implicit context: Context):List[IRTree] = {
+        if (ass.elze != null){
+            val vari = context.getFreshVariable(BoolType)
+            return vari.assign("=", BoolValue(true))::: 
+                withInstr(With(ass.expr, ass.isat, ass.cond, InstructionList(List(VariableAssigment(List((Right(vari), Selector.self)), "=", BoolValue(false)), ass.block)), null)):::
+                Execute.ifs(If(LinkedVariableValue(vari), ass.elze, List()))
+        }
+
         def apply(keyword: IRTree=>IRTree, ctx: Context)={
             val (pref2, cases) = getIfCase(Utils.simplify(ass.cond))
             val tail = getListCase(cases)
@@ -711,19 +718,19 @@ object Execute{
                 filter match{
                     case "all" => {
                         val vari = context.getFreshVariable(BoolType)
-                        val prev = vari.assign("=", BoolValue(true)) ::: Compiler.compile(With(selector, BoolValue(true), BoolValue(true), If(UnaryOperation("!", expr), VariableAssigment(List((Right(vari), Selector.self)), "=", BoolValue(false)), List())))(context)
+                        val prev = vari.assign("=", BoolValue(true)) ::: Compiler.compile(With(selector, BoolValue(true), BoolValue(true), If(UnaryOperation("!", expr), VariableAssigment(List((Right(vari), Selector.self)), "=", BoolValue(false)), List()), null))(context)
                         val (p, c) = getIfCase(LinkedVariableValue(vari))
                         (prev ::: p, c)
                     }
                     case "none" => {
                         val vari = context.getFreshVariable(BoolType)
-                        val prev = vari.assign("=", BoolValue(false)) ::: Compiler.compile(With(selector, BoolValue(true), BoolValue(true), If(expr, VariableAssigment(List((Right(vari), Selector.self)), "=", BoolValue(true)), List())))(context)
+                        val prev = vari.assign("=", BoolValue(false)) ::: Compiler.compile(With(selector, BoolValue(true), BoolValue(true), If(expr, VariableAssigment(List((Right(vari), Selector.self)), "=", BoolValue(true)), List()), null))(context)
                         val (p, c) = getIfCase(LinkedVariableValue(vari))
                         (prev ::: p, c)
                     }
                     case "any" => {
                         val vari = context.getFreshVariable(BoolType)
-                        val prev = vari.assign("=", BoolValue(false)) ::: Compiler.compile(With(selector, BoolValue(true), BoolValue(true), If(expr, VariableAssigment(List((Right(vari), Selector.self)), "=", BoolValue(true)), List())))(context)
+                        val prev = vari.assign("=", BoolValue(false)) ::: Compiler.compile(With(selector, BoolValue(true), BoolValue(true), If(expr, VariableAssigment(List((Right(vari), Selector.self)), "=", BoolValue(true)), List()), null))(context)
                         val (p, c) = getIfCase(LinkedVariableValue(vari))
                         (prev ::: p, c)
                     }
