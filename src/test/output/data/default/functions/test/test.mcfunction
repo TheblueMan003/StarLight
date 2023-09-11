@@ -1,21 +1,10 @@
-execute positioned ~-10 0 0 run summon creeper
-execute positioned ~-9 0 0 run summon creeper
-execute positioned ~-8 0 0 run summon creeper
-execute positioned ~-7 0 0 run summon creeper
-execute positioned ~-6 0 0 run summon creeper
-execute positioned ~-5 0 0 run summon creeper
-execute positioned ~-4 0 0 run summon creeper
-execute positioned ~-3 0 0 run summon creeper
-execute positioned ~-2 0 0 run summon creeper
-execute positioned ~-1 0 0 run summon creeper
-execute positioned ~0 0 0 run summon creeper
-execute positioned ~1 0 0 run summon creeper
-execute positioned ~2 0 0 run summon creeper
-execute positioned ~3 0 0 run summon creeper
-execute positioned ~4 0 0 run summon creeper
-execute positioned ~5 0 0 run summon creeper
-execute positioned ~6 0 0 run summon creeper
-execute positioned ~7 0 0 run summon creeper
-execute positioned ~8 0 0 run summon creeper
-execute positioned ~9 0 0 run summon creeper
-execute positioned ~10 0 0 run summon creeper
+execute as @e[tag=__class__] if score default.test.test.a tbms.var = @s default.object.__ref run function default:object/__rem-ref
+scoreboard players add default.__totalRefCount tbms.var 1
+summon minecraft:marker ~ ~ ~ {Tags:["__class__","cls_trg"]}
+execute as @e[tag=cls_trg] run function default:zzz_sl_block/1
+scoreboard players operation default.test.test.a tbms.var = default.__totalRefCount tbms.var
+scoreboard players set default.test.test.dmg.__init__.type tbms.var 0
+scoreboard players set default.test.test.dmg.__init__.amount tbms.var 10
+scoreboard players operation default.test.test.dmg.type tbms.var = default.test.test.dmg.__init__.type tbms.var
+scoreboard players operation default.test.test.dmg.amount tbms.var = default.test.test.dmg.__init__.amount tbms.var
+execute as @e[tag=__class__] if score default.test.test.a tbms.var = @s default.object.__ref run function default:zzz_sl_block/3

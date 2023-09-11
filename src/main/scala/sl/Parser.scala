@@ -69,6 +69,7 @@ object Parser extends StandardTokenParsers{
       | ((identFunction ~ typeVariables <~ "(") ~ repsep(exprNoTuple, ",")) <~ ")" ^^ {case f ~ t ~ e => FunctionCall(f, e, t)} // Function Call
       | packageInstr
       | structDecl
+      | caseStruct
       | classDecl
       | caseClassDecl
       | identLazy2 <~ ("+" ~ "+") ^^ (p => VariableAssigment(List((Left(p), Selector.self)), "+=", IntValue(1)))
@@ -115,7 +116,7 @@ object Parser extends StandardTokenParsers{
   def packageInstr: Parser[Instruction] = positioned("package" ~> identLazy2 ~ program ^^ (p => Package(p._1, p._2)))
   def classDecl: Parser[Instruction] = positioned(doc ~ (modifier <~ "class") ~ identLazy ~ typeArgument ~ opt("extends" ~> ident2) ~ rep("with" ~> namespacedName ~ "for" ~ ident) ~ block ^^ 
   { case doc ~ mod ~ iden ~ typeargs ~ par ~ entity ~ block => ClassDecl(iden, typeargs, block, mod.withDoc(doc), par, entity.map{ case e ~ _ ~ n => (n, e)}.toMap) })
-  def caseClassDecl: Parser[Instruction] = positioned(doc ~ (modifier <~ "class") ~ identLazy ~ typeArgument ~ arguments ~ opt("extends" ~> ident2) ~ rep("with" ~> namespacedName ~ "for" ~ ident) ~ block ^^ {
+  def caseClassDecl: Parser[Instruction] = positioned(doc ~ (modifier <~ opt("case") ~ "class") ~ identLazy ~ typeArgument ~ arguments ~ opt("extends" ~> ident2) ~ rep("with" ~> namespacedName ~ "for" ~ ident) ~ block ^^ {
     case doc ~ mod ~ iden ~ typeargs ~ arguments ~ par ~ entity ~ block => 
       val fieldsDecl = arguments.map{ case Argument(n, t, _) => VariableDecl(List(n), t, Modifier.newPublic(), null, null) }
       val fields = arguments.map{ case Argument(n, t, _) => (Left[Identifier, Variable](Identifier.fromString(f"this.$n")), Selector.self) }
@@ -123,6 +124,20 @@ object Parser extends StandardTokenParsers{
       val constructor = FunctionDecl("__init__", VariableAssigment(fields, "=", argu), VoidType, arguments, List(), Modifier.newPublic())
       ClassDecl(iden, typeargs, InstructionList(fieldsDecl ::: List(constructor, block)), mod.withDoc(doc), par, entity.map{ case e ~ _ ~ n => (n, e)}.toMap)
   })
+
+  def getCaseClassIntruction(args: List[Argument], rest: Option[Instruction]): Instruction ={
+    InstructionBlock(
+      args.map(a => VariableDecl(List(a.name), a.typ, Modifier.newPublic(), null, null)) ::: 
+      List(FunctionDecl("__init__", InstructionList(
+        args.map(a => VariableAssigment(List((Left(Identifier.fromString(f"this.${a.name}")), Selector.self)), "=", VariableValue(a.name)))
+        ), VoidType, args, List(), Modifier.newPublic()),
+        rest.getOrElse(InstructionList(List()))
+      )
+    )
+  }
+
+  def caseStruct: Parser[Instruction] = positioned(doc ~ (modifier <~ opt("case") ~ "struct") ~ identLazy ~ typeArgument ~ arguments ~ opt("extends" ~> ident2) ~ opt(block) ^^ 
+  { case doc ~ mod ~ iden ~ typeargs ~ args ~ par ~ block => StructDecl(iden, typeargs,  getCaseClassIntruction(args, block), mod.withDoc(doc), par) })
   def structDecl: Parser[Instruction] = positioned(doc ~ (modifier <~ "struct") ~ identLazy ~ typeArgument ~ opt("extends" ~> ident2) ~ block ^^ 
   { case doc ~ mod ~ iden ~ typeargs ~ par ~ block => StructDecl(iden, typeargs, block, mod.withDoc(doc), par) })
   def typedefInner: Parser[(String, Type, String)] = types ~ identLazy ~ opt("for" ~> identLazy) ^^ { case typ ~ str1 ~ str2 => (str1, typ, str2.getOrElse("")) }
@@ -333,7 +348,8 @@ object Parser extends StandardTokenParsers{
   def exprNotIn: Parser[Expression] = positioned(exprComp ~ rep("not" ~> "in" ~> exprNotIn) ^^ {unpack("not in", _)})
   def exprIn: Parser[Expression] = positioned(exprNotIn ~ rep("in" ~> exprIn) ^^ {unpack("in", _)})
   def exprIs: Parser[Expression] = positioned((exprIn ~ opt("is" ~ types)) ^^ {case e ~ Some(_ ~ t) => IsType(e, t);case e ~ None => e})
-  def exprShiftRight: Parser[Expression] = positioned(exprIs ~ rep(">>" ~> exprShiftRight) ^^ {unpack(">>", _)})
+  def exprIsNot: Parser[Expression] = positioned((exprIs ~ opt("is" ~ "not" ~ types)) ^^ {case e ~ Some(_ ~ t) => UnaryOperation("!", IsType(e, t));case e ~ None => e})
+  def exprShiftRight: Parser[Expression] = positioned(exprIsNot ~ rep(">>" ~> exprShiftRight) ^^ {unpack(">>", _)})
   def exprShiftLeft: Parser[Expression] = positioned(exprShiftRight ~ rep("<<" ~> exprShiftLeft) ^^ {unpack("<<", _)})
   def exprBitwiseAnd: Parser[Expression] = positioned(exprShiftLeft ~ rep("&" ~> exprBitwiseAnd) ^^ {unpack("&", _)})
   def exprBitwiseOr: Parser[Expression] = positioned(exprBitwiseAnd ~ rep("|" ~> exprBitwiseOr) ^^ {unpack("|", _)})
