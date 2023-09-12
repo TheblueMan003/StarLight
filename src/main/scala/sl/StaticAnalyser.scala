@@ -56,7 +56,7 @@ object StaticAnalyser{
                     FunctionDecl(name, block, typ, args, typeArgs, modifier)
                 else
                     FunctionDecl(name, finalBlock, typ, args, typeArgs, modifier)
-            case ClassDecl(name, generics, block, modifier, parent, entity) => ClassDecl(name, generics, check(block), modifier, parent, entity)
+            case ClassDecl(name, generics, block, modifier, parent, parentGenerics, interfaces, entity) => ClassDecl(name, generics, check(block), modifier, parent, parentGenerics, interfaces, entity)
             case StructDecl(name, generics, block, modifier, parent) => StructDecl(name, generics, check(block), modifier, parent)
             case ForEach(key, provider, instr) => ForEach(key, provider, check(instr))
             case ForGenerate(key, provider, instr) => ForGenerate(key, provider, check(instr))

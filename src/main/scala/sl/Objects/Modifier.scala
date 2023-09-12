@@ -2,6 +2,8 @@ package objects
 
 import scala.collection.mutable.ArrayBuffer
 import sl.*
+import IR.CommentsIR
+import sl.IR.IRTree
 
 object Modifier{
     def newPrivate()= {
@@ -36,6 +38,15 @@ class Modifier() extends Serializable{
     var tags = ArrayBuffer[String]()
     var attributes = Map[String,Expression]()
     var doc: String = ""
+
+    def getDocAsIR(): List[IRTree] = {
+        if (Settings.exportDoc && doc != ""){
+            List(CommentsIR("="*50+"\n"+doc+"\n"+"="*50))
+        }
+        else{
+            List()
+        }
+    }
 
     def simplify()(implicit context: Context) = {
         attributes = attributes.map(pair => (pair._1, Utils.simplify(pair._2)(context)))

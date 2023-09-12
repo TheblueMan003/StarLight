@@ -72,7 +72,8 @@ object Compiler{
     def compile(instruction: Instruction, meta: Meta = Meta(false, false))(implicit context: Context):List[IRTree]={   
         try{
             instruction match{
-                case FunctionDecl(name2, block, typ2, args, typevars, modifier) =>{
+                case FunctionDecl(name3, block, typ2, args, typevars, modifier) =>{
+                    val name2 = if context.getCurrentClass() != null && name3 == "this" then "__init__" else name3
                     val name = if (name2 == "~") then context.getFreshLambdaName() else name2
                     var fname = context.getFunctionWorkingName(name)
                     modifier.simplify()
@@ -115,14 +116,14 @@ object Compiler{
                     }
                     List()
                 }
-                case ClassDecl(name, generics, block, modifier, parent, entity) => {
+                case ClassDecl(name, generics, block, modifier, parent, parentGenerics, interfaces, entity) => {
                     modifier.simplify()
                     if (!meta.firstPass){
                         val parentName = parent match
                             case None => null
                             case Some(p) => Identifier.fromString(p)
                         
-                        context.addClass(new Class(context, name, generics, modifier, block.unBlockify(), parentName, entity))
+                        context.addClass(new Class(context, name, generics, modifier, block.unBlockify(), parentName, parentGenerics, interfaces.map(x => (Identifier.fromString(x._1), x._2)), entity))
                     }
                     List()
                 }

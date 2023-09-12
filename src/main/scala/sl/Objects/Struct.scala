@@ -5,6 +5,7 @@ import sl.{Instruction, InstructionList}
 
 class Struct(context: Context, name: String, val generics: List[String], _modifier: Modifier, val block: Instruction, val parentName: Identifier) extends CObject(context, name, _modifier){
     lazy val parent = if (parentName == null) null else context.getStruct(parentName)
+    var definingType = StructType(this, List())
     def getBlock(): Instruction = {
         if (parent != null){
             InstructionList(List(parent.getBlock(), block.unBlockify()))

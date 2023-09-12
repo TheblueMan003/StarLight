@@ -77,6 +77,6 @@ class Predicate(context: Context, name: String, val arguments: List[Argument], _
     }
 
     def getIRFiles(): List[IRFile] = {
-        files.map((name, content) => IRFile(name, name, content, true)).toList
+        files.map((name, content) => IRFile(name, name, content, List(), true)).toList
     }
 }

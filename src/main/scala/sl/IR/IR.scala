@@ -33,6 +33,12 @@ case class SBLink(entity: String, objective: String) extends IRTree{
 case class CommandIR(statement: String) extends IRTree{
     def getString(): String = statement
 }
+case object EmptyLineIR extends IRTree{
+    def getString(): String = ""
+}
+case class CommentsIR(statement: String) extends IRTree{
+    def getString(): String = statement.split("\n").map(line => "# "+line).mkString("\n")
+}
 /* 
 case class CommandInsertIR(link: SBLink, vari: String, statement: String) extends IRTree{
     def getString(): String = {

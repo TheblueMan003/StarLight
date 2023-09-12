@@ -9,6 +9,8 @@ import scala.util.Random
 import java.io._
 import java.net.URL
 import java.nio.file.{Files, Paths}
+import sl.JSONElement
+import sl.JsonDictionary
 
 object Downloader{
     val urlbases = List(("https://raw.githubusercontent.com/TheblueMan003/StarLightLibraries/main/published/", "github.com"), ("https://theblueman003.com/StarLightLibraries/published", "theblueman.com"))
@@ -49,6 +51,35 @@ object Downloader{
     def clearCache()={
         hasDownloadedIndex = false
     }
+    private def fetchLibrary(urlbase: String, servername: String, json: JsonDictionary, name: String)={
+        val version = json(name).getArray(-1)
+        val url = version.getDictionary("url").getStringValue
+        val filename = version.getDictionary("filename").getStringValue
+        val versionNumber = version.getDictionary("version").getStringValue
+        
+        Reporter.warning("Downloading "+name+" "+versionNumber+" from "+servername)
+        download(urlbase+url, "libraries/"+filename)
+
+        if (version.getDictionary.contains("resourcespack")){
+            version.getDictionary("resourcespack").getArray.content.foreach(resource => {
+                val url = resource.getDictionary("url").getStringValue
+                val filename = resource.getDictionary("filename").getStringValue
+                val versionNumber = resource.getDictionary("version").getStringValue
+                val game = resource.getDictionary("game").getStringValue
+                
+                Reporter.warning("Downloading resources pack"+name+" "+versionNumber+" from "+servername)
+                if (game == "java"){
+                    download(urlbase+url, "lib/"+filename+"/java_resourcepack")
+                }
+                else if (game == "bedrock"){
+                    download(urlbase+url, "lib/"+filename+"/bedrock_resourcepack")
+                }
+                else{
+                    Reporter.error("Unknown game "+game)
+                }
+            })
+        }
+    }
     def fetchLibrary(name: String):Unit={
         urlbases.find{case (urlbase, servername) => {
             if (!hasDownloadedIndex){
@@ -57,34 +88,17 @@ object Downloader{
             }
             val json = Parser.parseJson(Utils.getFile("libraries/index.json").trim()).getDictionary("libraries").getDictionary
             if (json.contains(name)){
-                val version = json(name).getArray(-1)
-                val url = version.getDictionary("url").getStringValue
-                val filename = version.getDictionary("filename").getStringValue
-                val versionNumber = version.getDictionary("version").getStringValue
-                
-                Reporter.warning("Downloading "+name+" "+versionNumber+" from "+servername)
-                download(urlbase+url, "libraries/"+filename)
-
-                if (version.getDictionary.contains("resourcespack")){
-                    version.getDictionary("resourcespack").getArray.content.foreach(resource => {
-                        val url = resource.getDictionary("url").getStringValue
-                        val filename = resource.getDictionary("filename").getStringValue
-                        val versionNumber = resource.getDictionary("version").getStringValue
-                        val game = resource.getDictionary("game").getStringValue
-                        
-                        Reporter.warning("Downloading resources pack"+name+" "+versionNumber+" from "+servername)
-                        if (game == "java"){
-                            download(urlbase+url, "lib/"+filename+"/java_resourcepack")
-                        }
-                        else if (game == "bedrock"){
-                            download(urlbase+url, "lib/"+filename+"/bedrock_resourcepack")
-                        }
-                        else{
-                            Reporter.error("Unknown game "+game)
-                        }
-                    })
-                }
+                fetchLibrary(urlbase, servername, json, name)
                 true
+            }
+            else if (name.endsWith("._")){
+                val pref = name.substring(0, name.size-1)
+                var found = false
+                json.map.filter(x => x._1.startsWith(pref)).foreach{case (name, version) => {
+                    fetchLibrary(urlbase, servername, json, name)
+                    found = true
+                }}
+                found
             }
             else{
                 false
@@ -122,7 +136,16 @@ object Downloader{
         }
         else{
             fetchLibrary(name)
-            Utils.getFile("libraries/"+name.replace(".","/")+".sl")
+            if (name.endsWith("._")){
+                File("libraries/"+name.substring(0, name.size - 1).replace(".","/")).listFiles().map(file => {
+                    if (file.getName.endsWith(".sl")){
+                        Utils.getFile(file.getAbsoluteFile().toString())
+                    }
+                }).mkString("\n")
+            }
+            else{
+                Utils.getFile("libraries/"+name.replace(".","/")+".sl")
+            }
         }
     }
 }

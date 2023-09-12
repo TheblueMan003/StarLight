@@ -556,7 +556,12 @@ Here is the list of possible operator overloading:
 * `__ne__`: `!=`
 * `__ge__`: `>=`
 * `__gt__`: `>`
-* `__init__`: Constructor
+* `__init__`/`this`: Constructor
+
+It is also possible to cast a json to a struct provided that the name inside the json are the same as inside the struct:
+```
+vector3 a = {x: 0, y: 1, z: 2}
+```
 
 Structs can also be extended. They will recieve all the methode & variable from the parent struct.
 ```

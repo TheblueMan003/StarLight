@@ -17,6 +17,6 @@ class JSONFile(context: Context, _name: String, _modifier: Modifier, _json: JSON
     def isJavaRP(): Boolean = modifiers.hasAttributes("java_rp")(context)
 
     def getIRFile(): IRFile = {
-        IRFile(getName(), name, getContent(), true)
+        IRFile(getName(), name, getContent(), List(), true)
     }
 }

@@ -54,7 +54,7 @@ object DataPackBuilder{
         val writer = new PrintWriter(zip)
         files.foreach { file =>
             val name = file.getPath()
-            val content = file.getContents()
+            val content = file.getFinalContents()
             zip.putNextEntry(new ZipEntry(if name.startsWith("/") then name.drop(1) else name))
             content.foreach(x => writer.println(x.getString()))
             writer.flush()
@@ -75,7 +75,7 @@ object DataPackBuilder{
             Files.copy(originalPath, copied, StandardCopyOption.REPLACE_EXISTING);
         })
         generated.map{case irfile => {
-            val content = irfile.getContents()
+            val content = irfile.getFinalContents()
             val file = irfile.getPath()
             val filename = target+file
             if (!previous.getOrElse(build, Map[String, List[IRTree]]()).contains(filename) || previous.getOrElse(build, Map[String, List[IRTree]]())(filename) != content){
@@ -110,9 +110,9 @@ object DataPackBuilder{
         // Add Generated Files
         generated.groupBy(_.getPath())
         .toList
-        .map((k,v) => v.sortBy(_.getContents().length).head)
+        .map((k,v) => v.sortBy(_.getFinalContents().length).head)
         .foreach { file =>
-            val content = file.getContents()
+            val content = file.getFinalContents()
             val name = file.getPath()
             zip.putNextEntry(new ZipEntry(if name.startsWith("/") then name.drop(1) else name))
             content.foreach(x => writer.println(x.getString()))

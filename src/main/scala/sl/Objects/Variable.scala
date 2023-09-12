@@ -51,10 +51,13 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 		if (wasGenerated)return
 		val parent = context.getCurrentVariable()
 		val parentClass = context.getCurrentClass()
+		val parentStruct = context.getCurrentStructUse()
 
 		if (context.getCurrentFunction() == null || isFunctionArgument){
 			if (parentClass != null && getType() == parentClass.definingType && !skipClassCheck) return
 		}
+		//if (parentStruct != null && getType() == parent.getType())return
+		
 		wasGenerated = true
 		
 
@@ -81,13 +84,15 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 
 				struct.generics.zip(sub).foreach((name, typee) => ctx.addTypeDef(name, typee))
 
-				val block = Utils.subst(struct.getBlock(), "$this", fullName)
-				if (isStructFunctionArgument && context.getCurrentVariable().getType() == getType()){
-					sl.Compiler.compile(Utils.rmFunctions(block))(ctx)
+				val block = Utils.subst(struct.getBlock().unBlockify(), "$this", fullName)
+				
+				if (parent != null && parent.getType() == getType()){
+					sl.Compiler.compile(Utils.rmFunctions(block)(f => f.name != "__init__" && f.name != "this"))(ctx)
 				}
 				else{
 					sl.Compiler.compile(block)(ctx)
 				}
+				
 				tupleVari.foreach(vari => vari.modifiers = vari.modifiers.combine(modifiers))
 			}
 			case ClassType(clazz, sub) => {
@@ -434,6 +439,11 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 	 * Assign binary operator to the variable.
 	 */
 	def assignBinaryOperator(op: String, value: BinaryOperation)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
+		if (value.op == "??"){
+			return Compiler.compile(If(BinaryOperation("==", value.left, NullValue), 
+				VariableAssigment(List((Right(this), selector)), "=", value.right),
+				List(ElseIf(BoolValue(true), VariableAssigment(List((Right(this), selector)), "=", value.left)))))
+		}
 		op match{
 			case "=" => assign("=", value.left) ::: assign(value.op+"=", value.right)
 			case "+=" => {
@@ -1211,6 +1221,9 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					}
 					case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 					case BinaryOperation(op, left, right) => assignBinaryOperator("=", BinaryOperation(op, left, right))
+					case JsonValue(JsonDictionary(map)) if map.forall(x => tupleVari.exists(y => y.name == x._1)) => {
+						map.flatMap(x => tupleVari.find(y => y.name == x._1).get.assign("=", Utils.jsonToExpr(x._2))).toList
+					}
 					case _ => context.getFunction(fullName + ".__set__", List(value), List(), getType(), false).call()
 			}
 			case op => 
@@ -1323,6 +1336,9 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 					case ArrayGetValue(name, index) => handleArrayGetValue(op, name, index)
 					case BinaryOperation(op, left, right) => assignBinaryOperator("=", BinaryOperation(op, left, right))
+					case JsonValue(JsonDictionary(map)) if map.forall(x => tupleVari.exists(y => y.name == x._1)) => {
+						map.flatMap(x => tupleVari.find(y => y.name == x._1).get.assign("=", Utils.jsonToExpr(x._2))).toList
+					}
 					case _ => context.getFunction(name + ".__set__", List(value), List(), getType(), false).call()
 			}
 			case _ => assignStruct(op, value)

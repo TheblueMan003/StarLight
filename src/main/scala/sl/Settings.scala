@@ -39,7 +39,7 @@ class SettingsContext(){
     var debug = false
     var allFunction = true
 
-    var optimize = true
+    var optimize = false
     var optimizeInlining = true
     var optimizeDeduplication = true
     var optimizeVariableValue = true
@@ -49,6 +49,10 @@ class SettingsContext(){
     var optimizeAllowRemoveProtected = false
 
     var experimentalMultithread = false
+
+    var exportDoc = true
+    var exportSource = false
+    var exportContextPath = true
 
     var optimizeMaxInlining = 10
 
@@ -109,19 +113,23 @@ case object MCJava extends Target{
                         .reduceOption(_ +","+_)
                         .getOrElse("")
 
-        val dfScore = List(CommandIR(f"scoreboard objectives add ${Settings.tmpScoreboard} dummy"),
+        val dfScore = List(CommentsIR("\n "+"="*15+"COMPILER SCOREBOARD"+"="*16+"\n "),
+                            CommandIR(f"scoreboard objectives add ${Settings.tmpScoreboard} dummy"),
                             CommandIR(f"scoreboard objectives add ${Settings.valueScoreboard} dummy"),
                             CommandIR(f"scoreboard objectives add ${Settings.constScoreboard} dummy"),
-                            CommandIR(f"scoreboard objectives add ${Settings.variableScoreboard} dummy"))::: 
+                            CommandIR(f"scoreboard objectives add ${Settings.variableScoreboard} dummy"),
+                            CommentsIR("\n "+"="*20+"CONSTANTS"+"="*21+"\n ")
+                            )::: 
                             context.getAllConstant().map(v => ScoreboardSet(SBLink(f"c$v", Settings.constScoreboard), v)):::
+                            List(CommentsIR("\n "+"="*17+"USER SCOREBOARD"+"="*18+"\n ")):::
                             context.getAllVariable().filter(_.modifiers.isEntity).map(v => CommandIR(f"scoreboard objectives add ${v.scoreboard} ${v.criterion}"))
 
         
 
-        List(IRFile("pack.mcmeta", "pack.mcmeta", List(JsonIR(getPackMeta())), true),
-            IRFile(f"data/${context.root.getPath()}/functions/__init__.mcfunction", "__init__", dfScore, false, false),
-            IRFile("data/minecraft/tags/functions/tick.json", "data/minecraft/tags/functions/tick.json", List(JsonIR("{"+ f"\t\"values\":[$ticks]"+ "}")), true),
-            IRFile("data/minecraft/tags/functions/load.json", "data/minecraft/tags/functions/load.json", List(JsonIR("{"+ f"\t\"values\":[$loads]"+ "}")), true))
+        List(IRFile("pack.mcmeta", "pack.mcmeta", List(JsonIR(getPackMeta())), List(), true),
+            IRFile(f"data/${context.root.getPath()}/functions/__init__.mcfunction", "__init__", dfScore,List(), false, false),
+            IRFile("data/minecraft/tags/functions/tick.json", "data/minecraft/tags/functions/tick.json", List(JsonIR("{"+ f"\t\"values\":[$ticks]"+ "}")), List(),true),
+            IRFile("data/minecraft/tags/functions/load.json", "data/minecraft/tags/functions/load.json", List(JsonIR("{"+ f"\t\"values\":[$loads]"+ "}")), List(),true))
     }
 
     def getPackMeta()=
@@ -134,7 +142,7 @@ case object MCJava extends Target{
         }
         """
     def getResourcesExtraFiles(context: Context):List[IRFile]= {
-        List(IRFile(f"pack.mcmeta", f"pack.mcmeta", List(JsonIR(getResourcePackMeta())), true))
+        List(IRFile(f"pack.mcmeta", f"pack.mcmeta", List(JsonIR(getResourcePackMeta())), List(),true))
     }
     def getResourcePackMeta()=
         f"""
@@ -173,18 +181,23 @@ case object MCBedrock extends Target{
                         .reduceOption(_ +","+_)
                         .getOrElse("")
 
-        val dfScore = List(CommandIR(f"scoreboard objectives add ${Settings.tmpScoreboard} dummy"),
+        val dfScore = List(CommentsIR("\n "+"="*15+"COMPILER SCOREBOARD"+"="*16+"\n "),
+                            CommandIR(f"scoreboard objectives add ${Settings.tmpScoreboard} dummy"),
                             CommandIR(f"scoreboard objectives add ${Settings.valueScoreboard} dummy"),
                             CommandIR(f"scoreboard objectives add ${Settings.constScoreboard} dummy"),
-                            CommandIR(f"scoreboard objectives add ${Settings.variableScoreboard} dummy"))::: 
+                            CommandIR(f"scoreboard objectives add ${Settings.variableScoreboard} dummy"),
+                            CommentsIR("\n "+"="*20+"CONSTANTS"+"="*21+"\n "))::: 
                             context.getAllConstant().map(v => ScoreboardSet(SBLink(f"c$v", Settings.constScoreboard), v)):::
+                            List(CommentsIR("\n "+"="*17+"USER SCOREBOARD"+"="*18+"\n ")):::
                             context.getAllVariable().filter(_.modifiers.isEntity).map(v => CommandIR(f"scoreboard objectives add ${v.scoreboard} dummy")):::
+                            List(CommentsIR("\n "+"="*18+"INITIALISATION"+"="*18+"\n ")):::
                             context.getAllVariable().filter(v => !v.modifiers.isEntity && !v.modifiers.isLazy && v.getType() != VoidType).map(v => ScoreboardSet(v.getIRSelector(), 0)):::
+                            List(CommentsIR("\n "+"="*23+"LOAD"+"="*23+"\n ")):::
                             List(CommandIR(f"function ${context.root.getPath()}/__load__"))
 
-        List(IRFile(f"manifest.json", f"manifest.json", List(JsonIR(getManifestContent())), true),
-            IRFile(f"functions/__init__.mcfunction", "__init__", dfScore, false, false),
-            IRFile("functions/tick.json", "functions/tick.json", List(JsonIR("{"+ f"\t\"values\":[$ticks]"+ "}")), true))
+        List(IRFile(f"manifest.json", f"manifest.json", List(JsonIR(getManifestContent())), List(), true),
+            IRFile(f"functions/__init__.mcfunction", "__init__", dfScore, List(), false, false),
+            IRFile("functions/tick.json", "functions/tick.json", List(JsonIR("{"+ f"\t\"values\":[$ticks]"+ "}")), List(),true))
     }
 
     def getManifestContent(): String = {
@@ -210,7 +223,7 @@ case object MCBedrock extends Target{
     }
 
     def getResourcesExtraFiles(context: Context):List[IRFile]= {
-        List(IRFile(f"manifest.json", f"manifest.json", List(JsonIR(getResourcesManifestContent())), true))
+        List(IRFile(f"manifest.json", f"manifest.json", List(JsonIR(getResourcesManifestContent())), List(),true))
     }
 
     def getResourcesManifestContent(): String = {

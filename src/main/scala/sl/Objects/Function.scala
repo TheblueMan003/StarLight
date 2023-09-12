@@ -140,7 +140,7 @@ abstract class Function(context: Context, val contextName: String, name: String,
     def getContent(): List[IRTree]
     def getFunctionType() = FuncType(arguments.map(a => a.typ), typ)
     def getIRFile(): IRFile ={
-        IRFile(getName(), fullName, getContent(), false, 
+        IRFile(getName(), fullName, getContent(), getExtraContextPathComments() ::: modifiers.getDocAsIR() ::: getExtraComments(), false, 
         !(modifiers.isTicking ||
           modifiers.isLoading || 
           modifiers.protection == Protection.Public || 
@@ -148,6 +148,20 @@ abstract class Function(context: Context, val contextName: String, name: String,
           (!Settings.optimizeAllowRemoveProtected && modifiers.protection == Protection.Protected && !wasMovedToBlock))
         )
     }
+    def getExtraContextPathComments(): List[IRTree] = {
+        if (Settings.exportContextPath){
+            if (contextName != fullName){
+                List(CommentsIR("="*50 + f"\n${typ} $fullName(${arguments.mkString(", ")})\na.k.a ${contextName}\n"+"="*50+"\n"))
+            }
+            else{
+                List(CommentsIR("="*50 + f"\n${typ} $fullName(${arguments.mkString(", ")})\n"+"="*50+"\n"))
+            }
+        }
+        else{
+            List[IRTree]()
+        }
+    }
+    def getExtraComments(): List[IRTree] = List()
 
     override def toString(): String = f"$fullName(${arguments.map(_.typ.toString()).foldRight("")(_ +","+_)})"
 }
@@ -226,6 +240,14 @@ class ConcreteFunction(context: Context, _contextName: String, name: String, arg
         _needCompiling = true
         if (needCompiling()) {
             context.addFunctionToCompile(this)
+        }
+    }
+    override def getExtraComments() = {
+        if (Settings.exportSource){
+            List(CommentsIR("=" * 50 + "\nStartLight Source: \n"+body.toString()+ "\n" + "="*50))
+        }
+        else{
+            List[IRTree]()
         }
     }
 
@@ -315,6 +337,15 @@ class MultiplexFunction(context: Context, _contextName: String, name: String, ar
         
         val switch = Switch(LinkedVariableValue(argumentsVariables.head), cases, false)
         content = sl.Compiler.compile(switch.unBlockify())(context.push(name, this))
+    }
+
+    override def getExtraComments() = {
+        if (Settings.exportDoc){
+            List(CommentsIR("=" * 50 + f"\nFunction Multiplexer for ${arguments.map(_.typ)} => ${typ}\n\n"+functions.map(f => f.fullName + " -> " + f.getMuxID().toString()).mkString("\n")+"\n"+"="*50))
+        }
+        else{
+            List[IRTree]()
+        }
     }
 }
 

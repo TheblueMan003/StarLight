@@ -51,13 +51,13 @@ object ContextBuilder{
                 
                 context.addStruct(new Struct(context, name, generics, modifier, block.unBlockify(), parentName))
             }
-            case ClassDecl(name, generics, block, modifier, parent, entity) => {
+            case ClassDecl(name, generics, block, modifier, parent, parentGenerics, interfaces, entity) => {
                 modifier.simplify()
                 val parentName = parent match
                     case None => null
                     case Some(p) => Identifier.fromString(p)
                 
-                context.addClass(new Class(context, name, generics, modifier, block.unBlockify(), parentName, entity))
+                context.addClass(new Class(context, name, generics, modifier, block.unBlockify(), parentName, parentGenerics, interfaces.map(x => (Identifier.fromString(x._1), x._2)), entity))
             }
             case EnumDecl(name, fields, values, modifier) => {
                 modifier.simplify()

@@ -72,7 +72,7 @@ object Utils{
         instr match
             case Package(name, block) => Package(name, substReturn(block, to))
             case StructDecl(name, generics, block, modifier, parent) => StructDecl(name, generics, substReturn(block, to), modifier, parent)
-            case ClassDecl(name, generics, block, modifier, parent, entity) => ClassDecl(name, generics, substReturn(block, to), modifier, parent, entity)
+            case ClassDecl(name, generics, block, modifier, parent, parentGenerics, interfaces, entity) => ClassDecl(name, generics, substReturn(block, to), modifier, parent, parentGenerics, interfaces, entity)
             case FunctionDecl(name, block, typ, args, typeargs, modifier) => FunctionDecl(name, substReturn(block, to), typ, args, typeargs, modifier)
             case PredicateDecl(name, args, block, modifier) => instr
             case BlocktagDecl(name, values, modifier) => instr
@@ -128,7 +128,7 @@ object Utils{
         instr match
             case Package(name, block) => Package(name, subst(block, from, to))
             case StructDecl(name, generics, block, modifier, parent) => StructDecl(name, generics, subst(block, from, to), modifier, parent)
-            case ClassDecl(name, generics, block, modifier, parent, entity) => ClassDecl(name, generics, subst(block, from, to), modifier, parent, entity)
+            case ClassDecl(name, generics, block, modifier, parent, parentGenerics, interfaces, entity) => ClassDecl(name, generics, subst(block, from, to), modifier, parent, parentGenerics, interfaces, entity)
             case FunctionDecl(name, block, typ, args, typeargs, modifier) => FunctionDecl(name, subst(block, from, to), typ, args, typeargs, modifier)
             case PredicateDecl(name, args, block, modifier) => PredicateDecl(name, args, block, modifier)
             case VariableDecl(name, _type, modifier, op, expr) => VariableDecl(name, _type, modifier, op, subst(expr, from, to))
@@ -218,8 +218,8 @@ object Utils{
         instr match
             case Package(name, block) => Package(name.replaceAllLiterally(from, to), subst(block, from, to))
             case StructDecl(name, generics, block, modifier, parent) => StructDecl(name.replaceAllLiterally(from, to), generics, subst(block, from, to), modifier, parent)
-            case ClassDecl(name, generics, block, modifier, parent, entity) =>
-                ClassDecl(name.replaceAllLiterally(from, to), generics, subst(block, from, to), modifier, parent, entity.map((k,v) => (k, subst(v, from, to))))
+            case ClassDecl(name, generics, block, modifier, parent, parentGenerics, interfaces, entity) =>
+                ClassDecl(name.replaceAllLiterally(from, to), generics, subst(block, from, to), modifier, parent, parentGenerics, interfaces, entity.map((k,v) => (k, subst(v, from, to))))
             case FunctionDecl(name, block, typ, args, typeargs, modifier) => {
                 if (args.exists(x => x.name == from)){
                     instr
@@ -343,7 +343,7 @@ object Utils{
         instr match
             case Package(name, block) => Package(name, subst(block, from, to))
             case StructDecl(name, generics, block, modifier, parent) => StructDecl(name, generics, subst(block, from, to), modifier, parent)
-            case ClassDecl(name, generics, block, modifier, parent, entity) => ClassDecl(name, generics, subst(block, from, to), modifier, parent, entity)
+            case ClassDecl(name, generics, block, modifier, parent, parentGenerics, interfaces, entity) => ClassDecl(name, generics, subst(block, from, to), modifier, parent, parentGenerics, interfaces, entity)
             case FunctionDecl(name, block, typ, args, typeargs, modifier) => {
                 if (args.exists(x => x.name == from)){
                     instr
@@ -395,12 +395,12 @@ object Utils{
             case null => null
     })
 
-    def rmFunctions(instr: Instruction): Instruction = positioned(instr, {
+    def rmFunctions(instr: Instruction)(implicit predicate: FunctionDecl=>Boolean = _ => true): Instruction = positioned(instr, {
         instr match
             case Package(name, block) => Package(name, rmFunctions(block))
             case StructDecl(name, generics, block, modifier, parent) => StructDecl(name, generics, rmFunctions(block), modifier, parent)
-            case ClassDecl(name, generics, block, modifier, parent, entity) => ClassDecl(name, generics, rmFunctions(block), modifier, parent, entity)
-            case FunctionDecl(name, block, typ, args, typeargs, modifier) => InstructionList(List())
+            case ClassDecl(name, generics, block, modifier, parent, parentGenerics, interfaces, entity) => ClassDecl(name, generics, rmFunctions(block), modifier, parent, parentGenerics, interfaces, entity)
+            case fct: FunctionDecl => if predicate(fct) then InstructionList(List()) else instr
             case PredicateDecl(name, args, block, modifier) => instr
             case BlocktagDecl(name, values, modifier) => instr
             case EnumDecl(name, fields, values, modifier) => EnumDecl(name, fields, values, modifier)
@@ -466,7 +466,7 @@ object Utils{
         instr match
             case Package(name, block) => Package(name, fix(block))
             case StructDecl(name, generics, block, modifier, parent) => StructDecl(name, generics, fix(block), modifier, parent)
-            case ClassDecl(name, generics, block, modifier, parent, entity) => ClassDecl(name, generics, fix(block), modifier, parent, entity)
+            case ClassDecl(name, generics, block, modifier, parent, parentGenerics, interfaces, entity) => ClassDecl(name, generics, fix(block), modifier, parent, parentGenerics.map(fix), interfaces.map(x => (x._1, x._2.map(fix(_)))), entity)
             case FunctionDecl(name, block, typ, args, typeargs, modifier) => FunctionDecl(name, fix(block)(context, ignore ++ args.map(a => Identifier.fromString(a.name)).toSet), typ, args, typeargs, modifier)
             case PredicateDecl(name, args, block, modifier) => PredicateDecl(name, args, fix(block), modifier)
             case EnumDecl(name, fields, values, modifier) => EnumDecl(name, fields, values.map(v => EnumValue(v.name, v.fields.map(fix(_)))), modifier)
@@ -923,6 +923,15 @@ object Utils{
                     case ("!",BoolValue(value)) => BoolValue(!value)
                     case (op, other) => UnaryOperation(op, other)
                 }
+            }
+            case BinaryOperation("??", left, right) => {
+                val nl = simplify(left)
+                val nr = simplify(right)
+                nl match
+                    case NullValue => nr
+                    case v: LinkedVariableValue => BinaryOperation("??", v, nr)
+                    case v: VariableValue => BinaryOperation("??", v, nr)
+                    case other => nl
             }
             case BinaryOperation("<" | "<=" | "==" | "!=" | ">=" | ">", left, right) => {
                 val op = expr.asInstanceOf[BinaryOperation].op

@@ -1,6 +1,6 @@
 package sl.IR
 
-class IRFile(val path: String, val name: String, val contents: List[IRTree], val isJson: Boolean = false, val canDelete: Boolean = true) {
+class IRFile(val path: String, val name: String, val contents: List[IRTree], val comments: List[IRTree], val isJson: Boolean = false, val canDelete: Boolean = true) {
     var calledBy: List[String] = List()
     var calling = List[String]()
 
@@ -31,6 +31,14 @@ class IRFile(val path: String, val name: String, val contents: List[IRTree], val
     }
     def getContents(): List[IRTree] = {
         _content
+    }
+    def getFinalContents(): List[IRTree] = {
+        if (comments.length > 0){
+            comments ::: List(EmptyLineIR) ::: _content
+        }
+        else{
+            _content
+        }
     }
     def setContents(content: List[IRTree]): Unit = {
         _content = content

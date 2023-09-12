@@ -76,6 +76,10 @@ object ConfigLoader{
 
                     case ("experimental.multi_thread", value) => Settings.experimentalMultithread = value == "true"
 
+                    case ("export.doc", value) => Settings.exportDoc = value == "true"
+                    case ("export.source", value) => Settings.exportSource = value == "true"
+                    case ("export.contextPath", value) => Settings.exportContextPath = value == "true"
+
 
                     case ("obfuscate", value)          => Settings.obfuscate = value == "true"
 
@@ -140,6 +144,10 @@ object ConfigLoader{
             f"optimization.variable.global=${Settings.optimizeVariableGlobal}",
             f"optimization.fold=${Settings.optimizeFold}",
             f"optimization.allowRemoveProtected=${Settings.optimizeAllowRemoveProtected}",
+
+            f"export.doc=${Settings.exportDoc}",
+            f"export.source=${Settings.exportSource}",
+            f"export.contextPath=${Settings.exportContextPath}",
 
             f"experimental.multi_thread=${Settings.experimentalMultithread}",
             

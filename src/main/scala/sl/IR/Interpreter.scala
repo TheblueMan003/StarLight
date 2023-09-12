@@ -109,6 +109,8 @@ class Interpreter(var files: List[IRFile], val context: Context){
                     case None => ()
                 }
             }
+            case CommentsIR(statement) => {
+            }
             case IfScoreboard(left, op, right, statement, invert) => {
                 val leftValue = scoreboards.getOrElse(left.getKey(), 0)
                 val rightValue = scoreboards.getOrElse(right.getKey(), 0)

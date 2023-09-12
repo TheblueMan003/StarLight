@@ -1,27 +1,25 @@
 package AnimatedEntity
 
-import mc.Entity
+import math
 
-class AnimatedEntity extends Entity{
-    void=>void animationClear
-    def lazy playAnimation(string animation){
-        lazy var name = Compiler.getBlockbenchEntityName()
-        animationClear()
-        Compiler.insert(($name, $animation), (name, animation)){
-            /function animated_java:$name/animations/$animation/play
-        }
-        animationClear = () => {
-            Compiler.insert(($name, $animation), (name, animation)){
-                /function animated_java:$name/animations/$animation/stop
-            }
-        }
+class A{
+    def a(){
+        /say a
     }
-    def lazy stopAnimation(){
-        animationClear()
+}
+class B{
+    def b(){
+        /say b
+    }
+}
+class C extends A implements B{
+    def c(){
+        /say c
     }
 }
 
-def test(){
-    AnimatedEntity a = new AnimatedEntity()
-    a.playAnimation("walk")
-}
+C c = new C()
+c.a()
+c.b()
+c.c()
+

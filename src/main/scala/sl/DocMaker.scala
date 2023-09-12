@@ -31,7 +31,7 @@ object DocMaker{
                     ContentMaker.h1(modifier.schema()+" struct "+name)+
                     ContentMaker.p(modifier.doc)+"\n\n"
                 + make2(block)+"\n\n"
-            case ClassDecl(name, List(), block, modifier, parent, entity) if modifier.protection != Private => 
+            case ClassDecl(name, List(), block, modifier, parent, parentGenerics, interfaces, entity) if modifier.protection != Private => 
                     ContentMaker.h1(modifier.schema()+" class "+name)+
                     ContentMaker.p(modifier.doc)+"\n\n"
                  + make2(block)+"\n\n"
@@ -40,7 +40,7 @@ object DocMaker{
                     ContentMaker.h1(modifier.schema()+" struct "+name+ generics.mkString("<", ",", ">"))+
                     ContentMaker.p(modifier.doc)+"\n\n"
                 + make2(block)+"\n\n"
-            case ClassDecl(name, generics, block, modifier, parent, entity) if modifier.protection != Private => 
+            case ClassDecl(name, generics, block, modifier, parent, parentGenerics, interfaces, entity) if modifier.protection != Private => 
                     ContentMaker.h1(modifier.schema()+" class "+name + generics.mkString("<", ",", ">"))+
                     ContentMaker.p(modifier.doc)+"\n\n"
                  + make2(block)+"\n\n"

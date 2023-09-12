@@ -43,6 +43,6 @@ class Tag(context: Context, _name: String, _modifier: Modifier, _content: List[E
     }
 
     def getIRFile(): IRFile = {
-        IRFile(getName(), name, getContent(), true)
+        IRFile(getName(), name, getContent(), List(), true)
     }
 }

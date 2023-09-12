@@ -7,8 +7,9 @@ import sl.Compilation.Selector.Selector
 import scala.collection.mutable
 import sl.IR.*
 
-class Class(context: Context, name: String, val generics: List[String], _modifier: Modifier, val block: Instruction, val parentName: Identifier, val entities: Map[String, Expression]) extends CObject(context, name, _modifier){
-    lazy val parent = if (parentName == null) {if (name != "object") {context.getClass("object")} else null} else context.getClass(parentName)
+class Class(context: Context, name: String, val generics: List[String], _modifier: Modifier, val block: Instruction, val parentName: Identifier, val parentGenerics: List[Type], val interfaceNames: List[(Identifier, List[Type])], val entities: Map[String, Expression]) extends CObject(context, name, _modifier){
+    lazy val parent = if (parentName == null) {if (name != "object") {context.getClass("object")} else null} else context.getClass(parentName).get(parentGenerics)
+    lazy val interfaces = interfaceNames.map(x => context.getClass(x._1).get(x._2))
     var implemented = mutable.Map[List[Type], Class]()
     var virutalFunction: List[(String, Function)] = List()
     var virutalFunctionVariable: List[Variable] = List()
@@ -26,6 +27,7 @@ class Class(context: Context, name: String, val generics: List[String], _modifie
                 .filter(f => f._2.context == context.push(name) || context.push(name).isInheriting(f._2.context))
                 .filter(f => f._2.parentVariable == null)
                 .filterNot(f => f._1 == "__init__" && f._2.clazz != this && hasOwnInnit)
+                .filterNot(f => f._1 == "__init__" && interfaces.contains(f._2.clazz))
                 .toList
 
     lazy val cacheGVVariables = getAllVariables()
@@ -54,7 +56,7 @@ class Class(context: Context, name: String, val generics: List[String], _modifie
             generics.zip(typevars).foreach(pair => {
                 ctx.addTypeDef(pair._1, pair._2)
             })
-            val cls = ctx.addClass(new Class(ctx, "impl", List(), modifiers, block, parentName, entities))
+            val cls = ctx.addClass(new Class(ctx, "impl", List(), modifiers, block, parentName, parentGenerics, interfaceNames, entities))
             cls.definingType = ClassType(this, typevars)
             implemented(typevars) = cls
             cls.generate()
@@ -67,6 +69,7 @@ class Class(context: Context, name: String, val generics: List[String], _modifie
             if (parent != null){
                 parent.generate()
             }
+            interfaces.foreach(_.generate())
             if (generics.length == 0){
                 val ctx = context.push(name, this)
                 ctx.push("this", ctx)
@@ -74,6 +77,10 @@ class Class(context: Context, name: String, val generics: List[String], _modifie
                     ctx.push("super", parent.context.push(parent.name))
                     ctx.inherit(parent.context.push(parent.name))
                 }
+
+                interfaces.foreach(intf => {
+                    ctx.inherit(intf.context.push(intf.name))
+                })
 
                 {
                     val mod = Modifier.newProtected()
@@ -153,7 +160,6 @@ class Class(context: Context, name: String, val generics: List[String], _modifie
         if (generics.length == 0){
             generate()
             val ctx = ctx2.push(vari.name, vari)
-            
             cacheGVFunctions.map((name, fct) => {
                     val deco = ClassFunction(ctx.getPath()+"."+name, vari, fct)
                     ctx.addFunction(name, deco)
@@ -229,13 +235,14 @@ class Class(context: Context, name: String, val generics: List[String], _modifie
     }
     def addClassTags(context: Option[Context] = None):List[IRTree] = {
         val ctx = context.getOrElse(this.context.push(name))
-        virutalFunctionVariable.zip(virutalFunctionBase).flatMap((vari, fct) => vari.assign("=", LinkedFunctionValue(getMostRecentFunction(fct)(ctx)))(ctx)) :::
+        (virutalFunctionVariable.zip(virutalFunctionBase).flatMap((vari, fct) => vari.assign("=", LinkedFunctionValue(getMostRecentFunction(fct)(ctx)))(ctx)) :::
         List(CommandIR(f"tag @s add ${getTag()}")) ::: (if (parent != null){
             parent.addClassTags(Some(ctx))
         }
         else{
             Nil
         })
+        ::: interfaces.flatMap(intf => intf.addClassTags(Some(ctx)))).distinct
     }
     def getTag()=f"--class.$fullName"
 

@@ -14,6 +14,7 @@ import sl.IR.*
 import scala.util.matching.Regex
 import sl.Reporter
 import scala.collection.mutable.ArrayBuffer
+import scala.compiletime.ops.string
 
 object Context{
     def getNew(name: String):Context = {
@@ -43,7 +44,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
     
     
     private val child = mutable.Map[String, Context]()
-    protected var inheritted: Context = null
+    protected var inheritted: List[Context] = List()
 
     lazy val fctCtx = root.push(Settings.functionFolder)
     lazy val muxCtx = root.push(Settings.multiplexFolder)
@@ -357,15 +358,18 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
     }
     def inherit(context: Context) = synchronized{
         if (context != null){
-            inheritted = context
+            inheritted = context :: inheritted
         }
     }
-    def isInheriting(context: Context):Boolean = synchronized{
-        if (inheritted == context){
+    def isInheriting(context: Context, height: Int = 0):Boolean = synchronized{
+        if (height >= 100){
+            false
+        }
+        else if (inheritted.contains(context)){
             true
         }
-        else if (inheritted != null){
-            inheritted.isInheriting(context)
+        else if (inheritted.exists(x => x.isInheriting(context, height+1))){
+            true
         }
         else{
             false
@@ -476,9 +480,11 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
     def getAllVariable(set: mutable.Set[Context], array: ArrayBuffer[Variable]): Unit = {
         if set.contains(this) then return
         set.add(this)
-        if (inheritted != null && !set.contains(inheritted)){
-            inheritted.getAllVariable(set, array)
-        }
+        inheritted.foreach(x => {
+            if (x != null && !set.contains(x)){
+                x.getAllVariable(set, array)
+            }
+        })
         array.appendAll(variables.values)
         child.filter(_._2.parent == this).foreach(_._2.getAllVariable(set, array))
     }
@@ -787,9 +793,11 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
     def getAllFunction(set: mutable.Set[Context], array: ArrayBuffer[(String, Function)]): Unit = {
         if set.contains(this) then return
         set.add(this)
-        if (inheritted != null && !set.contains(inheritted)) {
-            inheritted.getAllFunction(set, array)
-        }
+        inheritted.foreach(x => {
+            if (x != null && !set.contains(x)) {
+                x.getAllFunction(set, array)
+            }
+        })
         array.addAll(functions.toList.flatMap((k, v) => v.map(f => (k, f))))
         child.filter(_._2.parent == this).map(_._2.getAllFunction(set, array))
     }
@@ -1092,7 +1100,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
 
 
     private def tryGetElement[T](mapGetter: (Context)=>mutable.Map[String, T])(identifier: Identifier, down: Boolean = false): Option[T] = {
-        val value = tryGetElementNoCheck(mapGetter)(identifier, down)
+        val value = tryGetElementNoCheck(mapGetter)(identifier, down)(0)
         value match
             case None => None
             case Some(value) => {
@@ -1106,15 +1114,17 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
                 Some(value)
             }
     }
-    protected def tryGetElementNoCheck[T](mapGetter: (Context)=>mutable.Map[String, T])(identifier: Identifier, down: Boolean = false): Option[T] = {
-        val value = tryGetElementInner(mapGetter)(identifier, down)
+    protected def tryGetElementNoCheck[T](mapGetter: (Context)=>mutable.Map[String, T])(identifier: Identifier, down: Boolean = false)(depth: Int = 0): Option[T] = {
+        if (depth > 200)return None
+        val value = tryGetElementInner(mapGetter)(identifier, down)(depth + 1)
         value match
-            case None => if inheritted != null then inheritted.tryGetElementNoCheck(mapGetter)(identifier, down) else None
+            case None => inheritted.map(_.tryGetElementNoCheck(mapGetter)(identifier, down)(depth + 1)).filter(x => x != None).headOption.getOrElse(None)
             case Some(_) => value
     }
 
-    private def tryGetElementInner[T](mapGetter: (Context)=>mutable.Map[String, T])(identifier: Identifier, down: Boolean = false): Option[T] = {
+    private def tryGetElementInner[T](mapGetter: (Context)=>mutable.Map[String, T])(identifier: Identifier, down: Boolean = false)(depth: Int = 0): Option[T] = {
         val map = mapGetter(this)
+
         // Check if single word
         
         if (identifier.isSingleton()){
@@ -1124,7 +1134,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
             }
             // Check parent
             else if (parent != null && !down){
-                parent.tryGetElementNoCheck(mapGetter)(identifier, down)
+                parent.tryGetElementNoCheck(mapGetter)(identifier, down)(depth + 1)
             }
             else{
                 None
@@ -1133,20 +1143,20 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
         else{
             // Check if child has begin
             if (child.contains(identifier.head())){
-                val ret = child(identifier.head()).tryGetElementNoCheck(mapGetter)(identifier.drop(), true)
+                val ret = child(identifier.head()).tryGetElementNoCheck(mapGetter)(identifier.drop(), true)(depth + 1)
                 if (ret != None) return ret
             }
             // Check parent
             if (parent != null && !down){
-                val ret = parent.tryGetElementNoCheck(mapGetter)(identifier, down)
+                val ret = parent.tryGetElementNoCheck(mapGetter)(identifier, down)(depth + 1)
                 if (ret != None) return ret
             }
             if (name == identifier.head() && child.contains(identifier.drop().head())){
-                val ret = child(identifier.drop().head()).tryGetElementNoCheck(mapGetter)(identifier.drop().drop(), true)
+                val ret = child(identifier.drop().head()).tryGetElementNoCheck(mapGetter)(identifier.drop().drop(), true)(depth + 1)
                 if (ret != None) return ret
             }
             if (root == this && child.contains(identifier.head())){
-                val ret = child(identifier.head()).tryGetElementNoCheck(mapGetter)(identifier, true)
+                val ret = child(identifier.head()).tryGetElementNoCheck(mapGetter)(identifier, true)(depth + 1)
                 if (ret != None) return ret
             }
             None
@@ -1155,7 +1165,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
 
     private def getElementList[T](mapGetter: (Context)=>mutable.Map[String, List[T]])(identifier: Identifier, down: Boolean = false): List[T] = {
         val value = getElementListInner(mapGetter)(identifier, down)
-        if inheritted != null then (inheritted.getElementList(mapGetter)(identifier, down) ::: value).distinct else (value.distinct)
+        (inheritted.flatMap(_.getElementList(mapGetter)(identifier, down)) ::: value).distinct
     }
 
     private def getElementListInner[T](mapGetter: (Context)=>mutable.Map[String, List[T]])(identifier: Identifier, down: Boolean = false): List[T] = {
