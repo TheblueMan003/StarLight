@@ -1,25 +1,15 @@
 package AnimatedEntity
 
-import math
+import standard::print
 
-class A{
-    def a(){
-        /say a
-    }
-}
-class B{
-    def b(){
-        /say b
-    }
-}
-class C extends A implements B{
-    def c(){
-        /say c
+import mc.AnimatedEntity
+
+class A extends AnimatedEntity with minecraft:cow for mcjava{
+    def test(){
+        playAnimation("cow")
     }
 }
 
-C c = new C()
-c.a()
-c.b()
-c.c()
-
+def test(){
+    new A()
+}

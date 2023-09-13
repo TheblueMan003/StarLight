@@ -871,7 +871,8 @@ object DefaultFunction{
                 (args: List[Expression],ctx: Context) => {
                     args match{
                         case Nil => {
-                            val name = ctx.getCurrentClass().getEntity().getString()
+                            val clz = ctx.getCurrentClass()
+                            val name = clz.getEntity().getString()
                             val e = name.split(":")(1)
                             val splitted = e.split("\\.")
                             

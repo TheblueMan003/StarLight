@@ -434,7 +434,13 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 		vari.assign("=", expr) ::: assign(op, LinkedVariableValue(vari))
 	}
 
-
+	def assignTernaryOperator(value: TernaryOperation)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
+		Compiler.compile(If(value.left, 
+			VariableAssigment(List((Right(this), selector)), "=", value.middle),
+			List(
+				ElseIf(BoolValue(true), VariableAssigment(List((Right(this), selector)), "=", value.right))
+			)))
+	}
 	/**
 	 * Assign binary operator to the variable.
 	 */
@@ -517,6 +523,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 			case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 			case ArrayGetValue(name, index) => handleArrayGetValue(op, name, index)
 			case bin: BinaryOperation => assignBinaryOperator(op, bin)
+			case ter: TernaryOperation => assignTernaryOperator(ter)
 			case _ => throw new Exception(f"Unknown cast to int: $valueE at \n${valueE.pos.longString}")
 	}
 
@@ -547,6 +554,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 			case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 			case ArrayGetValue(name, index) => handleArrayGetValue(op, name, index)
 			case bin: BinaryOperation => assignBinaryOperator(op, bin)
+			case ter: TernaryOperation => assignTernaryOperator(ter)
 			case _ => throw new Exception(f"Unknown cast to int: $valueE at \n${valueE.pos.longString}")
 	}
 
@@ -765,6 +773,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 			case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 			case ArrayGetValue(name, index) => handleArrayGetValue(op, name, index)
 			case bin: BinaryOperation => assignBinaryOperator(op, bin)
+			case ter: TernaryOperation => assignTernaryOperator(ter)
 			case _ => throw new Exception(f"Unknown cast to float for $fullName and value $valueE at \n${valueE.pos.longString}")
 	}
 
@@ -819,6 +828,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 				ScoreboardSet(getIRSelector(), 0)::Compiler.compile(If(value, VariableAssigment(List((Right(this), selector)), "=", BoolValue(true)), List()))
 			}
 			case bin: BinaryOperation => assignBinaryOperator(op, bin)
+			case ter: TernaryOperation => assignTernaryOperator(ter)
 			case SelectorValue(sel) => ScoreboardSet(getIRSelector(), 0)::Compiler.compile(If(value, VariableAssigment(List((Right(this), selector)), "=", BoolValue(true)), List()))
 			case other if Utils.typeof(other) == BoolType || Utils.typeof(other) == IntType || Utils.typeof(other) == EntityType => 
 				var vari2 = context.getFreshVariable(BoolType)
@@ -1059,6 +1069,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 							List(CommandIR(f"tag ${value.getString()} add $tagName"))
 						}
 						case bin: BinaryOperation => assignBinaryOperator(op, bin)
+						case ter: TernaryOperation => assignTernaryOperator(ter)
 						case FunctionCallValue(name, args, typeargs, selector) => 
 							//removeEntityTag():::
 							tupleVari.zip(List(BoolValue(false))).flatMap((t, v) => t.assign(op, v)) ::: 
@@ -1093,6 +1104,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 						}
 						case NullValue => List()
 						case bin: BinaryOperation => assignBinaryOperator(op, bin)
+						case ter: TernaryOperation => assignTernaryOperator(ter)
 						case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 						case _ => throw new Exception(f"No cast from ${expr} to entity at \n${expr.pos.longString}")
 				}
@@ -1119,6 +1131,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 						}
 						case NullValue => List()
 						case bin: BinaryOperation => assignBinaryOperator(op, bin)
+						case ter: TernaryOperation => assignTernaryOperator(ter)
 						case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 						case _ => throw new Exception(f"No cast from ${expr} to entity at \n${expr.pos.longString}")
 				}
@@ -1179,6 +1192,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 				case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 				case ArrayGetValue(name, index) => handleArrayGetValue(op, name, index)
 				case bin: BinaryOperation => assignBinaryOperator(op, bin)
+				case ter: TernaryOperation => assignTernaryOperator(ter)
 				case _ => throw new Exception(f"Unknown cast to json $value at \n${value.pos.longString}")
 		}
 	}
@@ -1220,7 +1234,8 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 							case other => throw new Exception(f"Cannot constructor call $other at \n${value.pos.longString}")
 					}
 					case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
-					case BinaryOperation(op, left, right) => assignBinaryOperator("=", BinaryOperation(op, left, right))
+					case bin: BinaryOperation => assignBinaryOperator("=", bin)
+					case ter: TernaryOperation => assignTernaryOperator(ter)
 					case JsonValue(JsonDictionary(map)) if map.forall(x => tupleVari.exists(y => y.name == x._1)) => {
 						map.flatMap(x => tupleVari.find(y => y.name == x._1).get.assign("=", Utils.jsonToExpr(x._2))).toList
 					}
@@ -1229,7 +1244,8 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 			case op => 
 				value match
 					case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
-					case BinaryOperation(op2, left, right) => assignBinaryOperator(op, BinaryOperation(op2, left, right))
+					case bin: BinaryOperation => assignBinaryOperator(op, bin)
+					case ter: TernaryOperation => assignTernaryOperator(ter)
 					case _ => context.getFunction(fullName + "." + Utils.getOpFunctionName(op),  List(value), List(), getType(), false).call()
 	}
 
@@ -1335,7 +1351,8 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					}
 					case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 					case ArrayGetValue(name, index) => handleArrayGetValue(op, name, index)
-					case BinaryOperation(op, left, right) => assignBinaryOperator("=", BinaryOperation(op, left, right))
+					case bin: BinaryOperation => assignBinaryOperator("=", bin)
+					case ter: TernaryOperation => assignTernaryOperator(ter)
 					case JsonValue(JsonDictionary(map)) if map.forall(x => tupleVari.exists(y => y.name == x._1)) => {
 						map.flatMap(x => tupleVari.find(y => y.name == x._1).get.assign("=", Utils.jsonToExpr(x._2))).toList
 					}
@@ -1369,6 +1386,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 			case LinkedVariableValue(vari, sel) => vari == this && sel == selector
 			case RawJsonValue(value) => false
 			case BinaryOperation(op, left, right) => isPresentIn(left) || isPresentIn(right)
+			case TernaryOperation(left, middle, right) => isPresentIn(left) || isPresentIn(middle) || isPresentIn(right)
 			case UnaryOperation(op, left) => isPresentIn(left)
 			case TupleValue(values) => values.exists(isPresentIn(_))
 			case FunctionCallValue(name, args, typeargs, selector) => args.exists(isPresentIn(_)) || isPresentIn(name)

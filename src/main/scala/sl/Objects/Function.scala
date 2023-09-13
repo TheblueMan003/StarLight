@@ -275,7 +275,7 @@ class LazyFunction(context: Context, _contextName: String, name: String, argumen
     def call(args: List[Expression], ret: Variable = null, op: String = "=")(implicit ctx: Context): List[IRTree] = {
         //var block = Utils.fix(body)(context, arguments.map(a => Identifier.fromString(a.name)).toSet)
         var block = body
-        val sub = context.push(context.getLazyCallId())
+        val sub = context.push(context.getLazyCallId(), ctx.getCurrentClass())
         sub.setLazyCall()
         
         val pref = argMap(args).sortBy((a,v) => -a.name.length).flatMap((a, v) => {

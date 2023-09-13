@@ -203,6 +203,7 @@ object Utils{
             case ArrayGetValue(name, index) => ArrayGetValue(subst(name, from, to), index.map(subst(_, from, to)))
             case VariableValue(name, sel) => VariableValue(name.replaceAllLiterally(from, to), sel)
             case BinaryOperation(op, left, right) => BinaryOperation(op, subst(left, from, to), subst(right, from, to))
+            case TernaryOperation(left, middle, right) => TernaryOperation(subst(left, from, to), subst(middle, from, to), subst(right, from, to))
             case UnaryOperation(op, left) => UnaryOperation(op, subst(left, from, to))
             case TupleValue(values) => TupleValue(values.map(subst(_, from, to)))
             case FunctionCallValue(name, args, typeargs, selector) => FunctionCallValue(subst(name, from, to), args.map(subst(_, from, to)), typeargs, selector)
@@ -307,6 +308,7 @@ object Utils{
             case JsonValue(content) => JsonValue(subst(content, from, to))
             case VariableValue(name, sel) => VariableValue(name.toString().replaceAllLiterally(from, to), sel)
             case BinaryOperation(op, left, right) => BinaryOperation(op, subst(left, from, to), subst(right, from, to))
+            case TernaryOperation(left, middle, right) => TernaryOperation(subst(left, from, to), subst(middle, from, to), subst(right, from, to))
             case UnaryOperation(op, left) => UnaryOperation(op, subst(left, from, to))
             case TupleValue(values) => TupleValue(values.map(subst(_, from, to)))
             case FunctionCallValue(name, args, typeargs, selector) => FunctionCallValue(subst(name, from, to), args.map(subst(_, from, to)), typeargs, selector)
@@ -571,6 +573,7 @@ object Utils{
                             case _ => VariableValue(name, sel)
                         }
             case BinaryOperation(op, left, right) => BinaryOperation(op, fix(left), fix(right))
+            case TernaryOperation(left, middle, right) => TernaryOperation(fix(left), fix(middle), fix(right))
             case UnaryOperation(op, left) => UnaryOperation(op, fix(left))
             case TupleValue(values) => TupleValue(values.map(fix(_)))
             case FunctionCallValue(name, args, typeargs, sel) => FunctionCallValue(fix(name), args.map(fix(_)), typeargs.map(fix(_)), sel)
@@ -642,6 +645,7 @@ object Utils{
             case DotValue(left, right) => DotValue(subst(left, from, to), subst(right, from, to))
             case VariableValue(name, sel) => if name.toString() == from then to else instr
             case BinaryOperation(op, left, right) => BinaryOperation(op, subst(left, from, to), subst(right, from, to))
+            case TernaryOperation(left, middle, right) => TernaryOperation(subst(left, from, to), subst(middle, from, to), subst(right, from, to))
             case UnaryOperation(op, left) => UnaryOperation(op, subst(left, from, to))
             case TupleValue(values) => TupleValue(values.map(subst(_, from, to)))
             case FunctionCallValue(name, args, typeargs, selector) => FunctionCallValue(name, args.map(subst(_, from, to)), typeargs, selector)
@@ -772,6 +776,7 @@ object Utils{
                     case Some(value) => value.getType()
             }
             case BinaryOperation(op, left, right) => combineType(op, typeof(left), typeof(right), expr)
+            case TernaryOperation(left, middle, right) => typeof(middle)
             case UnaryOperation(op, left) => BoolType
             case TupleValue(values) => TupleType(values.map(typeof(_)))
             case FunctionCallValue(name, args, typeargs, selector) => {
@@ -812,6 +817,7 @@ object Utils{
             case "in" if t1 == EntityType => EntityType
             case "in" => BoolType
             case "==" | "<=" | "<" | ">" | ">=" => BoolType
+            case "??" => t1
             case "+" | "-" | "*" | "/" | "%" | "^" => {
                 (t1, t2) match
                     case (IntType, IntType) => IntType
@@ -836,6 +842,7 @@ object Utils{
                     case (BoolType | IntType | FloatType, BoolType | IntType | FloatType) => BoolType
                     case (a, b) => throw new Exception(f"Unexpect type in ${expr} found $a and $b, exptected: bool and bool") 
             }
+            case _ => throw new Exception(f"Unexpect operator in ${expr} found $op")
         }
     }
 
@@ -846,6 +853,7 @@ object Utils{
         expr match{
             case FunctionCallValue(_, _, _, _) => true
             case BinaryOperation(_, left, right) => containsFunctionCall(left) || containsFunctionCall(right)
+            case TernaryOperation(left, middle, right) => containsFunctionCall(left) || containsFunctionCall(middle) || containsFunctionCall(right)
             case UnaryOperation(_, left) => containsFunctionCall(left)
             case TupleValue(values) => values.exists(containsFunctionCall(_))
             case ArrayGetValue(name, index) => containsFunctionCall(name)
@@ -882,6 +890,7 @@ object Utils{
     def contains(expr: Expression, predicate: Expression=>Boolean): Boolean = {
         expr match
             case BinaryOperation(_, left, right) => contains(left, predicate) || contains(right, predicate) || predicate(expr)
+            case TernaryOperation(left, middle, right) => contains(left, predicate) || contains(middle, predicate) || contains(right, predicate) || predicate(expr)
             case UnaryOperation(op, left) => contains(left, predicate) || predicate(expr)
             case ArrayGetValue(name, index) => contains(name, predicate) || index.exists(contains(_, predicate)) || predicate(expr)
             case TupleValue(values) => values.exists(contains(_, predicate)) || predicate(expr)
@@ -923,6 +932,14 @@ object Utils{
                     case ("!",BoolValue(value)) => BoolValue(!value)
                     case (op, other) => UnaryOperation(op, other)
                 }
+            }
+            case TernaryOperation(left, middle, right) => {
+                val nl = simplify(left)
+                val nm = simplify(middle)
+                val nr = simplify(right)
+                (nl, nm, nr) match
+                    case (BoolValue(a), b, c) => if a then b else c
+                    case (a, b, c) => TernaryOperation(a, b, c)
             }
             case BinaryOperation("??", left, right) => {
                 val nl = simplify(left)

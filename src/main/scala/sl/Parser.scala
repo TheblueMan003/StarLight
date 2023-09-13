@@ -17,11 +17,11 @@ import objects.Variable
 object Parser extends StandardTokenParsers{
   lexical.delimiters ++= List("(", ")", "\\", ".", "..", ":", "=", "->", "{", "}", ",", "*", "[", "]", "/", "+", "-", "*", "/", "\\", "%", "&&", "||", "=>", ";",
                               "+=", "-=", "/=", "*=", "%=", "?=", ":=", "%", "@", "@e", "@a", "@s", "@r", "@p", "~", "^", "<=", "==", ">=", "<", ">", "!=", "%%%", "???", "$",
-                              "!", "!=", "#", "<<", ">>", "&", "<<=", ">>=", "&=", "|=", "::", ":>", "??")
+                              "!", "!=", "#", "<<", ">>", "&", "<<=", ">>=", "&=", "|=", "::", ":>", "??", "?")
   lexical.reserved   ++= List("true", "false", "if", "then", "else", "return", "switch", "for", "do", "while", "by", "is",
                               "as", "at", "with", "to", "import", "doc", "template", "null", "typedef", "foreach", "in", "not",
                               "def", "package", "struct", "enum", "class", "lazy", "jsonfile", "blocktag", "throw", "try", "catch", "finally",
-                              "public", "protected", "private", "scoreboard", "forgenerate", "from", "rotated", "facing", "align", "case",
+                              "public", "protected", "private", "scoreboard", "forgenerate", "from", "rotated", "facing", "align", "case", "default",
                               "ticking", "loading", "predicate", "extends", "implements", "new", "const", "static", "virtual", "abstract", "override", "repeat")
 
 
@@ -188,7 +188,10 @@ object Parser extends StandardTokenParsers{
         
   def switchCaseBase: Parser[SwitchCase] = 
     (exprNoTuple <~ "->") ~ instruction ^^ (p => SwitchCase(p._1, p._2)) |
-    ("case" ~> exprNoTuple <~ ":") ~ instruction ^^ (p => SwitchCase(p._1, p._2))
+    ("case" ~> exprNoTuple <~ ":") ~ instruction ^^ (p => SwitchCase(p._1, p._2)) |
+    ("default" ~ ":") ~> instruction ^^ (p => SwitchCase(DefaultValue, p)) |
+    ("default" ~> "->") ~> instruction ^^ (p => SwitchCase(DefaultValue, p))
+    
   def switchCase: Parser[SwitchElement] = 
     switchCaseBase
     | positioned((("foreach" ~ opt("(") ~> ident <~ "in") ~ exprNoTuple <~ opt(")")) ~ (opt("{") ~> switchCaseBase <~ opt("}")) ^^ { case v ~ e ~ i => SwitchForEach(v, e, i) })
@@ -359,7 +362,8 @@ object Parser extends StandardTokenParsers{
   def typeArgumentExpression= opt("<" ~ repsep(exprBottom,",") ~ ">") ^^ {case Some(_ ~ a ~ _) => a;case None => List()}
 
   def exprDot: Parser[Expression] = positioned(rep1sep(exprBottom, ".") ^^ { case e if e.size == 1 => e.head; case e => e.tail.foldLeft(e.head)((p, n) => DotValue(p, n))})
-  def exprRange: Parser[Expression] = positioned(exprDot ~ opt(".."~>exprDot ~ opt("by"~>exprDot)) ^^ { case e ~ None => e; case e1 ~ Some(e2 ~ None) => RangeValue(e1, e2, IntValue(1)); case e1 ~ Some(e2 ~ Some(e3)) => RangeValue(e1, e2, e3)})
+  def ternaryOperator: Parser[Expression] = positioned(exprDot ~ opt("?" ~> exprNoTuple ~ ":" ~ exprNoTuple) ^^ {case e1 ~ Some(e2 ~ _ ~ e3) => TernaryOperation(e1, e2, e3); case e1 ~ None => e1})
+  def exprRange: Parser[Expression] = positioned(ternaryOperator ~ opt(".."~>ternaryOperator ~ opt("by"~>ternaryOperator)) ^^ { case e ~ None => e; case e1 ~ Some(e2 ~ None) => RangeValue(e1, e2, IntValue(1)); case e1 ~ Some(e2 ~ Some(e3)) => RangeValue(e1, e2, e3)})
   def exprArray: Parser[Expression] = positioned(exprRange ~ rep("[" ~> rep1sep(expr, ",") <~ "]") ^^ {case e ~ g => g.foldLeft(e)((e, i) => ArrayGetValue(e, i))})
   def exprPow: Parser[Expression] = positioned(exprArray ~ rep("^" ~> exprPow) ^^ {unpack("^", _)})
   def exprMod: Parser[Expression] = positioned(exprPow ~ rep("%" ~> exprMod) ^^ {unpack("%", _)})

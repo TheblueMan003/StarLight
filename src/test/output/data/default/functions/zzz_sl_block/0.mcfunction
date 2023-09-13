@@ -4,10 +4,11 @@
 # ==================================================
 
 scoreboard players operation @s default.object.__ref = default.__totalRefCount tbms.var
-scoreboard players set @s default.object.__refCount 1
+scoreboard players set @s default.object.__refCount -1
 tag @s remove cls_trg
-tag @s add --class.default.AnimatedEntity.C
 tag @s add --class.default.AnimatedEntity.A
+tag @s add --class.default.mc.AnimatedEntity.AnimatedEntity
+tag @s add --class.default.mc.Entity.Entity
 scoreboard players set @s default.object.---__destroy__ 357358517
 tag @s add --class.default.object
-tag @s add --class.default.AnimatedEntity.B
+scoreboard players set @s default.mc.AnimatedEntity.AnimatedEntity.animationClear 0

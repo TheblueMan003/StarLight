@@ -797,8 +797,19 @@ object Execute{
                 val expr = Utils.simplify(swit.value)
                 Utils.typeof(expr) match
                     case IntType | FloatType | BoolType | FuncType(_, _) | EnumType(_) | StructType(_, _) | ClassType(_, _) => {
-                        val cases = flattenSwitchCase(swit.cases).map(c => SwitchCase(Utils.simplify(c.expr), c.instr))
-                        expr match{
+                        val cases2 = flattenSwitchCase(swit.cases).map(c => SwitchCase(Utils.simplify(c.expr), c.instr))
+
+                        val hasDefaultCase = cases2.exists(_.expr == DefaultValue)
+                        var prev = List[IRTree]()
+                        var variDone: Variable = null
+                        val cases = if (!hasDefaultCase) cases2 else {
+                            variDone = context.getFreshVariable(BoolType)
+                            prev = variDone.assign("=", BoolValue(true))
+                            cases2.filterNot(_.expr == DefaultValue).map(x => SwitchCase(x.expr, InstructionList(List(VariableAssigment(List((Right(variDone), Selector.self)), "=", BoolValue(false)), x.instr))))
+                        }
+                        val defaultCases = cases2.filter(_.expr == DefaultValue)
+
+                        prev ::: (expr match{
                             case VariableValue(name, sel) if !swit.copyVariable=> {
                                 makeTree(context.getVariable(name), cases.par.filter(_.expr.hasIntValue()).map(x => (x.expr.getIntValue(), x.instr)).toList):::
                                 cases.par.filter(!_.expr.hasIntValue()).flatMap(x => ifs(If(switchComp(VariableValue(name), x.expr), x.instr, List()))).toList
@@ -848,7 +859,9 @@ object Execute{
                                 vari.assign("=", swit.value) ::: makeTree(vari, cases.filter(_.expr.hasIntValue()).map(x => (x.expr.getIntValue(), x.instr)))::: 
                                 cases.filter(!_.expr.hasIntValue()).flatMap(x => ifs(If(switchComp(LinkedVariableValue(vari), x.expr), x.instr, List())))
                             }
-                        }
+                        })::: defaultCases.flatMap(x =>
+                            ifs(If(LinkedVariableValue(variDone), x.instr, List()))
+                        )
                     }
                     case TupleType(sub) => {
                         def getHead(expr: Expression): Expression = {

@@ -349,6 +349,15 @@ case class BinaryOperation(val op: String, val left: Expression, val right: Expr
     override def getString()(implicit context: Context): String = f"(${left.getString()} $op ${right.getString()})"
 }
 
+case class TernaryOperation(val left: Expression, val middle: Expression, val right: Expression) extends Expression{
+    override def toString(): String = f"($left ? $middle : $right)"
+    override def getIntValue(): Int = ???
+    override def hasIntValue(): Boolean = false
+    override def hasFloatValue(): Boolean = false
+    override def getFloatValue(): Double = ???
+    override def getString()(implicit context: Context): String = f"(${left.getString()} ? ${middle.getString()} : ${right.getString()})"
+}
+
 
 case class UnaryOperation(val op: String, val left: Expression) extends Expression{
     override def toString(): String = f"($op $left)"
