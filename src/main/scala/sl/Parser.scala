@@ -22,7 +22,8 @@ object Parser extends StandardTokenParsers{
                               "as", "at", "with", "to", "import", "doc", "template", "null", "typedef", "foreach", "in", "not",
                               "def", "package", "struct", "enum", "class", "lazy", "jsonfile", "blocktag", "throw", "try", "catch", "finally",
                               "public", "protected", "private", "scoreboard", "forgenerate", "from", "rotated", "facing", "align", "case", "default",
-                              "ticking", "loading", "predicate", "extends", "implements", "new", "const", "static", "virtual", "abstract", "override", "repeat")
+                              "ticking", "loading", "predicate", "extends", "implements", "new", "const", "static", "virtual", "abstract", "override", "repeat",
+                              "sleep", "async", "await")
 
 
   def block: Parser[Instruction] = positioned("{" ~> rep(instruction <~ opt(";")) <~ "}" ^^ (p => InstructionBlock(p)))
@@ -67,6 +68,8 @@ object Parser extends StandardTokenParsers{
       | ((((doc ~ (opt("def") ~> modifier)) ~ types) ~ identLazy ~ typeArgument) ~ arguments) ~ instruction ^^ { case doc ~ mod ~ t ~ n ~ at ~ a ~i  => FunctionDecl(n, i, t, a, at, mod.withDoc(doc)) }
       | functionCall
       | selectorFunctionCall
+      | sleepInstr
+      | awaitInstr
       | packageInstr
       | structDecl
       | caseStruct
@@ -106,15 +109,20 @@ object Parser extends StandardTokenParsers{
       | constructorCall ^^ {case c => FreeConstructorCall(c)}
   )
 
-  def functionCall: Parser[Instruction] = (((identFunction ~ typeVariables <~ "(") ~ repsep(exprNoTuple, ",")) <~ ")") ~ block ^^ {case f ~ t ~ e ~ b => FunctionCall(f, e ::: List(LambdaValue(List(), b, null)), t)} // Function Call
-      | ((identFunction ~ typeVariables <~ "(") ~ repsep(exprNoTuple, ",")) <~ ")" ^^ {case f ~ t ~ e => FunctionCall(f, e, t)} // Function Call
-      | (identFunction ~ typeVariables) ~ block ^^ {case f ~ t ~ b => FunctionCall(f, List(LambdaValue(List(), b, null)), t)} // Function Call
+  def functionCall: Parser[FunctionCall] = (((identFunction ~ typeVariables <~ "(") ~ repsep(exprNoTuple, ",")) <~ ")") ~ block ^^ {case f ~ t ~ e ~ b => FunctionCall(f, e ::: List(LambdaValue(List(), b, null)), t)} // Function Call
+      | (((identFunction ~ typeVariables <~ "(") ~ repsep(exprNoTuple, ",")) <~ ")") ^^ {case f ~ t ~ e => FunctionCall(f, e, t)} // Function Call
+      | (identFunction ~ typeVariables) ~ block ^^ {case f ~ t ~ b  => FunctionCall(f, List(LambdaValue(List(), b, null)), t)} // Function Call
 
-  def selectorFunctionCall: Parser[Instruction] = selector ~ "." ~ functionCall ^^  {case s ~ _ ~ f => With(SelectorValue(s), BoolValue(false), BoolValue(true), f, null)} 
+  def selectorFunctionCall: Parser[Instruction] = selector ~ "." ~ functionCall ^^  {case s ~ _ ~ f => With(SelectorValue(s), BoolValue(false), BoolValue(true), f, null)}
+
+  def continuation: Parser[Instruction] = positioned(opt(";") ~> rep(instruction <~ opt(";")) ^^ (p => InstructionList(p)))
+
+  def sleepInstr: Parser[Instruction] = positioned(("sleep" ~> exprNoTuple ) ~ continuation ^^ {case e ~ instr => Sleep(e, instr)})
+  def awaitInstr: Parser[Instruction] = positioned(("await" ~> functionCall ) ~ continuation ^^ {case e ~ instr => Await(e, instr)})
 
   def anyKeyword: Parser[String] = lexical.reserved.map(f => f ^^ (p => p)).reduce(_ | _)
-  def throwError: Parser[Instruction] = "throw"~exprNoTuple ^^ {case _ ~ e => Throw(e)}
-  def tryCatchFinalyBlock: Parser[Instruction] = "try"~>block~opt("catch"~>block)~opt("finally"~>block) ^^ {case b ~ c ~ f => Try(b, c.getOrElse(InstructionList(List())), f.getOrElse(InstructionList(List())))}
+  def throwError: Parser[Instruction] = positioned("throw"~exprNoTuple ^^ {case _ ~ e => Throw(e)})
+  def tryCatchFinalyBlock: Parser[Instruction] = positioned("try"~>block~opt("catch"~>block)~opt("finally"~>block) ^^ {case b ~ c ~ f => Try(b, c.getOrElse(InstructionList(List())), f.getOrElse(InstructionList(List())))})
 
   def predicate:Parser[Instruction] = positioned(doc ~ (modifier <~ "predicate") ~ identLazy ~ arguments ~ json ^^ {case doc ~ mod ~ name ~ args ~ json => PredicateDecl(name, args, json, mod.withDoc(doc))})
   def arrayAssign:Parser[Instruction] = positioned((identLazy2 <~ "[") ~ (rep1sep(exprNoTuple, ",") <~ "]") ~ assignmentOp ~ expr ^^ { case a ~ i ~ o ~ e => ArrayAssigment(Left(a), i, o, e) })
@@ -434,7 +442,7 @@ object Parser extends StandardTokenParsers{
                             ((nonRecTypes <~ "[" ~ "]")) ^^ (p => ArrayType(p, null)) |
                             nonRecTypes
 
-  def modifierSub: Parser[String] = ("override" | "virtual" |"lazy" | "scoreboard" | "ticking" | "loading" | "helper" | "static" | "const")
+  def modifierSub: Parser[String] = ("override" | "virtual" |"lazy" | "scoreboard" | "ticking" | "loading" | "helper" | "static" | "const" | "async")
   def modifierAttribute: Parser[(String,Expression)] = ident2 ~ "=" ~ exprNoTuple ^^ {case i ~ _ ~ e => (i, e)}
   def modifierAttributes: Parser[Map[String,Expression]] = opt("[" ~> rep1sep(modifierAttribute,",") <~"]") ^^ {(_.getOrElse(List()).toMap)}
   def modifier: Parser[Modifier] = 
@@ -460,6 +468,7 @@ object Parser extends StandardTokenParsers{
       if subs.contains("helper")    then {mod.isHelper = true}
       if subs.contains("static")    then {mod.isStatic = true}
       if subs.contains("const")     then {mod.isConst = true}
+      if subs.contains("async")     then {mod.isAsync = true}
 
       mod
     }
@@ -490,7 +499,7 @@ object Parser extends StandardTokenParsers{
     phrase(program)(tokens) match {
       case Success(trees, _) =>
         Reporter.ok(f"Parsed: $file")
-        Some(StaticAnalyser.check(trees))
+        Some(StaticAnalyser.handleSleep(StaticAnalyser.check(trees)))
       case e =>
         println(f"Error in file '${file}'': ${e}")
         None

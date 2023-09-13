@@ -2,13 +2,11 @@ package sl
 
 import objects.{Context, ConcreteFunction, GenericFunction, LazyFunction, Modifier, Struct, Class, Template, Variable, Enum, EnumField, Predicate, Property}
 import objects.Identifier
-import objects.types.{VoidType, TupleType, IdentifierType, ArrayType, IntType}
+import objects.types.{VoidType, TupleType, IdentifierType, ArrayType, IntType, FuncType, RangeType, StructType}
 import sl.Compilation.Execute
 import sl.Compilation.Selector.Selector
 import objects.types.JsonType
 import sl.IR.*
-import objects.types.RangeType
-import objects.types.StructType
 import scala.collection.parallel.CollectionConverters._
 import scala.collection.mutable.ArrayBuffer
 
@@ -72,10 +70,13 @@ object Compiler{
     def compile(instruction: Instruction, meta: Meta = Meta(false, false))(implicit context: Context):List[IRTree]={   
         try{
             instruction match{
-                case FunctionDecl(name3, block, typ2, args, typevars, modifier) =>{
+                case FunctionDecl(name3, block, typ2, args2, typevars, modifier) =>{
                     val name2 = if context.getCurrentClass() != null && name3 == "this" then "__init__" else name3
                     val name = if (name2 == "~") then context.getFreshLambdaName() else name2
                     var fname = context.getFunctionWorkingName(name)
+
+                    val args = if (modifier.isAsync) args2 ::: List(Argument("--await_callback--", FuncType(List(), VoidType), None)) else args2
+
                     modifier.simplify()
                     if (typevars.length > 0){
                         val func = new GenericFunction(context, context.getPath()+"."+name, fname, args, typevars, typ2, modifier, block.unBlockify())
@@ -435,6 +436,14 @@ object Compiler{
                 case whl: DoWhileLoop => Execute.doWhileLoop(whl)
                 case at: Execute => Execute.executeInstr(at)
                 case wth: With => Execute.withInstr(wth)
+                case Sleep(time, continuation) => {
+                    val uargs = List(time, LambdaValue(List(), continuation, context))
+                    val (fct,cargs) = context.getFunction(Identifier.fromString("__sleep__"), uargs, List(), VoidType)
+                    (fct, cargs).call()
+                }
+                case Await(func, continuation) => {
+                    Compiler.compile(FunctionCall(func.name, func.args ::: List(LambdaValue(List(), continuation, context)), func.typeargs))
+                }
                 case ElseIf(cond, ifBlock) => throw new Exception("Unexpected Instruction")
             }
         }

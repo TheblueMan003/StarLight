@@ -59,6 +59,10 @@ def lazy __repeat__(int variable, void=>void action){
         action()
     }
 }
+def lazy __sleep__(int time, void=>void action){
+    import cmd.schedule as schedule
+    schedule.add(time, action)
+}
 
 def lazy aligned(void=>void fct){
     align("xyz")at(~0.5 ~ ~0.5)fct()

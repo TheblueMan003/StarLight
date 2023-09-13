@@ -130,10 +130,20 @@ abstract class Function(context: Context, val contextName: String, name: String,
     def argMap(args: List[Expression]) = {
         if args.size > argumentsVariables.size then throw new Exception(f"Too much argument for $fullName got: $args expected: $arguments")
         if args.length < minArgCount then throw new Exception(f"Too few argument for $fullName got: $args expected: $arguments")
-        argumentsVariables.filter(_.getType() != VoidType)
-                .zip(arguments.map(_.defValue))
-                .zipAll(args, null, null)
-                .map(p => (p._1._1, if p._2 == null then p._1._2.get else p._2))
+
+        if (modifiers.isAsync){
+            argumentsVariables.dropRight(1).filter(_.getType() != VoidType)
+                    .zip(arguments.dropRight(1).map(_.defValue))
+                    .zipAll(args.dropRight(1), null, null)
+                    .map(p => (p._1._1, if p._2 == null then p._1._2.get else p._2)) :::
+            List((argumentsVariables.last, args.last))
+        }
+        else{
+            argumentsVariables.filter(_.getType() != VoidType)
+                    .zip(arguments.map(_.defValue))
+                    .zipAll(args, null, null)
+                    .map(p => (p._1._1, if p._2 == null then p._1._2.get else p._2))
+        }
     }
     def exists(): Boolean
     def getName(): String
@@ -392,7 +402,7 @@ class TagFunction(context: Context, _contextName: String, name: String, argument
     }
 }
 
-class ClassFunction(_contextName: String, variable: Variable, function: Function) extends Function(function.context, _contextName, function.name, function.arguments, function.getType(), function.modifiers){
+class ClassFunction(_contextName: String, variable: Variable, function: Function, clazz: Class) extends Function(function.context, _contextName, function.name, function.arguments, function.getType(), function.modifiers){
     override def exists()= false
 
     override def getContent(): List[IRTree] = List()
@@ -417,13 +427,14 @@ class ClassFunction(_contextName: String, variable: Variable, function: Function
         def callNoEntity(comp: Variable, ret: Variable = null) = {
             val tmp = args2.map(a => noScoreboardArg(a))
             val args3 = tmp.map(a => a._2)
+            val ctx2 = ctx.push(ctx.getFreshId(), clazz)
             tmp.flatMap(a => a._1) ::: Compiler.compile(With(
                 selector, 
                 BoolValue(false), 
                 BinaryOperation("==", LinkedVariableValue(comp), LinkedVariableValue(ctx.root.push("object").getVariable("__ref"))),
                 LinkedFunctionCall(function, args3, ret),
                 null
-                ))
+                ))(ctx2)
         }
 
         var pre = List[IRTree]()

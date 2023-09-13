@@ -1,15 +1,14 @@
-package AnimatedEntity
+package test
 
 import standard::print
 
-import mc.AnimatedEntity
-
-class A extends AnimatedEntity with minecraft:cow for mcjava{
-    def test(){
-        playAnimation("cow")
-    }
-}
-
 def test(){
-    new A()
+    int count = 10
+    while(count > 0){
+        /say hi
+        sleep 5
+        /say wait
+        count --
+    }
+    /say bye
 }

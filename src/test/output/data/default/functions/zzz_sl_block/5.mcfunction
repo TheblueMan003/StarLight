@@ -1,7 +1,13 @@
 # ==================================================
-# void default.zzz_sl_block.5()
-# a.k.a default.mc.AnimatedEntity.AnimatedEntity.0.lambda_1
+# void default.zzz_sl_block.5(int __fct__)
+# a.k.a default.zzz_sl_mux.void___to___void
+# ==================================================
+# ==================================================
+# Function Multiplexer for List(int) => void
+# 
+# default.zzz_sl_block.9 -> 137959428
+# default.zzz_sl_block.10 -> -305346944
 # ==================================================
 
-scoreboard players set default.zzz_sl_mux.void___to___void.__fct__ tbms.var 0
-function animated_java:cow/animations/cow/stop
+execute if score default.zzz_sl_mux.void___to___void.__fct__ tbms.var matches 137959428 run function default:zzz_sl_block/9
+execute if score default.zzz_sl_mux.void___to___void.__fct__ tbms.var matches -305346944 run function default:zzz_sl_block/10

@@ -1,13 +1,7 @@
 # ==================================================
-# void default.zzz_sl_block.1(int __fct__)
-# a.k.a default.zzz_sl_mux.void___to___void
-# ==================================================
-# ==================================================
-# Function Multiplexer for List(int) => void
-# 
-# default.object.__destroy__ -> 357358517
-# default.zzz_sl_block.5 -> 880267506
+# void default.zzz_sl_block.1()
+# a.k.a default.test.test.--async_while--.0
 # ==================================================
 
-execute if score default.zzz_sl_mux.void___to___void.__fct__ tbms.var matches 357358517 run function default:object/__destroy__
-execute if score default.zzz_sl_mux.void___to___void.__fct__ tbms.var matches 880267506 run function default:zzz_sl_block/5
+scoreboard players set default.test.test.-setup-loop- tbms.var 1
+scoreboard players operation default.test.test.--async_while--.-exit-loop- tbms.var = default.test.test.--async_while--.--await_callback-- tbms.var

@@ -492,6 +492,31 @@ Here is a list of used attributes by the compiler:
 - `java_rp`: (bool) Add the file to the Java Resources Pack
 - `bedrock_rp`: (bool) Add the file to the Bedrock Resources Pack
 
+## Async Programming
+You can "pause" the execute of a function with sleep. For Instance, the following code will print "hello" and wait 20 ticks before printing "world":
+```
+def example(){
+    print("hello")
+    sleep 20
+    print("world")
+}
+```
+If you call the above function inside another function, the calling function won't have its execution paused. To have the calling function be also pause the called function must be mark as `async` and the `await` keyword must be used a the call site.
+For example:
+```
+def async foo(){
+    print("hello")
+    sleep 20
+    print("world")
+}
+def bar(){
+    print("hello")
+    await foo()
+    print("world")
+}
+```
+will result as `hello hello world world`
+
 ## Predicate (JAVA Only)
 Predicate can be defined like function but with a json body.
 ```

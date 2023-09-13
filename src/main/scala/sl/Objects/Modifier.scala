@@ -35,6 +35,7 @@ class Modifier() extends Serializable{
     var isLoading = false
     var isStatic = false
     var isHelper = false
+    var isAsync = false
     var tags = ArrayBuffer[String]()
     var attributes = Map[String,Expression]()
     var doc: String = ""
@@ -66,6 +67,7 @@ class Modifier() extends Serializable{
         ret.isLoading = isLoading | other.isLoading
         ret.isHelper = isHelper | other.isHelper
         ret.isStatic = isStatic | other.isStatic
+        ret.isAsync = isAsync | other.isAsync
         ret.tags = tags ++ other.tags
         ret.attributes = attributes ++ other.attributes
         ret
@@ -123,6 +125,7 @@ class Modifier() extends Serializable{
         if isLoading then ret += " loading"
         if isStatic then ret += " static"
         if isHelper then ret+=" helper"
+        if isAsync then ret+=" async"
         if tags.length > 0 then ret += " "+tags.mkString(" ")
         if attributes.size > 0 then ret += " ["+attributes.map(a => s"${a._1}=${a._2}").mkString(",")+"]"
         ret

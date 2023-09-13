@@ -6,6 +6,8 @@ import objects.types.VoidType
 import objects._
 import objects.types.BoolType
 import objects.types.IntType
+import objects.types.Type
+import objects.types.FuncType
 
 enum ReturnState{
     case None
@@ -148,8 +150,8 @@ object StaticAnalyser{
             }
             lst.reverse
     }
-    def getDeclaration(name: String, value: Expression): Instruction = {
-        VariableDecl(List(name), IntType, Modifier.newPrivate(), "=", value)
+    def getDeclaration(name: String, value: Expression, typ: Type = IntType): Instruction = {
+        VariableDecl(List(name), typ, Modifier.newPrivate(), "=", value)
     }
     def getAssignment(name: String, value: Expression): Instruction = {
         VariableAssigment(List((Left(Identifier.fromString(name)), Selector.self)), "=", value)
@@ -157,4 +159,208 @@ object StaticAnalyser{
     def getComparaison(name: String, value: Expression): Expression = {
         BinaryOperation("==", VariableValue(name), value)
     }
+
+    def handleSleep(instruction: Instruction):Instruction = {
+        val (newInstr, changed) = handleSleep(instruction, List())
+        newInstr
+    }
+    def convertWhileToFunction(loop: WhileLoop): Instruction = {
+        val mod = Modifier.newPrivate()
+        mod.isAsync = true
+        val loopExit = InstructionList(List(getAssignment("--await_callback--", VariableValue("-exit-loop-"))))
+        val init = If(getComparaison("-setup-loop-", BoolValue(false)), InstructionList(List(getAssignment("-setup-loop-", BoolValue(true)), getDeclaration("-exit-loop-", VariableValue("--await_callback--"), FuncType(List(), VoidType)))), List())
+        val block =  InstructionList(List(init, loop.block, If(loop.cond, InstructionList(List(Await(FunctionCall(Identifier.fromString("--async_while--"), List(), List()), InstructionList(List())))), List(ElseIf(BoolValue(true), loopExit)))))
+        val func = FunctionDecl("--async_while--", block, VoidType, List(), List(), mod)
+        val call = Await(FunctionCall(Identifier.fromString("--async_while--"), List(), List()), InstructionList(List()))
+
+        val newBlock = InstructionBlock(List(getDeclaration("-setup-loop-", BoolValue(false), BoolType), func, If(loop.cond, call, List())))
+        newBlock
+    }
+    def convertDoWhileToFunction(loop: DoWhileLoop): Instruction = {
+        val mod = Modifier.newPrivate()
+        mod.isAsync = true
+        val loopExit = InstructionList(List(getAssignment("--await_callback--", VariableValue("-exit-loop-"))))
+        val init = If(getComparaison("-setup-loop-", BoolValue(false)), InstructionList(List(getAssignment("-setup-loop-", BoolValue(true)), getDeclaration("-exit-loop-", VariableValue("--await_callback--"), FuncType(List(), VoidType)))), List())
+        val block =  InstructionList(List(init, loop.block, If(loop.cond, InstructionList(List(Await(FunctionCall(Identifier.fromString("--async_while--"), List(), List()), InstructionList(List())))), List(ElseIf(BoolValue(true), loopExit)))))
+        val func = FunctionDecl("--async_while--", block, VoidType, List(), List(), mod)
+        val call = Await(FunctionCall(Identifier.fromString("--async_while--"), List(), List()), InstructionList(List()))
+
+        val newBlock = InstructionBlock(List(getDeclaration("-setup-loop-", BoolValue(false), BoolType), func, call))
+        newBlock
+    }
+    def needConversion(inst: Instruction): Boolean = {
+        Utils.contains(inst, x => x match
+            case Await(_, _) => true
+            case Sleep(_, _) => true
+            case _ => false)
+    }
+    def handleSleep(instruction: Instruction, rest: List[Instruction]): (Instruction, Boolean) = {
+        val ret = instruction match
+            case Sleep(time, continuation) => 
+                val (newContinuation, changed) = handleSleep(continuation, rest)
+                if changed then
+                    (Sleep(time, newContinuation), true)
+                else
+                    (Sleep(time, InstructionList(newContinuation :: rest)), true)
+            case Await(func, continuation) => 
+                val (newContinuation, changed) = handleSleep(continuation, rest)
+                if changed then
+                    (Await(func, newContinuation), true)
+                else
+                    (Await(func, InstructionList(newContinuation :: rest)), true)
+            case FunctionDecl(name, block, typ, args, typeArgs, modifier) => 
+                if (modifier.isAsync) then
+                    (FunctionDecl(name, handleSleep(InstructionList(List(block, FunctionCall(Identifier.fromString("--await_callback--"), List(), List())))), typ, args, typeArgs, modifier), false)
+                else
+                    (FunctionDecl(name, handleSleep(block), typ, args, typeArgs, modifier), false)
+            case ClassDecl(name, generics, block, modifier, parent, parentGenerics, interfaces, entity) => 
+                (ClassDecl(name, generics, handleSleep(block), modifier, parent, parentGenerics, interfaces, entity), false)
+            case StructDecl(name, generics, block, modifier, parent) => 
+                (StructDecl(name, generics, handleSleep(block), modifier, parent), false)
+            case TemplateDecl(name, block, modifier, parent, generics, parentGenerics) => 
+                (TemplateDecl(name, handleSleep(block), modifier, parent, generics, parentGenerics), false)
+            case TemplateUse(template, name, block, values) => 
+                (TemplateUse(template, name, handleSleep(block), values), false)
+            case Package(name, block) => 
+                (Package(name, handleSleep(block)), false)
+            case InstructionList(list) => {
+                list.foldRight((InstructionList(List()), false))((instr, acc) => {
+                    val (newInstr, changed) = handleSleep(instr, acc._1 match
+                        case InstructionList(list) => list ::: rest)
+                    
+                    if (changed){
+                        (InstructionList(newInstr :: Nil), changed || acc._2)
+                    }
+                    else{
+                        (InstructionList(newInstr :: acc._1 :: Nil), changed || acc._2)
+                    }
+                })
+            }
+            case InstructionBlock(list) => {
+                list.foldRight((InstructionList(List()), false))((instr, acc) => {
+                    val (newInstr, changed) = handleSleep(instr, acc._1 match
+                        case InstructionList(list) => list ::: rest)
+                    
+                    if (changed){
+                        (InstructionList(newInstr :: Nil), changed || acc._2)
+                    }
+                    else{
+                        (InstructionList(newInstr :: acc._1 :: Nil), changed || acc._2)
+                    }
+                })
+            }
+            case loop@WhileLoop(cond, block) => 
+                if needConversion(block) then
+                    handleSleep(convertWhileToFunction(loop), rest)
+                else
+                    (WhileLoop(cond, block), false)
+            case loop@DoWhileLoop(cond, block) => 
+                if needConversion(block) then
+                    handleSleep(convertDoWhileToFunction(loop), rest)
+                else
+                    (DoWhileLoop(cond, block), false)
+            case If(cond, ifBlock, elseBlock) => 
+                val needed = needConversion(ifBlock) || elseBlock.exists(e => needConversion(e.ifBlock))
+                if needed then
+                    var (newIfBlock, ifChanged) = handleSleep(ifBlock, rest)
+
+                    if (!ifChanged){
+                        newIfBlock = InstructionList(newIfBlock :: rest)
+                    }
+
+                    val elze = elseBlock.map(e => {
+                        val (newElseBlock, elseChanged) = handleSleep(e.ifBlock, rest)
+                        if (elseChanged){
+                            (ElseIf(e.cond, newElseBlock), elseChanged)
+                        }
+                        else{
+                            (ElseIf(e.cond, InstructionList(newElseBlock :: rest)), elseChanged)
+                        }
+                    })
+
+
+                    (If(cond, newIfBlock, elze.map(_._1):::List(ElseIf(BoolValue(true), InstructionList(rest)))), true)
+                else
+                    (instruction, false)
+            case Switch(value, cases, copyVariable) => {
+                val needed = cases.exists{
+                    case x: SwitchCase => needConversion(x.instr)
+                    case x: SwitchForGenerate => needConversion(x.instr.instr)
+                    case x: SwitchForEach => needConversion(x.instr.instr)
+                }
+
+                if (needed){
+                    val newCases = cases.map{
+                        case x: SwitchCase => {
+                            val (newInstr, changed) = handleSleep(x.instr, rest)
+                            if (changed){
+                                SwitchCase(x.expr, newInstr)
+                            }
+                            else{
+                                SwitchCase(x.expr, InstructionList(newInstr :: rest))
+                            }
+                        }
+                        case x: SwitchForGenerate => {
+                            val (newInstr, changed) = handleSleep(x.instr.instr, rest)
+                            if (changed){
+                                SwitchForGenerate(x.key, x.provider, SwitchCase(x.instr.expr, newInstr))
+                            }
+                            else{
+                                SwitchForGenerate(x.key, x.provider, SwitchCase(x.instr.expr, InstructionList(newInstr :: rest)))
+                            }
+                        }
+                        case x: SwitchForEach => {
+                            val (newInstr, changed) = handleSleep(x.instr.instr, rest)
+                            if (changed){
+                                SwitchForEach(x.key, x.provider, SwitchCase(x.instr.expr, newInstr))
+                            }
+                            else{
+                                SwitchForEach(x.key, x.provider, SwitchCase(x.instr.expr, InstructionList(newInstr :: rest)))
+                            }
+                        }
+                    }
+                    (Switch(value, newCases, copyVariable), true)
+                }
+                else{
+                    (instruction, false)
+                }
+            }
+            case Execute(typ, exprs, block) => 
+                val (newBlock, changed) = handleSleep(block, rest)
+                if (changed){
+                    (Execute(typ, exprs, newBlock), true)
+                }
+                else{
+                    (instruction, true)
+                }
+            case With(expr, isat, cond, block, elze) => 
+                val (newBlock, changed) = handleSleep(block, rest)
+                val (newElze, elzeChanged) = handleSleep(elze, rest)
+                if (changed || elzeChanged){
+                    (With(expr, isat, cond, newBlock, newElze), true)
+                }
+                else{
+                    (instruction, false)
+                }
+            case ForEach(key, provider, instr) => 
+                val (newInstr, changed) = handleSleep(instr, rest)
+                if (changed){
+                    (ForEach(key, provider, newInstr), true)
+                }
+                else{
+                    (instruction, false)
+                }
+            case ForGenerate(key, provider, instr) =>
+                val (newInstr, changed) = handleSleep(instr, rest)
+                if (changed){
+                    (ForGenerate(key, provider, newInstr), true)
+                }
+                else{
+                    (instruction, false)
+                }
+            
+            case other => (other, false)
+        (Utils.positioned(instruction, ret._1), ret._2)
+    }
+
 }

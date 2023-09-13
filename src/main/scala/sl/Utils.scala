@@ -116,6 +116,9 @@ object Utils{
             case Execute(typ, expr, block) => Execute(typ, expr, substReturn(block, to))
             case With(expr, isAt, cond, block, elze) => With(expr, isAt, cond, substReturn(block, to), substReturn(elze, to))
 
+            case Sleep(time, continuation) => Sleep(time, substReturn(continuation, to))
+            case Await(func, continuation) => Await(func, substReturn(continuation, to))
+
             case Switch(cond, cases, cv) => Switch(cond, cases.map{case x: SwitchCase => SwitchCase(x.expr, substReturn(x.instr, to));
                                                                     case x: SwitchForGenerate => SwitchForGenerate(x.key, x.provider, SwitchCase(x.instr.expr, substReturn(x.instr.instr, to)));
                                                                     case x: SwitchForEach => SwitchForEach(x.key, x.provider, SwitchCase(x.instr.expr, substReturn(x.instr.instr, to)));
@@ -166,6 +169,9 @@ object Utils{
 
             case Execute(typ, expr, block) => Execute(typ, expr.map(subst(_, from, to)), subst(block, from, to))
             case With(expr, isAt, cond, block, elze) => With(subst(expr, from, to), subst(isAt, from, to), subst(cond, from, to), subst(block, from, to), subst(elze, from, to))
+
+            case Sleep(time, continuation) => Sleep(subst(time, from, to), subst(continuation, from, to))
+            case Await(func, continuation) => Await(subst(func, from, to).asInstanceOf[FunctionCall], subst(continuation, from, to))
 
             case Switch(cond, cases, cv) => Switch(subst(cond, from, to), cases.map{case x: SwitchCase => SwitchCase(subst(x.expr, from, to), subst(x.instr, from, to));
                                                                                     case x: SwitchForGenerate => SwitchForGenerate(x.key, subst(x.provider, from, to), SwitchCase(subst(x.instr.expr, from, to), subst(x.instr.instr, from, to)));
@@ -271,6 +277,9 @@ object Utils{
 
             case Execute(typ, expr, block) => Execute(typ, expr.map(subst(_, from, to)), subst(block, from, to))
             case With(expr, isAt, cond, block, elze) => With(subst(expr, from, to), subst(isAt, from, to), subst(cond, from, to), subst(block, from, to), subst(elze, from, to))
+
+            case Sleep(time, continuation) => Sleep(subst(time, from, to), subst(continuation, from, to))
+            case Await(func, continuation) => Await(subst(func, from, to).asInstanceOf[FunctionCall], subst(continuation, from, to))
 
             case Switch(cond, cases, cv) => Switch(subst(cond, from, to), cases.map{case x: SwitchCase => SwitchCase(subst(x.expr, from, to), subst(x.instr, from, to));
                                                                                     case x: SwitchForGenerate => SwitchForGenerate(x.key, subst(x.provider, from, to), SwitchCase(subst(x.instr.expr, from, to), subst(x.instr.instr, from, to)));
@@ -389,7 +398,8 @@ object Utils{
 
             case Execute(typ, expr, block) => Execute(typ, expr.map(subst(_, from, to)), subst(block, from, to))
             case With(expr, isAt, cond, block, elze) => With(subst(expr, from, to), subst(isAt, from, to), subst(cond, from, to), subst(block, from, to), subst(elze, from, to))
-
+            case Sleep(time, continuation) => Sleep(subst(time, from, to), subst(continuation, from, to))
+            case Await(func, continuation) => Await(subst(func, from, to).asInstanceOf[FunctionCall], subst(continuation, from, to))
             case Switch(cond, cases, cv) => Switch(subst(cond, from, to), cases.map{case x: SwitchCase => SwitchCase(subst(x.expr, from, to), subst(x.instr, from, to));
                                                                                     case x: SwitchForGenerate => SwitchForGenerate(x.key, subst(x.provider, from, to), SwitchCase(subst(x.instr.expr, from, to), subst(x.instr.instr, from, to)));
                                                                                     case x: SwitchForEach => SwitchForEach(x.key, subst(x.provider, from, to), SwitchCase(subst(x.instr.expr, from, to), subst(x.instr.instr, from, to)));
@@ -437,7 +447,8 @@ object Utils{
 
             case Execute(typ, expr, block) => Execute(typ, expr, rmFunctions(block))
             case With(expr, isAt, cond, block, elze) => With(expr, isAt, cond, rmFunctions(block), rmFunctions(elze))
-
+            case Sleep(time, continuation) => Sleep(time, rmFunctions(continuation))
+            case Await(func, continuation) => Await(func, rmFunctions(continuation))
             case Switch(cond, cases, cv) => Switch(cond, cases.map{case x: SwitchCase => SwitchCase(x.expr, rmFunctions(x.instr));
                                                                     case x: SwitchForGenerate => SwitchForGenerate(x.key, x.provider, SwitchCase(x.instr.expr, rmFunctions(x.instr.instr)));
                                                                     case x: SwitchForEach => SwitchForEach(x.key, x.provider, SwitchCase(x.instr.expr, rmFunctions(x.instr.instr)));
@@ -515,7 +526,8 @@ object Utils{
 
             case Execute(typ, expr, block) => Execute(typ, expr.map(fix(_)), fix(block))
             case With(expr, isAt, cond, block, elze) => With(fix(expr), fix(isAt), fix(cond), fix(block), fix(elze))
-
+            case Sleep(time, continuation) => Sleep(fix(time), fix(continuation))
+            case Await(func, continuation) => Await(fix(func).asInstanceOf[FunctionCall], fix(continuation))
             case Switch(cond, cases, cv) => Switch(fix(cond), cases.map{case x: SwitchCase => SwitchCase(fix(x.expr), fix(x.instr));
                                                                         case x: SwitchForGenerate => SwitchForGenerate(x.key, fix(x.provider), SwitchCase(fix(x.instr.expr), fix(x.instr.instr)));
                                                                         case x: SwitchForEach => SwitchForEach(x.key, fix(x.provider), SwitchCase(fix(x.instr.expr), fix(x.instr.instr)));
@@ -885,6 +897,38 @@ object Utils{
             case JsonExpression(BoolValue(value), t) => JsonBoolean(value)
             case JsonExpression(NullValue, t) => JsonNull
             case other => other
+    }
+    def contains(instr: SwitchElement, predicate: Instruction=>Boolean): Boolean = { 
+        instr match
+            case SwitchCase(expr, instr) => contains(instr, predicate) || predicate(instr)
+            case SwitchForGenerate(key, provider, instr) => contains(instr, predicate) || predicate(instr.instr)
+            case SwitchForEach(key, provider, instr) => contains(instr, predicate) || predicate(instr.instr)
+    }
+    def contains(instr: Instruction, predicate: Instruction=>Boolean): Boolean = {
+        instr match
+            case InstructionList(list) => list.exists(contains(_, predicate)) || predicate(instr)
+            case InstructionBlock(list) => list.exists(contains(_, predicate)) || predicate(instr)
+            case If(cond, ifBlock, elseBlock) => contains(ifBlock, predicate) || elseBlock.exists(contains(_, predicate)) || predicate(instr)
+            case WhileLoop(cond, block) => contains(block, predicate) || predicate(instr)
+            case DoWhileLoop(cond, block) => contains(block, predicate) || predicate(instr)
+            case Switch(cond, cases, cv) => cases.exists(contains(_, predicate)) || predicate(instr)
+            case Try(block, catches, finalBlock) => contains(block, predicate) || contains(catches, predicate) || contains(finalBlock, predicate) || predicate(instr)
+            case ForGenerate(key, provider, instr) => contains(instr, predicate) || predicate(instr)
+            case ForEach(key, provider, instr) => contains(instr, predicate) || predicate(instr)
+            case With(expr, isAt, cond, block, elze) => contains(block, predicate) || contains(elze, predicate) || predicate(instr)
+            case Execute(typ, expr, block) => contains(block, predicate) || predicate(instr)
+            case TemplateUse(iden, name, instr, values) => contains(instr, predicate) || predicate(instr)
+            case TemplateDecl(name, block, modifier, parent, generics, parentGenerics) => contains(block, predicate) || predicate(instr)
+            case FunctionDecl(name, block, typ, args, typeargs, modifier) => contains(block, predicate) || predicate(instr)
+            case PredicateDecl(name, args, block, modifier) => predicate(instr)
+            case EnumDecl(name, fields, values, modifier) => predicate(instr)
+            case VariableDecl(name, _type, modifier, op, expr) => predicate(instr)
+            case BlocktagDecl(name, values, modifier) => predicate(instr)
+            case TypeDef(defs) => predicate(instr)
+            case Import(lib, value, alias) => predicate(instr)
+            case JSONFile(name, json, mod) => predicate(instr)
+            case null => false
+            case _ => predicate(instr)
     }
 
     def contains(expr: Expression, predicate: Expression=>Boolean): Boolean = {

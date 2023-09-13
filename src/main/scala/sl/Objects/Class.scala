@@ -161,13 +161,13 @@ class Class(context: Context, name: String, val generics: List[String], _modifie
             generate()
             val ctx = ctx2.push(vari.name, vari)
             cacheGVFunctions.map((name, fct) => {
-                    val deco = ClassFunction(ctx.getPath()+"."+name, vari, fct)
+                    val deco = ClassFunction(ctx.getPath()+"."+name, vari, fct, this)
                     ctx.addFunction(name, deco)
                 })
             cacheGVVariables.map(vari => {
-                    val getter = ClassFunction(ctx.getPath()+"."+vari.getter.name, vari, vari.getter)
+                    val getter = ClassFunction(ctx.getPath()+"."+vari.getter.name, vari, vari.getter, this)
                     ctx.addFunction(vari.getter.name, getter)
-                    val setter = ClassFunction(ctx.getPath()+"."+vari.setter.name, vari, vari.setter)
+                    val setter = ClassFunction(ctx.getPath()+"."+vari.setter.name, vari, vari.setter, this)
                     ctx.addFunction(vari.setter.name, setter)
                     ctx.addProperty(Property(vari.name, getter, setter, vari))
                 })

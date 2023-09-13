@@ -180,6 +180,12 @@ case class With(val expr: Expression, val isat: Expression, val cond: Expression
     if (elze == null) then f"with($expr, $isat, $cond) $block"
     else f"with($expr, $isat, $cond) $block else $elze"
 }
+case class Sleep(val time: Expression, val continuation: Instruction) extends Instruction {
+  override def toString() = f"sleep($time)\n$continuation"
+}
+case class Await(val func: FunctionCall, val continuation: Instruction) extends Instruction {
+  override def toString() = f"await($func)\n$continuation"
+}
 
 case class JSONFile(val name: String, val json: Expression, val modifier: Modifier) extends Instruction {
   override def toString() = f"jsonfile $name"
