@@ -1,14 +1,15 @@
 package test
 
-import standard::print
+import utils.Process
+
+import test::Test
 
 def test(){
-    int count = 10
-    while(count > 0){
+    int a = 0
+    if (a){
         /say hi
-        sleep 5
-        /say wait
-        count --
     }
-    /say bye
+    else{
+        /say bye
+    }
 }

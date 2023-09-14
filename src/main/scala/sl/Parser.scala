@@ -15,7 +15,7 @@ import sl.files.CacheAST
 import objects.Variable
 
 object Parser extends StandardTokenParsers{
-  lexical.delimiters ++= List("(", ")", "\\", ".", "..", ":", "=", "->", "{", "}", ",", "*", "[", "]", "/", "+", "-", "*", "/", "\\", "%", "&&", "||", "=>", ";",
+  lexical.delimiters ++= List("(", ")", "\\", ".", "..", ":", "=", "{", "}", ",", "*", "[", "]", "/", "+", "-", "*", "/", "\\", "%", "&&", "||", "=>", ";",
                               "+=", "-=", "/=", "*=", "%=", "?=", ":=", "%", "@", "@e", "@a", "@s", "@r", "@p", "~", "^", "<=", "==", ">=", "<", ">", "!=", "%%%", "???", "$",
                               "!", "!=", "#", "<<", ">>", "&", "<<=", ">>=", "&=", "|=", "::", ":>", "??", "?")
   lexical.reserved   ++= List("true", "false", "if", "then", "else", "return", "switch", "for", "do", "while", "by", "is",
@@ -75,8 +75,6 @@ object Parser extends StandardTokenParsers{
       | caseStruct
       | classDecl
       | caseClassDecl
-      | identLazy2 <~ ("+" ~ "+") ^^ (p => VariableAssigment(List((Left(p), Selector.self)), "+=", IntValue(1)))
-      | identLazy2 <~ ("-" ~ "-") ^^ (p => VariableAssigment(List((Left(p), Selector.self)), "-=", IntValue(1)))
       | templateUse
       | varDeclaration
       | varAssignment
@@ -193,12 +191,13 @@ object Parser extends StandardTokenParsers{
       | (("with" ~> "(" ~> exprNoTuple <~ ",") ~ exprNoTuple <~ ")") ~ instruction ~ opt("else" ~> instruction) ^^ {case sel ~ isat ~ intr ~ elze => With(sel, isat, BoolValue(true), intr, elze.getOrElse(null))}
       | ((("with" ~> "(" ~> exprNoTuple <~ ",") ~ exprNoTuple <~ ",") ~ exprNoTuple <~ ")") ~ instruction ~ opt("else" ~> instruction) ^^ {case sel ~ isat ~ cond ~ intr ~ elze => With(sel, isat, cond, intr, elze.getOrElse(null))})
   def switch: Parser[Switch] = positioned(("switch" ~> exprNoTuple <~ "{") ~ rep(switchCase) <~ "}" ^^ (p => Switch(p._1, p._2)))
-        
+  
+  def switchIf: Parser[Expression] = opt("if" ~> exprNoTuple) ^^ (p => p.getOrElse(BoolValue(true)))
   def switchCaseBase: Parser[SwitchCase] = 
-    (exprNoTuple <~ "->") ~ instruction ^^ (p => SwitchCase(p._1, p._2)) |
-    ("case" ~> exprNoTuple <~ ":") ~ instruction ^^ (p => SwitchCase(p._1, p._2)) |
-    ("default" ~ ":") ~> instruction ^^ (p => SwitchCase(DefaultValue, p)) |
-    ("default" ~> "->") ~> instruction ^^ (p => SwitchCase(DefaultValue, p))
+    (exprNoTuple ~ switchIf <~ (("-"~">")|"=>")) ~ instruction ^^ {case e ~ c ~ i => SwitchCase(e, i, c)} |
+    ("case" ~> exprNoTuple ~ switchIf <~ ":") ~ instruction ^^ {case e ~ c ~ i => SwitchCase(e, i, c)} |
+    ((("default" | "else") ~> switchIf <~ ":")) ~ instruction ^^ {case c ~ i => SwitchCase(DefaultValue, i, c)} |
+    ((("default" | "else") ~> switchIf <~ (("-"~">")|"=>"))) ~ instruction ^^ {case c ~ i => SwitchCase(DefaultValue, i, c)}
     
   def switchCase: Parser[SwitchElement] = 
     switchCaseBase
@@ -219,11 +218,27 @@ object Parser extends StandardTokenParsers{
   def enumField: Parser[EnumField] = types ~ identLazy ^^ { p => EnumField(p._2, p._1) }
   def enumValue: Parser[EnumValue] = identLazy ~ opt("("~>repsep(exprNoTuple,",")<~")") ^^ (p => EnumValue(p._1, p._2.getOrElse(List())))
 
-  def varAssignment: Parser[Instruction] = positioned((rep1sep(opt(selector <~ ".") ~ identLazy2, ",") ~ assignmentOp ~ expr) ^^ (p => 
+  def varAssignment: Parser[Instruction] = positioned((rep1sep(opt(selector <~ ".") ~ identLazy2, ",") ~ assignmentOp ~ expr) ^^ {case id ~ op ~ expr => 
     {
-      val identifiers = p._1._1.map(p => (Identifier.fromString(p._2), p._1.getOrElse(Selector.self)))
-      VariableAssigment(identifiers.map((i,s) => (Left(i), s)), p._1._2, p._2)
-    }))
+      val identifiers = id.map(p => (Identifier.fromString(p._2), p._1.getOrElse(Selector.self)))
+      VariableAssigment(identifiers.map((i,s) => (Left(i), s)), op, expr)
+    }} |
+    (rep1sep(opt(selector <~ ".") ~ identLazy2, ",") <~ ("+" ~ "+")) ^^ {case id => 
+    {
+      val identifiers = id.map(p => (Identifier.fromString(p._2), p._1.getOrElse(Selector.self)))
+      VariableAssigment(identifiers.map((i,s) => (Left(i), s)), "+=", IntValue(1))
+    }} |
+    (rep1sep(opt(selector <~ ".") ~ identLazy2, ",") <~ ("-" ~ "-")) ^^ {case id => 
+    {
+      val identifiers = id.map(p => (Identifier.fromString(p._2), p._1.getOrElse(Selector.self)))
+      VariableAssigment(identifiers.map((i,s) => (Left(i), s)), "-=", IntValue(1))
+    }}
+    )
+
+  def singleVarAssignment: Parser[VariableAssigment] = positioned((opt(selector <~ ".") ~ identLazy2 ~ assignmentOp ~ expr) ^^ {case s ~ i ~ op ~ e => VariableAssigment(List((Left(i), s.getOrElse(Selector.self))), op, e)} |
+    opt(selector <~ ".") ~ identLazy2 <~ ("+" ~ "+") ^^ {case s ~ i => VariableAssigment(List((Left(i), s.getOrElse(Selector.self))), "+=", IntValue(1))} |
+    opt(selector <~ ".") ~ identLazy2 <~ ("-" ~ "-") ^^ {case s ~ i => VariableAssigment(List((Left(i), s.getOrElse(Selector.self))), "-=", IntValue(1))}
+    )
 
   def varDeclaration: Parser[Instruction] = positioned((doc ~ modifier ~ types ~ rep1sep(identLazy, ",") ~ opt(assignmentOp ~ expr)) ^^ {
     case doc ~ mod1 ~ typ ~ names ~ expr => {
@@ -347,33 +362,36 @@ object Parser extends StandardTokenParsers{
     | "true" ^^^ BoolValue(true)
     | "false" ^^^ BoolValue(false)
     | "null" ^^^ NullValue
+    | singleVarAssignment ^^ {p => SequenceValue(p, VariableValue(p.name.head._1.left.get, p.name.head._2))}
     | tagValue
     | namespacedName
     | stringLit2 ^^ (StringValue(_))
     | identLazy2 ~ selector ^^ { case id ~ sel => BinaryOperation("in", SelectorValue(sel), VariableValue(id)) }
     | constructorCall
-    | identLazy2 ~ typeVariables ~ ("(" ~> repsep(exprNoTuple, ",") <~ ")") ~ block ^^ { case f ~ t ~ a ~ b => FunctionCallValue(VariableValue(f), a ::: List(LambdaValue(List(), b, null)), t) }
-    | identLazy2 ~ rep1((typeVariables <~"(") ~ repsep(exprNoTuple, ",") <~ ")") ^^ { case f ~ a => a.foldLeft[Expression](VariableValue(f))((b, a) => FunctionCallValue(b, a._2, a._1)) }
-    | identLazy2 ^^ (VariableValue(_))
-    | selector ~ "." ~ identLazy2 ^^ { case s ~ _ ~ n => VariableValue(n, s) }
-    | identTag ^^ (VariableValue(_))
+    | exprArray
+    | identifierExpr
     | "(" ~> expr <~ ")"
     | json ^^ (JsonValue(_))
     | selector ^^ (SelectorValue(_))
   )
+  def identifierExpr: Parser[Expression] = identLazy2 ~ typeVariables ~ ("(" ~> repsep(exprNoTuple, ",") <~ ")") ~ block ^^ { case f ~ t ~ a ~ b => FunctionCallValue(VariableValue(f), a ::: List(LambdaValue(List(), b, null)), t) }
+    | identLazy2 ~ rep1((typeVariables <~"(") ~ repsep(exprNoTuple, ",") <~ ")") ^^ { case f ~ a => a.foldLeft[Expression](VariableValue(f))((b, a) => FunctionCallValue(b, a._2, a._1)) }
+    | identLazy2 ^^ (VariableValue(_))
+    | selector ~ "." ~ identLazy2 ^^ { case s ~ _ ~ n => VariableValue(n, s) }
+    | identTag ^^ (VariableValue(_))
+  def exprArray: Parser[Expression] = positioned((identifierExpr | "(" ~> expr <~ ")") ~ rep("[" ~> rep1sep(expr, ",") <~ "]") ^^ {case e ~ g => g.foldLeft(e)((e, i) => ArrayGetValue(e, i))})
 
   def comparator: Parser[String] = "<" | "<=" | ">=" | ">" | "==" | "!="
 
   def typeVariablesForce = "<" ~ repsep(types,",") ~ ">" ^^ {case _ ~ a ~ _ => a}
   def typeVariables = opt(typeVariablesForce) ^^ {case Some(a) => a;case None => List()}
   def typeArgument = opt("<" ~ repsep(ident,",") ~ ">") ^^ {case Some(_ ~ a ~ _) => a;case None => List()}
-  def typeArgumentExpression= opt("<" ~ repsep(exprBottom,",") ~ ">") ^^ {case Some(_ ~ a ~ _) => a;case None => List()}
+  def typeArgumentExpression= opt("<" ~ repsep(exprBottom,",") ~ ">") ^^ {case Some(_ ~ a ~ _) => a; case None => List()}
 
   def exprDot: Parser[Expression] = positioned(rep1sep(exprBottom, ".") ^^ { case e if e.size == 1 => e.head; case e => e.tail.foldLeft(e.head)((p, n) => DotValue(p, n))})
-  def ternaryOperator: Parser[Expression] = positioned(exprDot ~ opt("?" ~> exprNoTuple ~ ":" ~ exprNoTuple) ^^ {case e1 ~ Some(e2 ~ _ ~ e3) => TernaryOperation(e1, e2, e3); case e1 ~ None => e1})
+  def ternaryOperator: Parser[Expression] = positioned(exprDot ~ opt(("?" | "if") ~> exprNoTuple ~ ("::" | "else") ~ exprNoTuple) ^^ {case e1 ~ Some(e2 ~ _ ~ e3) => TernaryOperation(e1, e2, e3); case e1 ~ None => e1})
   def exprRange: Parser[Expression] = positioned(ternaryOperator ~ opt(".."~>ternaryOperator ~ opt("by"~>ternaryOperator)) ^^ { case e ~ None => e; case e1 ~ Some(e2 ~ None) => RangeValue(e1, e2, IntValue(1)); case e1 ~ Some(e2 ~ Some(e3)) => RangeValue(e1, e2, e3)})
-  def exprArray: Parser[Expression] = positioned(exprRange ~ rep("[" ~> rep1sep(expr, ",") <~ "]") ^^ {case e ~ g => g.foldLeft(e)((e, i) => ArrayGetValue(e, i))})
-  def exprPow: Parser[Expression] = positioned(exprArray ~ rep("^" ~> exprPow) ^^ {unpack("^", _)})
+  def exprPow: Parser[Expression] = positioned(exprRange ~ rep("^" ~> exprPow) ^^ {unpack("^", _)})
   def exprMod: Parser[Expression] = positioned(exprPow ~ rep("%" ~> exprMod) ^^ {unpack("%", _)})
   def exprDiv: Parser[Expression] = positioned(exprMod ~ rep(("/" | "\\") ~> exprDiv) ^^ {unpack("/", _)})
   def exprMult: Parser[Expression] = positioned(exprDiv ~ rep("*" ~> exprMult) ^^ {unpack("*", _)})

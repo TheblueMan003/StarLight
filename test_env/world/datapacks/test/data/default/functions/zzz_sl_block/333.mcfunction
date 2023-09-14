@@ -1,3 +1,8 @@
+# ==================================================
+# void default.zzz_sl_block.333()
+# a.k.a default.test.__init__
+# ==================================================
+
 scoreboard players set default.test.__pass__ tbms.var 0
 scoreboard players set default.test.__fail__ tbms.var 0
 scoreboard players set default.test.__total__ tbms.var 0

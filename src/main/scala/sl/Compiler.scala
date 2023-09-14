@@ -250,7 +250,7 @@ object Compiler{
                 case sl.JSONFile(name, expr, mod) => {
                     val json = Utils.simplify(expr) match
                         case JsonValue(json) => json
-                        case other => throw new Exception("JSON file must be a JSON value")
+                        case other => throw new Exception(f"JSON file must be a JSON value. Found: $other")
                     
                     context.addJsonFile(new objects.JSONFile(context, name, mod, Utils.compileJson(json)))
                     List()
@@ -341,6 +341,9 @@ object Compiler{
                         if (vari.modifiers.isLazy && typ == JsonType){
                             vari.lazyValue = JsonValue(Utils.combineJson(Utils.toJson(vari.lazyValue), JsonDictionary(Map(index.head.getString() -> Utils.toJson(Utils.simplify(value))))))
                             List()
+                        }
+                        else if (typ == JsonType && !vari.modifiers.isEntity){
+                            vari.assignJson(op, value, "json."+index.head.getString())
                         }
                         else{
                             (typ, Utils.simplify(index.head)) match
@@ -444,12 +447,16 @@ object Compiler{
                 case Await(func, continuation) => {
                     Compiler.compile(FunctionCall(func.name, func.args ::: List(LambdaValue(List(), continuation, context)), func.typeargs))
                 }
+                case Continue => ???
+                case Break => ???
                 case ElseIf(cond, ifBlock) => throw new Exception("Unexpected Instruction")
             }
         }
         catch{
             e => {
+                //if (instruction.pos.longString != "<undefined position>"){
                 Reporter.error(f"${e.getMessage()} at ${instruction.pos}\n${instruction.pos.longString}")
+                //}
                 throw e
             }
         }

@@ -227,17 +227,20 @@ if (value for none in @a){
 ### Switch
 A more simplier way of having multiple if is to use a switch statement:
 ```
-int a
+int a, b
 switch(a){
     0 -> do_stuff()
     1 -> {
         do_other_stuff()
     }
-    2 -> {
+    2 if b == 1-> {
         /say hi
     }
     3..4 -> {
         /say hi
+    }
+    default -> {
+        /say bye
     }
 }
 ```

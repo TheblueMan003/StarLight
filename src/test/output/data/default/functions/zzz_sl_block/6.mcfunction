@@ -1,7 +1,7 @@
 # ==================================================
 # void default.zzz_sl_block.6()
-# a.k.a default.test.test.--async_while--.lambda_1.4
+# a.k.a default.test.TestRunner.crash.2
 # ==================================================
 
-scoreboard players operation default.zzz_sl_mux.void___to___void.__fct__ tbms.var = default.test.test.--async_while--.--await_callback-- tbms.var
-function default:zzz_sl_block/5
+scoreboard players set default.test.TestRunner.crash._0 tbms.var 1
+scoreboard players set default.test.TestRunner.enabled tbms.var 0

@@ -1,8 +1,7 @@
 # ==================================================
-# void default.zzz_sl_block.0(()=>void --await_callback--)
-# a.k.a default.test.test.--async_while--
+# void default.zzz_sl_block.0()
+# a.k.a default.test.test.2
 # ==================================================
 
-execute if score default.test.test.-setup-loop- tbms.var matches 0 run function default:zzz_sl_block/1
+scoreboard players set default.test.test._0 tbms.var 1
 say hi
-schedule function default:zzz_sl_block/2 5 append

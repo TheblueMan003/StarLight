@@ -1,7 +1,9 @@
 # ==================================================
 # void default.zzz_sl_block.4()
-# a.k.a default.test.test.--async_while--.lambda_1.3
+# a.k.a default.test.TestRunner.run.lambda_0
 # ==================================================
 
-scoreboard players set default.test.test.--async_while--.lambda_1._0 tbms.var 1
-scoreboard players operation default.test.test.--async_while--.--await_callback-- tbms.var = default.test.test.--async_while--.-exit-loop- tbms.var
+schedule function default:test/-test-runner/crash 1 append
+execute unless score default.test.TestRunner.enabled tbms.var matches 0 run function default:test/-test-runner/main
+schedule clear default:test/-test-runner/crash
+scoreboard players set default.test.TestRunner.crashCount tbms.var 0

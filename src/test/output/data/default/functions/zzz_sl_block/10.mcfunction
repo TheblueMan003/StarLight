@@ -1,8 +1,7 @@
 # ==================================================
 # void default.zzz_sl_block.10()
-# a.k.a default.test.test.--async_while--.lambda_1.lambda_1
+# a.k.a default.utils.process_manager.show.6
 # ==================================================
 
-scoreboard players set default.zzz_sl_mux.void___to___void.__fct__ tbms.var 0
-scoreboard players operation default.zzz_sl_mux.void___to___void.__fct__ tbms.var = default.test.test.--async_while--.--await_callback-- tbms.var
-function default:zzz_sl_block/5
+tellraw @a [{"text": " [??] default.test.TestRunner.__count__", "bold":"false","obfuscated":"false","strikethrough":"false","underlined":"false","italic":"false", "color":"yellow"}]
+scoreboard players add default.utils.process_manager.show.unknown tbms.var 1

@@ -2,7 +2,7 @@
 # void default.test.test()
 # ==================================================
 
-scoreboard players set default.test.test.count tbms.var 10
-scoreboard players set default.test.test.-setup-loop- tbms.var 0
-scoreboard players set default.test.test.--async_while--.--await_callback-- tbms.var 137959428
-function default:zzz_sl_block/0
+scoreboard players set default.test.test.a tbms.var 0
+scoreboard players set default.test.test._0 tbms.var 0
+execute unless score default.test.test.a tbms.var matches 0 run function default:zzz_sl_block/0
+execute if score default.test.test._0 tbms.var matches 0 run say bye

@@ -239,6 +239,10 @@ def FacingEntityIR(ent: String, height: String, statement: IRTree) = ExecuteIR(f
 def AlignIR(value: String, statement: IRTree) = ExecuteIR(f"align ${value}", statement)
 
 case class ScoreboardOperation(target: SBLink, operation: String, source: SBLink) extends IRTree{
+    operation match
+        case "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "<" | ">" | "><" | "><=" | ">=" | "=<" | "<=" => ()
+        case _ => throw new Exception("Invalid operation: " + operation)
+    
     def getString(): String = s"scoreboard players operation $target $operation $source"
 }
 case class ScoreboardSet(target: SBLink, value: Int) extends IRTree{

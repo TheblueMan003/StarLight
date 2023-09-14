@@ -417,3 +417,40 @@ Test not_gte_float{
         }
     }
 }
+
+Test ternary_operator_integer_result{
+    def bool getResult(){
+        int a = 5
+        int b = 10
+        int result = (a < b) if a else b
+        return (result == a)
+    }
+}
+
+Test ternary_operator_float_result{
+    def bool getResult(){
+        float x = 3.5
+        float y = 2.0
+        float result = (x > y) ? x :: y
+        return (result == x)
+    }
+}
+
+Test ternary_operator_mixed_result{
+    def bool getResult(){
+        int a = 7
+        float b = 7.5
+        float result = (a >= 7) ? a :: b
+        return (result == a)
+    }
+}
+
+Test ternary_operator_nested{
+    def bool getResult(){
+        int a = 10
+        int b = 20
+        int c = 30
+        int result = (a < b) ? ((b < c) ? c :: b) :: a
+        return (result == a)
+    }
+}

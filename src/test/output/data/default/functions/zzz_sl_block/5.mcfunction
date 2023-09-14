@@ -1,13 +1,8 @@
 # ==================================================
-# void default.zzz_sl_block.5(int __fct__)
-# a.k.a default.zzz_sl_mux.void___to___void
-# ==================================================
-# ==================================================
-# Function Multiplexer for List(int) => void
-# 
-# default.zzz_sl_block.9 -> 137959428
-# default.zzz_sl_block.10 -> -305346944
+# void default.zzz_sl_block.5()
+# a.k.a default.test.TestRunner.start.1
 # ==================================================
 
-execute if score default.zzz_sl_mux.void___to___void.__fct__ tbms.var matches 137959428 run function default:zzz_sl_block/9
-execute if score default.zzz_sl_mux.void___to___void.__fct__ tbms.var matches -305346944 run function default:zzz_sl_block/10
+scoreboard players set default.test.TestRunner.enabled tbms.var 1
+function default:test/-test-runner/on-start-0
+function default:test/-test-runner/run

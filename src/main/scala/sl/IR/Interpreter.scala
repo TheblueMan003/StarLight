@@ -88,7 +88,9 @@ class Interpreter(var files: List[IRFile], val context: Context){
                     case "/=" => current / sourceValue
                     case "%=" => current % sourceValue
                     case "=" => sourceValue
-                    case _ => throw new Exception("Unknown operation: " + operation)
+                    case "<" => if(current > sourceValue) sourceValue else current
+                    case ">" => if(current < sourceValue) sourceValue else current
+                    case _ => throw new Exception("Unknown operation: " + operation + " in "+ir)
                 }
                 scoreboards.put(key, newValue)
                 if (context.debug){

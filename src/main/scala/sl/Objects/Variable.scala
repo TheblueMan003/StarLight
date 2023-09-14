@@ -434,11 +434,14 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 		vari.assign("=", expr) ::: assign(op, LinkedVariableValue(vari))
 	}
 
-	def assignTernaryOperator(value: TernaryOperation)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
+	def assignSequence(op: String, value: SequenceValue)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
+		Compiler.compile(value.left) ::: assign(op, value.right)
+	}
+	def assignTernaryOperator(op: String, value: TernaryOperation)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		Compiler.compile(If(value.left, 
-			VariableAssigment(List((Right(this), selector)), "=", value.middle),
+			VariableAssigment(List((Right(this), selector)), op, value.middle),
 			List(
-				ElseIf(BoolValue(true), VariableAssigment(List((Right(this), selector)), "=", value.right))
+				ElseIf(BoolValue(true), VariableAssigment(List((Right(this), selector)), op, value.right))
 			)))
 	}
 	/**
@@ -523,7 +526,8 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 			case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 			case ArrayGetValue(name, index) => handleArrayGetValue(op, name, index)
 			case bin: BinaryOperation => assignBinaryOperator(op, bin)
-			case ter: TernaryOperation => assignTernaryOperator(ter)
+			case ter: TernaryOperation => assignTernaryOperator(op, ter)
+			case seq: SequenceValue => assignSequence(op, seq)
 			case _ => throw new Exception(f"Unknown cast to int: $valueE at \n${valueE.pos.longString}")
 	}
 
@@ -554,7 +558,8 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 			case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 			case ArrayGetValue(name, index) => handleArrayGetValue(op, name, index)
 			case bin: BinaryOperation => assignBinaryOperator(op, bin)
-			case ter: TernaryOperation => assignTernaryOperator(ter)
+			case ter: TernaryOperation => assignTernaryOperator(op, ter)
+			case seq: SequenceValue => assignSequence(op, seq)
 			case _ => throw new Exception(f"Unknown cast to int: $valueE at \n${valueE.pos.longString}")
 	}
 
@@ -722,16 +727,27 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					case "+=" => List(ScoreboardAdd(getIRSelector(), fvalue))
 					case "-=" => List(ScoreboardRemove(getIRSelector(), fvalue))
 					case "*=" => {
-						context.requestConstant(fvalue)
-						context.requestConstant(Settings.floatPrec)
-						List(ScoreboardOperation(getIRSelector(), op, SBLink(f"c${fvalue}", Settings.constScoreboard)),
-							ScoreboardOperation(getIRSelector(), "/=", SBLink(f"c${Settings.floatPrec}", Settings.constScoreboard)))
+						if (value.toInt == value){
+							assignFloat(op, IntValue(value.toInt))
+						}
+						else{
+							context.requestConstant(fvalue)
+							context.requestConstant(Settings.floatPrec)
+							List(ScoreboardOperation(getIRSelector(), op, SBLink(f"c${fvalue}", Settings.constScoreboard)),
+								ScoreboardOperation(getIRSelector(), "/=", SBLink(f"c${Settings.floatPrec}", Settings.constScoreboard)))
+						}
 					}
 					case "/=" => {
-						context.requestConstant(fvalue)
-						context.requestConstant(Settings.floatPrec)
-						List(ScoreboardOperation(getIRSelector(), op, SBLink(f"c${fvalue}", Settings.constScoreboard)),
-							ScoreboardOperation(getIRSelector(), "*=", SBLink(f"c${Settings.floatPrec}", Settings.constScoreboard)))
+						if (value.toInt == value){
+							assignFloat(op, IntValue(value.toInt))
+						}
+						else{
+							context.requestConstant(fvalue)
+							context.requestConstant(Settings.floatPrec)
+							List(ScoreboardOperation(getIRSelector(), "*=", SBLink(f"c${Settings.floatPrec}", Settings.constScoreboard)),
+								ScoreboardOperation(getIRSelector(), op, SBLink(f"c${fvalue}", Settings.constScoreboard)))
+						}
+
 					}
 					case "%=" => {
 						context.requestConstant(fvalue)
@@ -773,7 +789,8 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 			case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 			case ArrayGetValue(name, index) => handleArrayGetValue(op, name, index)
 			case bin: BinaryOperation => assignBinaryOperator(op, bin)
-			case ter: TernaryOperation => assignTernaryOperator(ter)
+			case ter: TernaryOperation => assignTernaryOperator(op, ter)
+			case seq: SequenceValue => assignSequence(op, seq)
 			case _ => throw new Exception(f"Unknown cast to float for $fullName and value $valueE at \n${valueE.pos.longString}")
 	}
 
@@ -828,7 +845,8 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 				ScoreboardSet(getIRSelector(), 0)::Compiler.compile(If(value, VariableAssigment(List((Right(this), selector)), "=", BoolValue(true)), List()))
 			}
 			case bin: BinaryOperation => assignBinaryOperator(op, bin)
-			case ter: TernaryOperation => assignTernaryOperator(ter)
+			case ter: TernaryOperation => assignTernaryOperator(op, ter)
+			case seq: SequenceValue => assignSequence(op, seq)
 			case SelectorValue(sel) => ScoreboardSet(getIRSelector(), 0)::Compiler.compile(If(value, VariableAssigment(List((Right(this), selector)), "=", BoolValue(true)), List()))
 			case other if Utils.typeof(other) == BoolType || Utils.typeof(other) == IntType || Utils.typeof(other) == EntityType => 
 				var vari2 = context.getFreshVariable(BoolType)
@@ -1069,7 +1087,8 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 							List(CommandIR(f"tag ${value.getString()} add $tagName"))
 						}
 						case bin: BinaryOperation => assignBinaryOperator(op, bin)
-						case ter: TernaryOperation => assignTernaryOperator(ter)
+						case ter: TernaryOperation => assignTernaryOperator(op, ter)
+						case seq: SequenceValue => assignSequence(op, seq)
 						case FunctionCallValue(name, args, typeargs, selector) => 
 							//removeEntityTag():::
 							tupleVari.zip(List(BoolValue(false))).flatMap((t, v) => t.assign(op, v)) ::: 
@@ -1104,7 +1123,8 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 						}
 						case NullValue => List()
 						case bin: BinaryOperation => assignBinaryOperator(op, bin)
-						case ter: TernaryOperation => assignTernaryOperator(ter)
+						case ter: TernaryOperation => assignTernaryOperator(op, ter)
+						case seq: SequenceValue => assignSequence(op, seq)
 						case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 						case _ => throw new Exception(f"No cast from ${expr} to entity at \n${expr.pos.longString}")
 				}
@@ -1131,7 +1151,8 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 						}
 						case NullValue => List()
 						case bin: BinaryOperation => assignBinaryOperator(op, bin)
-						case ter: TernaryOperation => assignTernaryOperator(ter)
+						case ter: TernaryOperation => assignTernaryOperator(op, ter)
+						case seq: SequenceValue => assignSequence(op, seq)
 						case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 						case _ => throw new Exception(f"No cast from ${expr} to entity at \n${expr.pos.longString}")
 				}
@@ -1143,7 +1164,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 	/**
 	 * Assign a value to the float variable
 	 */
-	def assignJson(op: String, value: Expression)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
+	def assignJson(op: String, value: Expression, key: String = "json")(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		if (Settings.target == MCBedrock){
 			throw new Exception(f"Dynamic Json Variable Not Supported in Bedrock ($fullName) at \n${value.pos.longString}")
 		}
@@ -1154,9 +1175,9 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 			value match
 				case JsonValue(value) => 
 					op match{
-						case "=" => List(CommandIR(f"data modify storage ${fullName} json set value ${value.getNbt()}"))
-						case "+=" => List(CommandIR(f"data modify storage ${fullName} json append value ${value.getNbt()}"))
-						case "&=" => List(CommandIR(f"data modify storage ${fullName} json merge value ${value.getNbt()}"))
+						case "=" => List(CommandIR(f"data modify storage ${fullName} $key set value ${value.getNbt()}"))
+						case "+=" => List(CommandIR(f"data modify storage ${fullName} $key append value ${value.getNbt()}"))
+						case "&=" => List(CommandIR(f"data modify storage ${fullName} $key merge value ${value.getNbt()}"))
 					}
 				case DefaultValue => List(CommandIR(f"data modify storage ${fullName} json set value {}"))
 				case VariableValue(name, sel) => assignBool(op, context.resolveVariable(value))
@@ -1164,35 +1185,62 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					vari.getType() match{
 						case JsonType => {
 							op match{
-								case "=" => List(CommandIR(f"data modify storage ${fullName} json set from storage ${vari.fullName} json"))
-								case "+=" => List(CommandIR(f"data modify storage ${fullName} json append from storage ${vari.fullName} json"))
-								case "&=" => List(CommandIR(f"data modify storage ${fullName} json merge from storage ${vari.fullName} json"))
+								case "=" => List(CommandIR(f"data modify storage ${fullName} $key set from storage ${vari.fullName} json"))
+								case "+=" => List(CommandIR(f"data modify storage ${fullName} $key append from storage ${vari.fullName} json"))
+								case "&=" => List(CommandIR(f"data modify storage ${fullName} $key merge from storage ${vari.fullName} json"))
 							}
 						}
 						case IntType => {
 							op match{
-								case "=" => List(CommandIR(f"execute store result storage ${fullName} json int 1 run scoreboard players get ${vari.getSelector()(sel)}"))
+								case "=" => List(CommandIR(f"execute store result storage ${fullName} $key int 1 run scoreboard players get ${vari.getSelector()(sel)}"))
 								case "+=" => List(CommandIR(f"execute store result storage ${fullName} tmp int 1 run scoreboard players get ${vari.getSelector()(sel)}"), 
-												CommandIR(f"data modify storage ${fullName} json append from storage ${fullName} tmp"))
+												CommandIR(f"data modify storage ${fullName} $key append from storage ${fullName} tmp"))
 								case "&=" => List(CommandIR(f"execute store result storage ${fullName} tmp int 1 run scoreboard players get ${vari.getSelector()(sel)}"), 
-												CommandIR(f"data modify storage ${fullName} json merge from storage ${fullName} tmp"))
+												CommandIR(f"data modify storage ${fullName} $key merge from storage ${fullName} tmp"))
 							}
 						}
 						case FloatType => {
 							op match{
-								case "=" => List(CommandIR(f"execute store result storage ${fullName} json float ${1/Settings.floatPrec} run scoreboard players get ${vari.getSelector()(sel)}"))
+								case "=" => List(CommandIR(f"execute store result storage ${fullName} $key float ${1/Settings.floatPrec} run scoreboard players get ${vari.getSelector()(sel)}"))
 								case "+=" => List(CommandIR(f"execute store result storage ${fullName} tmp float ${1/Settings.floatPrec} run scoreboard players get ${vari.getSelector()(sel)}"), 
-												CommandIR(f"data modify storage ${fullName} json append from storage ${fullName} tmp"))
+												CommandIR(f"data modify storage ${fullName} $key append from storage ${fullName} tmp"))
 								case "&=" => List(CommandIR(f"execute store result storage ${fullName} tmp float ${1/Settings.floatPrec} run scoreboard players get ${vari.getSelector()(sel)}"), 
-												CommandIR(f"data modify storage ${fullName} json merge from storage ${fullName} tmp"))
+												CommandIR(f"data modify storage ${fullName} $key merge from storage ${fullName} tmp"))
 							}
 						}
 						case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()} at \n${value.pos.longString}")
 					}
 				case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 				case ArrayGetValue(name, index) => handleArrayGetValue(op, name, index)
-				case bin: BinaryOperation => assignBinaryOperator(op, bin)
-				case ter: TernaryOperation => assignTernaryOperator(ter)
+				case bin: BinaryOperation => ???
+				case ter: TernaryOperation => ???
+				case SequenceValue(left, right) => {
+					Compiler.compile(left):::assignJson(op, right, key)
+				}
+				case IntValue(value) => 
+					op match{
+						case "=" => List(CommandIR(f"data modify storage ${fullName} $key set value $value"))
+						case "+=" => List(CommandIR(f"data modify storage ${fullName} $key append value $value"))
+						case "&=" => List(CommandIR(f"data modify storage ${fullName} $key merge value $value"))
+					}
+				case FloatValue(value) => 
+					op match{
+						case "=" => List(CommandIR(f"data modify storage ${fullName} $key set value ${value/Settings.floatPrec}"))
+						case "+=" => List(CommandIR(f"data modify storage ${fullName} $key append value ${value/Settings.floatPrec}"))
+						case "&=" => List(CommandIR(f"data modify storage ${fullName} $key merge value ${value/Settings.floatPrec}"))
+					}
+				case StringValue(value) =>
+					op match{
+						case "=" => List(CommandIR(f"data modify storage ${fullName} $key set value ${value}"))
+						case "+=" => List(CommandIR(f"data modify storage ${fullName} $key append value ${value}"))
+						case "&=" => List(CommandIR(f"data modify storage ${fullName} $key merge value ${value}"))
+					}
+				case BoolValue(value) =>
+					op match{
+						case "=" => List(CommandIR(f"data modify storage ${fullName} $key set value ${value}"))
+						case "+=" => List(CommandIR(f"data modify storage ${fullName} $key append value ${value}"))
+						case "&=" => List(CommandIR(f"data modify storage ${fullName} $key merge value ${value}"))
+					}
 				case _ => throw new Exception(f"Unknown cast to json $value at \n${value.pos.longString}")
 		}
 	}
@@ -1235,7 +1283,8 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					}
 					case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 					case bin: BinaryOperation => assignBinaryOperator("=", bin)
-					case ter: TernaryOperation => assignTernaryOperator(ter)
+					case ter: TernaryOperation => assignTernaryOperator(op, ter)
+					case seq: SequenceValue => assignSequence(op, seq)
 					case JsonValue(JsonDictionary(map)) if map.forall(x => tupleVari.exists(y => y.name == x._1)) => {
 						map.flatMap(x => tupleVari.find(y => y.name == x._1).get.assign("=", Utils.jsonToExpr(x._2))).toList
 					}
@@ -1245,7 +1294,8 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 				value match
 					case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 					case bin: BinaryOperation => assignBinaryOperator(op, bin)
-					case ter: TernaryOperation => assignTernaryOperator(ter)
+					case ter: TernaryOperation => assignTernaryOperator(op, ter)
+					case seq: SequenceValue => assignSequence(op, seq)
 					case _ => context.getFunction(fullName + "." + Utils.getOpFunctionName(op),  List(value), List(), getType(), false).call()
 	}
 
@@ -1352,7 +1402,8 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 					case ArrayGetValue(name, index) => handleArrayGetValue(op, name, index)
 					case bin: BinaryOperation => assignBinaryOperator("=", bin)
-					case ter: TernaryOperation => assignTernaryOperator(ter)
+					case ter: TernaryOperation => assignTernaryOperator(op, ter)
+					case seq: SequenceValue => assignSequence(op, seq)
 					case JsonValue(JsonDictionary(map)) if map.forall(x => tupleVari.exists(y => y.name == x._1)) => {
 						map.flatMap(x => tupleVari.find(y => y.name == x._1).get.assign("=", Utils.jsonToExpr(x._2))).toList
 					}
@@ -1394,6 +1445,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 			case RangeValue(min, max, delta) => isPresentIn(min) || isPresentIn(max) || isPresentIn(delta)
 			case CastValue(left, right) => isPresentIn(left)
 			case ForSelect(expr, filter, selector) => isPresentIn(expr) || isPresentIn(selector)
+			case SequenceValue(left, right) => isPresentIn(right)
 		}
 
 

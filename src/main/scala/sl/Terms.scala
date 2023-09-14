@@ -125,7 +125,7 @@ case class Switch(val value: Expression, val cases: List[SwitchElement], val cop
 }
 trait SwitchElement{
 }
-case class SwitchCase(val expr: Expression, val instr: Instruction) extends SwitchElement{
+case class SwitchCase(val expr: Expression, val instr: Instruction, val cond: Expression) extends SwitchElement{
   override def toString(): String = f"$expr -> $instr"
 }
 case class SwitchForGenerate(val key: String, val provider: Expression, val instr: SwitchCase) extends CPositionable with SwitchElement {
@@ -153,7 +153,7 @@ case class InstructionList(val list: List[Instruction]) extends Instruction {
 }
 case class InstructionBlock(val list: List[Instruction]) extends Instruction {
   override def toString() = f"{\n${list.mkString("\n")}\n}"
-  override def unBlockify(): Instruction = InstructionList(list)
+  override def unBlockify(): Instruction = Utils.positioned(this, InstructionList(list))
 }
 case class FreeConstructorCall(val expr: Expression) extends Instruction{
     override def toString() = f"new ${expr}()"
@@ -186,6 +186,13 @@ case class Sleep(val time: Expression, val continuation: Instruction) extends In
 case class Await(val func: FunctionCall, val continuation: Instruction) extends Instruction {
   override def toString() = f"await($func)\n$continuation"
 }
+case object Continue extends Instruction {
+  override def toString() = f"continue"
+}
+case object Break extends Instruction {
+  override def toString() = f"break"
+}
+
 
 case class JSONFile(val name: String, val json: Expression, val modifier: Modifier) extends Instruction {
   override def toString() = f"jsonfile $name"

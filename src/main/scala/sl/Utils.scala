@@ -12,6 +12,7 @@ import sys.process._
 import sl.IR.*
 import objects.CompilerFunction
 import java.nio.charset.StandardCharsets
+import scala.util.parsing.input.Positional
 
 object Utils{
     val libaries = sl.files.FileUtils.getListOfFiles("./src/main/resources/libraries")
@@ -58,12 +59,7 @@ object Utils{
     def stringify(string: String): String = {
         f"\"${string.replaceAllLiterally("\\\\", "\\\\").replaceAllLiterally("\"", "\\\"")}\""
     }
-    def positioned(original: Instruction, newone: Instruction): Instruction = {
-        if (original != null)
-            newone.setPos(original.pos)
-        newone
-    }
-    def positioned(original: Expression, newone: Expression): Expression = {
+    def positioned[T <: Positional](original: T, newone: T): T = {
         if (original != null)
             newone.setPos(original.pos)
         newone
@@ -112,6 +108,8 @@ object Utils{
                 }
             case WhileLoop(cond, instr) => WhileLoop(cond, substReturn(instr, to))
             case DoWhileLoop(cond, instr) => DoWhileLoop(cond, substReturn(instr, to))
+            case Break => instr
+            case Continue => instr
 
             case Execute(typ, expr, block) => Execute(typ, expr, substReturn(block, to))
             case With(expr, isAt, cond, block, elze) => With(expr, isAt, cond, substReturn(block, to), substReturn(elze, to))
@@ -119,9 +117,9 @@ object Utils{
             case Sleep(time, continuation) => Sleep(time, substReturn(continuation, to))
             case Await(func, continuation) => Await(func, substReturn(continuation, to))
 
-            case Switch(cond, cases, cv) => Switch(cond, cases.map{case x: SwitchCase => SwitchCase(x.expr, substReturn(x.instr, to));
-                                                                    case x: SwitchForGenerate => SwitchForGenerate(x.key, x.provider, SwitchCase(x.instr.expr, substReturn(x.instr.instr, to)));
-                                                                    case x: SwitchForEach => SwitchForEach(x.key, x.provider, SwitchCase(x.instr.expr, substReturn(x.instr.instr, to)));
+            case Switch(cond, cases, cv) => Switch(cond, cases.map{case x: SwitchCase => SwitchCase(x.expr, substReturn(x.instr, to), x.cond);
+                                                                    case x: SwitchForGenerate => SwitchForGenerate(x.key, x.provider, SwitchCase(x.instr.expr, substReturn(x.instr.instr, to), x.instr.cond));
+                                                                    case x: SwitchForEach => SwitchForEach(x.key, x.provider, SwitchCase(x.instr.expr, substReturn(x.instr.instr, to), x.instr.cond));
                                                                     }, cv)
             case null => null
     })
@@ -166,6 +164,8 @@ object Utils{
             case Return(value) => Return(subst(value, from, to))
             case WhileLoop(cond, instr) => WhileLoop(subst(cond, from, to), subst(instr, from, to))
             case DoWhileLoop(cond, instr) => DoWhileLoop(subst(cond, from, to), subst(instr, from, to))
+            case Break => instr
+            case Continue => instr
 
             case Execute(typ, expr, block) => Execute(typ, expr.map(subst(_, from, to)), subst(block, from, to))
             case With(expr, isAt, cond, block, elze) => With(subst(expr, from, to), subst(isAt, from, to), subst(cond, from, to), subst(block, from, to), subst(elze, from, to))
@@ -173,9 +173,9 @@ object Utils{
             case Sleep(time, continuation) => Sleep(subst(time, from, to), subst(continuation, from, to))
             case Await(func, continuation) => Await(subst(func, from, to).asInstanceOf[FunctionCall], subst(continuation, from, to))
 
-            case Switch(cond, cases, cv) => Switch(subst(cond, from, to), cases.map{case x: SwitchCase => SwitchCase(subst(x.expr, from, to), subst(x.instr, from, to));
-                                                                                    case x: SwitchForGenerate => SwitchForGenerate(x.key, subst(x.provider, from, to), SwitchCase(subst(x.instr.expr, from, to), subst(x.instr.instr, from, to)));
-                                                                                    case x: SwitchForEach => SwitchForEach(x.key, subst(x.provider, from, to), SwitchCase(subst(x.instr.expr, from, to), subst(x.instr.instr, from, to)));
+            case Switch(cond, cases, cv) => Switch(subst(cond, from, to), cases.map{case x: SwitchCase => SwitchCase(subst(x.expr, from, to), subst(x.instr, from, to), subst(x.cond, from, to));
+                                                                                    case x: SwitchForGenerate => SwitchForGenerate(x.key, subst(x.provider, from, to), SwitchCase(subst(x.instr.expr, from, to), subst(x.instr.instr, from, to), subst(x.instr.cond, from, to)));
+                                                                                    case x: SwitchForEach => SwitchForEach(x.key, subst(x.provider, from, to), SwitchCase(subst(x.instr.expr, from, to), subst(x.instr.instr, from, to), subst(x.instr.cond, from, to)));
                                                                                     }, cv)
             case null => null
     })
@@ -206,6 +206,7 @@ object Utils{
             case NullValue => NullValue
             case IsType(value, typ) => IsType(subst(value, from, to), typ)
             case DotValue(left, right) => DotValue(subst(left, from, to), subst(right, from, to))
+            case SequenceValue(left, right) => SequenceValue(subst(left, from, to), subst(right, from, to))
             case ArrayGetValue(name, index) => ArrayGetValue(subst(name, from, to), index.map(subst(_, from, to)))
             case VariableValue(name, sel) => VariableValue(name.replaceAllLiterally(from, to), sel)
             case BinaryOperation(op, left, right) => BinaryOperation(op, subst(left, from, to), subst(right, from, to))
@@ -274,6 +275,8 @@ object Utils{
             case Return(value) => Return(subst(value, from, to))
             case WhileLoop(cond, instr) => WhileLoop(subst(cond, from, to), subst(instr, from, to))
             case DoWhileLoop(cond, instr) => DoWhileLoop(subst(cond, from, to), subst(instr, from, to))
+            case Break => instr
+            case Continue => instr
 
             case Execute(typ, expr, block) => Execute(typ, expr.map(subst(_, from, to)), subst(block, from, to))
             case With(expr, isAt, cond, block, elze) => With(subst(expr, from, to), subst(isAt, from, to), subst(cond, from, to), subst(block, from, to), subst(elze, from, to))
@@ -281,9 +284,9 @@ object Utils{
             case Sleep(time, continuation) => Sleep(subst(time, from, to), subst(continuation, from, to))
             case Await(func, continuation) => Await(subst(func, from, to).asInstanceOf[FunctionCall], subst(continuation, from, to))
 
-            case Switch(cond, cases, cv) => Switch(subst(cond, from, to), cases.map{case x: SwitchCase => SwitchCase(subst(x.expr, from, to), subst(x.instr, from, to));
-                                                                                    case x: SwitchForGenerate => SwitchForGenerate(x.key, subst(x.provider, from, to), SwitchCase(subst(x.instr.expr, from, to), subst(x.instr.instr, from, to)));
-                                                                                    case x: SwitchForEach => SwitchForEach(x.key, subst(x.provider, from, to), SwitchCase(subst(x.instr.expr, from, to), subst(x.instr.instr, from, to)));
+            case Switch(cond, cases, cv) => Switch(subst(cond, from, to), cases.map{case x: SwitchCase => SwitchCase(subst(x.expr, from, to), subst(x.instr, from, to), subst(x.cond, from, to));
+                                                                                    case x: SwitchForGenerate => SwitchForGenerate(x.key, subst(x.provider, from, to), SwitchCase(subst(x.instr.expr, from, to), subst(x.instr.instr, from, to), subst(x.instr.cond, from, to)));
+                                                                                    case x: SwitchForEach => SwitchForEach(x.key, subst(x.provider, from, to), SwitchCase(subst(x.instr.expr, from, to), subst(x.instr.instr, from, to), subst(x.instr.cond, from, to)));
                                                                                     }, cv)
             case null => null
     })
@@ -305,6 +308,7 @@ object Utils{
             case TagValue(value) => TagValue(value.replaceAllLiterally(from, to))
             case LinkedTagValue(tag) => instr
             case DotValue(left, right) => DotValue(subst(left, from, to), subst(right, from, to))
+            case SequenceValue(left, right) => SequenceValue(subst(left, from, to), subst(right, from, to))
             case RawJsonValue(value) => instr
             case EnumIntValue(value) => instr
             case ClassValue(value) => instr
@@ -394,15 +398,17 @@ object Utils{
             case Return(value) => Return(subst(value, from, to))
             case WhileLoop(cond, instr) => WhileLoop(subst(cond, from, to), subst(instr, from, to))
             case DoWhileLoop(cond, instr) => DoWhileLoop(subst(cond, from, to), subst(instr, from, to))
+            case Break => instr
+            case Continue => instr
             case JSONFile(name, json, mod) => instr
 
             case Execute(typ, expr, block) => Execute(typ, expr.map(subst(_, from, to)), subst(block, from, to))
             case With(expr, isAt, cond, block, elze) => With(subst(expr, from, to), subst(isAt, from, to), subst(cond, from, to), subst(block, from, to), subst(elze, from, to))
             case Sleep(time, continuation) => Sleep(subst(time, from, to), subst(continuation, from, to))
             case Await(func, continuation) => Await(subst(func, from, to).asInstanceOf[FunctionCall], subst(continuation, from, to))
-            case Switch(cond, cases, cv) => Switch(subst(cond, from, to), cases.map{case x: SwitchCase => SwitchCase(subst(x.expr, from, to), subst(x.instr, from, to));
-                                                                                    case x: SwitchForGenerate => SwitchForGenerate(x.key, subst(x.provider, from, to), SwitchCase(subst(x.instr.expr, from, to), subst(x.instr.instr, from, to)));
-                                                                                    case x: SwitchForEach => SwitchForEach(x.key, subst(x.provider, from, to), SwitchCase(subst(x.instr.expr, from, to), subst(x.instr.instr, from, to)));
+            case Switch(cond, cases, cv) => Switch(subst(cond, from, to), cases.map{case x: SwitchCase => SwitchCase(subst(x.expr, from, to), subst(x.instr, from, to), x.cond);
+                                                                                    case x: SwitchForGenerate => SwitchForGenerate(x.key, subst(x.provider, from, to), SwitchCase(subst(x.instr.expr, from, to), subst(x.instr.instr, from, to), x.instr.cond));
+                                                                                    case x: SwitchForEach => SwitchForEach(x.key, subst(x.provider, from, to), SwitchCase(subst(x.instr.expr, from, to), subst(x.instr.instr, from, to), x.instr.cond));
                                                                                     }, cv)
             case null => null
     })
@@ -439,6 +445,8 @@ object Utils{
             case Return(value) => instr
             case WhileLoop(cond, instr) => WhileLoop(cond, rmFunctions(instr))
             case DoWhileLoop(cond, instr) => DoWhileLoop(cond, rmFunctions(instr))
+            case Break => instr
+            case Continue => instr
             case JSONFile(name, json, mod) => instr
 
             case Throw(expr) => instr
@@ -449,9 +457,9 @@ object Utils{
             case With(expr, isAt, cond, block, elze) => With(expr, isAt, cond, rmFunctions(block), rmFunctions(elze))
             case Sleep(time, continuation) => Sleep(time, rmFunctions(continuation))
             case Await(func, continuation) => Await(func, rmFunctions(continuation))
-            case Switch(cond, cases, cv) => Switch(cond, cases.map{case x: SwitchCase => SwitchCase(x.expr, rmFunctions(x.instr));
-                                                                    case x: SwitchForGenerate => SwitchForGenerate(x.key, x.provider, SwitchCase(x.instr.expr, rmFunctions(x.instr.instr)));
-                                                                    case x: SwitchForEach => SwitchForEach(x.key, x.provider, SwitchCase(x.instr.expr, rmFunctions(x.instr.instr)));
+            case Switch(cond, cases, cv) => Switch(cond, cases.map{case x: SwitchCase => SwitchCase(x.expr, rmFunctions(x.instr), x.cond);
+                                                                    case x: SwitchForGenerate => SwitchForGenerate(x.key, x.provider, SwitchCase(x.instr.expr, rmFunctions(x.instr.instr), x.instr.cond));
+                                                                    case x: SwitchForEach => SwitchForEach(x.key, x.provider, SwitchCase(x.instr.expr, rmFunctions(x.instr.instr), x.instr.cond));
                                                                     }, cv)
             case null => null
     })
@@ -519,6 +527,8 @@ object Utils{
             case Return(value) => Return(fix(value))
             case WhileLoop(cond, instr) => WhileLoop(fix(cond), fix(instr))
             case DoWhileLoop(cond, instr) => DoWhileLoop(fix(cond), fix(instr))
+            case Break => instr
+            case Continue => instr
             case JSONFile(name, json, mod) => instr
 
             case Throw(expr) => Throw(fix(expr))
@@ -528,9 +538,9 @@ object Utils{
             case With(expr, isAt, cond, block, elze) => With(fix(expr), fix(isAt), fix(cond), fix(block), fix(elze))
             case Sleep(time, continuation) => Sleep(fix(time), fix(continuation))
             case Await(func, continuation) => Await(fix(func).asInstanceOf[FunctionCall], fix(continuation))
-            case Switch(cond, cases, cv) => Switch(fix(cond), cases.map{case x: SwitchCase => SwitchCase(fix(x.expr), fix(x.instr));
-                                                                        case x: SwitchForGenerate => SwitchForGenerate(x.key, fix(x.provider), SwitchCase(fix(x.instr.expr), fix(x.instr.instr)));
-                                                                        case x: SwitchForEach => SwitchForEach(x.key, fix(x.provider), SwitchCase(fix(x.instr.expr), fix(x.instr.instr)));
+            case Switch(cond, cases, cv) => Switch(fix(cond), cases.map{case x: SwitchCase => SwitchCase(fix(x.expr), fix(x.instr), fix(x.cond));
+                                                                        case x: SwitchForGenerate => SwitchForGenerate(x.key, fix(x.provider), SwitchCase(fix(x.instr.expr), fix(x.instr.instr), fix(x.instr.cond)));
+                                                                        case x: SwitchForEach => SwitchForEach(x.key, fix(x.provider), SwitchCase(fix(x.instr.expr), fix(x.instr.instr), fix(x.instr.cond)));
                                                                         }, cv)
             case null => null
     })
@@ -572,6 +582,7 @@ object Utils{
             case IsType(left, right) => IsType(fix(left), fix(right))
             case PositionValue(x, y, z) => PositionValue(fix(x), fix(y), fix(z))
             case DotValue(left, right) => DotValue(fix(left), fix(right))
+            case SequenceValue(left, right) => SequenceValue(fix(left), fix(right))
             case JsonValue(content) => JsonValue(fix(content))
             case ArrayGetValue(name, index) => ArrayGetValue(fix(name), index.map(fix(_)))
             case VariableValue(name, sel) => if ignore.contains(name) then instr else
@@ -759,6 +770,7 @@ object Utils{
                 val (list, vari) = unpackDotValue(dot)
                 typeof(vari)
             }
+            case SequenceValue(left, right) => typeof(right)
             case ArrayGetValue(name, index) => {
                 typeof(name) match
                     case ArrayType(inner, size) => inner
@@ -900,7 +912,7 @@ object Utils{
     }
     def contains(instr: SwitchElement, predicate: Instruction=>Boolean): Boolean = { 
         instr match
-            case SwitchCase(expr, instr) => contains(instr, predicate) || predicate(instr)
+            case SwitchCase(expr, instr, cond) => contains(instr, predicate) || predicate(instr)
             case SwitchForGenerate(key, provider, instr) => contains(instr, predicate) || predicate(instr.instr)
             case SwitchForEach(key, provider, instr) => contains(instr, predicate) || predicate(instr.instr)
     }
@@ -966,8 +978,23 @@ object Utils{
             }
             case LambdaValue(args, instr, ctx) => LambdaValue(args, instr, if ctx == null then context else ctx)
             case SelectorValue(value) => Utils.fix(expr)(context, Set())
-            case IsType(left, typ) if Utils.typeof(simplify(left)) == context.getType(typ) => BoolValue(true)
-            case IsType(left, typ) if Utils.typeof(simplify(left)) != AnyType => BoolValue(false)
+            case IsType(left, typ) => 
+                val simpl = simplify(left)
+                val typ2 = Utils.typeof(simpl)
+                val typ1Con = context.getType(typ)
+                
+                typ1Con match{
+                    case ClassType(clazz, args) => {
+                        typ2 match
+                            case ClassType(clazz2, args2) => if clazz2 == clazz && args == args2 then BoolValue(true) else IsType(simpl, ClassType(clazz, args))
+                            case AnyType =>  IsType(simpl, ClassType(clazz, args))
+                            case _ => BoolValue(false)
+                    }
+                    case _ if typ2 != AnyType => BoolValue(typ1Con == typ2)
+                    case _ => IsType(simpl, typ)
+                }
+
+            case SequenceValue(left, right) => SequenceValue(left, simplify(right))
             case UnaryOperation(op, left) => {
                 val inner = Utils.simplify(left)
                 (op,inner) match {
@@ -1669,6 +1696,22 @@ object Utils{
                         (context.getFunction("__getBindEntity__", List(VariableValue(Identifier.fromString(vari.fullName+".binding"))), List(), VoidType, false).call(e), 
                         null,
                         JavaSelector("@e", List(("tag", SelectorIdentifier(e.tagName)))))
+                    }
+                    case ClassType(clazz, sub) => {
+                        val e = context.getFreshVariable(EntityType)
+                        val selector = SelectorValue(JavaSelector("@e", List(("tag", SelectorIdentifier(clazz.getTag())))))
+
+                        (
+                            Compiler.compile(With(
+                                selector, 
+                                BoolValue(false), 
+                                BinaryOperation("==", LinkedVariableValue(vari, sel), LinkedVariableValue(context.root.push("object").getVariable("__ref"))),
+                                VariableAssigment(List((Right(e), Selector.self)), "=", SelectorValue(Selector.self)),
+                                null
+                            )),
+                            clazz.context.push(clazz.name),
+                            JavaSelector("@e", List(("tag", SelectorIdentifier(e.tagName))))
+                        )
                     }
                     case _ => throw new Exception(f"Not a selector: $expr")
             case TupleValue(values) => ???
