@@ -342,6 +342,9 @@ object Compiler{
                             vari.lazyValue = JsonValue(Utils.combineJson(Utils.toJson(vari.lazyValue), JsonDictionary(Map(index.head.getString() -> Utils.toJson(Utils.simplify(value))))))
                             List()
                         }
+                        else if (typ == JsonType && !vari.modifiers.isEntity){
+                            vari.assignJson(op, value, "json."+index.head.getString())
+                        }
                         else{
                             (typ, Utils.simplify(index.head)) match
                                 case (ArrayType(sub, v), IntValue(index)) => indexed(index)
@@ -444,12 +447,16 @@ object Compiler{
                 case Await(func, continuation) => {
                     Compiler.compile(FunctionCall(func.name, func.args ::: List(LambdaValue(List(), continuation, context)), func.typeargs))
                 }
+                case Continue => ???
+                case Break => ???
                 case ElseIf(cond, ifBlock) => throw new Exception("Unexpected Instruction")
             }
         }
         catch{
             e => {
+                //if (instruction.pos.longString != "<undefined position>"){
                 Reporter.error(f"${e.getMessage()} at ${instruction.pos}\n${instruction.pos.longString}")
+                //}
                 throw e
             }
         }

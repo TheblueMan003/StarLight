@@ -2,4 +2,4 @@
 # void default.__tick_tag__()
 # ==================================================
 
-function default:zzz_sl_block/8
+function default:zzz_sl_block/2

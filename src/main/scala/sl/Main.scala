@@ -165,6 +165,27 @@ object Main{
               }
             }
           }
+          case "?" => {
+            if (args.length != 2) then {
+              Reporter.error(f"Expected 1 argument got: ${args.length-1}")
+            }
+            else{
+              lazy val name = args(1).replaceAll("/",".").replaceAll(":",".")
+              val varis = lastContxt.getAllVariable()
+              if (name.contains("*")){
+                varis.filter(f => f.fullName.contains(name.replaceAllLiterally("*",""))).foreach{f => println(f.fullName)}
+              }
+              else{
+                varis.filter(f => f.fullName == name).headOption match
+                  case Some(value) => {
+                    println(value.fullName)
+                  }
+                  case None => {
+                    varis.filter(f => f.fullName.contains(name)).foreach{f => println(f.fullName)}
+                  }
+              }
+            }
+          }
           case "help" => {
             println("build <config_name>: Build the project with the config contains in the file config_name. The .slconf must be omited.")
             println("new: Make a new project")
@@ -175,6 +196,7 @@ object Main{
             println("update <library>: Update a library into the local project.")
             println("clearcache: Clear the caches of the compiler")
             println("tree: Print the tree of the last compilation")
+            println("show <file>: Print the IR of the last compilation")
             println("exit: Close")
           }
           case "exit" => {

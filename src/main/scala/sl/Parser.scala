@@ -15,7 +15,7 @@ import sl.files.CacheAST
 import objects.Variable
 
 object Parser extends StandardTokenParsers{
-  lexical.delimiters ++= List("(", ")", "\\", ".", "..", ":", "=", "->", "{", "}", ",", "*", "[", "]", "/", "+", "-", "*", "/", "\\", "%", "&&", "||", "=>", ";",
+  lexical.delimiters ++= List("(", ")", "\\", ".", "..", ":", "=", "{", "}", ",", "*", "[", "]", "/", "+", "-", "*", "/", "\\", "%", "&&", "||", "=>", ";",
                               "+=", "-=", "/=", "*=", "%=", "?=", ":=", "%", "@", "@e", "@a", "@s", "@r", "@p", "~", "^", "<=", "==", ">=", "<", ">", "!=", "%%%", "???", "$",
                               "!", "!=", "#", "<<", ">>", "&", "<<=", ">>=", "&=", "|=", "::", ":>", "??", "?")
   lexical.reserved   ++= List("true", "false", "if", "then", "else", "return", "switch", "for", "do", "while", "by", "is",
@@ -23,7 +23,7 @@ object Parser extends StandardTokenParsers{
                               "def", "package", "struct", "enum", "class", "lazy", "jsonfile", "blocktag", "throw", "try", "catch", "finally",
                               "public", "protected", "private", "scoreboard", "forgenerate", "from", "rotated", "facing", "align", "case", "default",
                               "ticking", "loading", "predicate", "extends", "implements", "new", "const", "static", "virtual", "abstract", "override", "repeat",
-                              "sleep", "async", "await")
+                              "sleep", "async", "await", "break", "continue")
 
 
   def block: Parser[Instruction] = positioned("{" ~> rep(instruction <~ opt(";")) <~ "}" ^^ (p => InstructionBlock(p)))
@@ -75,8 +75,6 @@ object Parser extends StandardTokenParsers{
       | caseStruct
       | classDecl
       | caseClassDecl
-      | identLazy2 <~ ("+" ~ "+") ^^ (p => VariableAssigment(List((Left(p), Selector.self)), "+=", IntValue(1)))
-      | identLazy2 <~ ("-" ~ "-") ^^ (p => VariableAssigment(List((Left(p), Selector.self)), "-=", IntValue(1)))
       | templateUse
       | varDeclaration
       | varAssignment
@@ -193,12 +191,13 @@ object Parser extends StandardTokenParsers{
       | (("with" ~> "(" ~> exprNoTuple <~ ",") ~ exprNoTuple <~ ")") ~ instruction ~ opt("else" ~> instruction) ^^ {case sel ~ isat ~ intr ~ elze => With(sel, isat, BoolValue(true), intr, elze.getOrElse(null))}
       | ((("with" ~> "(" ~> exprNoTuple <~ ",") ~ exprNoTuple <~ ",") ~ exprNoTuple <~ ")") ~ instruction ~ opt("else" ~> instruction) ^^ {case sel ~ isat ~ cond ~ intr ~ elze => With(sel, isat, cond, intr, elze.getOrElse(null))})
   def switch: Parser[Switch] = positioned(("switch" ~> exprNoTuple <~ "{") ~ rep(switchCase) <~ "}" ^^ (p => Switch(p._1, p._2)))
-        
+  
+  def switchIf: Parser[Expression] = opt("if" ~> exprNoTuple) ^^ (p => p.getOrElse(BoolValue(true)))
   def switchCaseBase: Parser[SwitchCase] = 
-    (exprNoTuple <~ "->") ~ instruction ^^ (p => SwitchCase(p._1, p._2)) |
-    ("case" ~> exprNoTuple <~ ":") ~ instruction ^^ (p => SwitchCase(p._1, p._2)) |
-    ("default" ~ ":") ~> instruction ^^ (p => SwitchCase(DefaultValue, p)) |
-    ("default" ~> "->") ~> instruction ^^ (p => SwitchCase(DefaultValue, p))
+    (exprNoTuple ~ switchIf <~ (("-"~">")|"=>")) ~ instruction ^^ {case e ~ c ~ i => SwitchCase(e, i, c)} |
+    ("case" ~> exprNoTuple ~ switchIf <~ ":") ~ instruction ^^ {case e ~ c ~ i => SwitchCase(e, i, c)} |
+    ((("default" | "else") ~> switchIf <~ ":")) ~ instruction ^^ {case c ~ i => SwitchCase(DefaultValue, i, c)} |
+    ((("default" | "else") ~> switchIf <~ (("-"~">")|"=>"))) ~ instruction ^^ {case c ~ i => SwitchCase(DefaultValue, i, c)}
     
   def switchCase: Parser[SwitchElement] = 
     switchCaseBase
@@ -219,11 +218,27 @@ object Parser extends StandardTokenParsers{
   def enumField: Parser[EnumField] = types ~ identLazy ^^ { p => EnumField(p._2, p._1) }
   def enumValue: Parser[EnumValue] = identLazy ~ opt("("~>repsep(exprNoTuple,",")<~")") ^^ (p => EnumValue(p._1, p._2.getOrElse(List())))
 
-  def varAssignment: Parser[Instruction] = positioned((rep1sep(opt(selector <~ ".") ~ identLazy2, ",") ~ assignmentOp ~ expr) ^^ (p => 
+  def varAssignment: Parser[Instruction] = positioned((rep1sep(opt(selector <~ ".") ~ identLazy2, ",") ~ assignmentOp ~ expr) ^^ {case id ~ op ~ expr => 
     {
-      val identifiers = p._1._1.map(p => (Identifier.fromString(p._2), p._1.getOrElse(Selector.self)))
-      VariableAssigment(identifiers.map((i,s) => (Left(i), s)), p._1._2, p._2)
-    }))
+      val identifiers = id.map(p => (Identifier.fromString(p._2), p._1.getOrElse(Selector.self)))
+      VariableAssigment(identifiers.map((i,s) => (Left(i), s)), op, expr)
+    }} |
+    (rep1sep(opt(selector <~ ".") ~ identLazy2, ",") <~ ("+" ~ "+")) ^^ {case id => 
+    {
+      val identifiers = id.map(p => (Identifier.fromString(p._2), p._1.getOrElse(Selector.self)))
+      VariableAssigment(identifiers.map((i,s) => (Left(i), s)), "+=", IntValue(1))
+    }} |
+    (rep1sep(opt(selector <~ ".") ~ identLazy2, ",") <~ ("-" ~ "-")) ^^ {case id => 
+    {
+      val identifiers = id.map(p => (Identifier.fromString(p._2), p._1.getOrElse(Selector.self)))
+      VariableAssigment(identifiers.map((i,s) => (Left(i), s)), "-=", IntValue(1))
+    }}
+    )
+
+  def singleVarAssignment: Parser[VariableAssigment] = positioned((opt(selector <~ ".") ~ identLazy2 ~ assignmentOp ~ expr) ^^ {case s ~ i ~ op ~ e => VariableAssigment(List((Left(i), s.getOrElse(Selector.self))), op, e)} |
+    opt(selector <~ ".") ~ identLazy2 <~ ("+" ~ "+") ^^ {case s ~ i => VariableAssigment(List((Left(i), s.getOrElse(Selector.self))), "+=", IntValue(1))} |
+    opt(selector <~ ".") ~ identLazy2 <~ ("-" ~ "-") ^^ {case s ~ i => VariableAssigment(List((Left(i), s.getOrElse(Selector.self))), "-=", IntValue(1))}
+    )
 
   def varDeclaration: Parser[Instruction] = positioned((doc ~ modifier ~ types ~ rep1sep(identLazy, ",") ~ opt(assignmentOp ~ expr)) ^^ {
     case doc ~ mod1 ~ typ ~ names ~ expr => {
@@ -347,6 +362,7 @@ object Parser extends StandardTokenParsers{
     | "true" ^^^ BoolValue(true)
     | "false" ^^^ BoolValue(false)
     | "null" ^^^ NullValue
+    | singleVarAssignment ^^ {p => SequenceValue(p, VariableValue(p.name.head._1.left.get, p.name.head._2))}
     | tagValue
     | namespacedName
     | stringLit2 ^^ (StringValue(_))

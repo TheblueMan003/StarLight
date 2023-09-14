@@ -37,9 +37,9 @@ object StaticAnalyser{
             case If(cond, ifBlock, elseBlock) => If(cond, check(ifBlock), elseBlock.map(e => ElseIf(e.cond, check(e.ifBlock))))
             case WhileLoop(cond, block) => WhileLoop(cond, check(block))
             case DoWhileLoop(cond, block) => DoWhileLoop(cond, check(block))
-            case Switch(value, cases, _) => Switch(value, cases.map{case x: SwitchCase => SwitchCase(x.expr, check(x.instr));
-                                                                    case x: SwitchForGenerate => SwitchForGenerate(x.key, x.provider, SwitchCase(x.instr.expr, check(x.instr.instr)));
-                                                                    case x: SwitchForEach => SwitchForEach(x.key, x.provider, SwitchCase(x.instr.expr, check(x.instr.instr)));
+            case Switch(value, cases, _) => Switch(value, cases.map{case x: SwitchCase => SwitchCase(x.expr, check(x.instr), x.cond);
+                                                                    case x: SwitchForGenerate => SwitchForGenerate(x.key, x.provider, SwitchCase(x.instr.expr, check(x.instr.instr), x.instr.cond));
+                                                                    case x: SwitchForEach => SwitchForEach(x.key, x.provider, SwitchCase(x.instr.expr, check(x.instr.instr), x.instr.cond));
                                                                     })
             case Execute(typ, exprs, block) => Execute(typ, exprs, check(block))
             case With(expr, isat, cond, block, elze) => With(expr, isat, cond, check(block), check(elze))
@@ -111,9 +111,9 @@ object StaticAnalyser{
                     case _ => DoWhileLoop(BinaryOperation("&&", cond, getComparaison("__hasFunctionReturned__", IntValue(0))), returnOne(block))
             }
             case Switch(value, cases, default) => {
-                val newCases = cases.map{case x: SwitchCase => SwitchCase(x.expr, InstructionList(returnOnce(List(x.instr))));
-                                        case x: SwitchForGenerate => SwitchForGenerate(x.key, x.provider, SwitchCase(x.instr.expr, InstructionList(returnOnce(List(x.instr.instr)))));
-                                        case x: SwitchForEach => SwitchForEach(x.key, x.provider, SwitchCase(x.instr.expr, InstructionList(returnOnce(List(x.instr.instr)))));
+                val newCases = cases.map{case x: SwitchCase => SwitchCase(x.expr, InstructionList(returnOnce(List(x.instr))), x.cond);
+                                        case x: SwitchForGenerate => SwitchForGenerate(x.key, x.provider, SwitchCase(x.instr.expr, InstructionList(returnOnce(List(x.instr.instr))), x.instr.cond));
+                                        case x: SwitchForEach => SwitchForEach(x.key, x.provider, SwitchCase(x.instr.expr, InstructionList(returnOnce(List(x.instr.instr))), x.instr.cond));
                                         }
                 Switch(value, newCases, default)
             }
@@ -294,28 +294,28 @@ object StaticAnalyser{
                         case x: SwitchCase => {
                             val (newInstr, changed) = handleSleep(x.instr, rest)
                             if (changed){
-                                SwitchCase(x.expr, newInstr)
+                                SwitchCase(x.expr, newInstr, x.cond)
                             }
                             else{
-                                SwitchCase(x.expr, InstructionList(newInstr :: rest))
+                                SwitchCase(x.expr, InstructionList(newInstr :: rest), x.cond)
                             }
                         }
                         case x: SwitchForGenerate => {
                             val (newInstr, changed) = handleSleep(x.instr.instr, rest)
                             if (changed){
-                                SwitchForGenerate(x.key, x.provider, SwitchCase(x.instr.expr, newInstr))
+                                SwitchForGenerate(x.key, x.provider, SwitchCase(x.instr.expr, newInstr, x.instr.cond))
                             }
                             else{
-                                SwitchForGenerate(x.key, x.provider, SwitchCase(x.instr.expr, InstructionList(newInstr :: rest)))
+                                SwitchForGenerate(x.key, x.provider, SwitchCase(x.instr.expr, InstructionList(newInstr :: rest), x.instr.cond))
                             }
                         }
                         case x: SwitchForEach => {
                             val (newInstr, changed) = handleSleep(x.instr.instr, rest)
                             if (changed){
-                                SwitchForEach(x.key, x.provider, SwitchCase(x.instr.expr, newInstr))
+                                SwitchForEach(x.key, x.provider, SwitchCase(x.instr.expr, newInstr, x.instr.cond))
                             }
                             else{
-                                SwitchForEach(x.key, x.provider, SwitchCase(x.instr.expr, InstructionList(newInstr :: rest)))
+                                SwitchForEach(x.key, x.provider, SwitchCase(x.instr.expr, InstructionList(newInstr :: rest), x.instr.cond))
                             }
                         }
                     }

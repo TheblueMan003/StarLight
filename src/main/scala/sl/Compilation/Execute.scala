@@ -264,8 +264,32 @@ object Execute{
             case BoolValue(value) => if value then (List(), List(IFTrue)) else (List(), List(IFFalse))
             case DefaultValue => (List(), List(IFFalse))
 
-            case IsType(left, typ) if Utils.typeof(Utils.simplify(left)) == context.getType(typ) => (List(), List(IFTrue))
-            case IsType(left, typ) => (List(), List(IFFalse))
+            case IsType(left, typ) => 
+                val simp = Utils.simplify(left)
+                val lType = Utils.typeof(simp)
+                val rType = context.getType(typ)
+                rType match
+                    case ClassType(clazz, _) => {
+                        simp match
+                            case LinkedVariableValue(vari, sel) => {
+                                val tmp = context.getFreshVariable(BoolType)
+                                val selector = SelectorValue(JavaSelector("@e", List(("tag", SelectorIdentifier(clazz.getTag())))))
+
+                                val prev = tmp.assign("=", BoolValue(false)):::Compiler.compile(With(
+                                        selector, 
+                                        BoolValue(false), 
+                                        BinaryOperation("==", LinkedVariableValue(vari, sel), LinkedVariableValue(context.root.push("object").getVariable("__ref"))),
+                                        VariableAssigment(List((Right(tmp), Selector.self)), "=", BoolValue(true)),
+                                        null
+                                    ))
+                                val other = getIfCase(LinkedVariableValue(tmp, Selector.self))
+                                (prev ::: other._1, other._2)
+                            }
+                            case other => (List(), List(IFFalse))
+                    }
+
+                    case _ if rType == lType => (List(), List(IFTrue))
+                    case _ => (List(), List(IFFalse))
 
             case NullValue => (List(), List(IFFalse))
             case LinkedFunctionValue(fct) => (List(), List(IFTrue))
@@ -294,6 +318,18 @@ object Execute{
                 val (prev2, c) = getIfCase(rest)
                 (prev1:::prev2, c)
             }
+
+            case TernaryOperation(left, middle, right) => {
+                val vari = context.getFreshVariable(Utils.typeof(expr))
+                val (ir, ca) = getIfCase(LinkedVariableValue(vari, Selector.self))
+                (vari.assign("=", expr):::ir, ca)
+            }
+
+            case SequenceValue(left, right) => {
+                val (prev2, c2) = getIfCase(right)
+                (Compiler.compile(left):::prev2, c2)
+            }
+
             case BinaryOperation(op, VariableValue(left, sel), right) =>
                 getIfCase(BinaryOperation(op, context.resolveVariable(VariableValue(left, sel)), right))
             case BinaryOperation(op, left, VariableValue(right, sel)) =>
@@ -550,7 +586,16 @@ object Execute{
                             left
                         }
                         else{
-                            (left._1:::right._1, left._2:::right._2)
+                            if (right._1.isEmpty){
+                                (left._1:::right._1, left._2:::right._2)
+                            }
+                            else{
+                                val vari = context.getFreshVariable(BoolType)
+                                val exec1 = makeExecute(getListCase(left._2), 
+                                            right._1 ::: makeExecute(getListCase(right._2), vari.assign("=", BoolValue(true))))
+                                
+                                (vari.assign("=", BoolValue(false)) ::: left._1 ::: exec1, List(IFValueCase(LinkedVariableValue(vari))))
+                            }
                         }
                     }
                     case "||" => {
@@ -748,16 +793,16 @@ object Execute{
     def flattenSwitchCase(ori: List[SwitchElement])(implicit context: Context) = {
         ori.flatMap(c => 
             c match{
-                case SwitchCase(expr, instr) => List(SwitchCase(expr, instr))
-                case SwitchForGenerate(key, provider, SwitchCase(expr, instr)) => {
+                case SwitchCase(expr, instr, cond) => List(SwitchCase(expr, instr, cond))
+                case SwitchForGenerate(key, provider, SwitchCase(expr, instr, cond)) => {
                     val gcases = Utils.getForgenerateCases(key, provider)
                     
-                    gcases.map(lst => lst.sortBy(0 - _._1.length()).foldLeft(SwitchCase(expr, instr))
-                        {case (SwitchCase(expr, instr), elm) => 
-                            SwitchCase(Utils.subst(expr, elm._1, elm._2), Utils.subst(instr, elm._1, elm._2))}
+                    gcases.map(lst => lst.sortBy(0 - _._1.length()).foldLeft(SwitchCase(expr, instr, cond))
+                        {case (SwitchCase(expr, instr, cond), elm) => 
+                            SwitchCase(Utils.subst(expr, elm._1, elm._2), Utils.subst(instr, elm._1, elm._2), Utils.subst(cond, elm._1, elm._2))}
                     ).toList
                 }
-                case SwitchForEach(key, provider, SwitchCase(expr, instr)) => {
+                case SwitchForEach(key, provider, SwitchCase(expr, instr, cond)) => {
                     val cases = Utils.getForeachCases(key.toString(), provider)
                     
                     var index = -1
@@ -775,17 +820,22 @@ object Execute{
                             index += 1
                             indx.assign("=", IntValue(index))
 
-                            SwitchCase(Utils.fix(expr)(ctx, Set()), Utils.fix(instr)(ctx, Set()))
+                            SwitchCase(Utils.fix(expr)(ctx, Set()), Utils.fix(instr)(ctx, Set()), Utils.fix(cond)(ctx, Set()))
                         })
                     }).toList
                 }
             }
         )
     }
-    def switchComp(left: Expression, right: Expression)(implicit context: Context): Expression = {
-        Utils.typeof(right) match{
-            case RangeType(_) => BinaryOperation("in", left, right)
-            case _ => BinaryOperation("==", left, right)
+    def switchComp(left: Expression, right: Expression, cond: Expression)(implicit context: Context): Expression = {
+        if (cond == BoolValue(true)){
+            Utils.typeof(right) match{
+                case RangeType(_) => BinaryOperation("in", left, right)
+                case _ => BinaryOperation("==", left, right)
+            }
+        }
+        else{
+            BinaryOperation("&&", cond, switchComp(left, right, BoolValue(true)))
         }
     }
     def switch(swit: Switch)(implicit context: Context):List[IRTree] = {
@@ -797,26 +847,26 @@ object Execute{
                 val expr = Utils.simplify(swit.value)
                 Utils.typeof(expr) match
                     case IntType | FloatType | BoolType | FuncType(_, _) | EnumType(_) | StructType(_, _) | ClassType(_, _) => {
-                        val cases2 = flattenSwitchCase(swit.cases).map(c => SwitchCase(Utils.simplify(c.expr), c.instr))
+                        val cases2 = flattenSwitchCase(swit.cases).map(c => SwitchCase(Utils.simplify(c.expr), c.instr, Utils.simplify(c.cond)))
 
-                        val hasDefaultCase = cases2.exists(_.expr == DefaultValue)
+                        val hasDefaultCase = cases2.exists(c => c.expr == DefaultValue || c.cond != BoolValue(true))
                         var prev = List[IRTree]()
                         var variDone: Variable = null
                         val cases = if (!hasDefaultCase) cases2 else {
                             variDone = context.getFreshVariable(BoolType)
                             prev = variDone.assign("=", BoolValue(true))
-                            cases2.filterNot(_.expr == DefaultValue).map(x => SwitchCase(x.expr, InstructionList(List(VariableAssigment(List((Right(variDone), Selector.self)), "=", BoolValue(false)), x.instr))))
+                            cases2.filterNot(_.expr == DefaultValue).map(x => SwitchCase(x.expr, InstructionList(List(VariableAssigment(List((Right(variDone), Selector.self)), "=", BoolValue(false)), x.instr)), x.cond))
                         }
                         val defaultCases = cases2.filter(_.expr == DefaultValue)
 
                         prev ::: (expr match{
                             case VariableValue(name, sel) if !swit.copyVariable=> {
-                                makeTree(context.getVariable(name), cases.par.filter(_.expr.hasIntValue()).map(x => (x.expr.getIntValue(), x.instr)).toList):::
-                                cases.par.filter(!_.expr.hasIntValue()).flatMap(x => ifs(If(switchComp(VariableValue(name), x.expr), x.instr, List()))).toList
+                                makeTree(context.getVariable(name), cases.par.filter(_.expr.hasIntValue()).map(x => (x.expr.getIntValue(), x.instr, x.cond)).toList):::
+                                cases.par.filter(!_.expr.hasIntValue()).flatMap(x => ifs(If(switchComp(VariableValue(name), x.expr, x.cond), x.instr, List()))).toList
                             }
                             case LinkedVariableValue(vari, sel) if !swit.copyVariable=> {
-                                makeTree(vari, cases.par.filter(_.expr.hasIntValue()).map(x => (x.expr.getIntValue(), x.instr)).toList):::
-                                cases.par.filter(!_.expr.hasIntValue()).flatMap(x => ifs(If(switchComp(LinkedVariableValue(vari), x.expr), x.instr, List()))).toList
+                                makeTree(vari, cases.par.filter(_.expr.hasIntValue()).map(x => (x.expr.getIntValue(), x.instr, x.cond)).toList):::
+                                cases.par.filter(!_.expr.hasIntValue()).flatMap(x => ifs(If(switchComp(LinkedVariableValue(vari), x.expr, x.cond), x.instr, List()))).toList
                             }
                             case IntValue(value) => {
                                 val tail = cases.par.filter(!_.expr.hasIntValue()).toList
@@ -827,7 +877,7 @@ object Execute{
                                 else{
                                     val vari = context.getFreshVariable(Utils.typeof(swit.value))
                                     vari.assign("=", swit.value) ::: head ::: 
-                                    tail.flatMap(x => ifs(If(switchComp(LinkedVariableValue(vari), x.expr), x.instr, List())))
+                                    tail.flatMap(x => ifs(If(switchComp(LinkedVariableValue(vari), x.expr, x.cond), x.instr, List())))
                                 }
                             }
                             case FloatValue(value) => {
@@ -839,7 +889,7 @@ object Execute{
                                 else{
                                     val vari = context.getFreshVariable(Utils.typeof(swit.value))
                                     vari.assign("=", swit.value) ::: head ::: 
-                                    tail.flatMap(x => ifs(If(switchComp(LinkedVariableValue(vari), x.expr), x.instr, List())))
+                                    tail.flatMap(x => ifs(If(switchComp(LinkedVariableValue(vari), x.expr, x.cond), x.instr, List())))
                                 }
                             }
                             case EnumIntValue(value) => {
@@ -851,16 +901,16 @@ object Execute{
                                 else{
                                     val vari = context.getFreshVariable(Utils.typeof(swit.value))
                                     vari.assign("=", swit.value) ::: head ::: 
-                                    tail.flatMap(x => ifs(If(switchComp(LinkedVariableValue(vari), x.expr), x.instr, List())))
+                                    tail.flatMap(x => ifs(If(switchComp(LinkedVariableValue(vari), x.expr, x.cond), x.instr, List())))
                                 }
                             }
                             case _ => {
                                 val vari = context.getFreshVariable(Utils.typeof(swit.value))
-                                vari.assign("=", swit.value) ::: makeTree(vari, cases.filter(_.expr.hasIntValue()).map(x => (x.expr.getIntValue(), x.instr)))::: 
-                                cases.filter(!_.expr.hasIntValue()).flatMap(x => ifs(If(switchComp(LinkedVariableValue(vari), x.expr), x.instr, List())))
+                                vari.assign("=", swit.value) ::: makeTree(vari, cases.filter(_.expr.hasIntValue()).map(x => (x.expr.getIntValue(), x.instr, x.cond)))::: 
+                                cases.filter(!_.expr.hasIntValue()).flatMap(x => ifs(If(switchComp(LinkedVariableValue(vari), x.expr, x.cond), x.instr, List())))
                             }
                         })::: defaultCases.flatMap(x =>
-                            ifs(If(LinkedVariableValue(variDone), x.instr, List()))
+                            ifs(If(BinaryOperation("&&", x.cond, LinkedVariableValue(variDone)), x.instr, List()))
                         )
                     }
                     case TupleType(sub) => {
@@ -893,11 +943,11 @@ object Execute{
                         }
                         
                         if (sub.size == 1){
-                            switch(Switch(getHead(expr), flattenSwitchCase(swit.cases).map(c => SwitchCase(getHead(c.expr), c.instr))))
+                            switch(Switch(getHead(expr), flattenSwitchCase(swit.cases).map(c => SwitchCase(getHead(c.expr), c.instr, c.cond))))
                         }
                         else{
                             val cases = flattenSwitchCase(swit.cases).groupBy(c => getHead(c.expr))
-                                                .map((g, cases) => SwitchCase(g, Switch(getTail(expr), cases.map(c => SwitchCase(getTail(c.expr), c.instr)))))
+                                                .map((g, cases) => SwitchCase(g, Switch(getTail(expr), cases.map(c => SwitchCase(getTail(c.expr), c.instr, c.cond))), BoolValue(true)))
                                                 .toList
                                                 
                             switch(Switch(getHead(expr), cases))
@@ -906,11 +956,13 @@ object Execute{
                 }
     }
 
-    def makeTree(cond: Variable, values: List[(Int, Instruction)])(implicit context: Context):List[IRTree] = {
+    def makeTree(cond: Variable, values: List[(Int, Instruction, Expression)])(implicit context: Context):List[IRTree] = {
         if (values.length <= Settings.treeSize){
-            values.flatMap((v, i) =>
-                makeExecute(getListCase(List(IFValueCase(BinaryOperation("==", LinkedVariableValue(cond), IntValue(v))))), Compiler.compile(i))
-            )
+            values.flatMap((v, i, c) => ifs(If(
+                    BinaryOperation("&&", c,BinaryOperation("==", LinkedVariableValue(cond), IntValue(v))), 
+                    i,
+                    List()
+            )))
         }
         else{
             val values2 = values.sortBy(_._1)
@@ -921,10 +973,10 @@ object Execute{
                     val block = context.getFreshBlock(makeTree(cond, x.map(p => p._1).sortBy(_._1)))
                     val min = x.map(p => p._1).head._1
                     val max = x.map(p => p._1).last._1
-                    makeExecute(getListCase(List(IFValueCase(switchComp(LinkedVariableValue(cond), RangeValue(IntValue(min), IntValue(max), IntValue(1)))))), block.call(List()))
+                    makeExecute(getListCase(List(IFValueCase(switchComp(LinkedVariableValue(cond), RangeValue(IntValue(min), IntValue(max), IntValue(1)), BoolValue(true))))), block.call(List()))
                 }
                 else{
-                    makeExecute(getListCase(List(IFValueCase(switchComp(LinkedVariableValue(cond), IntValue(x.head._1._1))))), Compiler.compile(x.head._1._2))
+                    makeExecute(getListCase(List(IFValueCase(switchComp(LinkedVariableValue(cond), IntValue(x.head._1._1), BoolValue(true))))), Compiler.compile(x.head._1._2))
                 }
             }
             ).toList

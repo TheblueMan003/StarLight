@@ -341,9 +341,9 @@ class MultiplexFunction(context: Context, _contextName: String, name: String, ar
     override def compile(): Unit = {
         val cases = 
             if typ == VoidType then
-                functions.zipWithIndex.map((x, i) => SwitchCase(IntValue(x.getMuxID()), LinkedFunctionCall(x, argumentsVariables.tail.map(LinkedVariableValue(_))))).toList
+                functions.zipWithIndex.map((x, i) => SwitchCase(IntValue(x.getMuxID()), LinkedFunctionCall(x, argumentsVariables.tail.map(LinkedVariableValue(_))), BoolValue(true))).toList
             else
-                functions.zipWithIndex.map((x, i) => SwitchCase(IntValue(x.getMuxID()), LinkedFunctionCall(x, argumentsVariables.tail.map(LinkedVariableValue(_)), returnVariable))).toList
+                functions.zipWithIndex.map((x, i) => SwitchCase(IntValue(x.getMuxID()), LinkedFunctionCall(x, argumentsVariables.tail.map(LinkedVariableValue(_)), returnVariable), BoolValue(true))).toList
         
         val switch = Switch(LinkedVariableValue(argumentsVariables.head), cases, false)
         content = sl.Compiler.compile(switch.unBlockify())(context.push(name, this))
@@ -409,7 +409,7 @@ class ClassFunction(_contextName: String, variable: Variable, function: Function
     override def getName(): String = function.name
 
     def call(args2: List[Expression], ret: Variable = null, op: String = "=")(implicit ctx: Context): List[IRTree] = {
-        val selector = SelectorValue(JavaSelector("@e", List(("tag", SelectorIdentifier("__class__")))))
+        val selector = SelectorValue(JavaSelector("@e", List(("tag", SelectorIdentifier(clazz.getTag())))))
         def isScoreboard(expr: Expression) = {
             expr match
                 case LinkedVariableValue(vari, selector) => vari.modifiers.isEntity

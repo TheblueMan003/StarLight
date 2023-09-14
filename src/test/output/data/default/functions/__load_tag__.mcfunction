@@ -2,4 +2,4 @@
 # void default.__load_tag__()
 # ==================================================
 
-function default:zzz_sl_block/7
+function default:zzz_sl_block/1
