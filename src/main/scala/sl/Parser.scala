@@ -23,7 +23,7 @@ object Parser extends StandardTokenParsers{
                               "def", "package", "struct", "enum", "class", "lazy", "jsonfile", "blocktag", "throw", "try", "catch", "finally",
                               "public", "protected", "private", "scoreboard", "forgenerate", "from", "rotated", "facing", "align", "case", "default",
                               "ticking", "loading", "predicate", "extends", "implements", "new", "const", "static", "virtual", "abstract", "override", "repeat",
-                              "sleep", "async", "await")
+                              "sleep", "async", "await", "break", "continue")
 
 
   def block: Parser[Instruction] = positioned("{" ~> rep(instruction <~ opt(";")) <~ "}" ^^ (p => InstructionBlock(p)))
