@@ -30,6 +30,7 @@ object Variable {
 	}
 }
 class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) extends CObject(context, name, _modifier) with Typed(typ){
+	val parentFunction = context.getCurrentFunction()
 	var tupleVari: List[Variable] = List()
 	var indexedVari: List[(Variable, Expression)] = List()
 	val variName = if modifiers.hasAttributes("versionSpecific")(context) then fullName+"_"+Settings.version.mkString("_") else fullName
@@ -54,7 +55,9 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 		val parentStruct = context.getCurrentStructUse()
 
 		if (context.getCurrentFunction() == null || isFunctionArgument){
-			if (parentClass != null && getType() == parentClass.definingType && !skipClassCheck) return
+			if (parentClass != null && getType() == parentClass.definingType && !skipClassCheck) {
+				return
+			}
 		}
 		//if (parentStruct != null && getType() == parent.getType())return
 		
@@ -221,10 +224,10 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 								if (fct._1.canBeCallAtCompileTime){
 									if (fct._1.modifiers.hasAttributes("requiresVariable")){
 										val vari = context.getFreshVariable(getType())
-										return fct.call(vari, "=") ::: assign(op, LinkedVariableValue(vari))
+										return fct.call(vari, selector, "=") ::: assign(op, LinkedVariableValue(vari))
 									}
 									else{
-										return fct.call(this, op)
+										return fct.call(this, selector, op)
 									}
 								}
 							}
@@ -240,10 +243,10 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 							if (fct.canBeCallAtCompileTime){
 								if (fct.modifiers.hasAttributes("requiresVariable")){
 									val vari = context.getFreshVariable(getType())
-									return (fct,args).call(vari, "=") ::: assign(op, LinkedVariableValue(vari))
+									return (fct,args).call(vari, selector, "=") ::: assign(op, LinkedVariableValue(vari))
 								}
 								else{
-									return (fct,args).call(this, op)
+									return (fct,args).call(this, selector, op)
 								}
 							}
 						case ArrayGetValue(LinkedVariableValue(vari, sl), index) if vari.modifiers.isLazy => {
@@ -385,6 +388,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 									case EnumType(enm) => assignEnum(op, other)
 									case StringType => assignString(op, other)
 									case RangeType(sub) => assignRange(op, other)
+									case VoidType if other == NullValue => List()
 									case other => throw new Exception(f"Cannot Assign to $fullName of type $other at \n${value.pos.longString}")
 							}
 						}
@@ -576,15 +580,15 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 				case VariableValue(iden, sel) => 
 					context.tryGetVariable(iden) match
 						case Some(vari) if vari.getType().isInstanceOf[StructType] => {
-							context.getFunction(iden.child("__apply__"), args, typeargs, getType()).call(this, op)
+							context.getFunction(iden.child("__apply__"), args, typeargs, getType()).call(this, selector, op)
 						}
-						case other => context.getFunction(iden, args, typeargs, getType()).call(this, op)
-				case LinkedFunctionValue(fct) => (fct, args).call(this, op)
+						case other => context.getFunction(iden, args, typeargs, getType()).call(this, selector, op)
+				case LinkedFunctionValue(fct) => (fct, args).call(this, selector, op)
 				case other =>{
 					val (t, v) = Utils.simplifyToVariable(other)
 					v.vari.getType() match
 						case FuncType(sources, output) =>
-							t ::: (context.getFunctionMux(sources, output)(context), v::args).call(this, op)
+							t ::: (context.getFunctionMux(sources, output)(context), v::args).call(this, selector, op)
 						case other => throw new Exception(f"Cannot call $other at \n${name.pos.longString}")
 				}
 		}
@@ -1301,10 +1305,10 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 
 	def deref()(implicit context: Context) = 
 		if (modifiers.hasAttributes("variable.isTemp") || isFunctionArgument) List() else
-		context.getFunction(this.name + ".__remRef", List[Expression](), List(), getType(), false).call()
+		context.getFunction(this.fullName + ".__remRef", List[Expression](), List(), getType(), false).call()
 	def addref()(implicit context: Context)= 
 		if (modifiers.hasAttributes("variable.isTemp")|| isFunctionArgument) List() else
-		context.getFunction(this.name + ".__addRef", List[Expression](), List(), getType(), false).call()
+		context.getFunction(this.fullName + ".__addRef", List[Expression](), List(), getType(), false).call()
 
 	/**
 	 * Assign a value to the struct variable
@@ -1420,6 +1424,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 			case BoolValue(value) => false
 			case JsonValue(content) => false
 			case SelectorValue(value) => false
+			case InterpolatedString(content) => content.exists(isPresentIn(_))
 			case StringValue(value) => false
 			case DefaultValue => false
 			case NullValue => false

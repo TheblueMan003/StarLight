@@ -84,6 +84,37 @@ case class StringValue(val value: String) extends Expression with SmallValue wit
     override def getFloatValue(): Double = ???
     override def getString()(implicit context: Context): String = value
 }
+case class InterpolatedString(val value: List[Expression]) extends Expression with SmallValue with Stringifyable{
+    override def toString(): String = value.toString()
+    override def getIntValue(): Int = ???
+    override def hasIntValue(): Boolean = false
+    override def hasFloatValue(): Boolean = false
+    override def getFloatValue(): Double = ???
+    override def getString()(implicit context: Context): String = value.map(_.getString()).reduce(_ + _)
+}
+object InterpolatedString{
+    def build(string: String) = {
+        val patern = "\\$\\{([^\\}]+)\\}".r
+        var text = string
+        var ended = false
+        var values = List[Expression]()
+        while(!ended){
+            patern.findFirstMatchIn(text)match
+                case None => ended = true
+                case Some(value) => {
+                    value.matched
+                    val expr = value.group(1)
+                    val befor = value.before.toString()
+                    values = values ::: (if (befor.size > 0) then List(StringValue(befor), Parser.parseExpression(expr, true)) else List(Parser.parseExpression(expr, true)))
+                    text = value.after.toString()
+                }
+        }
+        values match{
+            case List(StringValue(s)) => StringValue(s)
+            case _ => InterpolatedString(values)
+        }
+    }
+}
 case class RawJsonValue(val value: List[Printable]) extends Expression with SmallValue with Stringifyable{
     override def toString(): String = value.toString()
     override def getIntValue(): Int = ???

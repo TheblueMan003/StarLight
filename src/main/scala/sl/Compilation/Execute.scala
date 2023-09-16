@@ -683,23 +683,23 @@ object Execute{
                         case (block: NamespacedName)::Nil => (List(), List(IFBlock("~ ~ ~ "+BlockConverter.getBlockName(block.getString())+" "+BlockConverter.getBlockID(block.getString()))))
                         case (pos:PositionValue)::TagValue(block)::Nil => {
                             val tag = context.getBlockTag(block)
-                            val prev = makeExecute(f => PositionedIR(pos.getString(), f), tag.testFunction.call(List(), null, "="))
+                            val prev = makeExecute(f => PositionedIR(pos.getString(), f), tag.testFunction.call(List(), null, Selector.self, "="))
                             val (p, c) = getIfCase(LinkedVariableValue(tag.testFunction.returnVariable))
                             (prev ::: p, c)
                         }
                         case TagValue(block)::Nil => {
                             val tag = context.getBlockTag(block)
-                            val prev = tag.testFunction.call(List(), null, "=")
+                            val prev = tag.testFunction.call(List(), null, Selector.self, "=")
                             val (p, c) = getIfCase(LinkedVariableValue(tag.testFunction.returnVariable))
                             (prev ::: p, c)
                         }
                         case (pos:PositionValue)::LinkedTagValue(tag)::Nil => {
-                            val prev = makeExecute(f => PositionedIR(pos.getString(), f), tag.testFunction.call(List(), null, "="))
+                            val prev = makeExecute(f => PositionedIR(pos.getString(), f), tag.testFunction.call(List(), null, Selector.self, "="))
                             val (p, c) = getIfCase(LinkedVariableValue(tag.testFunction.returnVariable))
                             (prev ::: p, c)
                         }
                         case LinkedTagValue(tag)::Nil => {
-                            val prev = tag.testFunction.call(List(), null, "=")
+                            val prev = tag.testFunction.call(List(), null, Selector.self, "=")
                             val (p, c) = getIfCase(LinkedVariableValue(tag.testFunction.returnVariable))
                             (prev ::: p, c)
                         }

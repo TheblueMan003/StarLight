@@ -308,13 +308,45 @@ object Compiler{
                         val simplied = Utils.simplify(expr)
                         val varis = names.map((i,s) => (i.get(), s))
                         simplied match
-                            case TupleValue(lst) => varis.zip(lst).flatMap(p => (p._1._1.assign(op, p._2)(context, p._1._2)))
+                            case TupleValue(lst) => 
+                                val isSwap = varis.exists(x => lst.exists(y => x._1.isPresentIn(y)(context, x._2)))
+                                if (isSwap){
+                                    val t = varis.zip(lst).zipWithIndex.map{case ((v, e), i) => {
+                                        if (varis.take(i).exists(x => x._1.isPresentIn(e)(context, x._2))){
+                                            val tmp = context.getFreshVariable(Utils.typeof(e))
+                                            tmp.modifiers.isLazy = varis.take(i).filter(x => x._1.isPresentIn(e)(context, x._2)).forall(x => x._1.modifiers.isLazy)
+                                            (()=>tmp.assign("=", e), ()=>v._1.assign("=", LinkedVariableValue(tmp))(context, v._2))
+                                        }
+                                        else{
+                                            (()=>List(), ()=>v._1.assign("=", e)(context, v._2))
+                                        }
+                                    }}
+                                    (t.flatMap(p => p._1()) ::: t.flatMap(p => p._2()))
+                                }
+                                else{
+                                    varis.zip(lst).flatMap(p => (p._1._1.assign(op, p._2)(context, p._1._2)))
+                                }
                             case VariableValue(name, sel) => {
                                 val vari = context.getVariable(name) 
                                 vari.getType() match
                                     case TupleType(sub) => varis.zip(vari.tupleVari).flatMap(p => p._1._1.assign(op, LinkedVariableValue(p._2, sel))(context, p._1._2))
                                     case _ => varis.flatMap(l => l._1.assign(op, simplied)(context, l._2))
-                                
+                            }
+                            case FunctionCallValue(name, args, typeargs, selector) => {
+                                Utils.typeof(simplied) match
+                                    case TupleType(sub) if sub.size == varis.size => {
+                                        val fake = context.getFreshVariable(TupleType(sub))
+                                        if (varis.forall(x => x._2 == Selector.self)){
+                                            fake.tupleVari = varis.map(_._1)
+                                            fake.assign("=", simplied)
+                                        }
+                                        else{
+                                            fake.assign("=", simplied) ::: varis.zip(fake.tupleVari).flatMap(p => p._1._1.assign("=", LinkedVariableValue(p._2))(context, p._1._2))
+                                        }
+                                    }
+                                    case other => {
+                                        varis.flatMap(x => x._1.assign(op, simplied)(context, x._2))
+                                    }
                             }
                             case _ => varis.flatMap(l => l._1.assign(op, simplied)(context, l._2))
                     }

@@ -78,6 +78,26 @@ object Print{
                                 (a._1:::b._1, a._2::: List(PrintString(f",", col, mod)) :::b._2))
                             (p1, List(PrintString(f"(", col, mod)) ::: print ::: List(PrintString(f")", col, mod)))
                         }
+                        case FloatType => {
+                            val variLeft = ctx.getFreshVariable(IntType)
+                            val upCal = variLeft.assign("=", LinkedVariableValue(vari, sel))
+                            val digit1 = ctx.getFreshVariable(IntType)
+                            val digit2 = ctx.getFreshVariable(IntType)
+                            val digit3 = ctx.getFreshVariable(IntType)
+
+                            val digit1Cal = digit1.assign("=", CastValue(LinkedVariableValue(vari, sel), IntType)) ::: digit1.assign("/=", IntValue(100)) ::: digit1.assign("%=", IntValue(10))
+                            val digit2Cal = digit2.assign("=", CastValue(LinkedVariableValue(vari, sel), IntType)) ::: digit2.assign("/=", IntValue(10)) ::: digit2.assign("%=", IntValue(10))
+                            val digit3Cal = digit3.assign("=", CastValue(LinkedVariableValue(vari, sel), IntType)) ::: digit3.assign("%=", IntValue(10))
+
+                            val leftPrint = toRawJson(LinkedVariableValue(variLeft, sel))
+                            val digit1Print = toRawJson(LinkedVariableValue(digit1, sel))
+                            val digit2Print = toRawJson(LinkedVariableValue(digit2, sel))
+                            val digit3Print = toRawJson(LinkedVariableValue(digit3, sel))
+
+                            val rightPrint = List(PrintString(".", col, mod)) ::: digit1Print._2 ::: digit2Print._2 ::: digit3Print._2
+
+                            (upCal ::: digit1Cal ::: digit2Cal ::: digit3Cal, leftPrint._2 ::: rightPrint)
+                        }
                         case StringType => (List(), List(PrintNBT(vari, col, mod)))
                         case EntityType => (List(), List(PrintSelector(vari.getEntityVariableSelector(), col, mod)))
                         case other => (List(), List(PrintVariable(vari, sel, col, mod)))
@@ -103,9 +123,18 @@ object Print{
             case RangeValue(min, max, delta) => (List(), List(PrintString(f"$min..$max by $delta", col, mod)))
             case SelectorValue(value) => (List(), List(PrintSelector(value, col, mod)))
             case BinaryOperation(op, left, right) => {
-                val (p1, vari) = Utils.simplifyToVariable(expr)
-                val (p2, print) = toRawJson(vari)
-                (p1:::p2,print)
+                op match{
+                    case "+" if Utils.typeof(left) == StringType || Utils.typeof(right) == StringType => {
+                        val (p1, print1) = toRawJson(left)
+                        val (p2, print2) = toRawJson(right)
+                        (p1:::p2, print1:::print2)
+                    }
+                    case _ => {
+                        val (p1, vari) = Utils.simplifyToVariable(expr)
+                        val (p2, print) = toRawJson(vari)
+                        (p1:::p2,print)
+                    }
+                }
             }
             case UnaryOperation(op, left) => {
                 val (p1, vari) = Utils.simplifyToVariable(expr)
@@ -113,6 +142,9 @@ object Print{
                 (p1:::p2,print)
             }
             case JsonValue(content) => toRawJson(StringValue(content.getString().replace("\"", "\\\"")))
+            case InterpolatedString(content) => {
+                content.map(v => toRawJson(v, false)(ctx)).reduce((a,b) => (a._1:::b._1, a._2:::b._2))
+            }
             case TupleValue(values) => {
                 if (top){
                     val (p2, print) = toRawJson(values(0))
@@ -141,6 +173,8 @@ object Print{
                                         ctx.addScoreboardUsedForce(vari.getIRSelector())
                                         PrintVariable(vari, sel, col, mod)
                                     }
+                                    case PrintTranslate(key, rjv, color, modifier) => PrintTranslate(key, rjv, col, mod)
+                                    case PrintNBT(vari, color, modifier) => PrintNBT(vari, col, mod)
                             }
                             values.drop(1).foreach(checkArg(_));
 

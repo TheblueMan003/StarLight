@@ -39,7 +39,7 @@ class SettingsContext(){
     var debug = false
     var allFunction = true
 
-    var optimize = false
+    var optimize = true
     var optimizeInlining = true
     var optimizeDeduplication = true
     var optimizeVariableValue = true

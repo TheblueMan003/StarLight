@@ -10,7 +10,7 @@ import sl.IR.*
 
 object Function {
   extension (str: (Function, List[Expression])) {
-    def call(ret: Variable = null, op: String = "=")(implicit context: Context): List[IRTree] = {
+    def call(ret: Variable = null, retSel: Selector = Selector.self, op: String = "=")(implicit context: Context): List[IRTree] = {
         if (str._1 == null){
             List()
         }
@@ -18,16 +18,16 @@ object Function {
             val prefix = str._2.take(str._1.arguments.length - 1)
             val sufix = str._2.drop(str._1.arguments.length - 1)
             val (prep, json) = Print.toRawJson(sufix)
-            prep ::: str._1.call(prefix ::: List(json), ret, op)
+            prep ::: str._1.call(prefix ::: List(json), ret, retSel, op)
         }
         else if (str._1.hasParamsArg()){
             val prefix = str._2.take(str._1.arguments.length - 1)
             val sufix = str._2.drop(str._1.arguments.length - 1)
             val tuple = TupleValue(sufix)
-            str._1.call(prefix ::: List(tuple), ret, op)
+            str._1.call(prefix ::: List(tuple), ret, retSel, op)
         }
         else{
-            str._1.call(str._2, ret, op)
+            str._1.call(str._2, ret, retSel, op)
         }
     }
     def markAsStringUsed()={
@@ -114,7 +114,7 @@ abstract class Function(context: Context, val contextName: String, name: String,
             case Nil => 0
         }
     }
-    def call(args: List[Expression], ret: Variable = null, op: String = "=")(implicit ctx: Context): List[IRTree]
+    def call(args: List[Expression], ret: Variable = null, retSel: Selector = Selector.self, op: String = "=")(implicit ctx: Context): List[IRTree]
     def generateArgument()(implicit ctx: Context):Unit = {
         val ctx2 = ctx.push(name)
         argumentsVariables = arguments.map(a => {
@@ -211,23 +211,27 @@ class ConcreteFunction(context: Context, _contextName: String, name: String, arg
         super.generateArgument()
     }
     
-    def call(args2: List[Expression], ret: Variable = null, op: String = "=")(implicit ctx: Context): List[IRTree] = {
+    def call(args2: List[Expression], ret: Variable = null, retSel: Selector = Selector.self, op: String = "=")(implicit ctx: Context): List[IRTree] = {
+        if (modifiers.isAbstract) throw new Exception(f"Cannot call abstract function $fullName")
         markAsUsed()
         val r = argMap(args2).flatMap(p => p._1.assign("=", Utils.simplify(p._2))) :::
             List(BlockCall(Settings.target.getFunctionName(fullName), fullName))
 
         if (ret != null){
-            r ::: ret.assign(op, LinkedVariableValue(returnVariable))
+            r ::: ret.assign(op, LinkedVariableValue(returnVariable))(context, retSel)
         }
         else{
             r
         }
     }
+    def clearObject()(implicit ctx: Context): List[IRTree] = {
+        List()//ctx.getAllVariable().filter(x => x.parentFunction == this && x != returnVariable).filter(x => x.getType() match {case _: ClassType => true;case _ => false}).flatMap(x => x.assign("=", NullValue))
+    }
 
     def compile():Unit={
         if (!wasCompiled){
             val suf = sl.Compiler.compile(body.unBlockify())(context.push(name, this))
-            content = content ::: suf
+            content = content ::: suf/* ::: clearObject()(context.push(name, this))*/
             wasCompiled = true
         }
     }
@@ -267,7 +271,7 @@ class ConcreteFunction(context: Context, _contextName: String, name: String, arg
 }
 
 class BlockFunction(context: Context, _contextName: String, name: String, arguments: List[Argument], var body: List[IRTree]) extends Function(context, _contextName, name, arguments, VoidType, Modifier.newPrivate()){
-    def call(args2: List[Expression], ret: Variable = null, op: String = "=")(implicit ctx: Context): List[IRTree] = {
+    def call(args2: List[Expression], ret: Variable = null, retSel: Selector = Selector.self, op: String = "=")(implicit ctx: Context): List[IRTree] = {
         argMap(args2).flatMap(p => p._1.assign("=", p._2)) :::
             List(BlockCall(Settings.target.getFunctionName(fullName), fullName))
     }
@@ -282,7 +286,8 @@ class BlockFunction(context: Context, _contextName: String, name: String, argume
 }
 
 class LazyFunction(context: Context, _contextName: String, name: String, arguments: List[Argument], typ: Type, _modifier: Modifier, val body: Instruction) extends Function(context, _contextName, name, arguments, typ, _modifier){
-    def call(args: List[Expression], ret: Variable = null, op: String = "=")(implicit ctx: Context): List[IRTree] = {
+    def call(args: List[Expression], ret: Variable = null, retSel: Selector = Selector.self, op: String = "=")(implicit ctx: Context): List[IRTree] = {
+        if (modifiers.isAbstract) throw new Exception(f"Cannot call abstract function $fullName")
         //var block = Utils.fix(body)(context, arguments.map(a => Identifier.fromString(a.name)).toSet)
         var block = body
         val sub = context.push(context.getLazyCallId(), ctx.getCurrentClass())
@@ -303,12 +308,12 @@ class LazyFunction(context: Context, _contextName: String, name: String, argumen
             pref:::sl.Compiler.compile(block.unBlockify())(if modifiers.hasAttributes("inline") then ctx else sub)
         }
         else if (op == "="){
-            block = Utils.substReturn(block, ret)(!modifiers.hasAttributes("__returnCheck__"))
+            block = Utils.substReturn(block, ret)(!modifiers.hasAttributes("__returnCheck__"), retSel)
             pref:::sl.Compiler.compile(block.unBlockify())(if modifiers.hasAttributes("inline") then ctx else sub)
         }
         else{
             val vari = ctx.getFreshVariable(getType())
-            block = Utils.substReturn(block, vari)(!modifiers.hasAttributes("__returnCheck__"))
+            block = Utils.substReturn(block, vari)(!modifiers.hasAttributes("__returnCheck__"), retSel)
             pref:::sl.Compiler.compile(block.unBlockify())(if modifiers.hasAttributes("inline") then ctx else sub) ::: (if ret == null then List() else ret.assign(op, LinkedVariableValue(vari)))
         }
     }
@@ -408,7 +413,8 @@ class ClassFunction(_contextName: String, variable: Variable, function: Function
     override def getContent(): List[IRTree] = List()
     override def getName(): String = function.name
 
-    def call(args2: List[Expression], ret: Variable = null, op: String = "=")(implicit ctx: Context): List[IRTree] = {
+    def call(args2: List[Expression], ret: Variable = null, retSel: Selector = Selector.self, op: String = "=")(implicit ctx: Context): List[IRTree] = {
+        if (modifiers.isAbstract) throw new Exception(f"Cannot call abstract function $fullName")
         val selector = SelectorValue(JavaSelector("@e", List(("tag", SelectorIdentifier(clazz.getTag())))))
         def isScoreboard(expr: Expression) = {
             expr match
@@ -452,7 +458,7 @@ class ClassFunction(_contextName: String, variable: Variable, function: Function
         }
         else{
             val vari = ctx.getFreshVariable(function.getType())
-            pre:::callNoEntity(comp, vari) ::: ret.assign(op, LinkedVariableValue(vari))
+            pre:::callNoEntity(comp, vari) ::: ret.assign(op, LinkedVariableValue(vari))(ctx, retSel)
         }
     }
 }
@@ -466,10 +472,10 @@ class CompilerFunction(context: Context, name: String, arguments: List[Argument]
     override def getContent(): List[IRTree] = List()
     override def getName(): String = name
 
-    def call(args2: List[Expression], ret: Variable = null, op: String = "=")(implicit ctx: Context): List[IRTree] = {
+    def call(args2: List[Expression], ret: Variable = null, retSel: Selector = Selector.self, op: String = "=")(implicit ctx: Context): List[IRTree] = {
         val call = body(argMap(args2).map((v,e) => Utils.simplify(e)), ctx)
         if (ret != null){
-            call._1 ::: ret.assign(op, call._2)
+            call._1 ::: ret.assign(op, call._2)(ctx, retSel)
         }
         else{
             call._1
@@ -487,8 +493,8 @@ class GenericFunction(context: Context, _contextName: String, name: String, argu
     override def getContent(): List[IRTree] = List()
     override def getName(): String = name
 
-    def call(args2: List[Expression], ret: Variable = null, op: String = "=")(implicit ctx: Context): List[IRTree] = {
-        get(args2.map(Utils.typeof)).call(args2, ret, op)
+    def call(args2: List[Expression], ret: Variable = null, retSel: Selector = Selector.self, op: String = "=")(implicit ctx: Context): List[IRTree] = {
+        get(args2.map(Utils.typeof)).call(args2, ret, retSel, op)
     }
 
     override def generateArgument()(implicit ctx: Context): Unit = {}

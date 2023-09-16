@@ -604,7 +604,7 @@ Struct can also accept type parameters with the following syntax:
 struct Struct<T>{
     T vari
 
-    def __init__(T value){
+    def this(T value){
         vari = value
     }
 }
@@ -628,7 +628,7 @@ Class can also accept type parameters with the following syntax:
 class Class<T>{
     T vari
 
-    def __init__(T value){
+    def this(T value){
         vari = value
     }
 }
@@ -640,10 +640,43 @@ Class<int> example = new Class<int>(0)
 Class use an entity, to store data. By default it use a marker entity but you can change it with the following syntax:
 ```
 class Cow with minecraft:cow for mcjava with minecraft:pig for mcbedrock{
-    def __init__(){
+    def this(){
 
     }
 }
+```
+
+### Method Overriding
+With class you can downcast a instance to one of its parent parent.
+```
+class A{
+
+}
+class B extends A{
+
+}
+A a = new B()
+```
+In this case, if a method is use it will take the one from A.
+To have proper method override you need to use `abstract`,`virtual`,`overriding` keyword like in c#.
+```
+class A{
+    public abstract foo()
+    public virtual bar(){
+        /say I'm a
+    }
+}
+class B extends A{
+    public override foo(){
+        /say hi
+    }
+    public override bar(){
+        /say I'm b
+    }
+}
+A a = new B()
+a.foo() // call foo from B
+a.bar() // call bar from B
 ```
 
 

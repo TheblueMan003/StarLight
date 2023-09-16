@@ -129,6 +129,7 @@ class Class(context: Context, name: String, val generics: List[String], _modifie
                     val modifier = fct.modifiers.copy()
                     modifier.isVirtual = false
                     modifier.isOverride = false
+                    modifier.isAbstract = false
                     
                     val fct2 = ConcreteFunction(ctx, ctx.getPath()+f".--${fct.name}", f"--${fct.name}", fct.arguments, fct.getType(), modifier,
                         if (fct.getType() == VoidType) FunctionCall(vari.fullName,fct.arguments.map(arg => VariableValue(arg.name)), List())
@@ -235,7 +236,13 @@ class Class(context: Context, name: String, val generics: List[String], _modifie
     }
     def addClassTags(context: Option[Context] = None):List[IRTree] = {
         val ctx = context.getOrElse(this.context.push(name))
-        (virutalFunctionVariable.zip(virutalFunctionBase).flatMap((vari, fct) => vari.assign("=", LinkedFunctionValue(getMostRecentFunction(fct)(ctx)))(ctx)) :::
+
+        val recent = virutalFunctionBase.map(fct => getMostRecentFunction(fct)(ctx))
+        if (recent.exists(x => x.modifiers.isAbstract)){
+            throw new Exception(f"Cannot instantiate class ${fullName} with abstract functions: \n"+recent.filter(x => x.modifiers.isAbstract).map(x => x.name).mkString("\n")+"\n")
+        }
+
+        (virutalFunctionVariable.zip(recent).flatMap((vari, fct) => vari.assign("=", LinkedFunctionValue(fct))(ctx)) :::
         List(CommandIR(f"tag @s add ${getTag()}")) ::: (if (parent != null){
             parent.addClassTags(Some(ctx))
         }

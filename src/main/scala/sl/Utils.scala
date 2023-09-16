@@ -64,7 +64,7 @@ object Utils{
             newone.setPos(original.pos)
         newone
     }
-    def substReturn(instr: Instruction, to: Variable)(implicit isFullReturn: Boolean): Instruction = positioned(instr, {
+    def substReturn(instr: Instruction, to: Variable)(implicit isFullReturn: Boolean, selector: Selector): Instruction = positioned(instr, {
         instr match
             case Package(name, block) => Package(name, substReturn(block, to))
             case StructDecl(name, generics, block, modifier, parent) => StructDecl(name, generics, substReturn(block, to), modifier, parent)
@@ -98,12 +98,12 @@ object Utils{
             case VariableAssigment(name, op, expr) => instr
             case Return(value) => 
                 if (isFullReturn){
-                    VariableAssigment(List((Left(to.fullName), Selector.self)), "=", value)
+                    VariableAssigment(List((Left(to.fullName), selector)), "=", value)
                 }
                 else{
                     InstructionList(List(
                         VariableAssigment(List((Left("__hasFunctionReturned__"), Selector.self)), "=", BoolValue(true)),
-                        VariableAssigment(List((Left(to.fullName), Selector.self)), "=", value)
+                        VariableAssigment(List((Left(to.fullName), selector)), "=", value)
                     ))
                 }
             case WhileLoop(cond, instr) => WhileLoop(cond, substReturn(instr, to))
@@ -194,6 +194,7 @@ object Utils{
             case StringValue(value) => instr
             case RawJsonValue(value) => instr
             case SelectorValue(content) => instr
+            case InterpolatedString(content) => InterpolatedString(content.map(subst(_, from, to)))
             case CastValue(value, typ) => CastValue(subst(value, from, to), typ)
             case NamespacedName(value, json) => NamespacedName(value, subst(json, from, to))
             case EnumIntValue(value) => instr
@@ -302,6 +303,7 @@ object Utils{
             case FloatValue(value) => instr
             case BoolValue(value) => instr
             case SelectorValue(content) => SelectorValue(content.subst(from,to))
+            case InterpolatedString(content) => InterpolatedString(content.map(subst(_, from, to)))
             case NamespacedName(value, json) => NamespacedName(value.replaceAllLiterally(from, to), subst(json, from, to))
             case StringValue(value) => StringValue(value.replaceAllLiterally(from, to))
             case PositionValue(x, y, z) => PositionValue(subst(x, from, to), subst(y, from, to), subst(z, from, to))
@@ -563,6 +565,7 @@ object Utils{
             case FloatValue(value) => instr
             case BoolValue(value) => instr
             case SelectorValue(content) => SelectorValue(content.fix)
+            case InterpolatedString(content) => InterpolatedString(content.map(fix(_)))
             case NamespacedName(value, json) => NamespacedName(value, fix(json))
             case StringValue(value) => instr
             case RawJsonValue(value) => instr
@@ -653,6 +656,7 @@ object Utils{
             case RawJsonValue(value) => instr
             case JsonValue(content) => instr
             case SelectorValue(content) => instr
+            case InterpolatedString(content) => InterpolatedString(content.map(subst(_, from, to)))
             case NamespacedName(value, json) => NamespacedName(value, subst(json, from, to))
             case EnumIntValue(value) => instr
             case CastValue(value, typ) => CastValue(subst(value, from, to), typ)
@@ -757,6 +761,7 @@ object Utils{
             case RawJsonValue(value) => RawJsonType
             case JsonValue(content) => JsonType
             case SelectorValue(content) => EntityType
+            case InterpolatedString(content) => RawJsonType
             case LambdaValue(args, instr, ctx) => LambdaType(args.length)
             case EnumIntValue(value) => IntType
             case ClassValue(value) => TypeType
@@ -964,6 +969,10 @@ object Utils{
             case VariableValue(name, selector) if name == Identifier.fromString("this") => simplify(CastValue(VariableValue("__ref", selector), ClassType(context.getCurrentClass(), List())))
             case NamespacedName(value, json) => NamespacedName(value, simplify(json))
             case PositionValue(x, y, z) => PositionValue(simplify(x), simplify(y), simplify(z))
+            case JsonValue(JsonArray(List(JsonExpression(ForSelect(expr, filter, selector), _)))) => {
+                JsonValue(JsonArray(getForeachCases("_", selector).map(l => JsonExpression(l.foldLeft(expr)((a, b) => simplify(subst(a, filter, b._2))), "")).toList))
+            }
+            case InterpolatedString(values) => InterpolatedString(values.map(simplify(_)))
             case JsonValue(JsonString(value)) => StringValue(value)
             case JsonValue(JsonInt(value, t)) => IntValue(value)
             case JsonValue(JsonFloat(value, t)) => FloatValue(value)
@@ -1076,7 +1085,6 @@ object Utils{
                     case (a, IntValue(b)) if op == "&" && isPowerOfTwo(b+1) => BinaryOperation("%", a, IntValue(b+1))
                     case (a, b) if a == b && op == "+" && !containsFunctionCall(a) => BinaryOperation("*", a, IntValue(2))
                     case (a, b) if a == b && op == "-" && !containsFunctionCall(a) => IntValue(0)
-                    case (a, b) if a == b && op == "*" && !containsFunctionCall(a) => BinaryOperation("^", a, IntValue(2))
                     case (a, b) if a == b && op == "/" && !containsFunctionCall(a) => IntValue(1)
                     case (a, b) if a == b && op == "%" && !containsFunctionCall(a) => IntValue(0)
                     case (a, b) if a == b && op == "&&" && !containsFunctionCall(a) => a

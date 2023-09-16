@@ -618,7 +618,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
             
             if (filtered.length == 1) return Some(filtered.head)
             if (filtered.size == 0) return None
-            val ret = handleOverride(filtered.map(f => (f.arguments.zip(args).map((a, v)=> v.getDistance(a.typ)(this)).reduceOption(_ + _).getOrElse(0), f))
+            val ret = handleOverride(filtered.filterNot(x => x.modifiers.isAbstract).map(f => (f.arguments.zip(args).map((a, v)=> v.getDistance(a.typ)(this)).reduceOption(_ + _).getOrElse(0), f))
                               .groupBy(_._1)
                               .toList
                               .sortBy(_._1)
