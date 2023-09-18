@@ -45,8 +45,15 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 	var getter: Function = null
 	var setter: Function = null
 	var wasGenerated = false
+	var jsonArrayKey: String = "json"
 
 	def canBeReduceToLazyValue = modifiers.isLazy && !getType().isInstanceOf[StructType]
+
+	def withKey(key: String)={
+		val vari = Variable(context, name, typ, _modifier)
+		vari.jsonArrayKey = key
+		vari
+	}
 
 	def generate(isStructFunctionArgument: Boolean = false, skipClassCheck: Boolean = false)(implicit context: Context):Unit = {
 		if (wasGenerated)return
@@ -608,6 +615,12 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 						prev ::: List(StringCopy(getIRSelector(), vari.vari.getIRSelector(), min, max))
 					}
 					case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
+					case LinkedVariableValue(vari, selector) => {
+						vari.getType() match
+							case StringType => List(StringCopy(getIRSelector(), vari.getIRSelector()(selector)))
+							case other => throw new Exception(f"Cannot assign string to $other at \n${valueE.pos.longString}")
+					}
+					case DefaultValue => List(StringSet(getIRSelector(), ""))
 					case _ => throw new Exception(f"Unknown cast to string: $valueE at \n${valueE.pos.longString}")
 				}
 			case other => throw new Exception(f"Cannot assign use op: $other with int at \n${valueE.pos.longString}")
@@ -644,6 +657,23 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 									assign(op, FunctionCallValue(VariableValue(vari.fullName+".get"), indexes, List()))
 								}
 								case _ => assign(op, FunctionCallValue(VariableValue(vari.fullName+".get"), index, List()))
+						}
+						case JsonType if op == "=" => {
+							index match{
+								case List(StringValue(str)) => 
+									getType() match
+										case IntType => List(CommandIR(f"execute store result score ${getSelector()} ${getSelectorObjective()} run data get storage ${vari.fullName} json.${str} 1"))
+										case FloatType => List(CommandIR(f"execute store result score ${getSelector()} ${getSelectorObjective()} run data get storage ${vari.fullName} json.${str} 1000"))
+										case BoolType => List(CommandIR(f"execute store result score ${getSelector()} ${getSelectorObjective()} run data get storage ${vari.fullName} json.${str} 1"))
+										case StringType => ???
+										case StructType(struct, sub) => {
+											tupleVari.flatMap(x => x.handleArrayGetValue(op, name, List(StringValue(str+"."+x.name))))
+										}
+										case JsonType => {
+											assignJson("=", LinkedVariableValue(vari.withKey("json."+str)))
+										}
+								case other => assign(op, FunctionCallValue(VariableValue(vari.fullName+".get"), index, List()))
+							}
 						}
 						case other => assign(op, FunctionCallValue(VariableValue(vari.fullName+".__get__"), index, List()))
 				}
@@ -1168,7 +1198,8 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 	/**
 	 * Assign a value to the float variable
 	 */
-	def assignJson(op: String, value: Expression, key: String = "json")(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
+	def assignJson(op: String, value: Expression, keya: String = "json")(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
+		val key = if jsonArrayKey != "json" then jsonArrayKey else keya
 		if (Settings.target == MCBedrock){
 			throw new Exception(f"Dynamic Json Variable Not Supported in Bedrock ($fullName) at \n${value.pos.longString}")
 		}
@@ -1183,15 +1214,15 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 						case "+=" => List(CommandIR(f"data modify storage ${fullName} $key append value ${value.getNbt()}"))
 						case "&=" => List(CommandIR(f"data modify storage ${fullName} $key merge value ${value.getNbt()}"))
 					}
-				case DefaultValue => List(CommandIR(f"data modify storage ${fullName} json set value {}"))
+				case DefaultValue => List(CommandIR(f"data modify storage ${fullName} $key set value {}"))
 				case VariableValue(name, sel) => assignBool(op, context.resolveVariable(value))
 				case LinkedVariableValue(vari, sel) => 
 					vari.getType() match{
 						case JsonType => {
 							op match{
-								case "=" => List(CommandIR(f"data modify storage ${fullName} $key set from storage ${vari.fullName} json"))
-								case "+=" => List(CommandIR(f"data modify storage ${fullName} $key append from storage ${vari.fullName} json"))
-								case "&=" => List(CommandIR(f"data modify storage ${fullName} $key merge from storage ${vari.fullName} json"))
+								case "=" => List(CommandIR(f"data modify storage ${fullName} $key set from storage ${vari.fullName} ${vari.jsonArrayKey}"))
+								case "+=" => List(CommandIR(f"data modify storage ${fullName} $key append from storage ${vari.fullName} ${vari.jsonArrayKey}"))
+								case "&=" => List(CommandIR(f"data modify storage ${fullName} $key merge from storage ${vari.fullName} ${vari.jsonArrayKey}"))
 							}
 						}
 						case IntType => {
@@ -1205,19 +1236,38 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 						}
 						case FloatType => {
 							op match{
-								case "=" => List(CommandIR(f"execute store result storage ${fullName} $key float ${1/Settings.floatPrec} run scoreboard players get ${vari.getSelector()(sel)}"))
-								case "+=" => List(CommandIR(f"execute store result storage ${fullName} tmp float ${1/Settings.floatPrec} run scoreboard players get ${vari.getSelector()(sel)}"), 
+								case "=" => List(CommandIR(f"execute store result storage ${fullName} $key float ${1f/Settings.floatPrec} run scoreboard players get ${vari.getSelector()(sel)}"))
+								case "+=" => List(CommandIR(f"execute store result storage ${fullName} tmp float ${1f/Settings.floatPrec} run scoreboard players get ${vari.getSelector()(sel)}"), 
 												CommandIR(f"data modify storage ${fullName} $key append from storage ${fullName} tmp"))
-								case "&=" => List(CommandIR(f"execute store result storage ${fullName} tmp float ${1/Settings.floatPrec} run scoreboard players get ${vari.getSelector()(sel)}"), 
+								case "&=" => List(CommandIR(f"execute store result storage ${fullName} tmp float ${1f/Settings.floatPrec} run scoreboard players get ${vari.getSelector()(sel)}"), 
 												CommandIR(f"data modify storage ${fullName} $key merge from storage ${fullName} tmp"))
 							}
+						}
+						case StructType(struct, sub) => {
+							vari.tupleVari.flatMap(v => {
+								vari.assignJson(op, LinkedVariableValue(withKey(key + "." + v.name), sel))
+							})
 						}
 						case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()} at \n${value.pos.longString}")
 					}
 				case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 				case ArrayGetValue(name, index) => handleArrayGetValue(op, name, index)
-				case bin: BinaryOperation => ???
-				case ter: TernaryOperation => ???
+				case bin: BinaryOperation => {
+					if (keya == "json"){
+						assignBinaryOperator(op, bin)
+					}
+					else {
+						withKey(keya).assignJson(op, bin, "json")
+					}
+				}
+				case ter: TernaryOperation => {
+					if (keya == "json"){
+						assignTernaryOperator(op, ter)
+					}
+					else {
+						withKey(keya).assignJson(op, ter, "json")
+					}
+				}
 				case SequenceValue(left, right) => {
 					Compiler.compile(left):::assignJson(op, right, key)
 				}
@@ -1262,7 +1312,13 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 							tupleVari.zip(vari.tupleVari).flatMap((a,v) => a.assign(op, LinkedVariableValue(v, sel)))
 						}
 						else{
-							context.getFunction(this.name + ".__set__", List(value), List(), getType(), false).call()
+							vari.getType() match
+								case JsonType => {
+									tupleVari.flatMap(vari => vari.assign("=", ArrayGetValue(value, List(StringValue(vari.name)))))
+								}
+								case other => {
+									context.getFunction(this.name + ".__set__", List(value), List(), getType(), false).call()
+								}
 						}
 					}
 					case VariableValue(name, sel) => {
@@ -1291,6 +1347,9 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					case seq: SequenceValue => assignSequence(op, seq)
 					case JsonValue(JsonDictionary(map)) if map.forall(x => tupleVari.exists(y => y.name == x._1)) => {
 						map.flatMap(x => tupleVari.find(y => y.name == x._1).get.assign("=", Utils.jsonToExpr(x._2))).toList
+					}
+					case ArrayGetValue(name, index) if Utils.typeof(value) == JsonType => {
+						handleArrayGetValue(op, name, index)
 					}
 					case _ => context.getFunction(fullName + ".__set__", List(value), List(), getType(), false).call()
 			}

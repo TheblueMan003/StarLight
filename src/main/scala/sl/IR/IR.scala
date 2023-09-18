@@ -31,7 +31,10 @@ case class SBLink(entity: String, objective: String) extends IRTree{
 }
 
 case class CommandIR(statement: String) extends IRTree{
-    def getString(): String = statement
+    def getString(): String = {
+        if statement.contains("$") then "$"+statement
+        else statement
+    }
 }
 case object EmptyLineIR extends IRTree{
     def getString(): String = ""
@@ -277,8 +280,10 @@ case class ScoreboardReset(target: SBLink) extends IRTree{
     def getString(): String = s"scoreboard players reset $target"
 }
 
-case class BlockCall(function: String, fullName: String) extends IRTree{
-    def getString(): String = s"function $function"
+case class BlockCall(function: String, fullName: String, arg: String) extends IRTree{
+    def getString(): String = 
+        if arg == "" || arg == null then s"function $function"
+        else s"function $function $arg"
 }
 case class ScheduleCall(function: String, fullName: String, time: Int) extends IRTree{
     def getString(): String = s"schedule function $function $time append"

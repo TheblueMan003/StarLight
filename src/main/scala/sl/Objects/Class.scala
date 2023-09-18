@@ -232,7 +232,7 @@ class Class(context: Context, name: String, val generics: List[String], _modifie
             .filter(!_.modifiers.isLazy)
             .filter(f => f.modifiers.protection == Protection.Public || f.modifiers.protection == Protection.Protected)
             .filter(_.modifiers.isEntity)
-            .flatMap(_.assign("=", DefaultValue)(context))
+            .flatMap(_.assign("=", DefaultValue)(context)) ::: interfaces.flatMap(intf => intf.addVariableDefaultAssign())
     }
     def addClassTags(context: Option[Context] = None):List[IRTree] = {
         val ctx = context.getOrElse(this.context.push(name))

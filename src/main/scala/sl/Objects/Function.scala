@@ -215,7 +215,7 @@ class ConcreteFunction(context: Context, _contextName: String, name: String, arg
         if (modifiers.isAbstract) throw new Exception(f"Cannot call abstract function $fullName")
         markAsUsed()
         val r = argMap(args2).flatMap(p => p._1.assign("=", Utils.simplify(p._2))) :::
-            List(BlockCall(Settings.target.getFunctionName(fullName), fullName))
+            List(BlockCall(Settings.target.getFunctionName(fullName), fullName, null))
 
         if (ret != null){
             r ::: ret.assign(op, LinkedVariableValue(returnVariable))(context, retSel)
@@ -273,7 +273,7 @@ class ConcreteFunction(context: Context, _contextName: String, name: String, arg
 class BlockFunction(context: Context, _contextName: String, name: String, arguments: List[Argument], var body: List[IRTree]) extends Function(context, _contextName, name, arguments, VoidType, Modifier.newPrivate()){
     def call(args2: List[Expression], ret: Variable = null, retSel: Selector = Selector.self, op: String = "=")(implicit ctx: Context): List[IRTree] = {
         argMap(args2).flatMap(p => p._1.assign("=", p._2)) :::
-            List(BlockCall(Settings.target.getFunctionName(fullName), fullName))
+            List(BlockCall(Settings.target.getFunctionName(fullName), fullName, null))
     }
 
     def exists(): Boolean = true
@@ -320,6 +320,19 @@ class LazyFunction(context: Context, _contextName: String, name: String, argumen
     override def generateArgument()(implicit ctx: Context):Unit = {
         super.generateArgument()
         argumentsVariables.foreach(_.modifiers.isLazy = true)
+    }
+    override def canBeCallAtCompileTime = true
+
+    def exists(): Boolean = false
+    def getContent(): List[IRTree] = List()
+    def getName(): String = Settings.target.getFunctionPath(fullName)
+}
+
+class MacroFunction(context: Context, _contextName: String, name: String, arguments: List[Argument], typ: Type, _modifier: Modifier, val body: Instruction) extends Function(context, _contextName, name, arguments, typ, _modifier){
+    val vari = context.getFreshVariable(JsonType)
+
+    def call(args: List[Expression], ret: Variable = null, retSel: Selector = Selector.self, op: String = "=")(implicit ctx: Context): List[IRTree] = {
+        argMap(args).flatMap((v,e) => vari.withKey("json."+v.name).assign("=", e)) ::: List(BlockCall(Settings.target.getFunctionName(fullName), fullName, f"with storage ${vari.fullName} ${vari.jsonArrayKey}"))
     }
     override def canBeCallAtCompileTime = true
 

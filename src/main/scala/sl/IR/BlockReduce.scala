@@ -36,7 +36,7 @@ class BlockReduce(var files: List[IRFile]){
     def computeCallGraph() ={
         def apply(instr: IRTree)(implicit parent: IRFile): Unit = {
             instr match {
-                case BlockCall(function, fullName) => {
+                case BlockCall(function, fullName, args) => {
                     map.get(fullName) match {
                         case Some(file) => file.addCalledBy(parent.getName())
                         case None => (println("error: " + fullName + " not found in " + parent.getName()))
@@ -92,7 +92,7 @@ class BlockReduce(var files: List[IRFile]){
     def reduceBlockCall() ={
         def applyTop(instr: IRTree)(implicit parent: IRFile, inliningSet: Set[String] = Set()): List[IRTree] = {
             instr match {
-                case BlockCall(function, fullName) => {
+                case BlockCall(function, fullName, args) => {
                     map.get(fullName) match {
                         case Some(file) => {
                             val size = file.getContents().length
@@ -116,7 +116,7 @@ class BlockReduce(var files: List[IRFile]){
         }
         def apply(instr: IRTree)(implicit parent: IRFile, inliningSet: Set[String] = Set()): IRTree = {
             instr match {
-                case BlockCall(function, fullName) => {
+                case BlockCall(function, fullName, args) => {
                     map.get(fullName) match {
                         case Some(file) => {
                             val size = file.getContents().length
@@ -164,7 +164,7 @@ class BlockReduce(var files: List[IRFile]){
         var changed = false
         def apply(instr: IRTree)(implicit parent: IRFile): IRTree = {
             instr match {
-                case BlockCall(function, fullName) => {
+                case BlockCall(function, fullName, args) => {
                     map.get(fullName) match {
                         case Some(file) => {
                             irMap.get(file.getContents()) match {
@@ -172,7 +172,7 @@ class BlockReduce(var files: List[IRFile]){
                                     changed = true
                                     //file.delete()
                                     //if(debug){println("replace " + file.getName() + " with " + f.getName() +" in "+parent.getName()+ " because they are the same:\n"+file.getContents()+"\n===\n"+f.getContents())}
-                                    BlockCall(Settings.target.getFunctionName(f.getName()), f.getName())
+                                    BlockCall(Settings.target.getFunctionName(f.getName()), f.getName(), args)
                                 }
                                 case _ => instr
                             }

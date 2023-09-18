@@ -435,19 +435,51 @@ object Execute{
 
             case BinaryOperation("==", LinkedVariableValue(left, sel), NullValue) 
                 if left.getType().isDirectEqualitable() => 
-                    (List(), List(IFNotValueCase(IFValueCase(BinaryOperation("==", LinkedVariableValue(left, sel), LinkedVariableValue(left, sel))))))
+                    left.getType() match
+                        case ClassType(clazz, _) => {
+                            // check whether null or zero
+                            val vari = context.getFreshVariable(BoolType)
+                            val exec1 = makeExecute(getListCase(List(IFNotValueCase(IFValueCase(BinaryOperation("==", LinkedVariableValue(left, sel), LinkedVariableValue(left, sel)))))), vari.assign("=", BoolValue(true)))
+                            val exec2 = makeExecute(getListCase(List(IFValueCase(BinaryOperation("==", LinkedVariableValue(left, sel), IntValue(0))))), vari.assign("=", BoolValue(true)))
+                            (vari.assign("=", BoolValue(false)) ::: exec1 ::: exec2, List(IFValueCase(LinkedVariableValue(vari))))
+                        }
+                        case other => (List(), List(IFNotValueCase(IFValueCase(BinaryOperation("==", LinkedVariableValue(left, sel), LinkedVariableValue(left, sel))))))
 
             case BinaryOperation("!=", LinkedVariableValue(left, sel), NullValue) 
                 if left.getType().isDirectEqualitable() => 
-                    (List(), List(IFValueCase(BinaryOperation("==", LinkedVariableValue(left, sel), LinkedVariableValue(left, sel)))))
+                    left.getType() match
+                        case ClassType(clazz, _) => {
+                            // check whether null or zero
+                            val vari = context.getFreshVariable(BoolType)
+                            val exec1 = makeExecute(getListCase(List(IFNotValueCase(IFValueCase(BinaryOperation("==", LinkedVariableValue(left, sel), LinkedVariableValue(left, sel)))))), vari.assign("=", BoolValue(true)))
+                            val exec2 = makeExecute(getListCase(List(IFValueCase(BinaryOperation("==", LinkedVariableValue(left, sel), IntValue(0))))), vari.assign("=", BoolValue(true)))
+                            (vari.assign("=", BoolValue(false)) ::: exec1 ::: exec2, List(IFNotValueCase(IFValueCase(LinkedVariableValue(vari)))))
+                        }
+                        case other => (List(), List(IFValueCase(BinaryOperation("==", LinkedVariableValue(left, sel), LinkedVariableValue(left, sel)))))
 
             case BinaryOperation("==", NullValue, LinkedVariableValue(left, sel)) 
                 if left.getType().isDirectEqualitable() => 
-                    (List(), List(IFNotValueCase(IFValueCase(BinaryOperation("==", LinkedVariableValue(left, sel), LinkedVariableValue(left, sel))))))
+                    left.getType() match
+                        case ClassType(clazz, _) => {
+                            // check whether null or zero
+                            val vari = context.getFreshVariable(BoolType)
+                            val exec1 = makeExecute(getListCase(List(IFNotValueCase(IFValueCase(BinaryOperation("==", LinkedVariableValue(left, sel), LinkedVariableValue(left, sel)))))), vari.assign("=", BoolValue(true)))
+                            val exec2 = makeExecute(getListCase(List(IFValueCase(BinaryOperation("==", LinkedVariableValue(left, sel), IntValue(0))))), vari.assign("=", BoolValue(true)))
+                            (vari.assign("=", BoolValue(false)) ::: exec1 ::: exec2, List(IFValueCase(LinkedVariableValue(vari))))
+                        }
+                        case other => (List(), List(IFNotValueCase(IFValueCase(BinaryOperation("==", LinkedVariableValue(left, sel), LinkedVariableValue(left, sel))))))
 
             case BinaryOperation("!=", NullValue, LinkedVariableValue(left, sel)) 
                 if left.getType().isDirectEqualitable() => 
-                    (List(), List(IFValueCase(BinaryOperation("==", LinkedVariableValue(left, sel), LinkedVariableValue(left, sel)))))
+                    left.getType() match
+                        case ClassType(clazz, _) => {
+                            // check whether null or zero
+                            val vari = context.getFreshVariable(BoolType)
+                            val exec1 = makeExecute(getListCase(List(IFNotValueCase(IFValueCase(BinaryOperation("==", LinkedVariableValue(left, sel), LinkedVariableValue(left, sel)))))), vari.assign("=", BoolValue(true)))
+                            val exec2 = makeExecute(getListCase(List(IFValueCase(BinaryOperation("==", LinkedVariableValue(left, sel), IntValue(0))))), vari.assign("=", BoolValue(true)))
+                            (vari.assign("=", BoolValue(false)) ::: exec1 ::: exec2, List(IFNotValueCase(IFValueCase(LinkedVariableValue(vari)))))
+                        }
+                        case other => (List(), List(IFValueCase(BinaryOperation("==", LinkedVariableValue(left, sel), LinkedVariableValue(left, sel)))))
 
             // Special Case for class
             case BinaryOperation("==" | "!=", LinkedVariableValue(left, sel), LinkedVariableValue(right, sel2)) 
@@ -671,6 +703,8 @@ object Execute{
                     args.map(Utils.simplify(_)) match
                         case (pos:PositionValue)::(block: NamespacedName)::Nil => (List(), List(IFBlock(pos.getString()+" "+block.getString())))
                         case (block: NamespacedName)::Nil => (List(), List(IFBlock("~ ~ ~ "+block.getString())))
+                        case (pos:PositionValue)::(block: StringValue)::Nil => (List(), List(IFBlock(pos.getString()+" "+block.getString())))
+                        case (block: StringValue)::Nil => (List(), List(IFBlock("~ ~ ~ "+block.getString())))
                         case (pos:PositionValue)::TagValue(block)::Nil => (List(), List(IFBlock(pos.getString()+" "+context.getBlockTag(block).getTag())))
                         case TagValue(block)::Nil => (List(), List(IFBlock("~ ~ ~ "+context.getBlockTag(block).getTag())))
                         case (pos:PositionValue)::LinkedTagValue(block)::Nil => (List(), List(IFBlock(pos.getString()+" "+block.getTag())))
@@ -681,6 +715,10 @@ object Execute{
                     args.map(Utils.simplify(_)) match
                         case (pos:PositionValue)::(block: NamespacedName)::Nil => (List(), List(IFBlock(pos.getString()+" "+BlockConverter.getBlockName(block.getString())+" "+BlockConverter.getBlockID(block.getString()))))
                         case (block: NamespacedName)::Nil => (List(), List(IFBlock("~ ~ ~ "+BlockConverter.getBlockName(block.getString())+" "+BlockConverter.getBlockID(block.getString()))))
+
+                        case (pos:PositionValue)::(block: StringValue)::Nil => (List(), List(IFBlock(pos.getString()+" "+BlockConverter.getBlockName(block.getString())+" "+BlockConverter.getBlockID(block.getString()))))
+                        case (block: StringValue)::Nil => (List(), List(IFBlock("~ ~ ~ "+BlockConverter.getBlockName(block.getString())+" "+BlockConverter.getBlockID(block.getString()))))
+
                         case (pos:PositionValue)::TagValue(block)::Nil => {
                             val tag = context.getBlockTag(block)
                             val prev = makeExecute(f => PositionedIR(pos.getString(), f), tag.testFunction.call(List(), null, Selector.self, "="))
@@ -806,22 +844,24 @@ object Execute{
                     val cases = Utils.getForeachCases(key.toString(), provider)
                     
                     var index = -1
-                    cases.flatMap(v =>{
+                    cases.map(v =>{
                         val ctx = context.getFreshContext()
+                        
+                        val mod = Modifier.newPrivate()
+                        mod.isLazy = true
+
                         v.map(v => {
-                            val mod = Modifier.newPrivate()
-                            mod.isLazy = true
                             val vari = new Variable(ctx, v._1, Utils.typeof(v._2), mod)
                             ctx.addVariable(Identifier.fromString(v._1), vari)
                             vari.assign("=", v._2)
-
-                            val indx = new Variable(ctx, "index", IntType, mod)
-                            ctx.push(v._1).addVariable(Identifier.fromString("index"), indx)
-                            index += 1
-                            indx.assign("=", IntValue(index))
-
-                            SwitchCase(Utils.fix(expr)(ctx, Set()), Utils.fix(instr)(ctx, Set()), Utils.fix(cond)(ctx, Set()))
                         })
+
+                        val indx = new Variable(ctx, "index", IntType, mod)
+                        ctx.push(v.head._1).addVariable(Identifier.fromString("index"), indx)
+                        index += 1
+                        indx.assign("=", IntValue(index))
+
+                        SwitchCase(Utils.fix(expr)(ctx, Set()), Utils.fix(instr)(ctx, Set()), Utils.fix(cond)(ctx, Set()))
                     }).toList
                 }
             }

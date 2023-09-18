@@ -9,6 +9,7 @@ import objects.types.JsonType
 import sl.IR.*
 import scala.collection.parallel.CollectionConverters._
 import scala.collection.mutable.ArrayBuffer
+import objects.MacroFunction
 
 object Compiler{
     def compile(context: Context):List[IRFile] = {
@@ -91,14 +92,20 @@ object Compiler{
                         }
                         val clazz = context.getCurrentClass()
 
-                        if (!modifier.isLazy){
-                            val func = new ConcreteFunction(context, context.getPath()+"."+name, fname, args, context.getType(typ), modifier, block.unBlockify(), meta.firstPass)
+                        if (modifier.isLazy){
+                            val func = new LazyFunction(context, context.getPath()+"."+name, fname, args, context.getType(typ), modifier, Utils.fix(block)(context, args.map(a => Identifier.fromString(a.name)).toSet))
+                            func.overridedFunction = if modifier.isOverride then context.getFunction(Identifier.fromString(name), args.map(_.typ), List(), typ, false, false) else null
+                            context.addFunction(name, func)
+                            func.generateArgument()(context)
+                        }
+                        else if (modifier.isMacro){
+                            val func = new MacroFunction(context, context.getPath()+"."+name, fname, args, context.getType(typ), modifier, Utils.fix(block)(context, args.map(a => Identifier.fromString(a.name)).toSet))
                             func.overridedFunction = if modifier.isOverride then context.getFunction(Identifier.fromString(name), args.map(_.typ), List(), typ, false, false) else null
                             context.addFunction(name, func)
                             func.generateArgument()(context)
                         }
                         else{
-                            val func = new LazyFunction(context, context.getPath()+"."+name, fname, args, context.getType(typ), modifier, Utils.fix(block)(context, args.map(a => Identifier.fromString(a.name)).toSet))
+                            val func = new ConcreteFunction(context, context.getPath()+"."+name, fname, args, context.getType(typ), modifier, block.unBlockify(), meta.firstPass)
                             func.overridedFunction = if modifier.isOverride then context.getFunction(Identifier.fromString(name), args.map(_.typ), List(), typ, false, false) else null
                             context.addFunction(name, func)
                             func.generateArgument()(context)

@@ -104,7 +104,7 @@ class ScoreboardReduce(files: List[IRFile], access: mutable.Set[SBLink]){
             case e: IRExecute => {
                 computeState0(e.getStatements)
             }
-            case BlockCall(function, fullName) => ()
+            case BlockCall(function, fullName, args) => ()
             case _ => ()
         }
     }
@@ -579,7 +579,7 @@ class ScoreboardReduce(files: List[IRFile], access: mutable.Set[SBLink]){
                         case (_, "-=", DirectValue(v))=> ScoreboardRemove(target, v)
                         case other => tree
                 }
-                case BlockCall(function, fullName) => {
+                case BlockCall(function, fullName, args) => {
                     map.get(fullName) match
                         case Some(block) => {
                             block.scoreboardModified.foreach(name => {

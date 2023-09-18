@@ -19,8 +19,8 @@ object Parser extends StandardTokenParsers{
                               "+=", "-=", "/=", "*=", "%=", "?=", ":=", "%", "@", "@e", "@a", "@s", "@r", "@p", "~", "^", "<=", "==", ">=", "<", ">", "!=", "%%%", "???", "§§§", "$",
                               "!", "!=", "#", "<<", ">>", "&", "<<=", ">>=", "&=", "|=", "::", ":>", "??", "?")
   lexical.reserved   ++= List("true", "false", "if", "then", "else", "return", "switch", "for", "do", "while", "by", "is",
-                              "as", "at", "with", "to", "import", "doc", "template", "null", "typedef", "foreach", "in", "not",
-                              "def", "package", "struct", "enum", "class", "interface", "lazy", "jsonfile", "blocktag", "throw", "try", "catch", "finally",
+                              "as", "at", "with", "to", "import", "template", "null", "typedef", "foreach", "in", "not",
+                              "def", "package", "struct", "enum", "class", "interface", "lazy", "macro", "jsonfile", "blocktag", "throw", "try", "catch", "finally",
                               "public", "protected", "private", "scoreboard", "forgenerate", "from", "rotated", "facing", "align", "case", "default",
                               "ticking", "loading", "predicate", "extends", "implements", "new", "const", "static", "virtual", "abstract", "override", "repeat",
                               "sleep", "async", "await")
@@ -481,10 +481,10 @@ object Parser extends StandardTokenParsers{
 
   def modifierSub(sel: String): Parser[String] = {
     sel match{
-      case "all" => ("abstract" | "override" | "virtual" |"lazy" | "scoreboard" | "ticking" | "loading" | "helper" | "static" | "const" | "async")
-      case "function" => ("abstract" | "override" | "virtual" | "lazy" | "ticking" | "loading" | "helper" | "static" | "const" | "async")
-      case "function_short" => ("lazy" | "ticking" | "loading" | "helper" | "static" | "const" | "async")
-      case "variable" => ("lazy" | "scoreboard" | "static" | "const")
+      case "all" => ("abstract" | "override" | "virtual" |"lazy" | "macro" | "scoreboard" | "ticking" | "loading" | "helper" | "static" | "const" | "async")
+      case "function" => ("abstract" | "override" | "virtual" | "lazy" | "macro" | "ticking" | "loading" | "helper" | "static" | "const" | "async")
+      case "function_short" => ("lazy" | "macro" | "ticking" | "loading" | "helper" | "static" | "const" | "async")
+      case "variable" => ("lazy" | "macro" | "scoreboard" | "static" | "const")
       case "class" => ("abstract" | "static")
       case "struct" => ("abstract" | "static")
       case "enum" => ("abstract" | "static")
@@ -514,6 +514,7 @@ object Parser extends StandardTokenParsers{
       if subs.contains("abstract") || sel == "abstract_function" then {mod.isAbstract = true}
       if subs.contains("override")  then {mod.isOverride = true}
       if subs.contains("lazy")      then {mod.isLazy = true}
+      if subs.contains("macro")     then {mod.isMacro = true}
       if subs.contains("scoreboard")then {mod.isEntity = true}
       if subs.contains("ticking")   then {mod.isTicking = true}
       if subs.contains("loading")   then {mod.isLoading = true}

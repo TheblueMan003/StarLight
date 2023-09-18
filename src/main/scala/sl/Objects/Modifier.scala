@@ -29,6 +29,7 @@ class Modifier() extends Serializable{
     var isVirtual = false
     var isOverride = false
     var isLazy = false
+    var isMacro = false
     var isEntity = false
     var isConst = false
     var isTicking = false
@@ -60,7 +61,8 @@ class Modifier() extends Serializable{
         ret.isVirtual = isVirtual | other.isVirtual
         ret.isAbstract = isAbstract | other.isAbstract
         ret.isOverride = isOverride | other.isOverride
-        ret.isLazy = isLazy | other.isLazy        
+        ret.isLazy = isLazy | other.isLazy
+        ret.isMacro = isMacro | other.isMacro
         ret.isEntity = isEntity | other.isEntity
         ret.isConst = isConst | other.isConst
         ret.isTicking = isTicking | other.isTicking

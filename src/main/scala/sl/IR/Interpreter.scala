@@ -97,7 +97,7 @@ class Interpreter(var files: List[IRFile], val context: Context){
                     println(context.shift + "Scoreboard " + key + " = " + current + " " + operation + " " + sourceValue + " = " + scoreboards.getOrElse(key, 0))
                 }
             }
-            case BlockCall(function, fullName) => {
+            case BlockCall(function, fullName, args) => {
                 if (context.debug){
                     println(context.shift + "BlockCall " + fullName)
                 }

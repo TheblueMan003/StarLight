@@ -3,17 +3,15 @@ package test
 import standard::print
 
 class A{
-    B b
-    void=>B get
-
-    def test(){
-        b = get()
+    int a
+}
+interface B{
+    int b
+}
+class C extends A implements B{
+    def this(){
+        this.a = 1
+        this.b = 2
     }
 }
-class B{
-
-}
-
-def test(){
-    A a = new A()
-}
+C c = new C()
