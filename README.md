@@ -718,11 +718,19 @@ When Instantiating the template, the type parameter can be given with the follow
 ```
 example<int, 0> instance
 ```
+### Macro Functions
+Macro functions only work for Minecraft Java and follow the same logic as in Datapack. A command with a $<variable> inside it will be replace by the value of the variable. Note that <variable> will not be usable inside the macro function as a variable for optimization purpose.
+```
+def macro test(int a){
+    /say $a
+}
+test(0)
+```
 
 ### Lazy Functions
 Lazy functions are also not exported into the output code. Instead when they are called, there content is replace at the call site.
 ```
-lazy def test(int a){
+def lazy test(int a){
     int b = a
 }
 test(0)
