@@ -27,7 +27,7 @@ object Parser extends StandardTokenParsers{
 
 
   def block: Parser[Instruction] = positioned("{" ~> rep(instruction <~ opt(";")) <~ "}" ^^ (p => InstructionBlock(p)))
-  def assignmentOp: Parser[String] = ("=" | "+=" | "-=" | "*=" | "/=" | ":=" | "%=" | "^=" | "|=" | "&=" | "<<=" | ">>=")
+  def assignmentOp: Parser[String] = ("=" | "+=" | "-=" | "*=" | "/=" | ":=" | "%=" | "^=" | "|=" | "&=" | "<<=" | ">>=" | "::=")
 
   def ident2: Parser[String] = rep1sep(subident, ".") ^^ { p => p.reduce(_ + "." + _) }
   def subident: Parser[String] = opt("$") ~ ident ^^ { case _1 ~ _2 => _1.getOrElse("") + _2 }
@@ -417,7 +417,8 @@ object Parser extends StandardTokenParsers{
   def exprSub: Parser[Expression] = positioned(exprMult ~ rep("-" ~> exprSub) ^^ {unpack("-", _)})
   def exprAdd: Parser[Expression] = positioned(exprSub ~ rep("+" ~> exprAdd) ^^ {unpack("+", _)})
   def exprComp: Parser[Expression] = positioned(exprAdd ~ rep(comparator ~ exprComp) ^^ {unpack(_)})
-  def exprNotIn: Parser[Expression] = positioned(exprComp ~ rep(("not" | "!") ~> "in" ~> exprNotIn) ^^ {unpack("not in", _)})
+  def exprAppend: Parser[Expression] = positioned(exprComp ~ rep("::" ~> exprAppend) ^^ {unpack("::", _)})
+  def exprNotIn: Parser[Expression] = positioned(exprAppend ~ rep(("not" | "!") ~> "in" ~> exprNotIn) ^^ {unpack("not in", _)})
   def exprIn: Parser[Expression] = positioned(exprNotIn ~ rep("in" ~> exprIn) ^^ {unpack("in", _)})
   def exprIs: Parser[Expression] = positioned((exprIn ~ opt("is" ~ types)) ^^ {case e ~ Some(_ ~ t) => IsType(e, t);case e ~ None => e})
   def exprIsNot: Parser[Expression] = positioned((exprIs ~ opt("is" ~ "not" ~ types)) ^^ {case e ~ Some(_ ~ t) => UnaryOperation("!", IsType(e, t));case e ~ None => e})

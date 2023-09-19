@@ -847,6 +847,7 @@ object Utils{
             case "in" => BoolType
             case "==" | "<=" | "<" | ">" | ">=" => BoolType
             case "??" => t1
+            case "::" if t1 == JsonType || t2 == JsonType => JsonType
             case "+" | "-" | "*" | "/" | "%" | "^" => {
                 (t1, t2) match
                     case (IntType, IntType) => IntType
@@ -1413,11 +1414,13 @@ object Utils{
     def combine(op: String, a: JSONElement, b: JSONElement): JSONElement = {
         op match
             case "+" => combineJson(a, b)
+            case "::" => combineJson(a, b)
     }
 
     def combine(op: String, a: String, b: String): String = {
         op match
             case "+" => a + b
+            case "::" => a + b
     }
 
     def combine(op: String, a: Boolean, b: Boolean): Boolean = {

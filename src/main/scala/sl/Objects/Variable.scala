@@ -1208,45 +1208,70 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 		}
 		else{
 			value match
-				case JsonValue(value) => 
+				case JsonValue(json) => 
 					op match{
-						case "=" => List(CommandIR(f"data modify storage ${fullName} $key set value ${value.getNbt()}"))
-						case "+=" => List(CommandIR(f"data modify storage ${fullName} $key append value ${value.getNbt()}"))
-						case "&=" => List(CommandIR(f"data modify storage ${fullName} $key merge value ${value.getNbt()}"))
+						case "=" => List(StorageSet(StorageStorage(fullName, key), StorageString(json.getNbt())))
+						case "::=" => List(StorageAppend(StorageStorage(fullName, key), StorageString(json.getNbt())))
+						case "&=" => List(StorageMerge(StorageStorage(fullName, key), StorageString(json.getNbt())))
+						case other => throw new Exception(f"Illegal operation with json ${name}: $op at \n${value.pos.longString}")
 					}
-				case DefaultValue => List(CommandIR(f"data modify storage ${fullName} $key set value {}"))
+				case DefaultValue => List(StorageSet(StorageStorage(fullName, key), StorageString("")))
 				case VariableValue(name, sel) => assignBool(op, context.resolveVariable(value))
 				case LinkedVariableValue(vari, sel) => 
 					vari.getType() match{
 						case JsonType => {
 							op match{
-								case "=" => List(CommandIR(f"data modify storage ${fullName} $key set from storage ${vari.fullName} ${vari.jsonArrayKey}"))
-								case "+=" => List(CommandIR(f"data modify storage ${fullName} $key append from storage ${vari.fullName} ${vari.jsonArrayKey}"))
-								case "&=" => List(CommandIR(f"data modify storage ${fullName} $key merge from storage ${vari.fullName} ${vari.jsonArrayKey}"))
+								case "=" => List(StorageSet(StorageStorage(fullName, key), StorageStorage(vari.fullName, vari.jsonArrayKey)))
+								case "::=" => List(StorageAppend(StorageStorage(fullName, key), StorageStorage(vari.fullName, vari.jsonArrayKey)))
+								case "&=" => List(StorageMerge(StorageStorage(fullName, key), StorageStorage(vari.fullName, vari.jsonArrayKey)))
+								case other => jsonUnpackedOperation(op, value, key)
 							}
 						}
 						case IntType => {
 							op match{
 								case "=" => List(CommandIR(f"execute store result storage ${fullName} $key int 1 run scoreboard players get ${vari.getSelector()(sel)}"))
-								case "+=" => List(CommandIR(f"execute store result storage ${fullName} tmp int 1 run scoreboard players get ${vari.getSelector()(sel)}"), 
+								case "::=" => List(CommandIR(f"execute store result storage ${fullName} tmp int 1 run scoreboard players get ${vari.getSelector()(sel)}"), 
 												CommandIR(f"data modify storage ${fullName} $key append from storage ${fullName} tmp"))
 								case "&=" => List(CommandIR(f"execute store result storage ${fullName} tmp int 1 run scoreboard players get ${vari.getSelector()(sel)}"), 
 												CommandIR(f"data modify storage ${fullName} $key merge from storage ${fullName} tmp"))
+								case other => jsonUnpackedOperation(op, value, key)
 							}
 						}
 						case FloatType => {
 							op match{
 								case "=" => List(CommandIR(f"execute store result storage ${fullName} $key float ${1f/Settings.floatPrec} run scoreboard players get ${vari.getSelector()(sel)}"))
-								case "+=" => List(CommandIR(f"execute store result storage ${fullName} tmp float ${1f/Settings.floatPrec} run scoreboard players get ${vari.getSelector()(sel)}"), 
+								case "::=" => List(CommandIR(f"execute store result storage ${fullName} tmp float ${1f/Settings.floatPrec} run scoreboard players get ${vari.getSelector()(sel)}"), 
 												CommandIR(f"data modify storage ${fullName} $key append from storage ${fullName} tmp"))
 								case "&=" => List(CommandIR(f"execute store result storage ${fullName} tmp float ${1f/Settings.floatPrec} run scoreboard players get ${vari.getSelector()(sel)}"), 
 												CommandIR(f"data modify storage ${fullName} $key merge from storage ${fullName} tmp"))
+								case other => jsonUnpackedOperation(op, value, key)
+							}
+						}
+						case BoolType => {
+							op match{
+								case "=" => ???
+								case "::=" => ???
+								case "&=" => ???
+								case other => jsonUnpackedOperation(op, value, key)
+							}
+						}
+						case StringType => {
+							op match{
+								case "=" => List(CommandIR(f"execute store result storage ${fullName} $key string 1 run scoreboard players get ${vari.getSelector()(sel)}"))
+								case "::=" => List(CommandIR(f"execute store result storage ${fullName} tmp string 1 run scoreboard players get ${vari.getSelector()(sel)}"), 
+												CommandIR(f"data modify storage ${fullName} $key append from storage ${fullName} tmp"))
+								case "&=" => List(CommandIR(f"execute store result storage ${fullName} tmp string 1 run scoreboard players get ${vari.getSelector()(sel)}"), 
+												CommandIR(f"data modify storage ${fullName} $key merge from storage ${fullName} tmp"))
+								case other => jsonUnpackedOperation(op, value, key)
 							}
 						}
 						case StructType(struct, sub) => {
-							vari.tupleVari.flatMap(v => {
-								vari.assignJson(op, LinkedVariableValue(withKey(key + "." + v.name), sel))
-							})
+							op match{
+								case "=" => vari.tupleVari.flatMap(v => {
+												vari.assignJson(op, LinkedVariableValue(withKey(key + "." + v.name), sel))
+											})
+								case other => jsonUnpackedOperation(op, value, key)
+							}
 						}
 						case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()} at \n${value.pos.longString}")
 					}
@@ -1273,30 +1298,39 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 				}
 				case IntValue(value) => 
 					op match{
-						case "=" => List(CommandIR(f"data modify storage ${fullName} $key set value $value"))
-						case "+=" => List(CommandIR(f"data modify storage ${fullName} $key append value $value"))
-						case "&=" => List(CommandIR(f"data modify storage ${fullName} $key merge value $value"))
+						case "=" => List(StorageSet(StorageStorage(fullName, key), StorageString(value.toString())))
+						case "::=" => List(StorageAppend(StorageStorage(fullName, key), StorageString(value.toString())))
+						case "&=" => List(StorageMerge(StorageStorage(fullName, key), StorageString(value.toString())))
+						case other => jsonUnpackedOperation(op, IntValue(value), key)
 					}
 				case FloatValue(value) => 
 					op match{
-						case "=" => List(CommandIR(f"data modify storage ${fullName} $key set value ${value/Settings.floatPrec}"))
-						case "+=" => List(CommandIR(f"data modify storage ${fullName} $key append value ${value/Settings.floatPrec}"))
-						case "&=" => List(CommandIR(f"data modify storage ${fullName} $key merge value ${value/Settings.floatPrec}"))
+						case "=" => List(StorageSet(StorageStorage(fullName, key), StorageString(value.toString())))
+						case "::=" => List(StorageAppend(StorageStorage(fullName, key), StorageString(value.toString())))
+						case "&=" => List(StorageMerge(StorageStorage(fullName, key), StorageString(value.toString())))
+						case other => jsonUnpackedOperation(op, FloatValue(value), key)
 					}
 				case StringValue(value) =>
 					op match{
-						case "=" => List(CommandIR(f"data modify storage ${fullName} $key set value ${value}"))
-						case "+=" => List(CommandIR(f"data modify storage ${fullName} $key append value ${value}"))
-						case "&=" => List(CommandIR(f"data modify storage ${fullName} $key merge value ${value}"))
+						case "=" => List(StorageSet(StorageStorage(fullName, key), StorageString(value)))
+						case "::=" => List(StorageAppend(StorageStorage(fullName, key), StorageString(value)))
+						case "&=" => List(StorageMerge(StorageStorage(fullName, key), StorageString(value)))
+						case other => jsonUnpackedOperation(op, StringValue(value), key)
 					}
 				case BoolValue(value) =>
 					op match{
 						case "=" => List(CommandIR(f"data modify storage ${fullName} $key set value ${value}"))
-						case "+=" => List(CommandIR(f"data modify storage ${fullName} $key append value ${value}"))
+						case "::=" => List(CommandIR(f"data modify storage ${fullName} $key append value ${value}"))
 						case "&=" => List(CommandIR(f"data modify storage ${fullName} $key merge value ${value}"))
+						case other => jsonUnpackedOperation(op, BoolValue(value), key)
 					}
 				case _ => throw new Exception(f"Unknown cast to json $value at \n${value.pos.longString}")
 		}
+	}
+
+	def jsonUnpackedOperation(op: String, value: Expression, keya: String = "json")(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
+		val vari = context.getFreshVariable(Utils.typeof(value))
+		vari.assign("=", LinkedVariableValue(withKey(keya), selector)) ::: vari.assign(op, value) ::: assign("=", LinkedVariableValue(vari))
 	}
 
 	/**
