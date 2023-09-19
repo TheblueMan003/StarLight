@@ -1,8 +1,11 @@
 package sl.IR
 
+import scala.collection.mutable
+
 class FoldReduce(var files: List[IRFile]){
     val map = files.map(f => f.getName() -> f).toMap
     var globalChanged = false
+    var state: mutable.Map[SBLink, ScoreboardState] = null
 
     def run(): (List[IRFile], Boolean) ={
         files.foreach(f => f.setContents(f.getContents().map(map).foldLeft(List[IRTree]())(fold)))
@@ -89,7 +92,25 @@ class FoldReduce(var files: List[IRFile]){
                     globalChanged = true
                     List(op2)
 
-                
+
+
+                case (StorageSet(target1, value1), StorageSet(target2, value2)) if target1 == target2 => {
+                    globalChanged = true
+                    List(StorageSet(target1, value2))
+                }
+                case (StorageAppend(target1, value1), StorageSet(target2, value2)) if target1 == target2 => {
+                    globalChanged = true
+                    List(StorageSet(target1, value2))
+                }
+                case (StoragePrepend(target1, value1), StorageSet(target2, value2)) if target1 == target2 => {
+                    globalChanged = true
+                    List(StorageSet(target1, value2))
+                }
+                case (StorageRemove(target1, value1), StorageSet(target2, value2)) if target1 == target2 => {
+                    globalChanged = true
+                    List(StorageSet(target1, value2))
+                }
+
                 case (op1 @ ScoreboardSet(sb1: SBLink, value), IfScoreboardMatch(sb2: SBLink, min, max, stm, invert)) 
                     if sb1 == sb2 && ((min <= value && value <= max && !invert) || (!(min <= value && value <= max) && invert)) =>
                         globalChanged = true

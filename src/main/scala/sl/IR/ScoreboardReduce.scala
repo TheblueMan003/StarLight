@@ -9,7 +9,7 @@ class ScoreboardReduce(files: List[IRFile], access: mutable.Set[SBLink]){
     var changed = false
     var globalChanged = false
 
-    def run():(List[IRFile], Boolean) = {
+    def run():(List[IRFile], Boolean, mutable.Map[SBLink, ScoreboardState]) = {
         changed = true
         var iteration = 0
         while(changed){
@@ -43,7 +43,7 @@ class ScoreboardReduce(files: List[IRFile], access: mutable.Set[SBLink]){
                 globalChanged = true
             }
         }
-        (files, globalChanged)
+        (files, globalChanged, state)
     }
     def resetState()={
         state = mutable.Map[SBLink, ScoreboardState]()
@@ -100,6 +100,26 @@ class ScoreboardReduce(files: List[IRFile], access: mutable.Set[SBLink]){
                 getOrAdd(left).addAccessed(file)
                 getOrAdd(right).addAccessed(file)
                 computeState0(statement)
+            }
+            case StorageSet(StorageScoreboard(key, _, _), _) => {
+                val v = getOrAdd(key)
+                v.addModified(file)
+                v.setAny()
+            }
+            case StorageMerge(StorageScoreboard(key, _, _), _) => {
+                val v = getOrAdd(key)
+                v.addModified(file)
+                v.setAny()
+            }
+            case StorageSet(_, StorageScoreboard(key, _, _)) => {
+                val v = getOrAdd(key)
+                v.addAccessed(file)
+                v.setAny()
+            }
+            case StorageMerge(_, StorageScoreboard(key, _, _)) => {
+                val v = getOrAdd(key)
+                v.addAccessed(file)
+                v.setAny()
             }
             case e: IRExecute => {
                 computeState0(e.getStatements)
@@ -623,6 +643,13 @@ class ScoreboardState(sblink: SBLink,forced: Boolean = false){
     var accessedValue = mutable.Set[ScoreboardValue]()
     var operation = mutable.Set[SBOperation]()
 
+    def isModified(file: IRFile, map: Map[String, IRFile], set: mutable.Set[IRFile] = mutable.Set()): Boolean ={
+        if (forced) return true
+        if (set.contains(file)) return false
+        set += file
+        modified.contains(file) || file.calling.map(x => map.get(x)).exists(x => x.isDefined && !set.contains(x.get) && isModified(x.get, map, set))
+    }
+
     def addAccessed(file: IRFile): Unit ={
         accessed += file
         file.addScoreboardAccess(sblink)
@@ -640,6 +667,9 @@ class ScoreboardState(sblink: SBLink,forced: Boolean = false){
         possibleValue = AnyValue
     }
     def setNull(): Unit ={
+        possibleValue = AnyValue
+    }
+    def setAny(): Unit ={
         possibleValue = AnyValue
     }
     def setValue(value: Int): Unit ={

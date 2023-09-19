@@ -378,7 +378,7 @@ object Compiler{
                         val typ = Utils.typeof(LinkedVariableValue(vari))
 
                         if (vari.modifiers.isLazy && typ == JsonType){
-                            vari.lazyValue = JsonValue(Utils.combineJson(Utils.toJson(vari.lazyValue), JsonDictionary(Map(index.head.getString() -> Utils.toJson(Utils.simplify(value))))))
+                            vari.lazyValue = JsonValue(Utils.combineJson(op, Utils.toJson(vari.lazyValue), JsonDictionary(Map(index.head.getString() -> Utils.toJson(Utils.simplify(value))))))
                             List()
                         }
                         else if (typ == JsonType && !vari.modifiers.isEntity){

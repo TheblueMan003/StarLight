@@ -92,7 +92,7 @@ class BlockReduce(var files: List[IRFile]){
     def reduceBlockCall() ={
         def applyTop(instr: IRTree)(implicit parent: IRFile, inliningSet: Set[String] = Set()): List[IRTree] = {
             instr match {
-                case BlockCall(function, fullName, args) => {
+                case BlockCall(function, fullName, args) if args == null || args == "" => {
                     map.get(fullName) match {
                         case Some(file) => {
                             val size = file.getContents().length
@@ -116,7 +116,7 @@ class BlockReduce(var files: List[IRFile]){
         }
         def apply(instr: IRTree)(implicit parent: IRFile, inliningSet: Set[String] = Set()): IRTree = {
             instr match {
-                case BlockCall(function, fullName, args) => {
+                case BlockCall(function, fullName, args) if args == null || args == "" => {
                     map.get(fullName) match {
                         case Some(file) => {
                             val size = file.getContents().length
@@ -164,7 +164,7 @@ class BlockReduce(var files: List[IRFile]){
         var changed = false
         def apply(instr: IRTree)(implicit parent: IRFile): IRTree = {
             instr match {
-                case BlockCall(function, fullName, args) => {
+                case BlockCall(function, fullName, args) if args == null || args == "" => {
                     map.get(fullName) match {
                         case Some(file) => {
                             irMap.get(file.getContents()) match {

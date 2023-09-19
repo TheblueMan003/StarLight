@@ -2,16 +2,11 @@ package test
 
 import standard::print
 
-class A{
-    int a
+[nbt="Pos[0]"] scoreboard json x
+def macro bar(int a){
+    a = 1
+    /say $a
 }
-interface B{
-    int b
+def lol(int a){
+    bar(5)
 }
-class C extends A implements B{
-    def this(){
-        this.a = 1
-        this.b = 2
-    }
-}
-C c = new C()
