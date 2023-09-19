@@ -328,17 +328,16 @@ class LazyFunction(context: Context, _contextName: String, name: String, argumen
     def getName(): String = Settings.target.getFunctionPath(fullName)
 }
 
-class MacroFunction(context: Context, _contextName: String, name: String, arguments: List[Argument], typ: Type, _modifier: Modifier, val body: Instruction) extends Function(context, _contextName, name, arguments, typ, _modifier){
+class MacroFunction(context: Context, _contextName: String, name: String, arguments: List[Argument], typ: Type, _modifier: Modifier, _body: Instruction) extends ConcreteFunction(context, _contextName, name, arguments, typ, _modifier, _body, false){
     val vari = context.getFreshVariable(JsonType)
 
-    def call(args: List[Expression], ret: Variable = null, retSel: Selector = Selector.self, op: String = "=")(implicit ctx: Context): List[IRTree] = {
+    override def call(args: List[Expression], ret: Variable = null, retSel: Selector = Selector.self, op: String = "=")(implicit ctx: Context): List[IRTree] = {
         argMap(args).flatMap((v,e) => vari.withKey("json."+v.name).assign("=", e)) ::: List(BlockCall(Settings.target.getFunctionName(fullName), fullName, f"with storage ${vari.fullName} ${vari.jsonArrayKey}"))
     }
-    override def canBeCallAtCompileTime = true
-
-    def exists(): Boolean = false
-    def getContent(): List[IRTree] = List()
-    def getName(): String = Settings.target.getFunctionPath(fullName)
+    override def generateArgument()(implicit ctx: Context):Unit = {
+        super.generateArgument()
+        context.getAllVariable().map(x => x.makeJson(fullName))
+    }
 }
 
 class MultiplexFunction(context: Context, _contextName: String, name: String, arguments: List[Argument], typ: Type) extends ConcreteFunction(context, _contextName, name, arguments, typ, objects.Modifier.newPrivate(), sl.InstructionList(List()), false){

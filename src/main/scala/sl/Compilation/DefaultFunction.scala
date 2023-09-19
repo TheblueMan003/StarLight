@@ -26,7 +26,7 @@ object DefaultFunction{
                                 (List(), JsonValue(Parser.parseJson(Source.fromFile(path, "UTF-8").mkString)))
                             }
                             case other => throw new Exception(f"Illegal Arguments $other for readJson")
-                        }).reduce((a,b) => (a._1:::b._1, JsonValue(Utils.combineJson(a._2.asInstanceOf[JsonValue].content, b._2.asInstanceOf[JsonValue].content))))
+                        }).reduce((a,b) => (a._1:::b._1, JsonValue(Utils.combineJson(">:", a._2.asInstanceOf[JsonValue].content, b._2.asInstanceOf[JsonValue].content))))
                     }
                 ))
         ctx.addFunction("mergeSelector", CompilerFunction(ctx, "mergeSelector", 

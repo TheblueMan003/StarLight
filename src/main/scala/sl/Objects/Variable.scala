@@ -29,7 +29,7 @@ object Variable {
 		}
 	}
 }
-class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) extends CObject(context, name, _modifier) with Typed(typ){
+class Variable(context: Context, name: String, var typ: Type, _modifier: Modifier) extends CObject(context, name, _modifier) with Typed(typ){
 	val parentFunction = context.getCurrentFunction()
 	var tupleVari: List[Variable] = List()
 	var indexedVari: List[(Variable, Expression)] = List()
@@ -45,7 +45,7 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 	var getter: Function = null
 	var setter: Function = null
 	var wasGenerated = false
-	var jsonArrayKey: String = "json"
+	var jsonArrayKey: String = if modifiers.isEntity then modifiers.getAttributesString("nbt", ()=>"json")(context) else modifiers.getAttributesString("path", ()=>"json")(context)
 
 	def canBeReduceToLazyValue = modifiers.isLazy && !getType().isInstanceOf[StructType]
 
@@ -53,6 +53,11 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 		val vari = Variable(context, name, typ, _modifier)
 		vari.jsonArrayKey = key
 		vari
+	}
+
+	def makeJson(prefix: String) = {
+		typ = JsonType
+		jsonArrayKey = fullName.stripPrefix(prefix+".")
 	}
 
 	def generate(isStructFunctionArgument: Boolean = false, skipClassCheck: Boolean = false)(implicit context: Context):Unit = {
@@ -721,6 +726,16 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 					case other => throw new Exception(f"Cannot use $other with $fullName & ${vari.fullName}")
 				}
 			case FuncType(sources, output) => List(ScoreboardOperation(getIRSelector(), op, vari.getIRSelector()(oselector)))
+			case JsonType => {
+				op match{
+					case "=" => List(StorageRead(getIRSelector(), vari.getStorage()))
+					case other => {
+						val tmp = context.getFreshVariable(getType())
+						StorageRead(tmp.getIRSelector(), vari.getStorage())::
+							assign(op, LinkedVariableValue(tmp))
+					}
+				}
+			}
 			case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()}")
 		}
 	}
@@ -871,6 +886,16 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 							case "=" => List(ScoreboardOperation(getIRSelector(), "=", vari.getIRSelector()(sel)))
 							case _ => List(ScoreboardOperation(getIRSelector(), "*=", vari.getIRSelector()(sel)))
 					}
+					case JsonType => {
+						op match{
+							case "=" => List(StorageRead(getIRSelector(), vari.getStorage()))
+							case other => {
+								val tmp = context.getFreshVariable(getType())
+								StorageRead(tmp.getIRSelector(), vari.getStorage())::
+									assign(op, LinkedVariableValue(tmp))
+							}
+						}
+					}
 					case EntityType => ScoreboardSet(getIRSelector(), 0)::Compiler.compile(If(value, VariableAssigment(List((Right(this), selector)), "=", BoolValue(true)), List()))
 					case other => throw new Exception(f"Cannot assign $value of type $other to $fullName of type ${getType()} at \n${value.pos.longString}")
 			case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
@@ -939,6 +964,16 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 							ScoreboardOperation(SBLink(tmp, Settings.tmpScoreboard), "*=", SBLink(f"c${Settings.floatPrec}", Settings.constScoreboard)),
 							ScoreboardOperation(getIRSelector(), op, SBLink(tmp, Settings.tmpScoreboard))
 						)
+					}
+				}
+			}
+			case JsonType => {
+				op match{
+					case "=" => List(StorageRead(getIRSelector(), vari.getStorage(), Settings.floatPrec))
+					case other => {
+						val tmp = context.getFreshVariable(getType())
+						StorageRead(tmp.getIRSelector(), vari.getStorage(), Settings.floatPrec)::
+							assign(op, LinkedVariableValue(tmp))
 					}
 				}
 			}
@@ -1195,6 +1230,16 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 		}
 	}
 
+	def getStorage(keya: String = "json")(implicit context: Context, selector: Selector = Selector.self) = {
+		val key = if jsonArrayKey != "json" then jsonArrayKey else keya
+		if (modifiers.isEntity){
+			StorageEntity(getSelector().toString(), if (key.startsWith("json."))then key.substring(5) else key)
+		}
+		else{
+			StorageStorage(fullName, key)
+		}
+	}
+
 	/**
 	 * Assign a value to the float variable
 	 */
@@ -1203,100 +1248,140 @@ class Variable(context: Context, name: String, typ: Type, _modifier: Modifier) e
 		if (Settings.target == MCBedrock){
 			throw new Exception(f"Dynamic Json Variable Not Supported in Bedrock ($fullName) at \n${value.pos.longString}")
 		}
-		if (modifiers.isEntity){
-			throw new Exception(f"Not Supported at \n${value.pos.longString}")
-		}
-		else{
-			value match
-				case JsonValue(value) => 
-					op match{
-						case "=" => List(CommandIR(f"data modify storage ${fullName} $key set value ${value.getNbt()}"))
-						case "+=" => List(CommandIR(f"data modify storage ${fullName} $key append value ${value.getNbt()}"))
-						case "&=" => List(CommandIR(f"data modify storage ${fullName} $key merge value ${value.getNbt()}"))
-					}
-				case DefaultValue => List(CommandIR(f"data modify storage ${fullName} $key set value {}"))
-				case VariableValue(name, sel) => assignBool(op, context.resolveVariable(value))
-				case LinkedVariableValue(vari, sel) => 
-					vari.getType() match{
-						case JsonType => {
-							op match{
-								case "=" => List(CommandIR(f"data modify storage ${fullName} $key set from storage ${vari.fullName} ${vari.jsonArrayKey}"))
-								case "+=" => List(CommandIR(f"data modify storage ${fullName} $key append from storage ${vari.fullName} ${vari.jsonArrayKey}"))
-								case "&=" => List(CommandIR(f"data modify storage ${fullName} $key merge from storage ${vari.fullName} ${vari.jsonArrayKey}"))
-							}
-						}
-						case IntType => {
-							op match{
-								case "=" => List(CommandIR(f"execute store result storage ${fullName} $key int 1 run scoreboard players get ${vari.getSelector()(sel)}"))
-								case "+=" => List(CommandIR(f"execute store result storage ${fullName} tmp int 1 run scoreboard players get ${vari.getSelector()(sel)}"), 
-												CommandIR(f"data modify storage ${fullName} $key append from storage ${fullName} tmp"))
-								case "&=" => List(CommandIR(f"execute store result storage ${fullName} tmp int 1 run scoreboard players get ${vari.getSelector()(sel)}"), 
-												CommandIR(f"data modify storage ${fullName} $key merge from storage ${fullName} tmp"))
-							}
-						}
-						case FloatType => {
-							op match{
-								case "=" => List(CommandIR(f"execute store result storage ${fullName} $key float ${1f/Settings.floatPrec} run scoreboard players get ${vari.getSelector()(sel)}"))
-								case "+=" => List(CommandIR(f"execute store result storage ${fullName} tmp float ${1f/Settings.floatPrec} run scoreboard players get ${vari.getSelector()(sel)}"), 
-												CommandIR(f"data modify storage ${fullName} $key append from storage ${fullName} tmp"))
-								case "&=" => List(CommandIR(f"execute store result storage ${fullName} tmp float ${1f/Settings.floatPrec} run scoreboard players get ${vari.getSelector()(sel)}"), 
-												CommandIR(f"data modify storage ${fullName} $key merge from storage ${fullName} tmp"))
-							}
-						}
-						case StructType(struct, sub) => {
-							vari.tupleVari.flatMap(v => {
-								vari.assignJson(op, LinkedVariableValue(withKey(key + "." + v.name), sel))
-							})
-						}
-						case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()} at \n${value.pos.longString}")
-					}
-				case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
-				case ArrayGetValue(name, index) => handleArrayGetValue(op, name, index)
-				case bin: BinaryOperation => {
-					if (keya == "json"){
-						assignBinaryOperator(op, bin)
-					}
-					else {
-						withKey(keya).assignJson(op, bin, "json")
-					}
+
+		value match
+			case JsonValue(json) => 
+				op match{
+					case "=" => List(StorageSet(getStorage(keya), StorageString(json.getNbt())))
+					case ">:=" => List(StorageAppend(getStorage(keya), StorageString(json.getNbt())))
+					case "<:=" => List(StoragePrepend(getStorage(keya), StorageString(json.getNbt())))
+					case "::=" => List(StorageMerge(getStorage(keya), StorageString(json.getNbt())))
+					case "-:=" => List(StorageRemove(getStorage(keya), StorageString(json.getNbt())))
+					case other => throw new Exception(f"Illegal operation with json ${name}: $op at \n${value.pos.longString}")
 				}
-				case ter: TernaryOperation => {
-					if (keya == "json"){
-						assignTernaryOperator(op, ter)
+			case DefaultValue => List(StorageSet(getStorage(keya), StorageString("")))
+			case VariableValue(name, sel) => assignBool(op, context.resolveVariable(value))
+			case NullValue => List(StorageSet(getStorage(keya), StorageString("{}")))
+			case LinkedVariableValue(vari, sel) => 
+				vari.getType() match{
+					case JsonType => {
+						op match{
+							case "=" => List(StorageSet(getStorage(keya), vari.getStorage()(context,sel)))
+							case ">:=" => List(StorageAppend(getStorage(keya), vari.getStorage()(context,sel)))
+							case "<:=" => List(StoragePrepend(getStorage(keya), vari.getStorage()(context,sel)))
+							case "::=" => List(StorageMerge(getStorage(keya), vari.getStorage()(context,sel)))
+							case "-:=" => List(StorageRemove(getStorage(keya), vari.getStorage()(context,sel)))
+							case other => jsonUnpackedOperation(op, value, key)
+						}
 					}
-					else {
-						withKey(keya).assignJson(op, ter, "json")
+					case IntType | BoolType | EnumType(_) => {
+						op match{
+							case "=" => List(StorageSet(getStorage(keya), StorageScoreboard(vari.getIRSelector()(sel), "int", 1)))
+							case ">:=" => List(StorageSet(StorageStorage(fullName, "tmp"), StorageScoreboard(vari.getIRSelector()(sel), "int", 1)), 
+											StorageAppend(getStorage(keya), StorageStorage(fullName, "tmp")))
+							case "<:=" => List(StorageSet(StorageStorage(fullName, "tmp"), StorageScoreboard(vari.getIRSelector()(sel), "int", 1)), 
+											StoragePrepend(getStorage(keya), StorageStorage(fullName, "tmp")))
+							case "::=" => List(StorageSet(StorageStorage(fullName, "tmp"), StorageScoreboard(vari.getIRSelector()(sel), "int", 1)), 
+											StorageMerge(getStorage(keya), StorageStorage(fullName, "tmp")))
+							case "-:=" => List(StorageSet(StorageStorage(fullName, "tmp"), StorageScoreboard(vari.getIRSelector()(sel), "int", 1)), 
+											StorageRemove(getStorage(keya), StorageStorage(fullName, "tmp")))
+							case other => jsonUnpackedOperation(op, value, key)
+						}
 					}
+					case FloatType => {
+						op match{
+							case "=" => List(StorageSet(getStorage(keya), StorageScoreboard(vari.getIRSelector()(sel), "float", 1f/Settings.floatPrec)))
+							case ">:=" => List(StorageSet(StorageStorage(fullName, "tmp"), StorageScoreboard(vari.getIRSelector()(sel), "float", 1f/Settings.floatPrec)), 
+											StorageAppend(getStorage(keya), StorageStorage(fullName, "tmp")))
+							case "<:=" => List(StorageSet(StorageStorage(fullName, "tmp"), StorageScoreboard(vari.getIRSelector()(sel), "float", 1f/Settings.floatPrec)), 
+											StoragePrepend(getStorage(keya), StorageStorage(fullName, "tmp")))
+							case "::=" => List(StorageSet(StorageStorage(fullName, "tmp"), StorageScoreboard(vari.getIRSelector()(sel), "float", 1f/Settings.floatPrec)),	
+											StorageMerge(getStorage(keya), StorageStorage(fullName, "tmp")))
+							case "-:=" => List(StorageSet(StorageStorage(fullName, "tmp"), StorageScoreboard(vari.getIRSelector()(sel), "float", 1f/Settings.floatPrec)), 
+											StorageRemove(getStorage(keya), StorageStorage(fullName, "tmp")))
+							case other => jsonUnpackedOperation(op, value, key)
+						}
+					}
+					case StringType => {
+						op match{
+							case "=" => List(StorageSet(getStorage(keya), StorageStorage(vari.fullName, "value")))
+							case ">:=" => List(StorageAppend(getStorage(keya), StorageStorage(vari.fullName, "value")))
+							case "<:=" => List(StoragePrepend(getStorage(keya), StorageStorage(vari.fullName, "value")))
+							case "::=" => List(StorageMerge(getStorage(keya), StorageStorage(vari.fullName, "value")))
+							case "-:=" => List(StorageRemove(getStorage(keya), StorageStorage(vari.fullName, "value")))
+							case other => jsonUnpackedOperation(op, value, key)
+						}
+					}
+					case StructType(struct, sub) => {
+						op match{
+							case "=" => vari.tupleVari.flatMap(v => {
+											vari.assignJson(op, LinkedVariableValue(withKey(key + "." + v.name), sel))
+										})
+							case other => jsonUnpackedOperation(op, value, key)
+						}
+					}
+					case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()} at \n${value.pos.longString}")
 				}
-				case SequenceValue(left, right) => {
-					Compiler.compile(left):::assignJson(op, right, key)
+			case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
+			case ArrayGetValue(name, index) => handleArrayGetValue(op, name, index)
+			case bin: BinaryOperation => {
+				if (keya == "json"){
+					assignBinaryOperatorJson(op, bin)
 				}
-				case IntValue(value) => 
-					op match{
-						case "=" => List(CommandIR(f"data modify storage ${fullName} $key set value $value"))
-						case "+=" => List(CommandIR(f"data modify storage ${fullName} $key append value $value"))
-						case "&=" => List(CommandIR(f"data modify storage ${fullName} $key merge value $value"))
-					}
-				case FloatValue(value) => 
-					op match{
-						case "=" => List(CommandIR(f"data modify storage ${fullName} $key set value ${value/Settings.floatPrec}"))
-						case "+=" => List(CommandIR(f"data modify storage ${fullName} $key append value ${value/Settings.floatPrec}"))
-						case "&=" => List(CommandIR(f"data modify storage ${fullName} $key merge value ${value/Settings.floatPrec}"))
-					}
-				case StringValue(value) =>
-					op match{
-						case "=" => List(CommandIR(f"data modify storage ${fullName} $key set value ${value}"))
-						case "+=" => List(CommandIR(f"data modify storage ${fullName} $key append value ${value}"))
-						case "&=" => List(CommandIR(f"data modify storage ${fullName} $key merge value ${value}"))
-					}
-				case BoolValue(value) =>
-					op match{
-						case "=" => List(CommandIR(f"data modify storage ${fullName} $key set value ${value}"))
-						case "+=" => List(CommandIR(f"data modify storage ${fullName} $key append value ${value}"))
-						case "&=" => List(CommandIR(f"data modify storage ${fullName} $key merge value ${value}"))
-					}
-				case _ => throw new Exception(f"Unknown cast to json $value at \n${value.pos.longString}")
-		}
+				else {
+					withKey(keya).assignJson(op, bin, "json")
+				}
+			}
+			case ter: TernaryOperation => {
+				if (keya == "json"){
+					assignTernaryOperator(op, ter)
+				}
+				else {
+					withKey(keya).assignJson(op, ter, "json")
+				}
+			}
+			case SequenceValue(left, right) => {
+				Compiler.compile(left):::assignJson(op, right, key)
+			}
+			case IntValue(_) | FloatValue(_) | StringValue(_) | BoolValue(_) => 
+				op match{
+					case "=" => List(StorageSet(getStorage(keya), StorageString(value.getString())))
+					case ">:=" => List(StorageAppend(getStorage(keya), StorageString(value.getString())))
+					case "<:=" => List(StoragePrepend(getStorage(keya), StorageString(value.getString())))
+					case "::=" => List(StorageMerge(getStorage(keya), StorageString(value.getString())))
+					case "-:=" => List(StorageRemove(getStorage(keya), StorageString(value.getString())))
+					case other => jsonUnpackedOperation(op, value, key)
+				}
+			case _ => throw new Exception(f"Unknown cast to json $value at \n${value.pos.longString}")
+	}
+
+	def assignBinaryOperatorJson(op: String, value: BinaryOperation)(implicit context: Context, selector: Selector = Selector.self):List[IRTree]={
+		value match
+			case BinaryOperation(op2 @ ("+" | "*"), left, right) if Utils.typeof(right) == JsonType && Utils.typeof(left) != JsonType => {
+				assignBinaryOperator(op, BinaryOperation(op2, right, left))
+			}
+			case BinaryOperation(op2, left, right) if Utils.typeof(right) == JsonType && Utils.typeof(left) != JsonType => {
+				val vari = context.getFreshVariable(Utils.typeof(left))
+				vari.assign("=", left) ::: vari.assign(op2, right) ::: assignJson(op, LinkedVariableValue(vari, selector))
+			}
+			case other => {
+				assignBinaryOperator(op, other)
+			}
+	}
+
+	def jsonUnpackedOperation(op: String, value: Expression, keya: String = "json")(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
+		value match
+			case BinaryOperation("+" | "*", left, right) if Utils.typeof(right) == JsonType && Utils.typeof(left) != JsonType => {
+				jsonUnpackedOperation(op, BinaryOperation(op, right, left), keya)
+			}
+			case BinaryOperation(op, left, right) if Utils.typeof(right) == JsonType && Utils.typeof(left) != JsonType => {
+				val vari = context.getFreshVariable(Utils.typeof(left))
+				vari.assign("=", left) ::: vari.assign(op, right) ::: assignJson("=", LinkedVariableValue(vari, selector), keya)
+			}
+			case other => {
+				val vari = context.getFreshVariable(Utils.typeof(value))
+				vari.assign("=", LinkedVariableValue(withKey(keya), selector)) ::: vari.assign(op, value) ::: assign("=", LinkedVariableValue(vari))
+			}
 	}
 
 	/**

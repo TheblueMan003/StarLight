@@ -12,6 +12,8 @@ import sl.files.CacheAST
 import sl.IR.*
 import sl.Library.Downloader
 import sys.process._
+import java.util.Locale
+import scala.collection.mutable
 
 object Main{
   var version = List(0, 10, 0)
@@ -22,6 +24,7 @@ object Main{
   private var lastExecption: Throwable = null
 
   def main(args: Array[String]): Unit = {
+    Locale.setDefault(Locale.US)
     if (args.length == 0){
       mainLoop()
     }
@@ -333,15 +336,19 @@ object Main{
       while(count < 20 && changed){
         changed = false
         Reporter.info(f"Iteration ${count}")
+        var states: mutable.Map[SBLink, ScoreboardState] = null
         if (Settings.optimizeVariableValue){
           Reporter.info(f">> Optimizing variable")
-          val (a, b) = sl.IR.ScoreboardReduce(output, context.getScoreboardUsedForce()).run()
+          val (a, b, s) = sl.IR.ScoreboardReduce(output, context.getScoreboardUsedForce()).run()
+          states = s
           output = a
           changed |= b
         }
         if (Settings.optimizeFold){
           Reporter.info(f">> Optimizing fold")
-          val (a, b) = sl.IR.FoldReduce(output).run()
+          val reducer = new FoldReduce(output)
+          reducer.state = states
+          val (a, b) = reducer.run()
           output = a
           changed |= b
         }

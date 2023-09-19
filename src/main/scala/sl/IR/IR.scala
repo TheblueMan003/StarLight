@@ -280,6 +280,81 @@ case class ScoreboardReset(target: SBLink) extends IRTree{
     def getString(): String = s"scoreboard players reset $target"
 }
 
+trait StorageVariable
+trait StorageValue
+case class StorageStorage(target: String, key: String) extends StorageVariable with StorageValue{
+    override def toString(): String = s"storage ${target} $key"
+}
+case class StorageEntity(target: String, key: String) extends StorageVariable with StorageValue{
+    override def toString(): String = s"entity ${target} $key"
+}
+case class StorageBlock(target: String, key: String) extends StorageVariable with StorageValue{
+    override def toString(): String = s"block ${target} $key"
+}
+
+case class StorageString(value: String) extends StorageValue
+case class StorageScoreboard(key: SBLink, typ: String, scale: Double) extends StorageValue
+
+case class StorageSet(target: StorageVariable, value: StorageValue) extends IRTree{
+    def getString(): String = 
+        value match{
+            case StorageString(value) => s"data modify ${target} set value $value"
+            case StorageStorage(target2, key2) => s"data modify ${target} set from $value"
+            case StorageBlock(target, key) => s"data modify ${target} set from ${value.toString()}"
+            case StorageEntity(target, key) => s"data modify ${target} set from ${value.toString()}"
+            case StorageScoreboard(key2, typ, scale) => f"execute store result ${target} $typ $scale%.5f run scoreboard players get ${key2.toString()}"
+        }
+}
+case class StorageAppend(target: StorageVariable, value: StorageValue) extends IRTree{
+    def getString(): String = 
+        value match{
+            case StorageString(value) => s"data modify ${target} append value $value"
+            case StorageStorage(target, key) => s"data modify ${target} append from $value"
+            case StorageBlock(target, key) => s"data modify ${target} append from ${value.toString()}"
+            case StorageEntity(target, key) => s"data modify ${target} append from ${value.toString()}"
+            case StorageScoreboard(key, typ, scale) => throw new Exception("Cannot append scoreboard value")
+        }
+}
+case class StoragePrepend(target: StorageVariable, value: StorageValue) extends IRTree{
+    def getString(): String = 
+        value match{
+            case StorageString(value) => s"data modify ${target} prepend value $value"
+            case StorageStorage(target, key) => s"data modify ${target} prepend from $value"
+            case StorageBlock(target, key) => s"data modify ${target} prepend from ${value.toString()}"
+            case StorageEntity(target, key) => s"data modify ${target} prepend from ${value.toString()}"
+            case StorageScoreboard(key, typ, scale) => throw new Exception("Cannot prepend scoreboard value")
+        }
+}
+case class StorageMerge(target: StorageVariable, value: StorageValue) extends IRTree{
+    def getString(): String = 
+        value match{
+            case StorageString(value) => s"data modify ${target} merge value $value"
+            case StorageStorage(target, key) => s"data modify ${target} merge from storage $value"
+            case StorageBlock(target, key) => s"data modify ${target} merge from ${value.toString()}"
+            case StorageEntity(target, key) => s"data modify ${target} merge from ${value.toString()}"
+            case StorageScoreboard(key, typ, scale) => f"execute store result ${target} $typ $scale%.5f run scoreboard players get ${key.toString()}"
+        }
+}
+case class StorageRemove(target: StorageVariable, value: StorageValue) extends IRTree{
+    def getString(): String = 
+        value match{
+            case StorageString(value) => s"data modify ${target} remove value $value"
+            case StorageStorage(target, key) => s"data modify ${target} remove from $value"
+            case StorageBlock(target, key) => s"data modify ${target} remove from ${value.toString()}"
+            case StorageEntity(target, key) => s"data modify ${target} remove from ${value.toString()}"
+            case StorageScoreboard(key, typ, scale) => throw new Exception("Cannot remove scoreboard value")
+        }
+}
+case class StorageRead(score: SBLink, target: StorageVariable, scale: Double = 1) extends IRTree{
+    def getString(): String = 
+        target match
+            case StorageStorage(target, key) => f"execute store result score $score run data get $target $scale%.5f"
+            case StorageBlock(target, key) => f"execute store result score $score run data get $target $scale%.5f"
+            case StorageEntity(target, key) => f"execute store result score $score run data get $target $scale%.5f"
+            case StorageScoreboard(key, typ, scale) => throw new Exception("Cannot read scoreboard value")
+}
+
+
 case class BlockCall(function: String, fullName: String, arg: String) extends IRTree{
     def getString(): String = 
         if arg == "" || arg == null then s"function $function"

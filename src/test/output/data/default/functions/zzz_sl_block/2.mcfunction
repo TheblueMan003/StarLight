@@ -1,8 +1,0 @@
-# ==================================================
-# void default.zzz_sl_block.2()
-# a.k.a default.object.__remRef.1
-# ==================================================
-
-scoreboard players operation default.zzz_sl_mux.void___to___void.__fct__ tbms.var = @s default.object.---__destroy__
-execute if score default.zzz_sl_mux.void___to___void.__fct__ tbms.var matches 357358517 run scoreboard players set default.zzz_sl_mux.void___to___void.__fct__ tbms.var 0
-kill

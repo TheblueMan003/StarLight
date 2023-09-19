@@ -847,6 +847,7 @@ object Utils{
             case "in" => BoolType
             case "==" | "<=" | "<" | ">" | ">=" => BoolType
             case "??" => t1
+            case "::" if t1 == JsonType || t2 == JsonType => JsonType
             case "+" | "-" | "*" | "/" | "%" | "^" => {
                 (t1, t2) match
                     case (IntType, IntType) => IntType
@@ -1186,19 +1187,29 @@ object Utils{
         else if value > max then max
         else value
     }
-    def combineJson(elm1: JSONElement, elm2: JSONElement): JSONElement = {
+    def combineJson(op: String, elm1: JSONElement, elm2: JSONElement): JSONElement = {
         if elm1 == JsonNull then elm2
         else if elm2 == JsonNull then elm1
         else
         elm1 match
             case JsonArray(content1) => {
                 elm2 match
-                    case JsonArray(content2) => JsonArray(content1 ::: content2)
+                    case JsonArray(content2) => 
+                        op match
+                            case "::" | "::=" => JsonArray(content1.zipAll(content2, null, null).map((a, b) => if a == null then b else if b == null then a else combineJson(op, a, b)))
+                            case "<:" | "<:=" => JsonArray(content2 ::: content1)
+                            case ">:" | ">:=" => JsonArray(content1 ::: content2)
+                            case "-:" | "-:=" => JsonArray(content1.filterNot(content2.contains(_)))
                     case other => JsonArray(content1 ::: List(other))
             }
             case JsonDictionary(content1) => {
                 elm2 match
-                    case JsonDictionary(content2) => JsonDictionary((content1.toList ++ content2.toList).groupBy(_._1).map((k, value) => (k, if value.length == 1 then value.head._2 else combineJson(value(0)._2, value(1)._2))).toMap)
+                    case JsonDictionary(content2) => 
+                        op match
+                            case "::" | "::=" => JsonDictionary((content1.toList ++ content2.toList).groupBy(_._1).map((k, value) => (k, if value.length == 1 then value.head._2 else combineJson(op, value(0)._2, value(1)._2))).toMap)
+                            case "<:" | "<:=" => JsonDictionary((content2.toList ++ content1.toList).groupBy(_._1).map((k, value) => (k, if value.length == 1 then value.head._2 else combineJson(op, value(0)._2, value(1)._2))).toMap)
+                            case ">:" | ">:=" => JsonDictionary((content1.toList ++ content2.toList).groupBy(_._1).map((k, value) => (k, if value.length == 1 then value.head._2 else combineJson(op, value(0)._2, value(1)._2))).toMap)
+                            case "-:" | "-:=" => JsonDictionary(content1.filterNot(a => content2.contains(a._1)))
                     case _ => throw new Exception(f"Json Element doesn't match ${elm1} vs ${elm2}")
             }
             case other => elm1
@@ -1411,13 +1422,13 @@ object Utils{
     }
 
     def combine(op: String, a: JSONElement, b: JSONElement): JSONElement = {
-        op match
-            case "+" => combineJson(a, b)
+        combineJson(op, a, b)
     }
 
     def combine(op: String, a: String, b: String): String = {
         op match
             case "+" => a + b
+            case "::" => a + b
     }
 
     def combine(op: String, a: Boolean, b: Boolean): Boolean = {
