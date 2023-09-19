@@ -1198,7 +1198,7 @@ object Utils{
                         op match
                             case "::" | "::=" => JsonArray(content1.zipAll(content2, null, null).map((a, b) => if a == null then b else if b == null then a else combineJson(op, a, b)))
                             case "<:" | "<:=" => JsonArray(content2 ::: content1)
-                            case ">:" | ">:=" => JsonArray(content1 ::: content2)
+                            case ">:" | ">:=" | "+" | "+=" => JsonArray(content1 ::: content2)
                             case "-:" | "-:=" => JsonArray(content1.filterNot(content2.contains(_)))
                     case other => JsonArray(content1 ::: List(other))
             }
@@ -1208,7 +1208,7 @@ object Utils{
                         op match
                             case "::" | "::=" => JsonDictionary((content1.toList ++ content2.toList).groupBy(_._1).map((k, value) => (k, if value.length == 1 then value.head._2 else combineJson(op, value(0)._2, value(1)._2))).toMap)
                             case "<:" | "<:=" => JsonDictionary((content2.toList ++ content1.toList).groupBy(_._1).map((k, value) => (k, if value.length == 1 then value.head._2 else combineJson(op, value(0)._2, value(1)._2))).toMap)
-                            case ">:" | ">:=" => JsonDictionary((content1.toList ++ content2.toList).groupBy(_._1).map((k, value) => (k, if value.length == 1 then value.head._2 else combineJson(op, value(0)._2, value(1)._2))).toMap)
+                            case ">:" | ">:=" | "+" | "+=" => JsonDictionary((content1.toList ++ content2.toList).groupBy(_._1).map((k, value) => (k, if value.length == 1 then value.head._2 else combineJson(op, value(0)._2, value(1)._2))).toMap)
                             case "-:" | "-:=" => JsonDictionary(content1.filterNot(a => content2.contains(a._1)))
                     case _ => throw new Exception(f"Json Element doesn't match ${elm1} vs ${elm2}")
             }
