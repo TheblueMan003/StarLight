@@ -11,4 +11,3 @@ scoreboard objectives add tbms.var dummy
 # 
 #  =================USER SCOREBOARD==================
 #  
-scoreboard objectives add default.test.x dummy
