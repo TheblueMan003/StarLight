@@ -230,6 +230,13 @@ object Compiler{
                                     vari.generate()
                                 })
                             }
+                            case LinkedVariableValue(vari, selector) if vari.tupleVari.size == names.size => {
+                                names.zip(vari.tupleVari.map(_.getType())).map((name, typ2) => {
+                                    val vari = new Variable(context, name, context.getType(typ2), modifier)
+                                    context.addVariable(vari)
+                                    vari.generate()
+                                })
+                            }
                             case other => {
                                 val typ = Utils.typeof(other)
                                 names.map(name => {
@@ -335,6 +342,11 @@ object Compiler{
                                 }
                             case VariableValue(name, sel) => {
                                 val vari = context.getVariable(name) 
+                                vari.getType() match
+                                    case TupleType(sub) => varis.zip(vari.tupleVari).flatMap(p => p._1._1.assign(op, LinkedVariableValue(p._2, sel))(context, p._1._2))
+                                    case _ => varis.flatMap(l => l._1.assign(op, simplied)(context, l._2))
+                            }
+                            case LinkedVariableValue(vari, sel) => {
                                 vari.getType() match
                                     case TupleType(sub) => varis.zip(vari.tupleVari).flatMap(p => p._1._1.assign(op, LinkedVariableValue(p._2, sel))(context, p._1._2))
                                     case _ => varis.flatMap(l => l._1.assign(op, simplied)(context, l._2))

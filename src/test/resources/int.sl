@@ -454,3 +454,41 @@ Test ternary_operator_nested{
         return (result == a)
     }
 }
+
+Test tuple_unpacking_ints{
+    def bool getResult(){
+        (int, int) tuple = (5, 10)
+        int a, b = tuple
+        return (a == 5) && (b == 10)
+    }
+}
+
+Test tuple_unpacking_floats{
+    def bool getResult(){
+        (float, float) tuple = (3.14, 2.718)
+        float x, y = tuple
+        return (x == 3.14) && (y == 2.718)
+    }
+}
+
+Test tuple_unpacking_mixed_types{
+    def bool getResult(){
+        (int, float) tuple = (42, 3.14)
+        int a
+        float b
+        a, b = tuple
+        return (a == 42) && (b == 3.14)
+    }
+}
+
+Test tuple_unpacking_nested_tuples{
+    def bool getResult(){
+        ((int, int), (float, float)) tuple = ((1, 2), (3.14, 2.718))
+        int a, b
+        float x, y
+        var c,d = tuple
+        a, b = c
+        x, y = d
+        return (a == 1) && (b == 2) && (x == 3.14) && (y == 2.718)
+    }
+}

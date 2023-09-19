@@ -243,3 +243,50 @@ Test ne_int{
     }
 }
 
+
+
+Test float_addition {
+    def bool getResult(){
+        float a = 3.456
+        float b = 2.345
+        float result = a + b
+        return (result == 5.801)
+    }
+}
+
+Test float_subtraction {
+    def bool getResult(){
+        float a = 8.721
+        float b = 1.234
+        float result = a - b
+        return (result == 7.487)
+    }
+}
+
+Test float_multiplication {
+    def bool getResult(){
+        float a = 2.345
+        float b = 3.456
+        float result = a * b
+        return (result == 8.103)
+    }
+}
+
+Test float_division {
+    def bool getResult(){
+        float a = 9.876
+        float b = 3.456
+        float result = a / b
+        return (result == 2.857)
+    }
+}
+
+Test float_mixed_operations {
+    def bool getResult(){
+        float a = 4.321
+        float b = 1.234
+        float c = 5.678
+        float result = ((a + b) * c) / b
+        return (result == 23.145)
+    }
+}
