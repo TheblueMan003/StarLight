@@ -356,9 +356,42 @@ object DefaultFunction{
             (args: List[Expression],ctx: Context) => {
                 args match{
                     case JsonValue(value)::Nil => {
-                        (List(), StringValue(Utils.compileJson(value).getNbt()))
+                        val compiled = Utils.compileJson(value)
+                        var nbt = compiled.getNbt()
+                        (List(), StringValue(nbt))
                     }
                     case other => throw new Exception(f"Illegal Arguments $other for toNBT")
+                }
+            }
+        ))
+
+        ctx.addFunction("opNBT", CompilerFunction(ctx, "opNBT", 
+            List(Argument("op", StringType, None), Argument("vari", MCObjectType, None)),
+            VoidType,
+            Modifier.newPublic(),
+            (args: List[Expression],ctx: Context) => {
+                args match{
+                    case StringValue(op) :: JsonValue(value)::Nil => {
+                        val compiled = Utils.compileJson(value)
+                        var nbt = ""
+                        var lst = List[IRTree]()
+                        try{
+                            nbt = "value "+compiled.getNbt()
+                        }
+                        catch{
+                            _ => {
+                                val vari = ctx.getFreshVariable(JsonType)
+                                nbt = f"from ${vari.getStorage()}"
+                                lst = vari.assign("=", JsonValue(compiled))
+                            }
+                        }
+
+                        (lst ::: List(CommandIR(f"data $op $nbt")), NullValue)
+                    }
+                    case StringValue(op) :: LinkedVariableValue(vari, sel) :: Nil =>{
+                        (List(CommandIR(f"data $op from ${vari.getStorage()(ctx, sel)}")), NullValue)
+                    }
+                    case other => throw new Exception(f"Illegal Arguments $other for opNBT")
                 }
             }
         ))

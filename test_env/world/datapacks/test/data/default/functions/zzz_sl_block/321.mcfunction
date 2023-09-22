@@ -1,11 +1,10 @@
 # ==================================================
 # void default.zzz_sl_block.321()
-# a.k.a default.test.TestRunner.stop.1
+# a.k.a default.cmd.schedule.240.__lambda__
 # ==================================================
 
-tellraw @a [{"text": "=============[Test Completed]=============", "bold":"false","obfuscated":"false","strikethrough":"false","underlined":"false","italic":"false", "color":"gold"}]
-tellraw @a [{"text": ">> Total: ", "bold":"false","obfuscated":"false","strikethrough":"false","underlined":"false","italic":"false", "color":"white"},{"score": { "name": "default.test.__total__", "objective": "tbms.var"}, "bold":"false","obfuscated":"false","strikethrough":"false","underlined":"false","italic":"false", "color":"white"}]
-tellraw @a [{"text": ">> Passed: ", "bold":"false","obfuscated":"false","strikethrough":"false","underlined":"false","italic":"false", "color":"white"},{"score": { "name": "default.test.__pass__", "objective": "tbms.var"}, "bold":"false","obfuscated":"false","strikethrough":"false","underlined":"false","italic":"false", "color":"white"}]
-tellraw @a [{"text": ">> Failled: ", "bold":"false","obfuscated":"false","strikethrough":"false","underlined":"false","italic":"false", "color":"white"},{"score": { "name": "default.test.__fail__", "objective": "tbms.var"}, "bold":"false","obfuscated":"false","strikethrough":"false","underlined":"false","italic":"false", "color":"white"}]
-scoreboard players set default.test.TestRunner.enabled tbms.var 0
-scoreboard players set default.test.TestRunner.callback tbms.var 0
+schedule function default:int/addition_value/crash 1 append
+execute unless score default.int.addition_value.enabled tbms.var matches 0 run function default:int/addition_value/main
+schedule clear default:int/addition_value/crash
+scoreboard players set default.int.addition_value.crashCount tbms.var 0
+execute unless score default.int.addition_value.enabled tbms.var matches 0 run schedule function default:zzz_sl_block/321 1 append

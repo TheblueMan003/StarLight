@@ -348,7 +348,15 @@ case class SelectorIdentifier(val value: String) extends SelectorFilterValue{
     }
     override def subst(from: String, to: String): SelectorFilterValue = SelectorIdentifier(value.replaceAll(from, to))
 }
-
+case class SelectorTag(val value: Identifier) extends SelectorFilterValue{
+    override def getString()(implicit context: Context): String = {
+        context.getBlockTag(value).getTag()
+    }
+    override def fix(implicit context: Context, ignore: Set[Identifier]): SelectorFilterValue = {
+        SelectorIdentifier(context.getBlockTag(value).getTag())
+    }
+    override def subst(from: String, to: String): SelectorFilterValue = SelectorTag(Identifier.fromString(value.toString().replaceAll(from, to)))
+}
 case class SelectorNbt(val value: JSONElement) extends SelectorFilterValue{
     override def getString()(implicit context: Context): String = value.getNbt()
     override def fix(implicit context: Context, ignore: Set[Identifier]): SelectorFilterValue = this

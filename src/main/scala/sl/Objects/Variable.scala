@@ -49,6 +49,8 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 
 	def canBeReduceToLazyValue = modifiers.isLazy && !getType().isInstanceOf[StructType]
 
+	override def toString(): String = f"$modifiers ${getType()} $fullName"
+
 	def withKey(key: String)={
 		val vari = Variable(context, name, typ, _modifier)
 		vari.jsonArrayKey = key
@@ -161,8 +163,8 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 
 
 
-	def assign(op: String, value: Expression)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
-		if (modifiers.isConst && wasAssigned) throw new Exception(f"Cannot reassign variable $fullName at \n${value.pos.longString}")
+	def assign(op: String, value: Expression, allowReassign: Boolean = true)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
+		if (modifiers.isConst && wasAssigned && !allowReassign) throw new Exception(f"Cannot reassign variable $fullName at \n${value.pos.longString}")
 		val ret = if (modifiers.isLazy){
 			getType() match{
 				case StructType(struct, sub) => {
@@ -430,7 +432,10 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			}
 		}
 		else if (Settings.target == MCJava){
-			Execute.makeExecute(checkNull, assign("=", expr))
+			getType() match
+				case TupleType(_) => Execute.makeExecute(checkNull, assign("=", expr) ::: assign("=", CastValue(IntValue(1), getType())))
+				case StructType(_, _) => Execute.makeExecute(checkNull, assign("=", expr) ::: assign("=", CastValue(IntValue(1), getType())))
+				case _ => Execute.makeExecute(checkNull, assign("=", expr))
 		}
 		else{
 			???
@@ -614,20 +619,36 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 		op match{
 			case "=" =>
 				valueE match{
-					case StringValue(value) => List(StringSet(getIRSelector(), value))
+					case StringValue(value) => 
+						List(StringSet(getStorage(), Utils.stringify(value)))
 					case ArrayGetValue(name, List(RangeValue(IntValue(min), IntValue(max), IntValue(1)))) => {
 						val (prev,vari) = Utils.simplifyToVariable(name)
-						prev ::: List(StringCopy(getIRSelector(), vari.vari.getIRSelector(), min, max))
+						prev ::: List(StringCopy(getStorage(), vari.vari.getStorage(), min, max))
 					}
 					case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 					case LinkedVariableValue(vari, selector) => {
 						vari.getType() match
-							case StringType => List(StringCopy(getIRSelector(), vari.getIRSelector()(selector)))
-							case other => throw new Exception(f"Cannot assign string to $other at \n${valueE.pos.longString}")
+							case StringType => List(StringCopy(getStorage(), vari.getStorage()(context, selector)))
+							case other => handleFunctionCall("=", VariableValue("__string_cast__"), List(LinkedVariableValue(vari, selector)), List(), Selector.self)
+							//case other => throw new Exception(f"Cannot assign $other to string at \n${valueE.pos.longString}")
 					}
-					case DefaultValue => List(StringSet(getIRSelector(), ""))
-					case _ => throw new Exception(f"Unknown cast to string: $valueE at \n${valueE.pos.longString}")
+					case DefaultValue => List(StringSet(getStorage(), Utils.stringify("")))
+					case JsonValue(JsonString(value)) => List(StringSet(getStorage(), Utils.stringify(value)))
+					case other => 
+						handleFunctionCall("=", VariableValue("__string_cast__"), List(other), List(), Selector.self)
 				}
+			case "+=" => {
+				valueE match{
+					case StringValue(value) => handleFunctionCall("=", VariableValue("__string_concat__"), List(LinkedVariableValue(this), StringValue(value)), List(), Selector.self)
+					case LinkedVariableValue(vari, selector) => {
+						handleFunctionCall("=", VariableValue("__string_concat__"), List(LinkedVariableValue(this), LinkedVariableValue(vari, selector)), List(), Selector.self)
+					}
+					case _ => {
+						val vari = context.getFreshVariable(StringType)
+						vari.assign("=", valueE) ::: assign("+=", LinkedVariableValue(vari))
+					}
+				}
+			}
 			case other => throw new Exception(f"Cannot assign use op: $other with int at \n${valueE.pos.longString}")
 		}
 	}
@@ -679,6 +700,14 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 										}
 								case other => assign(op, FunctionCallValue(VariableValue(vari.fullName+".get"), index, List()))
 							}
+						}
+						case TupleType(sub) => {
+							index match
+								case List(IntValue(i)) => assign(op, LinkedVariableValue(vari.tupleVari(i)))
+								case index::Nil => 
+									val id=Identifier.fromString("key")
+									Compiler.compile(Switch(index, List(SwitchForEach(id, RangeValue(IntValue(0), IntValue(sub.size-1), IntValue(1)), SwitchCase(VariableValue(id), VariableAssigment(List((Right(this), sel)), op, ArrayGetValue(LinkedVariableValue(vari), List(VariableValue(id)))), BoolValue(true))))))
+								case other => throw new Exception(f"Cannot use $other as index for tuple")
 						}
 						case other => assign(op, FunctionCallValue(VariableValue(vari.fullName+".__get__"), index, List()))
 				}
@@ -1231,7 +1260,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 	}
 
 	def getStorage(keya: String = "json")(implicit context: Context, selector: Selector = Selector.self) = {
-		val key = if jsonArrayKey != "json" then jsonArrayKey else keya
+		val key = if keya != "json" then jsonArrayKey else keya
 		if (modifiers.isEntity){
 			StorageEntity(getSelector().toString(), if (key.startsWith("json."))then key.substring(5) else key)
 		}
@@ -1252,11 +1281,66 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 		value match
 			case JsonValue(json) => 
 				op match{
-					case "=" => List(StorageSet(getStorage(keya), StorageString(json.getNbt())))
-					case ">:=" => List(StorageAppend(getStorage(keya), StorageString(json.getNbt())))
-					case "<:=" => List(StoragePrepend(getStorage(keya), StorageString(json.getNbt())))
-					case "::=" => List(StorageMerge(getStorage(keya), StorageString(json.getNbt())))
-					case "-:=" => List(StorageRemove(getStorage(keya), StorageString(json.getNbt())))
+					case "=" => {
+						try{
+							List(StorageSet(getStorage(keya), StorageString(json.getNbt())))
+						}
+						catch{
+							_ => {
+								val vari = context.getFreshVariable(JsonType)
+								val a = json.forceNBT()(vari, "json", context)
+								vari.assign("=", JsonValue(a._2)) ::: a._1 ::: List(StorageSet(getStorage(keya), vari.getStorage()))
+							}
+						}
+					}
+					case ">:=" => {
+						try{
+							List(StorageAppend(getStorage(keya), StorageString(json.getNbt())))
+						}
+						catch{
+							_ => {
+								val vari = context.getFreshVariable(JsonType)
+								val a = json.forceNBT()(vari, "json", context)
+								vari.assign("=", JsonValue(a._2)) ::: a._1 ::: List(StorageAppend(getStorage(keya), vari.getStorage()))
+							}
+						}
+					}
+					case "<:=" => {
+						try{
+							List(StoragePrepend(getStorage(keya), StorageString(json.getNbt())))
+						}
+						catch{
+							_ => {
+								val vari = context.getFreshVariable(JsonType)
+								val a = json.forceNBT()(vari, "json", context)
+								vari.assign("=", JsonValue(a._2)) ::: a._1 ::: List(StoragePrepend(getStorage(keya), vari.getStorage()))
+							}
+						}
+					}
+					case "::=" => {
+						try{
+							List(StorageMerge(getStorage(keya), StorageString(json.getNbt())))
+						}
+						catch{
+							_ => {
+								val vari = context.getFreshVariable(JsonType)
+								val a = json.forceNBT()(vari, "json", context)
+								vari.assign("=", JsonValue(a._2)) ::: a._1 ::: List(StorageMerge(getStorage(keya), vari.getStorage()))
+							}
+						}
+					}
+					case "-:=" => {
+						try{
+							List(StorageRemove(getStorage(keya), StorageString(json.getNbt())))
+						}
+						catch{
+							_ => {
+								val vari = context.getFreshVariable(JsonType)
+								val a = json.forceNBT()(vari, "json", context)
+								vari.assign("=", JsonValue(a._2)) ::: a._1 ::: List(StorageRemove(getStorage(keya), vari.getStorage()))
+							}
+						}
+					}
 					case other => throw new Exception(f"Illegal operation with json ${name}: $op at \n${value.pos.longString}")
 				}
 			case DefaultValue => List(StorageSet(getStorage(keya), StorageString("")))
@@ -1343,7 +1427,16 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			case SequenceValue(left, right) => {
 				Compiler.compile(left):::assignJson(op, right, key)
 			}
-			case IntValue(_) | FloatValue(_) | StringValue(_) | BoolValue(_) => 
+			case StringValue(str) => 
+				op match{
+					case "=" => List(StorageSet(getStorage(keya), StorageString(Utils.stringify(str))))
+					case ">:=" => List(StorageAppend(getStorage(keya), StorageString(Utils.stringify(str))))
+					case "<:=" => List(StoragePrepend(getStorage(keya), StorageString(Utils.stringify(str))))
+					case "::=" => List(StorageMerge(getStorage(keya), StorageString(Utils.stringify(str))))
+					case "-:=" => List(StorageRemove(getStorage(keya), StorageString(Utils.stringify(str))))
+					case other => jsonUnpackedOperation(op, value, key)
+				}
+			case IntValue(_) | FloatValue(_) | BoolValue(_) => 
 				op match{
 					case "=" => List(StorageSet(getStorage(keya), StorageString(value.getString())))
 					case ">:=" => List(StorageAppend(getStorage(keya), StorageString(value.getString())))
@@ -1371,7 +1464,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 
 	def jsonUnpackedOperation(op: String, value: Expression, keya: String = "json")(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		value match
-			case BinaryOperation("+" | "*", left, right) if Utils.typeof(right) == JsonType && Utils.typeof(left) != JsonType => {
+			case BinaryOperation("+" | "*", left, right) if Utils.typeof(right) == JsonType && Utils.typeof(left) != JsonType && Utils.typeof(left) != StringType => {
 				jsonUnpackedOperation(op, BinaryOperation(op, right, left), keya)
 			}
 			case BinaryOperation(op, left, right) if Utils.typeof(right) == JsonType && Utils.typeof(left) != JsonType => {
@@ -1657,8 +1750,9 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 }
 
 class PropertySetVariable(context: Context, getter: Function, setter: Function, variable: Variable) extends Variable(context, "", VoidType, Modifier.newPublic()){
-	override def assign(op: String, value: Expression)(implicit context: Context, selector: Compilation.Selector.Selector): List[IRTree] = {
+	override def assign(op: String, value: Expression, allowReassign: Boolean = true)(implicit context: Context, selector: Compilation.Selector.Selector): List[IRTree] = {
 		if (op == ":=") throw new Exception("Operator not supported for Properties")
+		if (setter == null) throw new Exception("Cannot assign to a read-only property")
 		if (op == "="){
 			if (selector != Selector.self){
 				Compiler.compile(With(SelectorValue(selector), BoolValue(true), BoolValue(true), LinkedFunctionCall(setter, List(value)), null))

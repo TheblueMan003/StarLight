@@ -5,28 +5,34 @@ import sl._
 
 object CacheAST{
     val map = scala.collection.mutable.Map[String, CacheLine]()
-    def contains(file: String)={
-        if (new File(file).exists()){
-            map.contains(file) && new File(map(file).file).exists && new File(file).lastModified() <= map(file).lastWriteTime
+    def contains(file2: String)={
+        val file = normalize(file2)
+        if (!map.contains(file)) false
+        else if (File(file+".sl").exists() && File(file+".sl").lastModified() == map(file).time) true
+        else if (File("src/"+file+".sl").exists() && File("src/"+file+".sl").lastModified() == map(file).time) true
+        else if (file2 == "__init__") true
+        else false
+    }
+    def get(file2: String)={
+        val file = normalize(file2)
+        map(file).file
+    }
+    def add(file2: String, instr: Instruction)={
+        val file = normalize(file2)
+        if (File(file+".sl").exists()){
+            map(file) = CacheLine(File(file+".sl").lastModified(), instr)
+        }
+        else if (File("src/"+file+".sl").exists()){
+            map(file) = CacheLine(File("src/"+file+".sl").lastModified(), instr)
         }
         else{
-            map.contains(file) && new File(map(file).file).exists
+            map(file) = CacheLine(0, instr)
         }
     }
-    def get(file: String)={
-        val filename = map(file).file
-        val ois = new ObjectInputStream(new FileInputStream(filename))
-        val obj = ois.readObject.asInstanceOf[Instruction]
-        ois.close
-        obj
-    }
-    def add(file: String, instr: Instruction)={
-        val filename = "./bin/" + file.replace(".sl", "")+".slbin"
-        FileUtils.createFolderForFiles(new File(filename))
-        val oos = new ObjectOutputStream(new FileOutputStream(filename))
-        oos.writeObject(instr)
-        oos.close
-        map(file) = CacheLine(new File(file).lastModified(), filename)
+    def normalize(name: String):String={
+        if name.endsWith(".sl") then normalize(name.substring(0, name.size - 3))
+        else if name.startsWith("./") || name.startsWith(".\\") then normalize(name.substring(2))
+        else name.replace(".", "/").replace("\\", "/")
     }
 }
-case class CacheLine(lastWriteTime: Long, file: String)
+case class CacheLine(time: Long, file: Instruction)

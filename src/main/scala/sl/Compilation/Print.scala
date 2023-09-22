@@ -51,7 +51,10 @@ object Print{
                         toRawJson(LinkedVariableValue(vari, sel))
                     }
                     case None => {
-                        ???
+                        val vari = ctx.getFreshVariable(Utils.typeof(expr))
+                        val upCal = vari.assign("=", expr)
+                        val (a,b) = toRawJson(LinkedVariableValue(vari))
+                        (upCal:::a, b)
                     }
             }
             case ArrayGetValue(name, index) => {
@@ -99,6 +102,7 @@ object Print{
                             (upCal ::: digit1Cal ::: digit2Cal ::: digit3Cal, leftPrint._2 ::: rightPrint)
                         }
                         case StringType => (List(), List(PrintNBT(vari, col, mod)))
+                        case JsonType => (List(), List(PrintNBT(vari, col, mod)))
                         case EntityType => (List(), List(PrintSelector(vari.getEntityVariableSelector(), col, mod)))
                         case other => (List(), List(PrintVariable(vari, sel, col, mod)))
                 }
@@ -274,7 +278,7 @@ case class PrintSelector(val selector: Selector, val color: PrintColor, val modi
 }
 case class PrintNBT(val vari: Variable, val color: PrintColor, val modifier: TextModdifier) extends Printable{
     def toJava()(implicit ctx: Context): String = 
-        f"{\"nbt\": \"${vari.getSelectorName()}\", \"storage\":\"${vari.getSelectorObjective().replaceFirst("\\.",":")}\",${modifier.toJava()}, ${color.toJava()}}"
+        f"{\"nbt\": \"${vari.jsonArrayKey}\", \"storage\":\"${vari.getSelectorObjective().replaceFirst("\\.",":")}\",${modifier.toJava()}, ${color.toJava()}}"
     def toBedrock()(implicit ctx: Context): String = {
         ???
     }

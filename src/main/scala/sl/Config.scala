@@ -25,6 +25,21 @@ object ConfigLoader{
         "bedrock_resourcepack/sounds",
         "resources"
     )
+    def loadVersion(value: String): PackVersion = {
+        Parser.parseExpression(value, true) match
+            case IntValue(value) => SinglePackVersion(value)
+            case RangeValue(IntValue(min), IntValue(max), IntValue(1)) => RangedPackVersion(min, max)
+            case JsonValue(JsonArray(lst)) => {
+                ListPackVersion(lst.map{
+                    _ match
+                        case JsonInt(value, typ) => value
+                        case JsonExpression(IntValue(value), typ) => value
+                        case other => throw new Exception(f"Illegal Version format: $other")
+                })
+            }
+            case other => throw new Exception(f"Illegal Version format: $other")
+        
+    }
     def load(path: String)={
         Settings = SettingsContext()
 
@@ -46,22 +61,22 @@ object ConfigLoader{
                     case ("scoreboard.do_hash", value) => Settings.hashedScoreboard = value == "true"
 
                     case ("mc.java.datapack.path", value)              => Settings.java_datapack_output = value.split(";").toList
-                    case ("mc.java.datapack.version", value)           => Settings.java_datapack_version.version = value.toInt
+                    case ("mc.java.datapack.version", value)           => Settings.java_datapack_version.version = loadVersion(value)
                     case ("mc.java.datapack.description", value)       => Settings.java_datapack_version.description = value
                     case ("mc.java.datapack.min_engine_version", value)=> Settings.java_datapack_version.min_engine_version = value.split(raw"\.").map(_.toInt).toList
                     
                     case ("mc.java.resourcepack.path", value)              => Settings.java_resourcepack_output = value.split(";").toList
-                    case ("mc.java.resourcepack.version", value)           => Settings.java_resourcepack_version.version = value.toInt
+                    case ("mc.java.resourcepack.version", value)           => Settings.java_resourcepack_version.version = loadVersion(value)
                     case ("mc.java.resourcepack.description", value)       => Settings.java_resourcepack_version.description = value
                     case ("mc.java.resourcepack.min_engine_version", value)=> Settings.java_resourcepack_version.min_engine_version = value.split(raw"\.").map(_.toInt).toList
 
                     case ("mc.bedrock.behaviorpack.path", value)              => Settings.bedrock_behaviorpack_output = value.split(";").toList
-                    case ("mc.bedrock.behaviorpack.version", value)           => Settings.bedrock_behaviorpack_version.version = value.toInt
+                    case ("mc.bedrock.behaviorpack.version", value)           => Settings.bedrock_behaviorpack_version.version = loadVersion(value)
                     case ("mc.bedrock.behaviorpack.description", value)       => Settings.bedrock_behaviorpack_version.description = value
                     case ("mc.bedrock.behaviorpack.min_engine_version", value)=> Settings.bedrock_behaviorpack_version.min_engine_version = value.split(raw"\.").map(_.toInt).toList
 
                     case ("mc.bedrock.resourcepack.path", value)              => Settings.bedrock_resourcepack_output = value.split(";").toList
-                    case ("mc.bedrock.resourcepack.version", value)           => Settings.bedrock_resourcepack_version.version = value.toInt
+                    case ("mc.bedrock.resourcepack.version", value)           => Settings.bedrock_resourcepack_version.version = loadVersion(value)
                     case ("mc.bedrock.resourcepack.description", value)       => Settings.bedrock_resourcepack_version.description = value
                     case ("mc.bedrock.resourcepack.min_engine_version", value)=> Settings.bedrock_resourcepack_version.min_engine_version = value.split(raw"\.").map(_.toInt).toList
 

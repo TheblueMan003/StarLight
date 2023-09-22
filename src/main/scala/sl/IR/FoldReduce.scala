@@ -25,6 +25,9 @@ class FoldReduce(var files: List[IRFile]){
             case IfScoreboard(left, "<=" | "<", right, ScoreboardOperation(sb1, "=", sb3), false) if left == sb3 && right == sb1 => {
                 ScoreboardOperation(sb1, "<", sb3)
             }
+            case StorageSet(left, right) if left == right => {
+                EmptyIR
+            }
             case e @ ExecuteIR(block, statement) => {
                 e.withStatements(map(e.getStatements))
             }

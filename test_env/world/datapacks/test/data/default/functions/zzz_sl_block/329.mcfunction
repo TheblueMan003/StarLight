@@ -1,7 +1,10 @@
 # ==================================================
 # void default.zzz_sl_block.329()
-# a.k.a default.utils.process_manager.show.6
+# a.k.a default.cmd.schedule.246.__lambda__
 # ==================================================
 
-tellraw @a [{"text": " [??] default.test.TestRunner.__count__", "bold":"false","obfuscated":"false","strikethrough":"false","underlined":"false","italic":"false", "color":"yellow"}]
-scoreboard players add default.utils.process_manager.show.unknown tbms.var 1
+schedule function default:int/multi_variable/crash 1 append
+execute unless score default.int.multi_variable.enabled tbms.var matches 0 run function default:int/multi_variable/main
+schedule clear default:int/multi_variable/crash
+scoreboard players set default.int.multi_variable.crashCount tbms.var 0
+execute unless score default.int.multi_variable.enabled tbms.var matches 0 run schedule function default:zzz_sl_block/329 1 append

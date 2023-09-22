@@ -1,13 +1,7 @@
 # ==================================================
 # void default.zzz_sl_block.333()
-# a.k.a default.test.__init__
+# a.k.a default.int.addition_variable.getResult-0.2
 # ==================================================
 
-scoreboard players set default.test.__pass__ tbms.var 0
-scoreboard players set default.test.__fail__ tbms.var 0
-scoreboard players set default.test.__total__ tbms.var 0
-execute unless score default.test.TestRunner.enabled tbms.var = default.test.TestRunner.enabled tbms.var run scoreboard players set default.test.TestRunner.enabled tbms.var 0
-execute unless score default.test.TestRunner.crashCount tbms.var = default.test.TestRunner.crashCount tbms.var run scoreboard players set default.test.TestRunner.crashCount tbms.var 0
-execute unless score default.test.TestRunner.callback tbms.var = default.test.TestRunner.callback tbms.var run scoreboard players set default.test.TestRunner.callback tbms.var 0
-execute unless score default.test.TestRunner.index tbms.var = default.test.TestRunner.index tbms.var run scoreboard players set default.test.TestRunner.index tbms.var 0
-execute unless score default.test.TestRunner.running tbms.var = default.test.TestRunner.running tbms.var run scoreboard players set default.test.TestRunner.running tbms.var 0
+scoreboard players set default.int.addition_variable.getResult-0._0 tbms.var 1
+scoreboard players set default.int.addition_variable.getResult-0._ret tbms.var 1

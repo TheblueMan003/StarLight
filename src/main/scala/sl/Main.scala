@@ -148,6 +148,17 @@ object Main{
             Downloader.clearCache()
             Reporter.ok("Cache cleared!")
           }
+          case "updateconfig" => {
+            if (args.length != 2) then {
+              Reporter.error(f"Expected 1 argument got: ${args.length-1}")
+            }
+            else{
+              lastBuild = args(1)+".slconf"
+              ConfigLoader.load(lastBuild)
+              ConfigLoader.get(lastBuild)
+              Reporter.ok("Configuration Updated!")
+            }
+          }
           case ">" | "show" => {
             if (args.length != 2) then {
               Reporter.error(f"Expected 1 argument got: ${args.length-1}")
@@ -197,6 +208,7 @@ object Main{
             println("help: Show this")
             println("install <library> [version]: Install a library into the local project. If version is not specified, the latest version will be installed. Note that standard libraries are downloaded automatically when needed.")
             println("update <library>: Update a library into the local project.")
+            println("updateconfig <config_name>: Update the config file contains in the file config_name (Add the new field from new version). The .slconf must be omited.")
             println("clearcache: Clear the caches of the compiler")
             println("tree: Print the tree of the last compilation")
             println("show <file>: Print the IR of the last compilation")
@@ -305,6 +317,7 @@ object Main{
     compile("_", sourceFromArg(args, "-i"), List(), List(), List(getArg(args, "-o")))
   }
   def compile(script: String, inputs: List[String], dataInput: List[String],resourceInput: List[String], outputs: List[String]): Context = {
+    Utils.preloadAll()
     val start = LocalDateTime.now()
     var files = FileUtils.getFiles(inputs)
 

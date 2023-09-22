@@ -8,7 +8,7 @@ scoreboard objectives add tbms.var dummy
 # 
 #  ====================CONSTANTS=====================
 #  
-scoreboard players set c2 tbms.const 2
+scoreboard players set c1000 tbms.const 1000
 # 
 #  =================USER SCOREBOARD==================
 #  

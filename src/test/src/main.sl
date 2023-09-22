@@ -1,7 +1,11 @@
 package test
 
-from cmd import _
+import cmd.java.data as data
 
+import standard::print
+
+string a = "hello"
 def lol(){
-    effect.strength()
+    a += " world"
+    print(a)
 }

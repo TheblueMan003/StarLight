@@ -17,6 +17,14 @@ case object BlockTag extends TagType{
         fullName.replaceFirst("\\.", ".tags.blocks.")
 
 }
+case object ItemTag extends TagType{
+    override def path(fullName: String): String = 
+        fullName.replaceFirst("\\.", ".tags.items.")
+}
+case object EntityTag extends TagType{
+    override def path(fullName: String): String = 
+        fullName.replaceFirst("\\.", ".tags.entity_types.")
+}
 class Tag(context: Context, _name: String, _modifier: Modifier, _content: List[Expression], typ: TagType) extends CObject(context, _name, _modifier){
     val content = _content
     def exists(): Boolean = Settings.target == MCJava

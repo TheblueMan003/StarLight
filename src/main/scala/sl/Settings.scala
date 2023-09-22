@@ -5,7 +5,17 @@ import java.util.Random
 import objects.types.VoidType
 import sl.IR.*
 
-case class PackInfo(var version: Int, var description: String, var min_engine_version: List[Int])
+trait PackVersion
+case class RangedPackVersion(min: Int, max: Int) extends PackVersion{
+    override def toString(): String = f"{\"min_inclusive\": $min, \"max_inclusive\": $max}"
+}
+case class ListPackVersion(lst: List[Int]) extends PackVersion{
+    override def toString(): String = lst.mkString("[", ",", "]")
+}
+case class SinglePackVersion(value: Int) extends PackVersion{
+    override def toString(): String = value.toString()
+}
+case class PackInfo(var version: PackVersion, var description: String, var min_engine_version: List[Int])
 class SettingsContext(){
     var name = "default"
     var author = "user"
@@ -21,11 +31,11 @@ class SettingsContext(){
     var outputName = "default"
     var hashedScoreboard = false
 
-    var java_datapack_version = PackInfo(15, "Made With StarLight", List(1,19,3))
-    var java_resourcepack_version = PackInfo(15, "Made With StarLight", List(1,19,3))
+    var java_datapack_version = PackInfo(SinglePackVersion(18), "Made With StarLight", List(1,19,3))
+    var java_resourcepack_version = PackInfo(SinglePackVersion(18), "Made With StarLight", List(1,19,3))
 
-    var bedrock_behaviorpack_version = PackInfo(2, "Made With StarLight", List(1,19,50))
-    var bedrock_resourcepack_version = PackInfo(2, "Made With StarLight", List(1,19,50))
+    var bedrock_behaviorpack_version = PackInfo(SinglePackVersion(2), "Made With StarLight", List(1,19,50))
+    var bedrock_resourcepack_version = PackInfo(SinglePackVersion(2), "Made With StarLight", List(1,19,50))
 
     var java_datapack_output = List("./output/java_datapack")
     var java_resourcepack_output = List("./output/java_resourcepack")

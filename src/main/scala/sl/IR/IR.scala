@@ -1,5 +1,7 @@
 package sl.IR
 
+import objects.Variable
+
 trait IRTree{
     var canBeDeleted = false
     def getString(): String
@@ -31,10 +33,7 @@ case class SBLink(entity: String, objective: String) extends IRTree{
 }
 
 case class CommandIR(statement: String) extends IRTree{
-    def getString(): String = {
-        if statement.contains("$") then "$"+statement
-        else statement
-    }
+    def getString(): String = statement
 }
 case object EmptyLineIR extends IRTree{
     def getString(): String = ""
@@ -254,25 +253,6 @@ case class ScoreboardSet(target: SBLink, value: Int) extends IRTree{
 case class ScoreboardAdd(target: SBLink, value: Int) extends IRTree{
     def getString(): String = if (value >= 0){s"scoreboard players add $target $value"}else{s"scoreboard players remove $target ${-value}"}
 }
-case class StringSet(target: SBLink, value: String) extends IRTree{
-    def getString(): String = s"data modify storage ${target.getStorage()} set value $value"
-}
-case class StringCopy(target: SBLink, value: SBLink, start: Int = Int.MinValue, end: Int = Int.MaxValue) extends IRTree{
-    def getString(): String = {
-        if (start == Int.MinValue && end == Int.MaxValue){
-            s"data modify storage ${target.getStorage()} set string storage ${value.getStorage()}"    
-        }
-        else if (end == Int.MaxValue){
-            s"data modify storage ${target.getStorage()} set string storage ${value.getStorage()} $start"
-        }
-        else if (start == Int.MinValue){
-            s"data modify storage ${target.getStorage()} set string storage ${value.getStorage()} 0 $end"
-        }
-        else{
-            s"data modify storage ${target.getStorage()}set string storage ${value.getStorage()} $start $end"
-        }
-    }
-}
 case class ScoreboardRemove(target: SBLink, value: Int) extends IRTree{
     def getString(): String = if (value >= 0){s"scoreboard players remove $target $value"}else{s"scoreboard players add $target ${-value}"}
 }
@@ -294,6 +274,27 @@ case class StorageBlock(target: String, key: String) extends StorageVariable wit
 
 case class StorageString(value: String) extends StorageValue
 case class StorageScoreboard(key: SBLink, typ: String, scale: Double) extends StorageValue
+
+
+case class StringSet(target: StorageVariable, value: String) extends IRTree{    
+    def getString(): String = s"data modify $target set value $value"
+}
+case class StringCopy(target: StorageVariable, value: StorageVariable, start: Int = Int.MinValue, end: Int = Int.MaxValue) extends IRTree{
+    def getString(): String = {
+        if (start == Int.MinValue && end == Int.MaxValue){
+            s"data modify $target set string $value"    
+        }
+        else if (end == Int.MaxValue){
+            s"data modify $target set string $value $start"
+        }
+        else if (start == Int.MinValue){
+            s"data modify $target set string $value 0 $end"
+        }
+        else{
+            s"data modify $target set string $value $start $end"
+        }
+    }
+}
 
 case class StorageSet(target: StorageVariable, value: StorageValue) extends IRTree{
     def getString(): String = 

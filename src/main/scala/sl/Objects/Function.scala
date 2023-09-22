@@ -7,6 +7,7 @@ import scala.collection.mutable
 import sl.Compilation.Selector.*
 import sl.Compilation.Print
 import sl.IR.*
+import sl.Parser.modifier
 
 object Function {
   extension (str: (Function, List[Expression])) {
@@ -156,7 +157,8 @@ abstract class Function(context: Context, val contextName: String, name: String,
           modifiers.protection == Protection.Public || 
           stringUsed || 
           (!Settings.optimizeAllowRemoveProtected && modifiers.protection == Protection.Protected && !wasMovedToBlock))
-        )
+        , modifiers.isMacro
+          )
     }
     def getExtraContextPathComments(): List[IRTree] = {
         if (Settings.exportContextPath){
@@ -230,7 +232,7 @@ class ConcreteFunction(context: Context, _contextName: String, name: String, arg
 
     def compile():Unit={
         if (!wasCompiled){
-            val suf = sl.Compiler.compile(body.unBlockify())(context.push(name, this))
+            val suf = sl.Compiler.compile(body.unBlockify(), Meta(false, false, true))(context.push(name, this))
             content = content ::: suf/* ::: clearObject()(context.push(name, this))*/
             wasCompiled = true
         }
@@ -293,7 +295,7 @@ class LazyFunction(context: Context, _contextName: String, name: String, argumen
         val sub = context.push(context.getLazyCallId(), ctx.getCurrentClass())
         sub.setLazyCall()
         
-        val pref = argMap(args).sortBy((a,v) => -a.name.length).flatMap((a, v) => {
+        val pref = argMap(args.map(Utils.fix(_)(ctx, Set()))).sortBy((a,v) => -a.name.length).flatMap((a, v) => {
             val vari = Variable(sub, a.name, a.getType(), a.modifiers)
             vari.generate()(sub)
             vari.isFunctionArgument = true
@@ -329,15 +331,16 @@ class LazyFunction(context: Context, _contextName: String, name: String, argumen
 }
 
 class MacroFunction(context: Context, _contextName: String, name: String, arguments: List[Argument], typ: Type, _modifier: Modifier, _body: Instruction) extends ConcreteFunction(context, _contextName, name, arguments, typ, _modifier, _body, false){
-    val vari = context.getFreshVariable(JsonType)
+    val vari = context.push(name).getFreshVariable(JsonType)
 
     override def call(args: List[Expression], ret: Variable = null, retSel: Selector = Selector.self, op: String = "=")(implicit ctx: Context): List[IRTree] = {
-        argMap(args).flatMap((v,e) => vari.withKey("json."+v.name).assign("=", e)) ::: List(BlockCall(Settings.target.getFunctionName(fullName), fullName, f"with storage ${vari.fullName} ${vari.jsonArrayKey}"))
+        argMap(args).flatMap((v,e) => vari.withKey("json."+v.name).assign("=", e)) ::: List(BlockCall(Settings.target.getFunctionName(fullName), fullName, f"with ${vari.getStorage()}"))
     }
     override def generateArgument()(implicit ctx: Context):Unit = {
         super.generateArgument()
-        context.getAllVariable().map(x => x.makeJson(fullName))
+        context.push(name).getAllVariable().map(x => x.makeJson(fullName))
     }
+
 }
 
 class MultiplexFunction(context: Context, _contextName: String, name: String, arguments: List[Argument], typ: Type) extends ConcreteFunction(context, _contextName, name, arguments, typ, objects.Modifier.newPrivate(), sl.InstructionList(List()), false){

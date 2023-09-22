@@ -32,6 +32,12 @@ object Utils{
             case Some(p) => p
             case None => path
     }
+    def preloadAll():Unit={
+        sl.files.FileUtils.getListOfFiles("libraries").filter(p => p.endsWith(".sl")).par.foreach(f => {
+            val path = f.replace("/","/").replace("\\","/").dropRight(3)
+            Parser.parseFromFile(path, ()=> Utils.getFile(f.replace("/","/").replace("\\","/")))
+        })
+    }
     def getLib(path: String): Option[Instruction] = {
         val cpath = path.replace(".","/")
         val ipath = path.replace("/",".").replace("\\",".")
@@ -71,7 +77,7 @@ object Utils{
             case ClassDecl(name, generics, block, modifier, parent, parentGenerics, interfaces, entity) => ClassDecl(name, generics, substReturn(block, to), modifier, parent, parentGenerics, interfaces, entity)
             case FunctionDecl(name, block, typ, args, typeargs, modifier) => FunctionDecl(name, substReturn(block, to), typ, args, typeargs, modifier)
             case PredicateDecl(name, args, block, modifier) => instr
-            case BlocktagDecl(name, values, modifier) => instr
+            case TagDecl(name, values, modifier, typ) => instr
             case ForGenerate(key, provider, instr) => ForGenerate(key, provider, substReturn(instr, to))
             case ForEach(key, provider, instr) => ForEach(key, provider, substReturn(instr, to))
             case EnumDecl(name, fields, values, modifier) => instr
@@ -133,7 +139,7 @@ object Utils{
             case FunctionDecl(name, block, typ, args, typeargs, modifier) => FunctionDecl(name, subst(block, from, to), typ, args, typeargs, modifier)
             case PredicateDecl(name, args, block, modifier) => PredicateDecl(name, args, block, modifier)
             case VariableDecl(name, _type, modifier, op, expr) => VariableDecl(name, _type, modifier, op, subst(expr, from, to))
-            case BlocktagDecl(name, values, modifier) => BlocktagDecl(name, values.map(subst(_, from, to)), modifier)
+            case TagDecl(name, values, modifier, typ) => TagDecl(name, values.map(subst(_, from, to)), modifier, typ)
             case ForGenerate(key, provider, instr) => ForGenerate(key, subst(provider, from, to), subst(instr, from, to))
             case ForEach(key, provider, instr) => ForEach(key, subst(provider, from, to), subst(instr, from, to))
             case EnumDecl(name, fields, values, modifier) => EnumDecl(name, fields, values.map(v => EnumValue(v.name, v.fields.map(subst(_, from, to)))), modifier)
@@ -245,7 +251,7 @@ object Utils{
                     PredicateDecl(name.replaceAllLiterally(from, to), args, subst(block, from, to), modifier)
                 }
             }
-            case BlocktagDecl(name, values, modifier) => BlocktagDecl(name.replaceAllLiterally(from, to), values.map(subst(_, from, to)), modifier)
+            case TagDecl(name, values, modifier, typ) => TagDecl(name.replaceAllLiterally(from, to), values.map(subst(_, from, to)), modifier, typ)
             case Import(lib, value, alias) => instr
             case ForGenerate(key, provider, instr) => ForGenerate(key, subst(provider, from, to), subst(instr, from, to))
             case ForEach(key, provider, instr) => ForEach(key, subst(provider, from, to), subst(instr, from, to))
@@ -370,7 +376,7 @@ object Utils{
                 }
             }
             case PredicateDecl(name, args, block, modifier) => instr
-            case BlocktagDecl(name, values, modifier) => BlocktagDecl(name, values.map(subst(_, from, to)), modifier)
+            case TagDecl(name, values, modifier, typ) => TagDecl(name, values.map(subst(_, from, to)), modifier, typ)
             case Import(lib, value, alias) => instr
             case ForGenerate(key, provider, instr) => ForGenerate(key, subst(provider, from, to), subst(instr, from, to))
             case ForEach(key, provider, instr) => ForEach(key, subst(provider, from, to), subst(instr, from, to))
@@ -422,7 +428,7 @@ object Utils{
             case ClassDecl(name, generics, block, modifier, parent, parentGenerics, interfaces, entity) => ClassDecl(name, generics, rmFunctions(block), modifier, parent, parentGenerics, interfaces, entity)
             case fct: FunctionDecl => if predicate(fct) then InstructionList(List()) else instr
             case PredicateDecl(name, args, block, modifier) => instr
-            case BlocktagDecl(name, values, modifier) => instr
+            case TagDecl(name, values, modifier, typ) => instr
             case EnumDecl(name, fields, values, modifier) => EnumDecl(name, fields, values, modifier)
             case VariableDecl(name, _type, modifier, op, expr) => VariableDecl(name, _type, modifier, op, expr)
             case ForGenerate(key, provider, instr) => ForGenerate(key, provider, rmFunctions(instr))
@@ -494,7 +500,7 @@ object Utils{
             case PredicateDecl(name, args, block, modifier) => PredicateDecl(name, args, fix(block), modifier)
             case EnumDecl(name, fields, values, modifier) => EnumDecl(name, fields, values.map(v => EnumValue(v.name, v.fields.map(fix(_)))), modifier)
             case VariableDecl(name, _type, modifier, op, expr) => VariableDecl(name, fix(_type), modifier, op, fix(expr))
-            case BlocktagDecl(name, values, modifier) => BlocktagDecl(name, values.map(fix(_)), modifier)
+            case TagDecl(name, values, modifier, typ) => TagDecl(name, values.map(fix(_)), modifier, typ)
             case ForGenerate(key, provider, instr) => ForGenerate(key, fix(provider), fix(instr))
             case ForEach(key, provider, instr) => ForEach(key, fix(provider), fix(instr))
             case Import(lib, value, alias) => instr
@@ -639,6 +645,7 @@ object Utils{
                 if ignore.contains(value) then JsonIdentifier(value.toString(), t) else
                 context.tryGetVariable(value) match{
                     case Some(vari) if vari.canBeReduceToLazyValue => toJson(vari.lazyValue, t)
+                    case Some(vari) => JsonExpression(LinkedVariableValue(vari, sel), t)
                     case _ => JsonExpression(VariableValue(value, sel), t)
                 }
             }
@@ -781,6 +788,12 @@ object Utils{
                     case ArrayType(inner, size) => inner
                     case MCObjectType => MCObjectType
                     case JsonType => JsonType
+                    case TupleType(sub) => 
+                        index match{
+                            case IntValue(value) :: Nil => sub(value)
+                            case head::Nil => sub.foldRight(sub.head)((a,b) => combineType(a, b))
+                            case other => throw new Exception(f"Cannot access tuple with $other")
+                        }
                     case other => throw new Exception(f"Illegal array access of $name of type $other")
             }
             case LinkedFunctionValue(fct) => FuncType(fct.arguments.map(_.typ), fct.getType())
@@ -941,7 +954,7 @@ object Utils{
             case PredicateDecl(name, args, block, modifier) => predicate(instr)
             case EnumDecl(name, fields, values, modifier) => predicate(instr)
             case VariableDecl(name, _type, modifier, op, expr) => predicate(instr)
-            case BlocktagDecl(name, values, modifier) => predicate(instr)
+            case TagDecl(name, values, modifier, typ) => predicate(instr)
             case TypeDef(defs) => predicate(instr)
             case Import(lib, value, alias) => predicate(instr)
             case JSONFile(name, json, mod) => predicate(instr)
@@ -1129,6 +1142,7 @@ object Utils{
                         tag.content(n)
                     }
                     case (TupleValue(values), List(IntValue(n))) => values(n)
+                    case (LinkedVariableValue(vari, sel), List(IntValue(n))) if vari.typ.isInstanceOf[TupleType] => LinkedVariableValue(vari.tupleVari(n), sel)
                     case (TagValue(_) | LinkedTagValue(_), List(_)) => {
                         throw new Exception(s"Block tag can only be indexed with an integer")
                     }
@@ -1196,6 +1210,7 @@ object Utils{
                 elm2 match
                     case JsonArray(content2) => 
                         op match
+                            case "=" => JsonArray(content2)
                             case "::" | "::=" => JsonArray(content1.zipAll(content2, null, null).map((a, b) => if a == null then b else if b == null then a else combineJson(op, a, b)))
                             case "<:" | "<:=" => JsonArray(content2 ::: content1)
                             case ">:" | ">:=" | "+" | "+=" => JsonArray(content1 ::: content2)
@@ -1206,7 +1221,7 @@ object Utils{
                 elm2 match
                     case JsonDictionary(content2) => 
                         op match
-                            case "::" | "::=" => JsonDictionary((content1.toList ++ content2.toList).groupBy(_._1).map((k, value) => (k, if value.length == 1 then value.head._2 else combineJson(op, value(0)._2, value(1)._2))).toMap)
+                            case "::" | "::=" | "=" => JsonDictionary((content1.toList ++ content2.toList).groupBy(_._1).map((k, value) => (k, if value.length == 1 then value.head._2 else combineJson(op, value(0)._2, value(1)._2))).toMap)
                             case "<:" | "<:=" => JsonDictionary((content2.toList ++ content1.toList).groupBy(_._1).map((k, value) => (k, if value.length == 1 then value.head._2 else combineJson(op, value(0)._2, value(1)._2))).toMap)
                             case ">:" | ">:=" | "+" | "+=" => JsonDictionary((content1.toList ++ content2.toList).groupBy(_._1).map((k, value) => (k, if value.length == 1 then value.head._2 else combineJson(op, value(0)._2, value(1)._2))).toMap)
                             case "-:" | "-:=" => JsonDictionary(content1.filterNot(a => content2.contains(a._1)))
@@ -1299,7 +1314,7 @@ object Utils{
             }
             case LinkedFunctionValue(fct) => {fct.markAsStringUsed();JsonString(Settings.target.getFunctionName(fct.fullName))}
             case LinkedVariableValue(vari, selector) if vari.canBeReduceToLazyValue => toJson(vari.lazyValue, typ)
-            case LinkedVariableValue(vari, selector) => JsonString(vari.fullName)
+            case LinkedVariableValue(vari, selector) => JsonExpression(LinkedVariableValue(vari, selector), typ)
             
             case v => JsonExpression(fix(v)(context, Set()), typ)
     }

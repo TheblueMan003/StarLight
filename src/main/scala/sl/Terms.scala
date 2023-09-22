@@ -8,6 +8,7 @@ import objects.EnumField
 import objects.EnumValue
 import sl.Compilation.Selector.Selector
 import scala.util.parsing.input.Position
+import objects.TagType
 
 
 case class Argument(val name: String, val typ: Type, val defValue: Option[Expression]){
@@ -54,9 +55,10 @@ case class FunctionDecl(val name: String, val block: Instruction, val typ: Type,
 case class TemplateDecl(val name: String, val block: Instruction, val modifier: Modifier, val parent: Option[String], val generics: List[String], val parentGenerics: List[Expression]) extends Instruction {
   override def toString() = f"template ${name} ${block}"
 }
-case class BlocktagDecl(val name: String, val values: List[Expression], val modifier: Modifier) extends Instruction {
-  override def toString() = f"blocktag $name {${values.mkString(", ")}}"
+case class TagDecl(val name: String, val values: List[Expression], val modifier: Modifier, val typ: TagType) extends Instruction {
+  override def toString() = f"$typ $name {${values.mkString(", ")}}"
 }
+
 
 case class TypeDef(val defs: List[(String, Type, String)]) extends Instruction {
   override def toString() = f"typedef ${defs}"
@@ -197,3 +199,4 @@ case object Break extends Instruction {
 case class JSONFile(val name: String, val json: Expression, val modifier: Modifier) extends Instruction {
   override def toString() = f"jsonfile $name"
 }
+val EmptyInstruction = InstructionList(List())

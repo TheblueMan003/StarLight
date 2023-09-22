@@ -197,3 +197,10 @@ class object{
         return __totalRefCount
     }
 }
+
+def macro string __string_concat__(string a, string b){
+    return "$(a)$(b)"
+}
+def macro string __string_cast__(mcobject a){
+    return "$(a)"
+}

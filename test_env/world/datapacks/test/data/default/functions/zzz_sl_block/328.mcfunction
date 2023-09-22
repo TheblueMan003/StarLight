@@ -1,8 +1,19 @@
 # ==================================================
 # void default.zzz_sl_block.328()
-# a.k.a default.utils.process_manager.show.4
+# a.k.a default.int.multi_variable.stop.1
 # ==================================================
 
-scoreboard players set default.utils.process_manager.show._0 tbms.var 1
-tellraw @a [{"text": " [OFF] default.test.TestRunner.__count__", "bold":"false","obfuscated":"false","strikethrough":"false","underlined":"false","italic":"false", "color":"red"}]
-scoreboard players add default.utils.process_manager.show.off tbms.var 1
+scoreboard players set default.int.multi_variable.onStop-0._0._1 tbms.var 0
+scoreboard players set default.int.multi_variable.getResult-0.a tbms.var 1
+scoreboard players set default.int.multi_variable.getResult-0.b tbms.var 2
+scoreboard players operation default.int.multi_variable.getResult-0.c tbms.var = default.int.multi_variable.getResult-0.a tbms.var
+scoreboard players operation default.int.multi_variable.getResult-0.c tbms.var *= default.int.multi_variable.getResult-0.b tbms.var
+scoreboard players set default.int.multi_variable.getResult-0._0 tbms.var 0
+execute if score default.int.multi_variable.getResult-0.c tbms.var matches 2 run function default:zzz_sl_block/325
+execute if score default.int.multi_variable.getResult-0._0 tbms.var matches 0 run scoreboard players set default.int.multi_variable.getResult-0._ret tbms.var 0
+execute unless score default.int.multi_variable.getResult-0._ret tbms.var matches 0 run function default:zzz_sl_block/326
+execute if score default.int.multi_variable.onStop-0._0._1 tbms.var matches 0 run function default:zzz_sl_block/327
+scoreboard players add default.test.__total__ tbms.var 1
+function default:test/-test-runner/next
+scoreboard players set default.int.multi_variable.enabled tbms.var 0
+scoreboard players set default.int.multi_variable.callback tbms.var 0

@@ -11,6 +11,7 @@ import objects.Function
 import sl.Compilation.Printable
 import objects.Tag
 import scala.quoted.Expr
+import sl.IR.IRTree
 
 trait Expression extends CPositionable{
     def hasIntValue(): Boolean
@@ -447,6 +448,7 @@ case class JsonValue(val content: JSONElement) extends Expression with Stringify
 }
 trait JSONElement{
     def getString()(implicit context: Context): String
+    def forceNBT()(implicit vari: Variable, stack: String, context: Context): (List[IRTree], JSONElement)
     def getNbt(): String
     def getStringValue: String = throw new Exception(f"$this is not a string")
     def getIntValue: Int = throw new Exception(f"$this is not an int")
@@ -463,6 +465,10 @@ case class JsonDictionary(val map: Map[String, JSONElement]) extends JSONElement
     def getNbt(): String = {
         "{"+map.map((k, v) => f"${k}:${v.getNbt()}").reduceOption(_ +", "+ _).getOrElse("")+"}"
     }
+    def forceNBT()(implicit vari: Variable, stack: String, context: Context): (List[IRTree], JSONElement) = {
+        val m = map.map((k,v) => (k,v.forceNBT()(vari, stack+"."+k, context)))
+        (m.flatMap(_._2._1).toList, JsonDictionary(m.map((k,v) => (k, v._2))))
+    }
     def apply(key: String): JSONElement = map(key)
     override def getDictionary: JsonDictionary = this
     def contains(key: String): Boolean = map.contains(key)
@@ -474,6 +480,10 @@ case class JsonArray(val content: List[JSONElement]) extends JSONElement{
     def getNbt(): String = {
         "["+content.map(v => f"${v.getNbt()}").reduceOption(_ +", "+ _).getOrElse("")+"]"
     }
+    def forceNBT()(implicit vari: Variable, stack: String, context: Context): (List[IRTree], JSONElement) = {
+        val m = content.zipWithIndex.map((v, k) => v.forceNBT()(vari, stack+"."+k, context))
+        (m.flatMap(_._1).toList, JsonArray(m.map(_._2)))
+    }
     def apply(key: Int): JSONElement = if (key >= 0){ content(key) }else{ content(content.length + key) }
     override def getArray: JsonArray = this
 }
@@ -484,6 +494,9 @@ case class JsonString(val value: String) extends JSONElement{
     def getNbt(): String = {
         Utils.stringify(value)
     }
+    def forceNBT()(implicit vari: Variable, stack: String, context: Context): (List[IRTree], JSONElement) = {
+        (List(), this)
+    }
     override def getStringValue: String = value
 }
 case class JsonIdentifier(val value: String, val typ: String) extends JSONElement{
@@ -493,6 +506,9 @@ case class JsonIdentifier(val value: String, val typ: String) extends JSONElemen
     def getNbt(): String = {
         Utils.stringify(value)
     }
+    def forceNBT()(implicit vari: Variable, stack: String, context: Context): (List[IRTree], JSONElement) = {
+        (List(), this)
+    }
 }
 case object JsonNull extends JSONElement{
     def getString()(implicit context: Context): String = {
@@ -500,6 +516,9 @@ case object JsonNull extends JSONElement{
     }
     def getNbt(): String = {
         "null"
+    }
+    def forceNBT()(implicit vari: Variable, stack: String, context: Context): (List[IRTree], JSONElement) = {
+        (List(), this)
     }
     override def getStringValue: String = null
 }
@@ -515,6 +534,9 @@ case class JsonInt(val value: Int, val typ: String) extends JSONElement{
             value.toString() 
         }
     }
+    def forceNBT()(implicit vari: Variable, stack: String, context: Context): (List[IRTree], JSONElement) = {
+        (List(), this)
+    }
     override def getIntValue: Int = value
 }
 case class JsonFloat(val value: Double, val typ: String) extends JSONElement{
@@ -529,6 +551,9 @@ case class JsonFloat(val value: Double, val typ: String) extends JSONElement{
             value.toString() 
         }
     }
+    def forceNBT()(implicit vari: Variable, stack: String, context: Context): (List[IRTree], JSONElement) = {
+        (List(), this)
+    }
     override def getFloatValue: Double = value
 }
 case class JsonBoolean(val value: Boolean) extends JSONElement{
@@ -538,6 +563,9 @@ case class JsonBoolean(val value: Boolean) extends JSONElement{
     def getNbt(): String = {
         if value then "1b" else "0b"
     }
+    def forceNBT()(implicit vari: Variable, stack: String, context: Context): (List[IRTree], JSONElement) = {
+        (List(), this)
+    }
     override def getBooleanValue: Boolean = value
 }
 
@@ -545,7 +573,10 @@ case class JsonExpression(val value: Expression, val typ: String) extends JSONEl
     def getString()(implicit context: Context): String = {
         Utils.compileJson(this).getString()
     }
+    def forceNBT()(implicit vari: Variable, stack: String, context: Context): (List[IRTree], JSONElement) = {
+        (vari.withKey(stack).assign("=", value), JsonNull)
+    }
     def getNbt(): String = {
-        ???
+        throw new Exception("Illegal cast!")
     }
 }

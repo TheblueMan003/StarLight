@@ -269,8 +269,8 @@ object Compiler{
                     context.addJsonFile(new objects.JSONFile(context, name, mod, Utils.compileJson(json)))
                     List()
                 }
-                case sl.BlocktagDecl(name, value, mod) => {
-                    context.addBlockTag(new objects.Tag(context, name, mod, value.map(Utils.fix(_)(context, Set())), objects.BlockTag))
+                case sl.TagDecl(name, value, mod, typ) => {
+                    context.addBlockTag(new objects.Tag(context, name, mod, value.map(Utils.fix(_)(context, Set())), typ))
                     List()
                 }
                 case Import(lib, value, alias) => {
@@ -298,7 +298,10 @@ object Compiler{
 
                         compile(block.unBlockify(), meta.withFirstPass)(sub)
 
-                        context.addProperty(Property(name, sub.getFunction("get"), sub.getFunction("set"), null))
+                        var get = try {sub.getFunction("get")}catch{case e => null}
+                        var set = try {sub.getFunction("set")}catch{case e => null}
+
+                        context.addProperty(Property(name, get, set, null))
                         List()
                     }
                     else{
@@ -316,7 +319,7 @@ object Compiler{
                 case VariableAssigment(names, op, expr) => {
                     if (names.length == 1){
                         val (i,s) = names.head
-                        i.get().assign(op, Utils.simplify(expr))(context, s)
+                        i.get().assign(op, Utils.simplify(expr), !meta.isSource)(context, s)
                     }
                     else{
                         val simplied = Utils.simplify(expr)
@@ -338,18 +341,18 @@ object Compiler{
                                     (t.flatMap(p => p._1()) ::: t.flatMap(p => p._2()))
                                 }
                                 else{
-                                    varis.zip(lst).flatMap(p => (p._1._1.assign(op, p._2)(context, p._1._2)))
+                                    varis.zip(lst).flatMap(p => (p._1._1.assign(op, p._2, !meta.isSource)(context, p._1._2)))
                                 }
                             case VariableValue(name, sel) => {
                                 val vari = context.getVariable(name) 
                                 vari.getType() match
-                                    case TupleType(sub) => varis.zip(vari.tupleVari).flatMap(p => p._1._1.assign(op, LinkedVariableValue(p._2, sel))(context, p._1._2))
-                                    case _ => varis.flatMap(l => l._1.assign(op, simplied)(context, l._2))
+                                    case TupleType(sub) => varis.zip(vari.tupleVari).flatMap(p => p._1._1.assign(op, LinkedVariableValue(p._2, sel), !meta.isSource)(context, p._1._2))
+                                    case _ => varis.flatMap(l => l._1.assign(op, simplied, !meta.isSource)(context, l._2))
                             }
                             case LinkedVariableValue(vari, sel) => {
                                 vari.getType() match
-                                    case TupleType(sub) => varis.zip(vari.tupleVari).flatMap(p => p._1._1.assign(op, LinkedVariableValue(p._2, sel))(context, p._1._2))
-                                    case _ => varis.flatMap(l => l._1.assign(op, simplied)(context, l._2))
+                                    case TupleType(sub) => varis.zip(vari.tupleVari).flatMap(p => p._1._1.assign(op, LinkedVariableValue(p._2, sel), !meta.isSource)(context, p._1._2))
+                                    case _ => varis.flatMap(l => l._1.assign(op, simplied, !meta.isSource)(context, l._2))
                             }
                             case FunctionCallValue(name, args, typeargs, selector) => {
                                 Utils.typeof(simplied) match
@@ -360,14 +363,14 @@ object Compiler{
                                             fake.assign("=", simplied)
                                         }
                                         else{
-                                            fake.assign("=", simplied) ::: varis.zip(fake.tupleVari).flatMap(p => p._1._1.assign("=", LinkedVariableValue(p._2))(context, p._1._2))
+                                            fake.assign("=", simplied) ::: varis.zip(fake.tupleVari).flatMap(p => p._1._1.assign("=", LinkedVariableValue(p._2), !meta.isSource)(context, p._1._2))
                                         }
                                     }
                                     case other => {
-                                        varis.flatMap(x => x._1.assign(op, simplied)(context, x._2))
+                                        varis.flatMap(x => x._1.assign(op, simplied, !meta.isSource)(context, x._2))
                                     }
                             }
-                            case _ => varis.flatMap(l => l._1.assign(op, simplied)(context, l._2))
+                            case _ => varis.flatMap(l => l._1.assign(op, simplied, !meta.isSource)(context, l._2))
                     }
                 }
                 case ArrayAssigment(name, index, op, value) => {
@@ -514,7 +517,7 @@ object Compiler{
     }
 }
 
-case class Meta(firstPass: Boolean, isLib: Boolean){
-    def withLib = Meta(firstPass, true)
-    def withFirstPass = Meta(true, isLib)
+case class Meta(firstPass: Boolean, isLib: Boolean, isSource: Boolean = false){
+    def withLib = Meta(firstPass, true, isSource)
+    def withFirstPass = Meta(true, isLib, isSource)
 }

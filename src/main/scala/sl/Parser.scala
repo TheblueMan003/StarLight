@@ -20,7 +20,7 @@ object Parser extends StandardTokenParsers{
                               "!", "!=", "#", "<<", ">>", "&", "<<=", ">>=", "&=", "|=", "::", ":>", ">:", "<:", "-:", "??", "?", "::=" , ">:=" , "<:=" , "-:=")
   lexical.reserved   ++= List("true", "false", "if", "then", "else", "return", "switch", "for", "do", "while", "by", "is",
                               "as", "at", "with", "to", "import", "template", "null", "typedef", "foreach", "in", "not",
-                              "def", "package", "struct", "enum", "class", "interface", "lazy", "macro", "jsonfile", "blocktag", "throw", "try", "catch", "finally",
+                              "def", "package", "struct", "enum", "class", "interface", "lazy", "macro", "jsonfile", "blocktag", "itemtag", "entitytag", "throw", "try", "catch", "finally",
                               "public", "protected", "private", "scoreboard", "forgenerate", "from", "rotated", "facing", "align", "case", "default",
                               "ticking", "loading", "predicate", "extends", "implements", "new", "const", "static", "virtual", "abstract", "override", "repeat",
                               "sleep", "async", "await")
@@ -77,6 +77,7 @@ object Parser extends StandardTokenParsers{
       | interfaceDecl
       | caseClassDecl
       | templateUse
+      | propertyDeclaration
       | varDeclaration
       | varAssignment
       | arrayAssign
@@ -223,7 +224,10 @@ object Parser extends StandardTokenParsers{
   def facing2: Parser[Instruction] = positioned("facing" ~ exprNoTuple ~ instruction ^^ { case _ ~ e ~ i => Execute(FacingType, List(e), i) })
   def align: Parser[Instruction] = positioned("align" ~ exprNoTuple ~ instruction ^^ { case _ ~ e ~ i => Execute(AlignType, List(e), i) })
 
-  def blocktag: Parser[Instruction] = positioned(doc ~ modifier("blocktag") ~ "blocktag" ~ identLazy2 ~ "{" ~ repsep(tagentry, ",") ~ "}" ^^ { case d ~ m ~ _ ~ n ~ _ ~ c ~ _ => BlocktagDecl(n, c, m.withDoc(d))})
+  def blocktag: Parser[Instruction] = 
+    positioned(doc ~ modifier("blocktag") ~ "blocktag" ~ identLazy2 ~ "{" ~ repsep(tagentry, ",") ~ "}" ^^ { case d ~ m ~ _ ~ n ~ _ ~ c ~ _ => TagDecl(n, c, m.withDoc(d), objects.BlockTag)}) |
+    positioned(doc ~ modifier("entitytag") ~ "entitytag" ~ identLazy2 ~ "{" ~ repsep(tagentry, ",") ~ "}" ^^ { case d ~ m ~ _ ~ n ~ _ ~ c ~ _ => TagDecl(n, c, m.withDoc(d), objects.EntityTag)}) |
+    positioned(doc ~ modifier("itemtag") ~ "itemtag" ~ identLazy2 ~ "{" ~ repsep(tagentry, ",") ~ "}" ^^ { case d ~ m ~ _ ~ n ~ _ ~ c ~ _ => TagDecl(n, c, m.withDoc(d), objects.ItemTag)})
   def tagentry: Parser[Expression] = positioned(namespacedName | (identLazy2 ^^ (VariableValue(_))) | tagValue )
 
 
@@ -254,7 +258,7 @@ object Parser extends StandardTokenParsers{
     opt(selector <~ ".") ~ identLazy2 <~ ("-" ~ "-") ^^ {case s ~ i => VariableAssigment(List((Left(i), s.getOrElse(Selector.self))), "-=", IntValue(1))}
     )
 
-  def varDeclaration: Parser[Instruction] = positioned((doc ~ modifier("variable") ~ types ~ rep1sep(identLazy, ",") ~ opt(assignmentOp ~ expr)) ^^ {
+  def varDeclaration: Parser[VariableDecl] = positioned((doc ~ modifier("variable") ~ types ~ rep1sep(identLazy, ",") ~ opt(assignmentOp ~ expr)) ^^ {
     case doc ~ mod1 ~ typ ~ names ~ expr => {
       val mod = mod1.withDoc(doc)
       val identifiers = names.map(Identifier.fromString(_))
@@ -269,6 +273,21 @@ object Parser extends StandardTokenParsers{
       }
     }
   }) // Variable Dec
+
+  def propertyDeclaration: Parser[Instruction] = positioned(varDeclaration ~ "{" ~ rep1sep(("private" | "protected" |"public") ~ ident, (";"|",")) ~ opt(";" | ",") ~ "}" ^^ {
+    case VariableDecl(v, typ, mod, op, expr) ~ _ ~ m ~ _ ~ _ => 
+      var hasGet = m.exists{case _ ~ "get" => true; case _ => false}
+      var hasSet = m.exists{case _ ~ "set" => true; case _ => false}
+
+      val pp = v.map(x => {
+        TemplateUse(Identifier.fromString("property"), x, InstructionBlock(List(
+          if (hasGet)FunctionDecl("get", Return(VariableValue(Identifier.fromString("--"+x))), typ, List(), List(), mod)else EmptyInstruction,
+          if (hasSet)FunctionDecl("set", VariableAssigment(List((Left(Identifier.fromString("--"+x)), Selector.self)), "=", VariableValue("value")), VoidType, List(Argument("value", typ, None)), List(), mod)else EmptyInstruction
+          )), List())
+      })
+      InstructionList(List(VariableDecl(v.map(s => "--"+s), typ, mod, op, expr), InstructionList(pp)))
+  })
+
   def ifs: Parser[If] = positioned(("if" ~> "(" ~> expr <~ ")") ~ instruction ~ 
       rep(("else" ~> "if" ~> "(" ~> expr <~ ")") ~ instruction) ~
       opt("else" ~> instruction) ^^ {p => 
@@ -292,9 +311,10 @@ object Parser extends StandardTokenParsers{
   def sfNumber4: Parser[SelectorFilterValue] =  "-" ~> numericLit ^^ (p => SelectorNumber(f"-$p".toInt))
   def sfString: Parser[SelectorFilterValue] = stringLit2 ^^ (SelectorString(_))
   def sfIdentifier: Parser[SelectorFilterValue] = identLazy2 ^^ (SelectorIdentifier(_))
+  def sfTag: Parser[SelectorFilterValue] = tagValue ^^ {case TagValue(v) => SelectorTag(v)}
   def sfNamespacedName: Parser[SelectorFilterValue] = namespacedName ^^ (p => SelectorIdentifier(p.toString()))
   def sfNBT: Parser[SelectorFilterValue] = json ^^ (SelectorNbt(_))
-  def selectorFilterInnerValue2 = sfNumber | sfNumber3 | sfString | sfNamespacedName | sfIdentifier | sfNumber2 | sfNumber4 | sfNBT | sfCompound
+  def selectorFilterInnerValue2 = sfNumber | sfNumber3 | sfString | sfNamespacedName | sfIdentifier | sfNumber2 | sfNumber4 | sfNBT | sfCompound | sfTag
   def selectorFilterInnerValue = opt(selectorFilterInnerValue2) ~ opt(".." ~ opt(selectorFilterInnerValue2)) ^^ { 
     case Some(a) ~ Some(b, Some(c)) => SelectorRange(a, c)
     case Some(a) ~ Some(b, None) => SelectorGreaterRange(a)
