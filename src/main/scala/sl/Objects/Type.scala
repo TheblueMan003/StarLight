@@ -105,6 +105,7 @@ object IntType extends Type{
         other match
             case IntType => 0
             case FloatType => 1
+            case BoolType => 2
             case EnumType(enm) => 2
             case AnyType => 3
             case MCObjectType => 10
@@ -113,6 +114,7 @@ object IntType extends Type{
     override def isSubtypeOf(other: Type)(implicit context: Context): Boolean = {
         other match
             case IntType => true
+            case BoolType => true
             case FloatType => true
             case EnumType(enm) => true
             case AnyType => true
@@ -475,6 +477,7 @@ case class StructType(struct: Struct, sub: List[Type]) extends Type{
         other match
             case IdentifierType(name2, sub2) => getDistance(context.getType(other))
             case StructType(struct2, sub2) if struct2 == struct && sub2 == sub => 0
+            case JsonType => 100
             case MCObjectType => 1000
             case AnyType => 2000
             case _ => outOfBound
@@ -482,6 +485,7 @@ case class StructType(struct: Struct, sub: List[Type]) extends Type{
     override def isSubtypeOf(other: Type)(implicit context: Context): Boolean = {
         other match
             case StructType(str, sub2) => struct.hasParent(str) && sub2 == sub
+            case JsonType => true
             case AnyType => true
             case MCObjectType => true
             case _ => false
@@ -587,6 +591,7 @@ case object JsonType extends Type{
     override def getDistance(other: Type)(implicit context: Context): Int = {
         other match
             case JsonType => 0
+            case StructType(struct, sub) => 100
             case MCObjectType => 1000
             case AnyType => 10000
             case _ => outOfBound
@@ -594,6 +599,7 @@ case object JsonType extends Type{
     override def isSubtypeOf(other: Type)(implicit context: Context): Boolean = {
         other match
             case JsonType => true
+            case StructType(struct, sub) => true
             case AnyType => true
             case MCObjectType => true
             case _ => false

@@ -679,6 +679,14 @@ object Execute{
             case FunctionCallValue(name, args, typeargs, sel) if Settings.metaVariable.exists(_._1 == name.toString()) => {
                 if Settings.metaVariable.find(_._1 == name.toString()).get._2() then (List(), List(IFTrue)) else (List(), List(IFFalse))
             }
+            case FunctionCallValue(name, args, typeargs, sel) if name.toString() == "Compiler.isEqualitySupported" => {
+                val check = typeargs.head.isEqualitySupported()
+                if check then (List(), List(IFTrue)) else (List(), List(IFFalse))
+            }
+            case FunctionCallValue(name, args, typeargs, sel) if name.toString() == "Compiler.isComparaisonSupported" => {
+                val check = typeargs.head.isComparaisonSupported()
+                if check then (List(), List(IFTrue)) else (List(), List(IFFalse))
+            }
             case FunctionCallValue(name, args, typeargs, sel) if name.toString() == "Compiler.isVariable" => {
                 val check = args.map(Utils.simplify).forall(arg =>
                     arg match

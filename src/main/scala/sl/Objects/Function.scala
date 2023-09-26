@@ -290,12 +290,19 @@ class BlockFunction(context: Context, _contextName: String, name: String, argume
 class LazyFunction(context: Context, _contextName: String, name: String, arguments: List[Argument], typ: Type, _modifier: Modifier, val body: Instruction) extends Function(context, _contextName, name, arguments, typ, _modifier){
     def call(args: List[Expression], ret: Variable = null, retSel: Selector = Selector.self, op: String = "=")(implicit ctx: Context): List[IRTree] = {
         if (modifiers.isAbstract) throw new Exception(f"Cannot call abstract function $fullName")
+
+        val mapped = argMap(args.map(Utils.fix(_)(ctx, Set())))
+
+        if (Settings.lazyTypeChecking){
+            mapped.foreach((v,e) => if (!Utils.typeof(e).isSubtypeOf(v.getType())){throw new Exception(f"Cannot assign $e to $v\nType mismatch in $fullName: ${Utils.typeof(e)} is not a subtype of ${v.getType()}")})
+        }
+
         //var block = Utils.fix(body)(context, arguments.map(a => Identifier.fromString(a.name)).toSet)
         var block = body
         val sub = context.push(context.getLazyCallId(), ctx.getCurrentClass())
         sub.setLazyCall()
         
-        val pref = argMap(args.map(Utils.fix(_)(ctx, Set()))).sortBy((a,v) => -a.name.length).flatMap((a, v) => {
+        val pref = mapped.sortBy((a,v) => -a.name.length).flatMap((a, v) => {
             val vari = Variable(sub, a.name, a.getType(), a.modifiers)
             vari.generate()(sub)
             vari.isFunctionArgument = true
@@ -334,13 +341,43 @@ class MacroFunction(context: Context, _contextName: String, name: String, argume
     val vari = context.push(name).getFreshVariable(JsonType)
 
     override def call(args: List[Expression], ret: Variable = null, retSel: Selector = Selector.self, op: String = "=")(implicit ctx: Context): List[IRTree] = {
-        argMap(args).flatMap((v,e) => vari.withKey("json."+v.name).assign("=", Utils.simplify(e))) ::: List(BlockCall(Settings.target.getFunctionName(fullName), fullName, f"with ${vari.getStorage()}"))
-    }
-    override def generateArgument()(implicit ctx: Context):Unit = {
-        super.generateArgument()
-        context.push(name).getAllVariable().filterNot(x => x == returnVariable).map(x => x.makeJson(fullName))
+        val mapped = argMap(args).map((v,e) => (v, Utils.simplify(e)))
+        
+        if (Settings.lazyTypeChecking){
+            mapped.foreach((v,e) => if (!Utils.typeof(e).isSubtypeOf(v.getType())){throw new Exception(f"Cannot assign $e to $v\nType mismatch in $fullName: ${Utils.typeof(e)} is not a subtype of ${v.getType()}")})
+        }
+
+        if (Settings.macroConvertToLazy && mapped.forall((v,e) => isSimpleValue(e))){
+            val r = Compiler.compile(mapped.foldLeft(_body){case (block, (v, e)) => Utils.subst(block, "$("+v.name+")", e.toString())})
+            if (ret != null){
+                r ::: ret.assign(op, LinkedVariableValue(returnVariable))(context, retSel)
+            }
+            else{
+                r
+            }
+        }
+        else{
+            val r = mapped.flatMap((v,e) => vari.withKey("json."+v.name).assign("=", e)) ::: List(BlockCall(Settings.target.getFunctionName(fullName), fullName, f"with ${vari.getStorage()}"))
+            if (ret != null){
+                r ::: ret.assign(op, LinkedVariableValue(returnVariable))(context, retSel)
+            }
+            else{
+                r
+            }
+        }
     }
 
+    def isSimpleValue(expr: Expression) = {
+        expr match
+            case _: (IntValue | FloatValue | StringValue | BoolValue | JsonValue) => true
+            case NullValue => true
+            case _ => false
+    }
+
+    override def generateArgument()(implicit ctx: Context):Unit = {
+        super.generateArgument()
+        context.push(name).getAllVariable().filterNot(x => x == returnVariable || x == vari).map(x => x.makeJson(fullName))
+    }
 }
 
 class MultiplexFunction(context: Context, _contextName: String, name: String, arguments: List[Argument], typ: Type) extends ConcreteFunction(context, _contextName, name, arguments, typ, objects.Modifier.newPrivate(), sl.InstructionList(List()), false){

@@ -48,6 +48,8 @@ class SettingsContext(){
     var obfuscate = false
     var debug = false
     var allFunction = true
+    var lazyTypeChecking = false
+    var macroConvertToLazy = true
 
     var optimize = true
     var optimizeInlining = true

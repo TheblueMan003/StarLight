@@ -278,7 +278,7 @@ case class PrintSelector(val selector: Selector, val color: PrintColor, val modi
 }
 case class PrintNBT(val vari: Variable, val color: PrintColor, val modifier: TextModdifier) extends Printable{
     def toJava()(implicit ctx: Context): String = 
-        f"{\"nbt\": \"${vari.jsonArrayKey}\", \"storage\":\"${vari.getSelectorObjective().replaceFirst("\\.",":")}\",${modifier.toJava()}, ${color.toJava()}}"
+        f"{\"nbt\": \"${vari.jsonArrayKey}\", \"storage\":\"${vari.getStoragePath()}\",${modifier.toJava()}, ${color.toJava()}}"
     def toBedrock()(implicit ctx: Context): String = {
         ???
     }

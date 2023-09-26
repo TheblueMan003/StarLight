@@ -47,7 +47,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 	var setter: Function = null
 	var wasGenerated = false
 	var jsonArrayKey: String = if modifiers.isEntity then modifiers.getAttributesString("nbt", ()=>"json")(context) else modifiers.getAttributesString("path", ()=>"json")(context)
-
+	
 	def canBeReduceToLazyValue = modifiers.isLazy && !getType().isInstanceOf[StructType]
 
 	override def toString(): String = f"$modifiers ${getType()} $fullName"
@@ -1276,10 +1276,20 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 	def getStorage(keya: String = "json")(implicit context: Context, selector: Selector = Selector.self) = {
 		val key = if keya == "json" then jsonArrayKey else keya
 		if (modifiers.isEntity){
-			StorageEntity(getSelector().toString(), if (key.startsWith("json."))then key.substring(5) else key)
+			StorageEntity(getSelectorName().toString(), if (key.startsWith("json."))then key.substring(5) else key)
 		}
 		else{
-			StorageStorage(fullName, key)
+			StorageStorage(fullName.replaceAll("([A-Z])","-$1").toLowerCase(), key)
+		}
+	}
+
+	def getStoragePath(keya: String = "json")(implicit context: Context, selector: Selector = Selector.self) = {
+		val key = if keya == "json" then jsonArrayKey else keya
+		if (modifiers.isEntity){
+			getSelectorName().toString()
+		}
+		else{
+			fullName.replaceAll("([A-Z])","-$1").toLowerCase()
 		}
 	}
 
@@ -1292,7 +1302,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			throw new Exception(f"Dynamic Json Variable Not Supported in Bedrock ($fullName) at \n${value.pos.longString}")
 		}
 
-		if (!key.startsWith("json"))throw new Exception(f"Cannot assign to json key ${getType()} at \n${value.pos.longString}")
+		//if (!key.startsWith("json") && !modifiers.isEntity)throw new Exception(f"Cannot assign to json key ${key} at \n${value.pos.longString}")
 		value match
 			case JsonValue(json) => 
 				op match{
@@ -1416,7 +1426,10 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 							case "=" => vari.tupleVari.flatMap(v => {
 											vari.assignJson(op, LinkedVariableValue(withKey(key + "." + v.name), sel))
 										})
-							case other => jsonUnpackedOperation(op, value, key)
+							case other => {
+								val tmp = context.getFreshVariable(JsonType)
+								tmp.assign("=", value):::assignJson("=", LinkedVariableValue(tmp), keya)
+							}
 						}
 					}
 					case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()} at \n${value.pos.longString}")

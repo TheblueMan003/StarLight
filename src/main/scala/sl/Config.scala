@@ -89,6 +89,9 @@ object ConfigLoader{
                     case ("optimization.fold", value) => Settings.optimizeFold = value == "true"
                     case ("optimization.allowRemoveProtected", value) => Settings.optimizeAllowRemoveProtected = value == "true"
 
+                    case ("lazyTypeChecking", value) => Settings.lazyTypeChecking = value == "true"
+                    case ("macroConvertToLazy", value) => Settings.macroConvertToLazy = value == "true"
+
                     case ("experimental.multi_thread", value) => Settings.experimentalMultithread = value == "true"
 
                     case ("export.doc", value) => Settings.exportDoc = value == "true"
@@ -172,6 +175,9 @@ object ConfigLoader{
             f"optimization.variable.global=${Settings.optimizeVariableGlobal}",
             f"optimization.fold=${Settings.optimizeFold}",
             f"optimization.allowRemoveProtected=${Settings.optimizeAllowRemoveProtected}",
+
+            f"lazyTypeChecking=${Settings.lazyTypeChecking}",
+            f"macroConvertToLazy=${Settings.macroConvertToLazy}",
 
             f"export.doc=${Settings.exportDoc}",
             f"export.source=${Settings.exportSource}",

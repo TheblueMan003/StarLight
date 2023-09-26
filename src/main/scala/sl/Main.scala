@@ -16,7 +16,7 @@ import java.util.Locale
 import scala.collection.mutable
 
 object Main{
-  var version = List(0, 10, 0)
+  var version = List(0, 11, 0)
   private var lastIR: List[IRFile] = null
   private var lastContxt: Context = null
   private var interpreter: Interpreter = null
