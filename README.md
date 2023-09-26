@@ -841,11 +841,12 @@ print(2)
 Note that forgenerate "copy paste" the code inside the loop for each value. This mean that there is no loop at runtime.
 
 The allowed generators are:
-* `<start>..<end>`: Generate a range of number
-* `#<blocktag>`: Generate all the block inside the tag
+* `<start>..<end> [by <step>]`: Generate a range of number
+* `#<blocktag | itemtag | entitytag>`: Generate all the block inside the tag
 * `@<functiontag>`: Generate all the function inside the tag
 * `<json array>`: Generate all the value inside the array
 * `<json object>`: Generate all the key inside the object
+* `<tuple>`: Generate all the value inside the tuple
 
 ## Forgenerate
 Forgenerate is a legacy syntax that is not recommended to use. You can use foreach instead.
