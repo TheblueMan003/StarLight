@@ -37,6 +37,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 	val tagName = modifiers.getAttributesString("tag", ()=>variName)(context)
 	var wasAssigned = false
 	lazy val scoreboard = if modifiers.isEntity then modifiers.getAttributesString("name", ()=>context.getScoreboardID(this))(context) else ""
+	lazy val variableScoreboard = modifiers.getAttributesString("scoreboard", ()=>Settings.variableScoreboard)(context)
 	lazy val inGameName = modifiers.getAttributesString("name", ()=>variName)(context)
 	lazy val criterion = modifiers.getAttributesString("criterion", ()=>"dummy")(context)
 	var lazyValue: Expression = DefaultValue
@@ -55,6 +56,15 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 		val vari = Variable(context, name, typ, _modifier)
 		vari.jsonArrayKey = key
 		vari
+	}
+
+	def getSubKey(key: String) = {
+		if (key.endsWith("]") && key.startsWith("[")){
+			jsonArrayKey + key
+		}
+		else{
+			jsonArrayKey+"."+key
+		}
 	}
 
 	def makeJson(prefix: String) = {
@@ -201,6 +211,10 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 							return value2._1
 						}
 				}
+				/*case EntityType if !value.isInstanceOf[SelectorValue] => {
+					val (tree, ctx, sel) = Utils.getSelector(value, false)
+					tree ::: assign(op, SelectorValue(sel))
+				}*/
 				case other => {
 					Utils.simplify(value) match{
 						case LambdaValue(args, body, ctx) if args.size == 0 => {
@@ -388,7 +402,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 								tmp.assign("=", value) ::: assign(op, LinkedVariableValue(tmp))
 							}
 							else{
-								typ match
+								getType() match
 									case IntType => assignInt(op, other)
 									case FloatType => assignFloat(op, other)
 									case BoolType => assignBool(op, other)
@@ -696,7 +710,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 											tupleVari.flatMap(x => x.handleArrayGetValue(op, name, List(StringValue(str+"."+x.name))))
 										}
 										case JsonType => {
-											assignJson("=", LinkedVariableValue(vari.withKey("json."+str)))
+											assignJson("=", LinkedVariableValue(vari.withKey(vari.getSubKey(str))))
 										}
 								case other => assign(op, FunctionCallValue(VariableValue(vari.fullName+".get"), index, List()))
 							}
@@ -1260,7 +1274,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 	}
 
 	def getStorage(keya: String = "json")(implicit context: Context, selector: Selector = Selector.self) = {
-		val key = if keya != "json" then jsonArrayKey else keya
+		val key = if keya == "json" then jsonArrayKey else keya
 		if (modifiers.isEntity){
 			StorageEntity(getSelector().toString(), if (key.startsWith("json."))then key.substring(5) else key)
 		}
@@ -1278,121 +1292,122 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			throw new Exception(f"Dynamic Json Variable Not Supported in Bedrock ($fullName) at \n${value.pos.longString}")
 		}
 
+		if (!key.startsWith("json"))throw new Exception(f"Cannot assign to json key ${getType()} at \n${value.pos.longString}")
 		value match
 			case JsonValue(json) => 
 				op match{
 					case "=" => {
 						try{
-							List(StorageSet(getStorage(keya), StorageString(json.getNbt())))
+							List(StorageSet(getStorage(key), StorageString(json.getNbt())))
 						}
 						catch{
 							_ => {
 								val vari = context.getFreshVariable(JsonType)
 								val a = json.forceNBT()(vari, "json", context)
-								vari.assign("=", JsonValue(a._2)) ::: a._1 ::: List(StorageSet(getStorage(keya), vari.getStorage()))
+								vari.assign("=", JsonValue(a._2)) ::: a._1 ::: List(StorageSet(getStorage(key), vari.getStorage()))
 							}
 						}
 					}
 					case ">:=" => {
 						try{
-							List(StorageAppend(getStorage(keya), StorageString(json.getNbt())))
+							List(StorageAppend(getStorage(key), StorageString(json.getNbt())))
 						}
 						catch{
 							_ => {
 								val vari = context.getFreshVariable(JsonType)
 								val a = json.forceNBT()(vari, "json", context)
-								vari.assign("=", JsonValue(a._2)) ::: a._1 ::: List(StorageAppend(getStorage(keya), vari.getStorage()))
+								vari.assign("=", JsonValue(a._2)) ::: a._1 ::: List(StorageAppend(getStorage(key), vari.getStorage()))
 							}
 						}
 					}
 					case "<:=" => {
 						try{
-							List(StoragePrepend(getStorage(keya), StorageString(json.getNbt())))
+							List(StoragePrepend(getStorage(key), StorageString(json.getNbt())))
 						}
 						catch{
 							_ => {
 								val vari = context.getFreshVariable(JsonType)
 								val a = json.forceNBT()(vari, "json", context)
-								vari.assign("=", JsonValue(a._2)) ::: a._1 ::: List(StoragePrepend(getStorage(keya), vari.getStorage()))
+								vari.assign("=", JsonValue(a._2)) ::: a._1 ::: List(StoragePrepend(getStorage(key), vari.getStorage()))
 							}
 						}
 					}
 					case "::=" => {
 						try{
-							List(StorageMerge(getStorage(keya), StorageString(json.getNbt())))
+							List(StorageMerge(getStorage(key), StorageString(json.getNbt())))
 						}
 						catch{
 							_ => {
 								val vari = context.getFreshVariable(JsonType)
 								val a = json.forceNBT()(vari, "json", context)
-								vari.assign("=", JsonValue(a._2)) ::: a._1 ::: List(StorageMerge(getStorage(keya), vari.getStorage()))
+								vari.assign("=", JsonValue(a._2)) ::: a._1 ::: List(StorageMerge(getStorage(key), vari.getStorage()))
 							}
 						}
 					}
 					case "-:=" => {
 						try{
-							List(StorageRemove(getStorage(keya), StorageString(json.getNbt())))
+							List(StorageRemove(getStorage(key), StorageString(json.getNbt())))
 						}
 						catch{
 							_ => {
 								val vari = context.getFreshVariable(JsonType)
 								val a = json.forceNBT()(vari, "json", context)
-								vari.assign("=", JsonValue(a._2)) ::: a._1 ::: List(StorageRemove(getStorage(keya), vari.getStorage()))
+								vari.assign("=", JsonValue(a._2)) ::: a._1 ::: List(StorageRemove(getStorage(key), vari.getStorage()))
 							}
 						}
 					}
 					case other => throw new Exception(f"Illegal operation with json ${name}: $op at \n${value.pos.longString}")
 				}
-			case DefaultValue => List(StorageSet(getStorage(keya), StorageString("")))
-			case VariableValue(name, sel) => assignBool(op, context.resolveVariable(value))
-			case NullValue => List(StorageSet(getStorage(keya), StorageString("{}")))
+			case DefaultValue => List(StorageSet(getStorage(key), StorageString("")))
+			case VariableValue(name, sel) => withKey(key).assign(op, context.resolveVariable(value))
+			case NullValue => List(StorageSet(getStorage(key), StorageString("{}")))
 			case LinkedVariableValue(vari, sel) => 
 				vari.getType() match{
 					case JsonType => {
 						op match{
-							case "=" => List(StorageSet(getStorage(keya), vari.getStorage()(context,sel)))
-							case ">:=" => List(StorageAppend(getStorage(keya), vari.getStorage()(context,sel)))
-							case "<:=" => List(StoragePrepend(getStorage(keya), vari.getStorage()(context,sel)))
-							case "::=" => List(StorageMerge(getStorage(keya), vari.getStorage()(context,sel)))
-							case "-:=" => List(StorageRemove(getStorage(keya), vari.getStorage()(context,sel)))
+							case "=" => List(StorageSet(getStorage(key), vari.getStorage()(context,sel)))
+							case ">:=" => List(StorageAppend(getStorage(key), vari.getStorage()(context,sel)))
+							case "<:=" => List(StoragePrepend(getStorage(key), vari.getStorage()(context,sel)))
+							case "::=" => List(StorageMerge(getStorage(key), vari.getStorage()(context,sel)))
+							case "-:=" => List(StorageRemove(getStorage(key), vari.getStorage()(context,sel)))
 							case other => jsonUnpackedOperation(op, value, key)
 						}
 					}
 					case IntType | BoolType | EnumType(_) => {
 						op match{
-							case "=" => List(StorageSet(getStorage(keya), StorageScoreboard(vari.getIRSelector()(sel), "int", 1)))
+							case "=" => List(StorageSet(getStorage(key), StorageScoreboard(vari.getIRSelector()(sel), "int", 1)))
 							case ">:=" => List(StorageSet(StorageStorage(fullName, "tmp"), StorageScoreboard(vari.getIRSelector()(sel), "int", 1)), 
-											StorageAppend(getStorage(keya), StorageStorage(fullName, "tmp")))
+											StorageAppend(getStorage(key), StorageStorage(fullName, "tmp")))
 							case "<:=" => List(StorageSet(StorageStorage(fullName, "tmp"), StorageScoreboard(vari.getIRSelector()(sel), "int", 1)), 
-											StoragePrepend(getStorage(keya), StorageStorage(fullName, "tmp")))
+											StoragePrepend(getStorage(key), StorageStorage(fullName, "tmp")))
 							case "::=" => List(StorageSet(StorageStorage(fullName, "tmp"), StorageScoreboard(vari.getIRSelector()(sel), "int", 1)), 
-											StorageMerge(getStorage(keya), StorageStorage(fullName, "tmp")))
+											StorageMerge(getStorage(key), StorageStorage(fullName, "tmp")))
 							case "-:=" => List(StorageSet(StorageStorage(fullName, "tmp"), StorageScoreboard(vari.getIRSelector()(sel), "int", 1)), 
-											StorageRemove(getStorage(keya), StorageStorage(fullName, "tmp")))
+											StorageRemove(getStorage(key), StorageStorage(fullName, "tmp")))
 							case other => jsonUnpackedOperation(op, value, key)
 						}
 					}
 					case FloatType => {
 						op match{
-							case "=" => List(StorageSet(getStorage(keya), StorageScoreboard(vari.getIRSelector()(sel), "float", 1f/Settings.floatPrec)))
+							case "=" => List(StorageSet(getStorage(key), StorageScoreboard(vari.getIRSelector()(sel), "float", 1f/Settings.floatPrec)))
 							case ">:=" => List(StorageSet(StorageStorage(fullName, "tmp"), StorageScoreboard(vari.getIRSelector()(sel), "float", 1f/Settings.floatPrec)), 
-											StorageAppend(getStorage(keya), StorageStorage(fullName, "tmp")))
+											StorageAppend(getStorage(key), StorageStorage(fullName, "tmp")))
 							case "<:=" => List(StorageSet(StorageStorage(fullName, "tmp"), StorageScoreboard(vari.getIRSelector()(sel), "float", 1f/Settings.floatPrec)), 
-											StoragePrepend(getStorage(keya), StorageStorage(fullName, "tmp")))
+											StoragePrepend(getStorage(key), StorageStorage(fullName, "tmp")))
 							case "::=" => List(StorageSet(StorageStorage(fullName, "tmp"), StorageScoreboard(vari.getIRSelector()(sel), "float", 1f/Settings.floatPrec)),	
-											StorageMerge(getStorage(keya), StorageStorage(fullName, "tmp")))
+											StorageMerge(getStorage(key), StorageStorage(fullName, "tmp")))
 							case "-:=" => List(StorageSet(StorageStorage(fullName, "tmp"), StorageScoreboard(vari.getIRSelector()(sel), "float", 1f/Settings.floatPrec)), 
-											StorageRemove(getStorage(keya), StorageStorage(fullName, "tmp")))
+											StorageRemove(getStorage(key), StorageStorage(fullName, "tmp")))
 							case other => jsonUnpackedOperation(op, value, key)
 						}
 					}
 					case StringType => {
 						op match{
-							case "=" => List(StorageSet(getStorage(keya), StorageStorage(vari.fullName, "value")))
-							case ">:=" => List(StorageAppend(getStorage(keya), StorageStorage(vari.fullName, "value")))
-							case "<:=" => List(StoragePrepend(getStorage(keya), StorageStorage(vari.fullName, "value")))
-							case "::=" => List(StorageMerge(getStorage(keya), StorageStorage(vari.fullName, "value")))
-							case "-:=" => List(StorageRemove(getStorage(keya), StorageStorage(vari.fullName, "value")))
+							case "=" => List(StorageSet(getStorage(key), StorageStorage(vari.fullName, "value")))
+							case ">:=" => List(StorageAppend(getStorage(key), StorageStorage(vari.fullName, "value")))
+							case "<:=" => List(StoragePrepend(getStorage(key), StorageStorage(vari.fullName, "value")))
+							case "::=" => List(StorageMerge(getStorage(key), StorageStorage(vari.fullName, "value")))
+							case "-:=" => List(StorageRemove(getStorage(key), StorageStorage(vari.fullName, "value")))
 							case other => jsonUnpackedOperation(op, value, key)
 						}
 					}
@@ -1406,14 +1421,14 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 					}
 					case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()} at \n${value.pos.longString}")
 				}
-			case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
-			case ArrayGetValue(name, index) => handleArrayGetValue(op, name, index)
+			case FunctionCallValue(name, args, typeargs, selector) => withKey(key).handleFunctionCall(op, name, args, typeargs, selector)
+			case ArrayGetValue(name, index) => withKey(key).handleArrayGetValue(op, name, index)
 			case bin: BinaryOperation => {
 				if (keya == "json"){
 					assignBinaryOperatorJson(op, bin)
 				}
 				else {
-					withKey(keya).assignJson(op, bin, "json")
+					withKey(key).assignJson(op, bin, "json")
 				}
 			}
 			case ter: TernaryOperation => {
@@ -1421,7 +1436,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 					assignTernaryOperator(op, ter)
 				}
 				else {
-					withKey(keya).assignJson(op, ter, "json")
+					withKey(key).assignJson(op, ter, "json")
 				}
 			}
 			case SequenceValue(left, right) => {
@@ -1429,20 +1444,20 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			}
 			case StringValue(str) => 
 				op match{
-					case "=" => List(StorageSet(getStorage(keya), StorageString(Utils.stringify(str))))
-					case ">:=" => List(StorageAppend(getStorage(keya), StorageString(Utils.stringify(str))))
-					case "<:=" => List(StoragePrepend(getStorage(keya), StorageString(Utils.stringify(str))))
-					case "::=" => List(StorageMerge(getStorage(keya), StorageString(Utils.stringify(str))))
-					case "-:=" => List(StorageRemove(getStorage(keya), StorageString(Utils.stringify(str))))
+					case "=" => List(StorageSet(getStorage(key), StorageString(Utils.stringify(str))))
+					case ">:=" => List(StorageAppend(getStorage(key), StorageString(Utils.stringify(str))))
+					case "<:=" => List(StoragePrepend(getStorage(key), StorageString(Utils.stringify(str))))
+					case "::=" => List(StorageMerge(getStorage(key), StorageString(Utils.stringify(str))))
+					case "-:=" => List(StorageRemove(getStorage(key), StorageString(Utils.stringify(str))))
 					case other => jsonUnpackedOperation(op, value, key)
 				}
 			case IntValue(_) | FloatValue(_) | BoolValue(_) => 
 				op match{
-					case "=" => List(StorageSet(getStorage(keya), StorageString(value.getString())))
-					case ">:=" => List(StorageAppend(getStorage(keya), StorageString(value.getString())))
-					case "<:=" => List(StoragePrepend(getStorage(keya), StorageString(value.getString())))
-					case "::=" => List(StorageMerge(getStorage(keya), StorageString(value.getString())))
-					case "-:=" => List(StorageRemove(getStorage(keya), StorageString(value.getString())))
+					case "=" => List(StorageSet(getStorage(key), StorageString(value.getString())))
+					case ">:=" => List(StorageAppend(getStorage(key), StorageString(value.getString())))
+					case "<:=" => List(StoragePrepend(getStorage(key), StorageString(value.getString())))
+					case "::=" => List(StorageMerge(getStorage(key), StorageString(value.getString())))
+					case "-:=" => List(StorageRemove(getStorage(key), StorageString(value.getString())))
 					case other => jsonUnpackedOperation(op, value, key)
 				}
 			case _ => throw new Exception(f"Unknown cast to json $value at \n${value.pos.longString}")
@@ -1708,7 +1723,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			f"${selector} ${scoreboard}"
 		}
 		else{
-			f"${inGameName} ${Settings.variableScoreboard}"
+			f"${inGameName} ${variableScoreboard}"
 		}
 	}
 	def getIRSelector()(implicit selector: Selector = Selector.self): SBLink = {
@@ -1718,7 +1733,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			SBLink(selector.getString()(context), scoreboard)
 		}
 		else{
-			SBLink(inGameName, Settings.variableScoreboard)
+			SBLink(inGameName, variableScoreboard)
 		}
 	}
 
@@ -1740,7 +1755,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			f"${scoreboard}"
 		}
 		else{
-			f"${Settings.variableScoreboard}"
+			f"${variableScoreboard}"
 		}
 	} 
 

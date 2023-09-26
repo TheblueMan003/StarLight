@@ -5,6 +5,13 @@ import sl._
 
 object CacheAST{
     val map = scala.collection.mutable.Map[String, CacheLine]()
+    def hasChanged(): Boolean = {
+        map.exists((file, cache) => {
+            if (File(file+".sl").exists() && File(file+".sl").lastModified() > map(file).time) true
+            else if (File("src/"+file+".sl").exists() && File("src/"+file+".sl").lastModified() > map(file).time) true
+            else false}
+        ) || map.isEmpty
+    }
     def contains(file2: String)={
         val file = normalize(file2)
         if (!map.contains(file)) false

@@ -334,11 +334,11 @@ class MacroFunction(context: Context, _contextName: String, name: String, argume
     val vari = context.push(name).getFreshVariable(JsonType)
 
     override def call(args: List[Expression], ret: Variable = null, retSel: Selector = Selector.self, op: String = "=")(implicit ctx: Context): List[IRTree] = {
-        argMap(args).flatMap((v,e) => vari.withKey("json."+v.name).assign("=", e)) ::: List(BlockCall(Settings.target.getFunctionName(fullName), fullName, f"with ${vari.getStorage()}"))
+        argMap(args).flatMap((v,e) => vari.withKey("json."+v.name).assign("=", Utils.simplify(e))) ::: List(BlockCall(Settings.target.getFunctionName(fullName), fullName, f"with ${vari.getStorage()}"))
     }
     override def generateArgument()(implicit ctx: Context):Unit = {
         super.generateArgument()
-        context.push(name).getAllVariable().map(x => x.makeJson(fullName))
+        context.push(name).getAllVariable().filterNot(x => x == returnVariable).map(x => x.makeJson(fullName))
     }
 
 }

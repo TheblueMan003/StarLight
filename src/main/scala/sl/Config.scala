@@ -106,17 +106,30 @@ object ConfigLoader{
                     
                     case ("meta.debug", value)         => Settings.debug = value == "true"
                     case (meta_var(name), value)       => Settings.metaVariable ::= ("Compiler."+name, () => value == "true")
+                    case (other, value)                => Reporter.warning(f"Unknown config: $other")
                 }
             }
         })
     }
 
     def get(target: String, name: String, namespace: String, author: String):List[String] = {
+        Settings.outputName = name
+        Settings.name = namespace.toLowerCase().replaceAllLiterally("[^a-zA-Z0-9]", "_")
+        Settings.author = author
+
+        Settings.target = target match{
+            case "bedrock" => MCBedrock
+            case "java" => MCJava
+        }
+
+        get(target)
+    }
+    def get(target: String)={
         List(
-            f"name=$name",
-            f"namespace=${namespace.toLowerCase().replaceAllLiterally("[^a-zA-Z0-9]", "_")}",
-            f"author=${author}",
-            f"target=$target",
+            f"name=${Settings.outputName}",
+            f"namespace=${Settings.name}",
+            f"author=${Settings.author}",
+            f"target=${target}",
             f"scoreboard.variable=${Settings.variableScoreboard}",
             f"scoreboard.value=${Settings.valueScoreboard}",
             f"scoreboard.const=${Settings.constScoreboard}",

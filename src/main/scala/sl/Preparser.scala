@@ -5,7 +5,7 @@ import sl.Parser.namespacedName
 
 object Preparser{
     val paternsToReplace = List(("@s\n","@s\n;"), ("@e\n","@e\n;"), ("@a\n","@a\n;"), ("@p\n","@p\n;"), ("@r\n","@r\n;"))
-    def parse(name: String, text: String): String = {
+    def parse(name: String, text: String, silent: Boolean = false): String = {
         var text2 = text
         val cmd = "\n\\s*/([a-zA-Z0-9].+)".r
         val cmd2 = "\\./([a-zA-Z0-9].+)".r
@@ -78,7 +78,7 @@ object Preparser{
         }
 
         paternsToReplace.foreach(p => text2 = text2.replaceAllLiterally(p._1, p._2))
-        if (name != ""){
+        if (name != "" && !silent){
             Reporter.ok(f"Preparsed: $name")
         }
         

@@ -884,10 +884,12 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
         predicates(name) = predicate :: predicates(name)
         predicate
     }
-    def getAllPredicates():List[Predicate] = {
-        predicates.values.flatten.toList ::: child.filter(_._2 != this).flatMap(_._2.getAllPredicates()).foldLeft(List[Predicate]())((b, p) => p :: b)
-    }
 
+    def getAllPredicates(set: mutable.Set[Context] = mutable.Set[Context]()):List[Predicate] = {
+        if (set.contains(this)) return List()
+        set.add(this)
+        predicates.values.flatten.toList ::: child.filter(c => c._2 != this && !set.contains(c._2)).map(_._2.getAllPredicates(set)).foldLeft(List[Predicate]())(_.toList ::: _.toList)
+    }
 
 
     def getTemplate(identifier: Identifier): Template = {
@@ -995,9 +997,10 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
         jsonfiles.addOne(jsonfile.name, jsonfile)
         jsonfile
     }
-    def getAllJsonFiles(rec: Int = 0):List[JSONFile] = {
-        if (rec > 100) throw new Exception("Recursion limit reached")
-        jsonfiles.values.toList ::: child.filter(_._2 != this).map(_._2.getAllJsonFiles(rec+1)).foldLeft(List[JSONFile]())(_.toList ::: _.toList)
+    def getAllJsonFiles(set: mutable.Set[Context] = mutable.Set[Context]()):List[JSONFile] = {
+        if (set.contains(this)) return List()
+        set.add(this)
+        jsonfiles.values.toList ::: child.filter(c => c._2 != this && !set.contains(c._2)).map(_._2.getAllJsonFiles(set)).foldLeft(List[JSONFile]())(_.toList ::: _.toList)
     }
 
 
@@ -1014,8 +1017,10 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
         blocktags.addOne(blocktag.name, blocktag)
         blocktag
     }
-    def getAllBlockTag():List[Tag] = {
-        blocktags.values.toList ::: child.filter(_._2 != this).map(_._2.getAllBlockTag()).foldLeft(List[Tag]())(_.toList ::: _.toList)
+    def getAllBlockTag(set: mutable.Set[Context] = mutable.Set[Context]()):List[Tag] = {
+        if (set.contains(this)) return List()
+        set.add(this)
+        blocktags.values.toList ::: child.filter(c => c._2 != this && !set.contains(c._2)).map(_._2.getAllBlockTag(set)).foldLeft(List[Tag]())(_.toList ::: _.toList)
     }
 
 

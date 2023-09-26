@@ -153,10 +153,30 @@ object Main{
               Reporter.error(f"Expected 1 argument got: ${args.length-1}")
             }
             else{
-              lastBuild = args(1)+".slconf"
+              val lastBuild = args(1)+".slconf"
               ConfigLoader.load(lastBuild)
               ConfigLoader.get(lastBuild)
+              FileUtils.safeWriteFile("java.slconf", ConfigLoader.get(lastBuild))
               Reporter.ok("Configuration Updated!")
+            }
+          }
+          case "watch" => {
+            while(true){
+              if (CacheAST.hasChanged()){
+                if (args.length < 1 && lastBuild == null) then {
+                  Reporter.error(f"Expected 1 argument got: ${args.length-1}")
+                }
+                else if (args.length < 1 && lastBuild != null) then {
+                  build(lastBuild)
+                  Reporter.ok("Build Completed!")
+                }
+                else{
+                  lastBuild = args(1)+".slconf"
+                  build(args(1)+".slconf")
+                  Reporter.ok("Build Completed!")
+                }
+              }
+              Thread.sleep(1000)
             }
           }
           case ">" | "show" => {
@@ -280,8 +300,16 @@ object Main{
     FileUtils.safeWriteFile(directory+"/bedrock.slconf", ConfigLoader.get("bedrock", name, namespace, author))
     FileUtils.safeWriteFile(directory+"/src/main.sl", List("package main", "","def ticking main(){","","}"))
 
+    FileUtils.createDirectory(directory+"/lib")
+    FileUtils.createDirectory(directory+"/java_datapack/data")
+    FileUtils.safeWriteFile(directory+"/java_datapack/pack.mcmeta", List(MCJava.getPackMeta()))
+    FileUtils.createDirectory(directory+"/bedrock_datapack")
+
     FileUtils.copyFromResourcesToFolder("icon/64.png", directory+"/java_resourcepack/pack.png")
     FileUtils.copyFromResourcesToFolder("icon/256.png", directory+"/bedrock_resourcepack/pack_icon.png")
+
+    FileUtils.copyFromResourcesToFolder("icon/64.png", directory+"/java_datapack/pack.png")
+    FileUtils.copyFromResourcesToFolder("icon/256.png", directory+"/bedrock_datapack/pack_icon.png")
 
     FileUtils.copyFromResourcesToFolder("configs/blockmap.csv", directory+"/configs/blockmap.csv")
     FileUtils.copyFromResourcesToFolder("configs/soundmap.csv", directory+"/configs/soundmap.csv")

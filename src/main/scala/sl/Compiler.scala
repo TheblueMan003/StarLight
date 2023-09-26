@@ -310,6 +310,7 @@ object Compiler{
 
                         sub.inherit(template.getContext())
                         sub.push("this", sub)
+                        sub.push("super", context)
                         sub.setTemplateUse()
                         compile(Utils.fix(template.getBlock(values.map(Utils.simplify(_))))(template.context, Set()), meta.withFirstPass)(sub) ::: compile(block.unBlockify(), meta.withFirstPass)(sub)
                     }
@@ -397,7 +398,9 @@ object Compiler{
                             List()
                         }
                         else if (typ == JsonType && !vari.modifiers.isEntity){
-                            vari.assignJson(op, value, "json."+index.head.getString())
+                            Utils.simplify(index.head) match
+                                case IntValue(id) => vari.assignJson(op, value, vari.getSubKey(f"[$id]"))
+                                case other => vari.assignJson(op, value, vari.getSubKey(other.getString()))
                         }
                         else{
                             (typ, Utils.simplify(index.head)) match

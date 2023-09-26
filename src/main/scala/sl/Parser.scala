@@ -603,7 +603,7 @@ object Parser extends StandardTokenParsers{
     }
   }
   def parseExpression(file: String, silent: Boolean = false): Expression = {
-    val tokens = new lexical.Scanner(Preparser.parse(file, file))
+    val tokens = new lexical.Scanner(Preparser.parse(file, file, silent))
     phrase(expr)(tokens) match {
       case Success(trees, _) =>
         if (!silent){
