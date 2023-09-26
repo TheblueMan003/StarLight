@@ -111,7 +111,9 @@ Attributes can be added to function to specify thing to the compiler.
 ```
 Here is a list of used attributes by the compiler:
 - `criterion`: specify the criterion when other than dummy. (JAVA Only)
-- `name`: force the name of the variable
+- `nbt`: specify the nbt of the variable (for variable of type json & marked as scoreboard)
+- `name`: force the name of the variable (use for inter compatibility with other datapack)
+- `scoreboard`: force the scoreboard of the variable (use for inter compatibility with other datapack)
 - `versionSpecific`: Append the version to the name of the variable
 - `tag`: force the tag use by the variable (for variable of type entity)
 
@@ -121,7 +123,7 @@ Here is a list of used attributes by the compiler:
 Store Normal integer
 
 Supported operation:
-* `=`, `+`, `-`, `*`, `/`, `%`
+* `=`, `+`, `-`, `*`, `/`, `%`, `<<`, `>>`, `++`, `--`
 
 
 ### float
@@ -184,6 +186,17 @@ if (@s in set){
 
 }
 ```
+
+### json (Java Edition Only)
+Store a json value. The json value can be either a json object, a json array, a json string, a json number, a json boolean. 
+When it is marked as scoreboard, the behavior is undefined unless the "nbt" attribute is set. In case, the json will be stored as nbt on the current entity.
+
+Supported operation:
+* `=`: The variable to the json
+* `<:=`: Prepend the json
+* `>:=`: Append the json
+* `::=`: Merge the json
+* `-:=`: Remove the json
 
 ## Flow Controls
 ### If
@@ -382,9 +395,11 @@ int b = fct(5)
 
 Lambda can be created with the syntax:
 ```
-(int, int)=>int fct = (a,b)=> return a + b
+(int, int)=>int fct = (a,b)=> { return a + b }
 ```
+Note that Lambda refere to the variable outside of it by reference & not by value. Meaning that if you change the value of a variable outside of the lambda it will also change inside the lambda and vis-versa. (These are not closure.)
 
+You can call a variable of type function with the following syntax:
 ```
 def fct(void=>void arg){
     /say befor
@@ -396,12 +411,6 @@ fct(){
 }
 ```
 With the latter syntax the lambda is always the rightmost argument of the function; not including optional argument.
-
-### Lambda
-Lambda can be created with the following syntax:
-```
-int=>int fct = (a)=> {return a}
-```
 
 ### Function Tags
 Function can also belong to a tag by adding an name prefixed by `@`:
@@ -673,6 +682,7 @@ class B extends A{
     }
     public override bar(){
         /say I'm b
+        super.bar()
     }
 }
 A a = new B()
@@ -702,6 +712,19 @@ example2 foo{
 }
 ```
 
+Additionnaly, you can access the other of the template with the super keyword:
+```
+def foo(){
+    ...
+}
+template example{
+    def foo(){
+        super.foo()
+    }
+}
+```
+The super keyword do not need to be use if the function is not shadowed.
+
 ### Generic Template
 Template can also accept type parameters with the following syntax:
 ```
@@ -722,10 +745,13 @@ example<int, 0> instance
 Macro functions only work for Minecraft Java and follow the same logic as in Datapack. A command with a $<variable> inside it will be replace by the value of the variable. Note that <variable> will not be usable inside the macro function as a variable for optimization purpose.
 ```
 def macro test(int a){
-    /say $a
+    /say $(a)
 }
 test(0)
 ```
+Note: You do not need to prefix command with `$` like in a datapack.
+
+With the `macroConvertToLazy` Compiler setting activated the function will be converted to a lazy function in the case where the arguments provided are all value.
 
 ### Lazy Functions
 Lazy functions are also not exported into the output code. Instead when they are called, there content is replace at the call site.
@@ -772,6 +798,8 @@ This can be used to compile according to some compilation settings. Here is a li
 * `Compiler.isJava`: Tell if the target is MC Java
 * `Compiler.isBedrock`: Tell if the target is MC Bedrock
 * `Compiler.isDebug`: Used to add extra info in the datapack that can be used to debug
+* `Compiler.isEqualitySupported<T>`: Check if the type provided T support equality
+* `Compiler.isComparaisonSupported<T>`: Check if the type provided T support comparaison
 * `@tagExample`: where tagExample is a function tag. Tell if there is at least one function inside the tag when the compiler reach the condition.
 
 
