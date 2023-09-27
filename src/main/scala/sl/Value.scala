@@ -338,7 +338,7 @@ case class SelectorValue(val value: Selector) extends Expression{
     override def getString()(implicit context: Context): String = value.getString()
 }
 case class PositionValue(val x: Expression, val y: Expression, val z: Expression) extends Expression{
-    override def toString(): String = f"($x, $y, $z)"
+    override def toString(): String = f"$x $y $z"
     override def getIntValue(): Int = ???
     override def hasIntValue(): Boolean = false
     override def hasFloatValue(): Boolean = false

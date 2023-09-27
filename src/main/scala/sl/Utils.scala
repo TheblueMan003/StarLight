@@ -178,7 +178,7 @@ object Utils{
             case With(expr, isAt, cond, block, elze) => With(subst(expr, from, to), subst(isAt, from, to), subst(cond, from, to), subst(block, from, to), subst(elze, from, to))
 
             case Sleep(time, continuation) => Sleep(subst(time, from, to), subst(continuation, from, to))
-            case Await(func, continuation) => Await(subst(func, from, to).asInstanceOf[FunctionCall], subst(continuation, from, to))
+            case Await(func, continuation) => Await(subst(func, from, to), subst(continuation, from, to))
             case Assert(condition, continuation) => Assert(subst(condition, from, to), subst(continuation, from, to))
             case Switch(cond, cases, cv) => Switch(subst(cond, from, to), cases.map{case x: SwitchCase => SwitchCase(subst(x.expr, from, to), subst(x.instr, from, to), subst(x.cond, from, to));
                                                                                     case x: SwitchForGenerate => SwitchForGenerate(x.key, subst(x.provider, from, to), SwitchCase(subst(x.instr.expr, from, to), subst(x.instr.instr, from, to), subst(x.instr.cond, from, to)));
@@ -290,7 +290,7 @@ object Utils{
             case With(expr, isAt, cond, block, elze) => With(subst(expr, from, to), subst(isAt, from, to), subst(cond, from, to), subst(block, from, to), subst(elze, from, to))
 
             case Sleep(time, continuation) => Sleep(subst(time, from, to), subst(continuation, from, to))
-            case Await(func, continuation) => Await(subst(func, from, to).asInstanceOf[FunctionCall], subst(continuation, from, to))
+            case Await(func, continuation) => Await(subst(func, from, to), subst(continuation, from, to))
             case Assert(cond, continuation) => Assert(subst(cond, from, to), subst(continuation, from, to))
             case Switch(cond, cases, cv) => Switch(subst(cond, from, to), cases.map{case x: SwitchCase => SwitchCase(subst(x.expr, from, to), subst(x.instr, from, to), subst(x.cond, from, to));
                                                                                     case x: SwitchForGenerate => SwitchForGenerate(x.key, subst(x.provider, from, to), SwitchCase(subst(x.instr.expr, from, to), subst(x.instr.instr, from, to), subst(x.instr.cond, from, to)));
@@ -414,7 +414,7 @@ object Utils{
             case Execute(typ, expr, block) => Execute(typ, expr.map(subst(_, from, to)), subst(block, from, to))
             case With(expr, isAt, cond, block, elze) => With(subst(expr, from, to), subst(isAt, from, to), subst(cond, from, to), subst(block, from, to), subst(elze, from, to))
             case Sleep(time, continuation) => Sleep(subst(time, from, to), subst(continuation, from, to))
-            case Await(func, continuation) => Await(subst(func, from, to).asInstanceOf[FunctionCall], subst(continuation, from, to))
+            case Await(func, continuation) => Await(subst(func, from, to), subst(continuation, from, to))
             case Assert(cond, continuation) => Assert(subst(cond, from, to), subst(continuation, from, to))
             case Switch(cond, cases, cv) => Switch(subst(cond, from, to), cases.map{case x: SwitchCase => SwitchCase(subst(x.expr, from, to), subst(x.instr, from, to), x.cond);
                                                                                     case x: SwitchForGenerate => SwitchForGenerate(x.key, subst(x.provider, from, to), SwitchCase(subst(x.instr.expr, from, to), subst(x.instr.instr, from, to), x.instr.cond));
@@ -548,7 +548,7 @@ object Utils{
             case Execute(typ, expr, block) => Execute(typ, expr.map(fix(_)), fix(block))
             case With(expr, isAt, cond, block, elze) => With(fix(expr), fix(isAt), fix(cond), fix(block), fix(elze))
             case Sleep(time, continuation) => Sleep(fix(time), fix(continuation))
-            case Await(func, continuation) => Await(fix(func).asInstanceOf[FunctionCall], fix(continuation))
+            case Await(func, continuation) => Await(fix(func), fix(continuation))
             case Assert(cond, continuation) => Assert(fix(cond), fix(continuation))
             case Switch(cond, cases, cv) => Switch(fix(cond), cases.map{case x: SwitchCase => SwitchCase(fix(x.expr), fix(x.instr), fix(x.cond));
                                                                         case x: SwitchForGenerate => SwitchForGenerate(x.key, fix(x.provider), SwitchCase(fix(x.instr.expr), fix(x.instr.instr), fix(x.instr.cond)));
@@ -1761,9 +1761,9 @@ object Utils{
             case BinaryOperation("in", left, right) => 
                 val (p1, ctx1, s1) = getSelector(left)
                 right match{
-                    case Tuple(lst) => {
+                    case TupleValue(lst) => {
                         val c2 = lst.map(getSelector(_))
-                        (p1 ::: c2.map(_._1), ctx2, c2.foldLeft(s1)((a,b)=>a.merge(b._3)))
+                        (p1 ::: c2.flatMap(_._1), ctx1, c2.foldLeft(s1)((a,b)=>a.merge(b._3)))
                     }
                     case other => {
                         val (p2, ctx2, s2) = getSelector(right)
@@ -1774,9 +1774,9 @@ object Utils{
             case BinaryOperation("not in", left, right) => 
                 val (p1, ctx1, s1) = getSelector(left)
                 right match{
-                    case Tuple(lst) => {
+                    case TupleValue(lst) => {
                         val c2 = lst.map(getSelector(_))
-                        (p1 ::: c2.map(_._1), ctx2, c2.foldLeft(s1)((a,b)=>a.merge(b._3.invert())))
+                        (p1 ::: c2.flatMap(_._1), ctx1, c2.foldLeft(s1)((a,b)=>a.merge(b._3.invert())))
                     }
                     case other => {
                         val (p2, ctx2, s2) = getSelector(right)

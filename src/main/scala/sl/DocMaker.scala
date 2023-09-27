@@ -5,10 +5,33 @@ import objects.Modifier
 import objects.Protection.Private
 
 object DocMaker{
+    def listToMarkdownTree(files: List[(String, String)]): String = {
+        def formatTree(files: List[(String, String)], indent: String = ""): String = {
+            val (directories, remainingFiles) = files.partition(_._1.contains('/'))
+
+            val directoryTree = directories.map { dir =>
+                    val (dirName, subFiles) = dir._1.splitAt(dir._1.indexOf('/') + 1)
+                    (dirName, subFiles, dir._2)
+                }
+                .groupBy(_._1).map((key, values) => {
+                    (key, s"$indent- **${key.replace("/", "")}**\n" + formatTree(values.map(f => (f._2, f._3)), indent + "\t"))
+                })
+                .toList
+                .sortBy(_._1)
+                .map(_._2)
+                .mkString("\n")
+
+            val fileTree = remainingFiles.map(file => s"$indent- [${file._1}](libraries/${file._2}.md)\n").mkString
+
+            directoryTree + fileTree
+        }
+
+        formatTree(files)
+    }
     def makeIndex(files: List[String])={
         Utils.getFile("README.md")+
-        "\n# List of Libraries\n\n"+
-        files.map(f => f"[$f](libraries/$f/index.html)").mkString("\n\n")
+        "\n# List of Libraries\n\n"+listToMarkdownTree(files.zip(files))
+        //files.map(f => f"- [${f.replace("/", ".")}](libraries/$f.md)").mkString("\n")
     }
     /**
      * Traverse the instruction tree and generate the html documentation from modifiers and comments
@@ -20,11 +43,13 @@ object DocMaker{
             case Package(name, block) => make2(block)(name)
 
             case FunctionDecl(name, block, typ, args, List(), modifier) if modifier.protection != Private => 
-                ContentMaker.h2("`"+modifier.schema() +" "+typ.toString()+ " "+name+"("+args.map(a => a.typ.toString()+" "+a.name).mkString(", ")+")`")+
+                ContentMaker.h2(modifier.schema() + " function " + name)+
+                ContentMaker.p("### Arguments:\n"+args.map(a => f"- ${a.name} (`${a.typ}`)").mkString("\n")+f"\n### Return:\n- $typ")+"\n\n\n"+
                 ContentMaker.p(modifier.doc)+"\n\n"
 
             case FunctionDecl(name, block, typ, args, typeargs, modifier) if modifier.protection != Private => 
-                ContentMaker.h2("`"+modifier.schema() +" "+typ.toString()+ " "+name+typeargs.mkString("<", ",", ">")+"("+args.map(a => a.typ.toString()+" "+a.name).mkString(", ")+")`")+
+                ContentMaker.h2("`"+modifier.schema() + " function" + name)+
+                ContentMaker.p("### Type Arguments:\n"+typeargs.map(a => f"- `${a}`").mkString("\n")+"\n### Arguments:\n"+args.map(a => f"- ${a.name} (`${a.typ}`)").mkString("\n")+f"\n\n### Return:\n- `$typ`")+"\n\n\n"+
                 ContentMaker.p(modifier.doc)+"\n\n"
 
             case StructDecl(name, List(), block, modifier, parent) if modifier.protection != Private => 

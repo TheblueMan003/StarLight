@@ -185,7 +185,7 @@ case class With(val expr: Expression, val isat: Expression, val cond: Expression
 case class Sleep(val time: Expression, val continuation: Instruction) extends Instruction {
   override def toString() = f"sleep($time)\n$continuation"
 }
-case class Await(val func: FunctionCall, val continuation: Instruction) extends Instruction {
+case class Await(val func: Instruction, val continuation: Instruction) extends Instruction {
   override def toString() = f"await($func)\n$continuation"
 }
 case class Assert(val time: Expression, val continuation: Instruction) extends Instruction {

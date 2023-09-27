@@ -1,11 +1,13 @@
 package test
 
-def macro test(int a){
-    /say $(a)
+json t
+
+struct A{
+    int[10] lol
 }
 
-def lol(){
-    int c
-    test(5)
-    test(c)
+def test(){
+    A a
+    t = a
+    a = t
 }

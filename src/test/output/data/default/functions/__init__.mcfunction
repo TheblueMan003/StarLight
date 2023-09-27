@@ -11,3 +11,7 @@ scoreboard objectives add tbms.var dummy
 # 
 #  =================USER SCOREBOARD==================
 #  
+scoreboard objectives add default.object.__ref dummy
+scoreboard objectives add default.object.---__destroy__ dummy
+scoreboard objectives add default.object.__refCount dummy
+scoreboard objectives add default.object.__MCEntity dummy

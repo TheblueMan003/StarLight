@@ -57,7 +57,9 @@ object ContextBuilder{
                     case None => null
                     case Some(p) => Identifier.fromString(p)
                 
-                context.addClass(new Class(context, name, generics, modifier, block.unBlockify(), parentName, parentGenerics, interfaces.map(x => (Identifier.fromString(x._1), x._2)), entity))
+                val c = new Class(context, name, generics, modifier, block.unBlockify(), parentName, parentGenerics, interfaces.map(x => (Identifier.fromString(x._1), x._2)), entity)
+                context.addClass(c)
+                c.checkIfShouldGenerate()
             }
             case EnumDecl(name, fields, values, modifier) => {
                 modifier.simplify()
@@ -128,7 +130,7 @@ object ContextBuilder{
 
                     if (value != null){
                         try{
-                            context.addObjectFrom(value, if alias == null then value else alias, context.root.push(lib))
+                            context.addObjectFrom(value, Identifier.fromString(if alias == null then value else alias), context.root.push(lib))
                         }catch{case _ =>{}}
                     }
                     else{

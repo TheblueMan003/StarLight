@@ -46,6 +46,11 @@ object Main{
       val args = if argsOri != null then argsOri else scala.io.StdIn.readLine().split(" ")
       try{
         args(0) match
+          case ""=>{
+          }
+          case "clear"=>{
+            print("\n"*100)
+          }
           case "doc" => {
             if (args.length < 2 && lastBuild == null) then {
               Reporter.error(f"Expected 1 argument got: ${args.length-1}")
@@ -53,7 +58,7 @@ object Main{
             else if (args.length == 2) then {
               val path = args(1)
               val libraries: List[String] = FileUtils.getListOfFiles(path).filterNot(_.contains("__init__.sl"))
-              libraries.foreach(f => makeDocumentation(f.dropRight(3).replaceAllLiterally("\\","/").replaceAllLiterally(path,""), List(f)))
+              libraries.par.foreach(f => makeDocumentation(f.dropRight(3).replaceAllLiterally("\\","/").replaceAllLiterally(path,""), List(f)))
               val names = libraries.map(f => f.dropRight(3).replaceAllLiterally("\\","/").replaceAllLiterally(path,""))
               FileUtils.safeWriteFile("docs/index.md", List(DocMaker.makeIndex(names)))
               Reporter.ok("Documentation Completed!")
@@ -221,19 +226,20 @@ object Main{
             }
           }
           case "help" => {
-            println("build <config_name>: Build the project with the config contains in the file config_name. The .slconf must be omited.")
-            println("new: Make a new project")
-            println("run <function>: Interpret the function. The .sl must be omited and the internal name must be used. Example: `main.ticking.main`. You must compile the project before.")
-            println("debug <function>: Interpret the function in debug mode (print every operation). The .sl must be omited and the internal name must be used. Example: `main.ticking.main`. You must compile the project before.")
-            println("help: Show this")
-            println("install <library> [version]: Install a library into the local project. If version is not specified, the latest version will be installed. Note that standard libraries are downloaded automatically when needed.")
-            println("update <library>: Update a library into the local project.")
-            println("updateconfig <config_name>: Update the config file contains in the file config_name (Add the new field from new version). The .slconf must be omited.")
-            println("clearcache: Clear the caches of the compiler")
-            println("tree: Print the tree of the last compilation")
-            println("show <file>: Print the IR of the last compilation")
-            println("exit: Close")
-          }
+              println("build <config_name>: Build the project with the config contains in the file config_name. The .slconf must be omitted.")
+              println("clear: Clear the console")
+              println("clearcache: Clear the caches of the compiler")
+              println("debug <function>: Interpret the function in debug mode (print every operation). The .sl must be omitted and the internal name must be used. Example: `main.ticking.main`. You must compile the project before.")
+              println("exit: Close")
+              println("help: Show this")
+              println("install <library> [version]: Install a library into the local project. If version is not specified, the latest version will be installed. Note that standard libraries are downloaded automatically when needed.")
+              println("new: Make a new project")
+              println("show <file>: Print the IR of the last compilation")
+              println("tree: Print the tree of the last compilation")
+              println("update <library>: Update a library into the local project.")
+              println("updateconfig <config_name>: Update the config file contains in the file config_name (Add the new field from new version). The .slconf must be omitted.")
+              println("watch: Watch the project and compile it when a file change")
+            }
           case "exit" => {
             FileUtils.deleteDirectory("./bin")
             ended = true

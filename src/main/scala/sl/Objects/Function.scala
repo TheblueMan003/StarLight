@@ -273,7 +273,6 @@ class ConcreteFunction(context: Context, _contextName: String, name: String, arg
 }
 
 class BlockFunction(context: Context, _contextName: String, name: String, arguments: List[Argument], var body: List[IRTree]) extends Function(context, _contextName, name, arguments, VoidType, Modifier.newPrivate()){
-    val parentFunction = context.getCurrentFunction()
     def call(args2: List[Expression], ret: Variable = null, retSel: Selector = Selector.self, op: String = "=")(implicit ctx: Context): List[IRTree] = {
         parentFunction match{
             case mc: MacroFunction => {
@@ -284,6 +283,7 @@ class BlockFunction(context: Context, _contextName: String, name: String, argume
                 argMap(args2).flatMap(p => p._1.assign("=", p._2)) :::
                     List(BlockCall(Settings.target.getFunctionName(fullName), fullName, null))
             }
+        }
     }
 
     def exists(): Boolean = true
@@ -356,7 +356,7 @@ class MacroFunction(context: Context, _contextName: String, name: String, argume
         }
 
         if (Settings.macroConvertToLazy && mapped.forall((v,e) => isSimpleValue(e))){
-            val r = Compiler.compile(mapped.foldLeft(_body){case (block, (v, e)) => Utils.subst(block, "$("+v.name+")", e.toString())})
+            val r = Compiler.compile(mapped.foldLeft(Utils.substReturn(_body, ret)(!modifiers.hasAttributes("__returnCheck__"), retSel)){case (block, (v, e)) => Utils.subst(block, "$("+v.name+")", e.toString())})
             if (ret != null){
                 r ::: ret.assign(op, LinkedVariableValue(returnVariable))(context, retSel)
             }
@@ -378,7 +378,7 @@ class MacroFunction(context: Context, _contextName: String, name: String, argume
 
     def isSimpleValue(expr: Expression) = {
         expr match
-            case _: (IntValue | FloatValue | StringValue | BoolValue | JsonValue) => true
+            case _: (IntValue | FloatValue | StringValue | BoolValue | JsonValue | PositionValue | SelectorValue | TagValue | LinkedTagValue | NamespacedName) => true
             case NullValue => true
             case _ => false
     }

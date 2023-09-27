@@ -17,6 +17,12 @@ class Class(context: Context, name: String, val generics: List[String], _modifie
     var definingType = ClassType(this, List())
     private var wasGenerated = false
 
+    def checkIfShouldGenerate()={
+        if (Utils.contains(block, x => x match {case FunctionDecl(name, block, typ, args, typeArgs, modifier) => modifier.isStatic; case _ => false})){
+            generate()
+        }
+    }
+
     lazy val hasOwnInnit = getAllFunctions().exists(f => f._1 == "__init__" && f._2.clazz == this)
 
     lazy val cacheGVFunctions = getAllFunctions()

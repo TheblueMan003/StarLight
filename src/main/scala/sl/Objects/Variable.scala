@@ -89,7 +89,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 		
 
 		if (parent != null){
-			if (!isFunctionArgument){
+			if (!isFunctionArgument && !parent.tupleVari.contains(this)){
 				parent.tupleVari = parent.tupleVari ::: List(this)
 			}
 			isFunctionArgument |= parent.isFunctionArgument
@@ -128,7 +128,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			case ArrayType(inner, size) => {
 				size match
 					case IntValue(size) => {
-						val ctx = context.push(name)
+						val ctx = context.push(name, this)
 						tupleVari = Range(0, size).map(i => ctx.addVariable(new Variable(ctx, f"$i", inner, _modifier))).toList
 						tupleVari.map(_.generate()(ctx))
 
@@ -139,7 +139,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 					case TupleValue(values) if values.forall(x => x.isInstanceOf[IntValue])=> {
 						val sizes = values.map(x => x.asInstanceOf[IntValue].value)
 						val size = sizes.reduce(_ * _)
-						val ctx = context.push(name)
+						val ctx = context.push(name, this)
 						
 						val indexes = sizes.map(Range(0, _))
 									.foldLeft(List[List[Int]](List()))((acc, b) => b.flatMap(v => acc.map(_ ::: List(v))).toList)
@@ -153,17 +153,17 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 					case other => throw new Exception(f"Cannot have a array with size: $other")
 			}
 			case TupleType(sub) => {
-				val ctx = context.push(name)
+				val ctx = context.push(name, this)
 				tupleVari = sub.zipWithIndex.map((t, i) => ctx.addVariable(new Variable(ctx, f"_$i", t, _modifier)))
 				tupleVari.map(_.generate()(ctx))
 			}
 			case EntityType => {
-				val ctx = context.push(name)
+				val ctx = context.push(name, this)
 				tupleVari = entityTypeSubVariable.map((t, n) => ctx.addVariable(new Variable(ctx, n, t, _modifier)))
 				tupleVari.map(_.generate()(ctx))
 			}
 			case RangeType(sub) => {
-				val ctx = context.push(name)
+				val ctx = context.push(name, this)
 				tupleVari = List(ctx.addVariable(new Variable(ctx, f"min", sub, _modifier)), ctx.addVariable(new Variable(ctx, f"max", sub, _modifier)))
 				tupleVari.map(_.generate()(ctx))
 			}
@@ -702,10 +702,10 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 							index match{
 								case List(StringValue(str)) => 
 									getType() match
-										case IntType => List(CommandIR(f"execute store result score ${getSelector()} ${getSelectorObjective()} run data get storage ${vari.fullName} json.${str} 1"))
-										case FloatType => List(CommandIR(f"execute store result score ${getSelector()} ${getSelectorObjective()} run data get storage ${vari.fullName} json.${str} 1000"))
-										case BoolType => List(CommandIR(f"execute store result score ${getSelector()} ${getSelectorObjective()} run data get storage ${vari.fullName} json.${str} 1"))
-										case StringType => ???
+										case IntType => List(StorageRead(getIRSelector(), vari.getStorage(vari.getSubKey(str)), 1))
+										case FloatType => List(StorageRead(getIRSelector(), vari.getStorage(vari.getSubKey(str)), Settings.floatPrec))
+										case BoolType => List(StorageRead(getIRSelector(), vari.getStorage(vari.getSubKey(str)), 1))
+										case StringType => assign(op, LinkedVariableValue(vari.withKey(vari.getSubKey(str))))
 										case StructType(struct, sub) => {
 											tupleVari.flatMap(x => x.handleArrayGetValue(op, name, List(StringValue(str+"."+x.name))))
 										}
@@ -1057,12 +1057,16 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 					case _ => throw new Exception(f"Cannot assign tuple of size ${value.size} to array of size $size at \n${expr2.pos.longString}")
 			}
 			case LinkedVariableValue(vari, sel) => {
-				if (vari.getType().isSubtypeOf(getType())){
-					tupleVari.zip(vari.tupleVari).flatMap((t,v) => t.assign(op, LinkedVariableValue(v, sel)))
-				}
-				else{
-					tupleVari.flatMap(t => t.assign(op, expr))
-				}
+				vari.getType() match
+					case JsonType => tupleVari.zipWithIndex.flatMap((t, i) => t.assign(op, LinkedVariableValue(vari.withKey(vari.getSubKey(f"[$i]")), sel)))
+					case other => {
+						if (vari.getType().isSubtypeOf(getType())){
+							tupleVari.zip(vari.tupleVari).flatMap((t,v) => t.assign(op, LinkedVariableValue(v, sel)))
+						}
+						else{
+							tupleVari.flatMap(t => t.assign(op, expr))
+						}
+					}
 			}
 			case JsonValue(JsonArray(array)) => {
 				if (array.size != tupleVari.size) throw new Exception(f"Cannot assign array of size ${array.size} to array of size ${tupleVari.size} at \n${expr2.pos.longString}")
@@ -1386,46 +1390,56 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 					case IntType | BoolType | EnumType(_) => {
 						op match{
 							case "=" => List(StorageSet(getStorage(key), StorageScoreboard(vari.getIRSelector()(sel), "int", 1)))
-							case ">:=" => List(StorageSet(StorageStorage(fullName, "tmp"), StorageScoreboard(vari.getIRSelector()(sel), "int", 1)), 
-											StorageAppend(getStorage(key), StorageStorage(fullName, "tmp")))
-							case "<:=" => List(StorageSet(StorageStorage(fullName, "tmp"), StorageScoreboard(vari.getIRSelector()(sel), "int", 1)), 
-											StoragePrepend(getStorage(key), StorageStorage(fullName, "tmp")))
-							case "::=" => List(StorageSet(StorageStorage(fullName, "tmp"), StorageScoreboard(vari.getIRSelector()(sel), "int", 1)), 
-											StorageMerge(getStorage(key), StorageStorage(fullName, "tmp")))
-							case "-:=" => List(StorageSet(StorageStorage(fullName, "tmp"), StorageScoreboard(vari.getIRSelector()(sel), "int", 1)), 
-											StorageRemove(getStorage(key), StorageStorage(fullName, "tmp")))
+							case ">:=" => List(StorageSet(getStorage("tmp"), StorageScoreboard(vari.getIRSelector()(sel), "int", 1)), 
+											StorageAppend(getStorage(key), getStorage("tmp")))
+							case "<:=" => List(StorageSet(getStorage("tmp"), StorageScoreboard(vari.getIRSelector()(sel), "int", 1)), 
+											StoragePrepend(getStorage(key), getStorage("tmp")))
+							case "::=" => List(StorageSet(getStorage("tmp"), StorageScoreboard(vari.getIRSelector()(sel), "int", 1)), 
+											StorageMerge(getStorage(key), getStorage("tmp")))
+							case "-:=" => List(StorageSet(getStorage("tmp"), StorageScoreboard(vari.getIRSelector()(sel), "int", 1)), 
+											StorageRemove(getStorage(key), getStorage("tmp")))
 							case other => jsonUnpackedOperation(op, value, key)
 						}
 					}
 					case FloatType => {
 						op match{
 							case "=" => List(StorageSet(getStorage(key), StorageScoreboard(vari.getIRSelector()(sel), "float", 1f/Settings.floatPrec)))
-							case ">:=" => List(StorageSet(StorageStorage(fullName, "tmp"), StorageScoreboard(vari.getIRSelector()(sel), "float", 1f/Settings.floatPrec)), 
-											StorageAppend(getStorage(key), StorageStorage(fullName, "tmp")))
-							case "<:=" => List(StorageSet(StorageStorage(fullName, "tmp"), StorageScoreboard(vari.getIRSelector()(sel), "float", 1f/Settings.floatPrec)), 
-											StoragePrepend(getStorage(key), StorageStorage(fullName, "tmp")))
-							case "::=" => List(StorageSet(StorageStorage(fullName, "tmp"), StorageScoreboard(vari.getIRSelector()(sel), "float", 1f/Settings.floatPrec)),	
-											StorageMerge(getStorage(key), StorageStorage(fullName, "tmp")))
-							case "-:=" => List(StorageSet(StorageStorage(fullName, "tmp"), StorageScoreboard(vari.getIRSelector()(sel), "float", 1f/Settings.floatPrec)), 
-											StorageRemove(getStorage(key), StorageStorage(fullName, "tmp")))
+							case ">:=" => List(StorageSet(getStorage("tmp"), StorageScoreboard(vari.getIRSelector()(sel), "float", 1f/Settings.floatPrec)), 
+											StorageAppend(getStorage(key), getStorage("tmp")))
+							case "<:=" => List(StorageSet(getStorage("tmp"), StorageScoreboard(vari.getIRSelector()(sel), "float", 1f/Settings.floatPrec)), 
+											StoragePrepend(getStorage(key), getStorage("tmp")))
+							case "::=" => List(StorageSet(getStorage("tmp"), StorageScoreboard(vari.getIRSelector()(sel), "float", 1f/Settings.floatPrec)),	
+											StorageMerge(getStorage(key), getStorage("tmp")))
+							case "-:=" => List(StorageSet(getStorage("tmp"), StorageScoreboard(vari.getIRSelector()(sel), "float", 1f/Settings.floatPrec)), 
+											StorageRemove(getStorage(key), getStorage("tmp")))
 							case other => jsonUnpackedOperation(op, value, key)
 						}
 					}
 					case StringType => {
 						op match{
-							case "=" => List(StorageSet(getStorage(key), StorageStorage(vari.fullName, "value")))
-							case ">:=" => List(StorageAppend(getStorage(key), StorageStorage(vari.fullName, "value")))
-							case "<:=" => List(StoragePrepend(getStorage(key), StorageStorage(vari.fullName, "value")))
-							case "::=" => List(StorageMerge(getStorage(key), StorageStorage(vari.fullName, "value")))
-							case "-:=" => List(StorageRemove(getStorage(key), StorageStorage(vari.fullName, "value")))
+							case "=" => List(StorageSet(getStorage(key), vari.getStorage()))
+							case ">:=" => List(StorageAppend(getStorage(key), vari.getStorage()))
+							case "<:=" => List(StoragePrepend(getStorage(key), vari.getStorage()))
+							case "::=" => List(StorageMerge(getStorage(key), vari.getStorage()))
+							case "-:=" => List(StorageRemove(getStorage(key), vari.getStorage()))
 							case other => jsonUnpackedOperation(op, value, key)
 						}
 					}
 					case StructType(struct, sub) => {
 						op match{
-							case "=" => vari.tupleVari.flatMap(v => {
-											vari.assignJson(op, LinkedVariableValue(withKey(key + "." + v.name), sel))
-										})
+							case "=" => 
+								vari.tupleVari.flatMap(v => withKey(key + "." + v.name).assignJson(op, LinkedVariableValue(v, sel)))
+							case other => {
+								val tmp = context.getFreshVariable(JsonType)
+								tmp.assign("=", value):::assignJson("=", LinkedVariableValue(tmp), keya)
+							}
+						}
+					}
+					case ArrayType(inner, size) => {
+						op match{
+							case "=" => 
+								assign("=", JsonValue(JsonArray(List()))):::
+								vari.tupleVari.flatMap(v => assignJson(">:=", LinkedVariableValue(v, sel)))
 							case other => {
 								val tmp = context.getFreshVariable(JsonType)
 								tmp.assign("=", value):::assignJson("=", LinkedVariableValue(tmp), keya)
@@ -1471,6 +1485,15 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 					case "<:=" => List(StoragePrepend(getStorage(key), StorageString(value.getString())))
 					case "::=" => List(StorageMerge(getStorage(key), StorageString(value.getString())))
 					case "-:=" => List(StorageRemove(getStorage(key), StorageString(value.getString())))
+					case other => jsonUnpackedOperation(op, value, key)
+				}
+			case PositionValue(_,_,_) | SelectorValue(_) | TagValue(_) | LinkedTagValue(_) | NamespacedName(_, _) => 
+				op match{
+					case "=" => List(StorageSet(getStorage(key), StorageString(Utils.stringify(value.getString()))))
+					case ">:=" => List(StorageAppend(getStorage(key), StorageString(Utils.stringify(value.getString()))))
+					case "<:=" => List(StoragePrepend(getStorage(key), StorageString(Utils.stringify(value.getString()))))
+					case "::=" => List(StorageMerge(getStorage(key), StorageString(Utils.stringify(value.getString()))))
+					case "-:=" => List(StorageRemove(getStorage(key), StorageString(Utils.stringify(value.getString()))))
 					case other => jsonUnpackedOperation(op, value, key)
 				}
 			case _ => throw new Exception(f"Unknown cast to json $value at \n${value.pos.longString}")
@@ -1520,7 +1543,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 						else{
 							vari.getType() match
 								case JsonType => {
-									tupleVari.flatMap(vari => vari.assign("=", ArrayGetValue(value, List(StringValue(vari.name)))))
+									tupleVari.flatMap(v => v.assign("=", LinkedVariableValue(vari.withKey(vari.getSubKey(v.name)), sel)))
 								}
 								case other => {
 									context.getFunction(this.name + ".__set__", List(value), List(), getType(), false).call()

@@ -1025,7 +1025,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
 
 
 
-    def addObjectFrom(name: String, alias: String, other: Context) = {
+    def addObjectFrom(name: String, newName: Identifier, other: Context): Unit = {
         if (name == "_"){
             other.classes.foreach((k, v) =>{
                 classes.addOne(k, v)
@@ -1057,7 +1057,8 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
                 typedefs.addOne(k, v)
             })
         }
-        else{
+        else if (newName.isSingleton()){
+            val alias = newName.head()
             if (other.classes.contains(name)){
                 classes.addOne(alias, other.classes(name))
                 child.addOne(alias, other.push(name))
@@ -1086,6 +1087,11 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
             else{
                 throw new ObjectNotFoundException(f"$name Not Found in ${other.getPath()}")
             }
+        }
+        else{
+            val head = newName.head()
+            val tail = newName.drop()
+            val ctx = push(head).addObjectFrom(name, tail, other)
         }
     }
 
