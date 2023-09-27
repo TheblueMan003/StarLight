@@ -1760,13 +1760,29 @@ object Utils{
                 
             case BinaryOperation("in", left, right) => 
                 val (p1, ctx1, s1) = getSelector(left)
-                val (p2, ctx2, s2) = getSelector(right)
-                (p1 ::: p2, ctx2, s1.merge(s2))
+                right match{
+                    case Tuple(lst) => {
+                        val c2 = lst.map(getSelector(_))
+                        (p1 ::: c2.map(_._1), ctx2, c2.foldLeft(s1)((a,b)=>a.merge(b._3)))
+                    }
+                    case other => {
+                        val (p2, ctx2, s2) = getSelector(right)
+                        (p1 ::: p2, ctx2, s1.merge(s2))
+                    }
+                }
             
             case BinaryOperation("not in", left, right) => 
                 val (p1, ctx1, s1) = getSelector(left)
-                val (p2, ctx2, s2) = getSelector(right)
-                (p1 ::: p2, ctx2, s1.merge(s2.invert()))
+                right match{
+                    case Tuple(lst) => {
+                        val c2 = lst.map(getSelector(_))
+                        (p1 ::: c2.map(_._1), ctx2, c2.foldLeft(s1)((a,b)=>a.merge(b._3.invert())))
+                    }
+                    case other => {
+                        val (p2, ctx2, s2) = getSelector(right)
+                        (p1 ::: p2, ctx2, s1.merge(s2.invert()))
+                    }
+                }
             
             case BinaryOperation(op, left, right) => 
                 val (prefix, vari) = Utils.simplifyToVariable(expr)
