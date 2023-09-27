@@ -204,3 +204,12 @@ def macro string __string_concat__(string a, string b){
 def macro string __string_cast__(mcobject a){
     return "$(a)"
 }
+def lazy __assert__(bool cond, void=>void f){
+    if (cond){
+        f()
+    }
+    else{
+        import standard
+        standard.print("Assert Failled")
+    }
+}

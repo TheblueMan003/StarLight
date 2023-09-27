@@ -23,7 +23,7 @@ object Parser extends StandardTokenParsers{
                               "def", "package", "struct", "enum", "class", "interface", "lazy", "macro", "jsonfile", "blocktag", "itemtag", "entitytag", "throw", "try", "catch", "finally",
                               "public", "protected", "private", "scoreboard", "forgenerate", "from", "rotated", "facing", "align", "case", "default",
                               "ticking", "loading", "predicate", "extends", "implements", "new", "const", "static", "virtual", "abstract", "override", "repeat",
-                              "sleep", "async", "await")
+                              "sleep", "async", "await", "assert")
 
 
   def block: Parser[Instruction] = positioned("{" ~> rep(instruction <~ opt(";")) <~ "}" ^^ (p => InstructionBlock(p)))
@@ -70,6 +70,7 @@ object Parser extends StandardTokenParsers{
       | selectorFunctionCall
       | sleepInstr
       | awaitInstr
+      | assertInstr
       | packageInstr
       | structDecl
       | caseStruct
@@ -126,6 +127,7 @@ object Parser extends StandardTokenParsers{
 
   def sleepInstr: Parser[Instruction] = positioned(("sleep" ~> exprNoTuple ) ~ continuation ^^ {case e ~ instr => Sleep(e, instr)})
   def awaitInstr: Parser[Instruction] = positioned(("await" ~> functionCall ) ~ continuation ^^ {case e ~ instr => Await(e, instr)})
+  def assertInstr: Parser[Instruction] = positioned(("assert" ~> exprNoTuple ) ~ continuation ^^ {case e ~ instr => Assert(e, instr)})
 
   def anyKeyword: Parser[String] = lexical.reserved.map(f => f ^^ (p => p)).reduce(_ | _)
   def throwError: Parser[Instruction] = positioned("throw"~exprNoTuple ^^ {case _ ~ e => Throw(e)})

@@ -504,6 +504,18 @@ object Compiler{
                 case Await(func, continuation) => {
                     Compiler.compile(FunctionCall(func.name, func.args ::: List(LambdaValue(List(), continuation, context)), func.typeargs))
                 }
+                case Assert(cond, continutation) => {
+                    val simp = Utils.simplify(cond)
+                    simp match{
+                        case BoolValue(true) => compile(continutation, meta)
+                        case BoolValue(false) => throw new Exception(f"Assertion failed: $cond")
+                        case other => {
+                            val uargs = List(simp, LambdaValue(List(), continutation, context))
+                            val (fct,cargs) = context.getFunction(Identifier.fromString("__assert__"), uargs, List(), VoidType)
+                            (fct, cargs).call()
+                        }
+                    }
+                }
                 case Continue => ???
                 case Break => ???
                 case ElseIf(cond, ifBlock) => throw new Exception("Unexpected Instruction")

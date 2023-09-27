@@ -122,6 +122,7 @@ object Utils{
 
             case Sleep(time, continuation) => Sleep(time, substReturn(continuation, to))
             case Await(func, continuation) => Await(func, substReturn(continuation, to))
+            case Assert(cond, continuation) => Assert(cond, substReturn(continuation, to))
 
             case Switch(cond, cases, cv) => Switch(cond, cases.map{case x: SwitchCase => SwitchCase(x.expr, substReturn(x.instr, to), x.cond);
                                                                     case x: SwitchForGenerate => SwitchForGenerate(x.key, x.provider, SwitchCase(x.instr.expr, substReturn(x.instr.instr, to), x.instr.cond));
@@ -178,7 +179,7 @@ object Utils{
 
             case Sleep(time, continuation) => Sleep(subst(time, from, to), subst(continuation, from, to))
             case Await(func, continuation) => Await(subst(func, from, to).asInstanceOf[FunctionCall], subst(continuation, from, to))
-
+            case Assert(condition, continuation) => Assert(subst(condition, from, to), subst(continuation, from, to))
             case Switch(cond, cases, cv) => Switch(subst(cond, from, to), cases.map{case x: SwitchCase => SwitchCase(subst(x.expr, from, to), subst(x.instr, from, to), subst(x.cond, from, to));
                                                                                     case x: SwitchForGenerate => SwitchForGenerate(x.key, subst(x.provider, from, to), SwitchCase(subst(x.instr.expr, from, to), subst(x.instr.instr, from, to), subst(x.instr.cond, from, to)));
                                                                                     case x: SwitchForEach => SwitchForEach(x.key, subst(x.provider, from, to), SwitchCase(subst(x.instr.expr, from, to), subst(x.instr.instr, from, to), subst(x.instr.cond, from, to)));
@@ -290,7 +291,7 @@ object Utils{
 
             case Sleep(time, continuation) => Sleep(subst(time, from, to), subst(continuation, from, to))
             case Await(func, continuation) => Await(subst(func, from, to).asInstanceOf[FunctionCall], subst(continuation, from, to))
-
+            case Assert(cond, continuation) => Assert(subst(cond, from, to), subst(continuation, from, to))
             case Switch(cond, cases, cv) => Switch(subst(cond, from, to), cases.map{case x: SwitchCase => SwitchCase(subst(x.expr, from, to), subst(x.instr, from, to), subst(x.cond, from, to));
                                                                                     case x: SwitchForGenerate => SwitchForGenerate(x.key, subst(x.provider, from, to), SwitchCase(subst(x.instr.expr, from, to), subst(x.instr.instr, from, to), subst(x.instr.cond, from, to)));
                                                                                     case x: SwitchForEach => SwitchForEach(x.key, subst(x.provider, from, to), SwitchCase(subst(x.instr.expr, from, to), subst(x.instr.instr, from, to), subst(x.instr.cond, from, to)));
@@ -414,6 +415,7 @@ object Utils{
             case With(expr, isAt, cond, block, elze) => With(subst(expr, from, to), subst(isAt, from, to), subst(cond, from, to), subst(block, from, to), subst(elze, from, to))
             case Sleep(time, continuation) => Sleep(subst(time, from, to), subst(continuation, from, to))
             case Await(func, continuation) => Await(subst(func, from, to).asInstanceOf[FunctionCall], subst(continuation, from, to))
+            case Assert(cond, continuation) => Assert(subst(cond, from, to), subst(continuation, from, to))
             case Switch(cond, cases, cv) => Switch(subst(cond, from, to), cases.map{case x: SwitchCase => SwitchCase(subst(x.expr, from, to), subst(x.instr, from, to), x.cond);
                                                                                     case x: SwitchForGenerate => SwitchForGenerate(x.key, subst(x.provider, from, to), SwitchCase(subst(x.instr.expr, from, to), subst(x.instr.instr, from, to), x.instr.cond));
                                                                                     case x: SwitchForEach => SwitchForEach(x.key, subst(x.provider, from, to), SwitchCase(subst(x.instr.expr, from, to), subst(x.instr.instr, from, to), x.instr.cond));
@@ -465,6 +467,7 @@ object Utils{
             case With(expr, isAt, cond, block, elze) => With(expr, isAt, cond, rmFunctions(block), rmFunctions(elze))
             case Sleep(time, continuation) => Sleep(time, rmFunctions(continuation))
             case Await(func, continuation) => Await(func, rmFunctions(continuation))
+            case Assert(cond, continuation) => Assert(cond, rmFunctions(continuation))
             case Switch(cond, cases, cv) => Switch(cond, cases.map{case x: SwitchCase => SwitchCase(x.expr, rmFunctions(x.instr), x.cond);
                                                                     case x: SwitchForGenerate => SwitchForGenerate(x.key, x.provider, SwitchCase(x.instr.expr, rmFunctions(x.instr.instr), x.instr.cond));
                                                                     case x: SwitchForEach => SwitchForEach(x.key, x.provider, SwitchCase(x.instr.expr, rmFunctions(x.instr.instr), x.instr.cond));
@@ -546,6 +549,7 @@ object Utils{
             case With(expr, isAt, cond, block, elze) => With(fix(expr), fix(isAt), fix(cond), fix(block), fix(elze))
             case Sleep(time, continuation) => Sleep(fix(time), fix(continuation))
             case Await(func, continuation) => Await(fix(func).asInstanceOf[FunctionCall], fix(continuation))
+            case Assert(cond, continuation) => Assert(fix(cond), fix(continuation))
             case Switch(cond, cases, cv) => Switch(fix(cond), cases.map{case x: SwitchCase => SwitchCase(fix(x.expr), fix(x.instr), fix(x.cond));
                                                                         case x: SwitchForGenerate => SwitchForGenerate(x.key, fix(x.provider), SwitchCase(fix(x.instr.expr), fix(x.instr.instr), fix(x.instr.cond)));
                                                                         case x: SwitchForEach => SwitchForEach(x.key, fix(x.provider), SwitchCase(fix(x.instr.expr), fix(x.instr.instr), fix(x.instr.cond)));

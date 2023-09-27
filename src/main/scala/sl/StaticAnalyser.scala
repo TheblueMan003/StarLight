@@ -208,6 +208,12 @@ object StaticAnalyser{
                     (Await(func, newContinuation), true)
                 else
                     (Await(func, InstructionList(newContinuation :: rest)), true)
+            case Assert(func, continuation) => 
+                val (newContinuation, changed) = handleSleep(continuation, rest)
+                if changed then
+                    (Assert(func, newContinuation), true)
+                else
+                    (Assert(func, InstructionList(newContinuation :: rest)), true)
             case FunctionDecl(name, block, typ, args, typeArgs, modifier) => 
                 if (modifier.isAsync) then
                     (FunctionDecl(name, handleSleep(InstructionList(List(block, FunctionCall(Identifier.fromString("--await_callback--"), List(), List())))), typ, args, typeArgs, modifier), false)

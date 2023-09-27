@@ -273,9 +273,17 @@ class ConcreteFunction(context: Context, _contextName: String, name: String, arg
 }
 
 class BlockFunction(context: Context, _contextName: String, name: String, arguments: List[Argument], var body: List[IRTree]) extends Function(context, _contextName, name, arguments, VoidType, Modifier.newPrivate()){
+    val parentFunction = context.getCurrentFunction()
     def call(args2: List[Expression], ret: Variable = null, retSel: Selector = Selector.self, op: String = "=")(implicit ctx: Context): List[IRTree] = {
-        argMap(args2).flatMap(p => p._1.assign("=", p._2)) :::
-            List(BlockCall(Settings.target.getFunctionName(fullName), fullName, null))
+        parentFunction match{
+            case mc: MacroFunction => {
+                argMap(args2).flatMap(p => p._1.assign("=", p._2)) :::
+                    List(BlockCall(Settings.target.getFunctionName(fullName), fullName, f"with ${mc.vari.getStorage()}"))
+            }
+            case other => {
+                argMap(args2).flatMap(p => p._1.assign("=", p._2)) :::
+                    List(BlockCall(Settings.target.getFunctionName(fullName), fullName, null))
+            }
     }
 
     def exists(): Boolean = true
@@ -357,6 +365,7 @@ class MacroFunction(context: Context, _contextName: String, name: String, argume
             }
         }
         else{
+            if (!Settings.target.hasFeature("macro")) throw new Exception(f"Macro are not supported on your target. Missing lazy key word?")
             val r = mapped.flatMap((v,e) => vari.withKey("json."+v.name).assign("=", e)) ::: List(BlockCall(Settings.target.getFunctionName(fullName), fullName, f"with ${vari.getStorage()}"))
             if (ret != null){
                 r ::: ret.assign(op, LinkedVariableValue(returnVariable))(context, retSel)
@@ -378,6 +387,8 @@ class MacroFunction(context: Context, _contextName: String, name: String, argume
         super.generateArgument()
         context.push(name).getAllVariable().filterNot(x => x == returnVariable || x == vari).map(x => x.makeJson(fullName))
     }
+
+    override def exists(): Boolean = Settings.target.hasFeature("macro")
 }
 
 class MultiplexFunction(context: Context, _contextName: String, name: String, arguments: List[Argument], typ: Type) extends ConcreteFunction(context, _contextName, name, arguments, typ, objects.Modifier.newPrivate(), sl.InstructionList(List()), false){
