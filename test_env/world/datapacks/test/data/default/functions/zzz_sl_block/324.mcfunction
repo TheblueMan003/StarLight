@@ -1,7 +1,0 @@
-# ==================================================
-# void default.zzz_sl_block.324()
-# a.k.a default.int.addition_value.crash.2
-# ==================================================
-
-scoreboard players set default.int.addition_value.crash._0 tbms.var 1
-scoreboard players set default.int.addition_value.enabled tbms.var 0
