@@ -509,7 +509,7 @@ class ClassFunction(_contextName: String, variable: Variable, function: Function
         var pre = List[IRTree]()
         val comp = if (variable.modifiers.isEntity){
             val vari = ctx.getFreshVariable(IntType)
-            pre = vari.assignForce(variable)
+            pre = vari.assignUnchecked(LinkedVariableValue(variable))
             vari
         }
         else{

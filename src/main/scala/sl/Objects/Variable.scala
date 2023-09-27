@@ -9,8 +9,20 @@ import sl.Compilation.Array
 import sl.IR.*
 
 private val entityTypeSubVariable = List((BoolType, "isPlayer"), (IntType, "binding"))
+/**
+ * This object provides an extension method for the Either type, which is used to represent a value that can be one of two types.
+ * The extension method provides two functions:
+ * 1. get() - returns the Variable object represented by the Either value, using the given context to resolve any identifiers or properties.
+ * 2. path() - returns a string representation of the path to the Variable object represented by the Either value, using the given context to resolve any identifiers or properties.
+ */
 object Variable {
 	extension (value: Either[Identifier, Variable]) {
+		/**
+		 * Returns the Variable object represented by the Either value, using the given context to resolve any identifiers or properties.
+		 *
+		 * @param context The context to use for resolving any identifiers or properties.
+		 * @return The Variable object represented by the Either value.
+		 */
 		def get()(implicit context: Context):Variable = {
 			value match{
 				case Left(value) => {
@@ -21,6 +33,13 @@ object Variable {
 				case Right(value) => value
 			}
 		}
+
+		/**
+		 * Returns a string representation of the path to the Variable object represented by the Either value, using the given context to resolve any identifiers or properties.
+		 *
+		 * @param context The context to use for resolving any identifiers or properties.
+		 * @return A string representation of the path to the Variable object represented by the Either value.
+		 */
 		def path()(implicit context: Context):String = {
 			value match{
 				case Left(value) => value.toString()
@@ -29,6 +48,13 @@ object Variable {
 		}
 	}
 }
+/**
+ * Represents a variable in the StarLight programming language.
+ * @param context The context in which the variable is defined.
+ * @param name The name of the variable.
+ * @param typ The type of the variable.
+ * @param _modifier The modifier of the variable.
+ */
 class Variable(context: Context, name: String, var typ: Type, _modifier: Modifier) extends CObject(context, name, _modifier) with Typed(typ){
 	val parentFunction = context.getCurrentFunction()
 	var tupleVari: List[Variable] = List()
@@ -52,12 +78,24 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 
 	override def toString(): String = f"$modifiers ${getType()} $fullName"
 
+	/**
+	 * Returns a new Variable object with the specified key.
+	 *
+	 * @param key The key to set for the new Variable object.
+	 * @return A new Variable object with the specified key.
+	 */
 	def withKey(key: String)={
 		val vari = Variable(context, name, typ, _modifier)
 		vari.jsonArrayKey = key
 		vari
 	}
 
+	/**
+	 * Returns the subkey for the specified key.
+	 *
+	 * @param key The key to get the subkey for.
+	 * @return The subkey for the specified key.
+	 */
 	def getSubKey(key: String) = {
 		if (key.endsWith("]") && key.startsWith("[")){
 			jsonArrayKey + key
@@ -67,11 +105,20 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 		}
 	}
 
+	/**
+	 * This method generates a JSON object for the variable with the given prefix.
+	 * @param prefix The prefix to be stripped from the full name of the variable.
+	 */
 	def makeJson(prefix: String) = {
 		typ = JsonType
 		jsonArrayKey = fullName.stripPrefix(prefix+".")
 	}
-
+	/**
+	 * This method generates code for the variable.
+	 * @param isStructFunctionArgument A boolean indicating whether the variable is a struct function argument.
+	 * @param skipClassCheck A boolean indicating whether to skip the class check.
+	 * @param context The context in which the variable is being generated.
+	 */
 	def generate(isStructFunctionArgument: Boolean = false, skipClassCheck: Boolean = false)(implicit context: Context):Unit = {
 		if (wasGenerated)return
 		val parent = context.getCurrentVariable()
@@ -173,6 +220,16 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 
 
 
+	/**
+	 * Assigns a value to this variable.
+	 *
+	 * @param op The assignment operator.
+	 * @param value The value to assign.
+	 * @param allowReassign Whether reassignment is allowed.
+	 * @param context The context in which the assignment is made.
+	 * @param selector The selector for the variable.
+	 * @return A list of intermediate representation trees representing the assignment.
+	 */
 	def assign(op: String, value: Expression, allowReassign: Boolean = true)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		if (modifiers.isConst && wasAssigned && !allowReassign) throw new Exception(f"Cannot reassign variable $fullName at \n${value.pos.longString}")
 		val ret = if (modifiers.isLazy){
@@ -211,10 +268,6 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 							return value2._1
 						}
 				}
-				/*case EntityType if !value.isInstanceOf[SelectorValue] => {
-					val (tree, ctx, sel) = Utils.getSelector(value, false)
-					tree ::: assign(op, SelectorValue(sel))
-				}*/
 				case other => {
 					Utils.simplify(value) match{
 						case LambdaValue(args, body, ctx) if args.size == 0 => {
@@ -428,12 +481,26 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 		ret
 	}
 
+	/**
+	 * Checks if the variable is null and run the tree if it is.
+	 * 
+	 * @param tree The tree to run if the variable is null.
+	 * @param selector The Selector to use for the instruction. Defaults to Selector.self.
+	 * @return A List of instructions.
+	 */
 	def checkNull(tree: IRTree)(implicit selector: Selector = Selector.self) = 
 		getType() match
 			case EntityType => IfEntity(f"@e[tag=$tagName]", tree, true)
 			case _ => IfScoreboard(getIRSelector(), "=", getIRSelector(), tree, true)
-	
 
+	/**
+	 * Generates a default assignment instruction for the Variable.
+	 * 
+	 * @param expr The Expression to assign to the Variable.
+	 * @param context The Context to use for the instruction.
+	 * @param selector The Selector to use for the instruction. Defaults to Selector.self.
+	 * @return A List of instructions.
+	 */
 	def defaultAssign(expr: Expression)(implicit context: Context, selector: Selector = Selector.self) = {
 		if (Settings.target == MCBedrock){
 			if (modifiers.isEntity){
@@ -456,32 +523,69 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 		}
 	}
 
+	/**
+	 * Generates an assignment instruction for the Variable without checking for types.
+	 * 
+	 * @param vari The LinkedVariableValue to assign to the Variable.
+	 * @param context The Context to use for the instruction.
+	 * @param selector The Selector to use for the instruction. Defaults to Selector.self.
+	 * @return A List of instructions.
+	 */
 	def assignUnchecked(vari: LinkedVariableValue)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		val LinkedVariableValue(v, sl) = vari
 		List(ScoreboardOperation(getIRSelector(), "=", v.getIRSelector()(sl)))
 	}
 
-	/**
-	 * Assign the value to a tmp variable then apply op with the variable.
-	 */
+	
+	/** Assigns a temporary variable to the result of an expression and then assigns the temporary variable to this variable using the given operator.
+	*
+	* @param op The operator to use for the assignment.
+	* @param expr The expression to assign to the temporary variable.
+	* @param context The context in which the assignment is being made.
+	* @param selector The selector for the variable being assigned.
+	* @return A list of IRTree objects representing the assignment.
+	*/
 	def assignTmp(op: String, expr: Expression)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		val vari = context.getFreshVariable(getType())
 		vari.assign("=", expr) ::: assign(op, LinkedVariableValue(vari))
 	}
 
+	/** Compiles the left-hand side of a sequence assignment and then assigns the right-hand side to this variable using the given operator.
+	*
+	* @param op The operator to use for the assignment.
+	* @param value The sequence value to assign to this variable.
+	* @param context The context in which the assignment is being made.
+	* @param selector The selector for the variable being assigned.
+	* @return A list of IRTree objects representing the assignment.
+	*/
 	def assignSequence(op: String, value: SequenceValue)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		Compiler.compile(value.left) ::: assign(op, value.right)
 	}
+
+	/** Compiles a ternary operation and assigns the result to this variable using the given operator.
+	*
+	* @param op The operator to use for the assignment.
+	* @param value The ternary operation to assign to this variable.
+	* @param context The context in which the assignment is being made.
+	* @param selector The selector for the variable being assigned.
+	* @return A list of IRTree objects representing the assignment.
+	*/
 	def assignTernaryOperator(op: String, value: TernaryOperation)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
-		Compiler.compile(If(value.left, 
+		Compiler.compile(If(value.left,
 			VariableAssigment(List((Right(this), selector)), op, value.middle),
 			List(
 				ElseIf(BoolValue(true), VariableAssigment(List((Right(this), selector)), op, value.right))
 			)))
 	}
-	/**
-	 * Assign binary operator to the variable.
-	 */
+
+	/** Compiles a binary operation and assigns the result to this variable using the given operator.
+	*
+	* @param op The operator to use for the assignment.
+	* @param value The binary operation to assign to this variable.
+	* @param context The context in which the assignment is being made.
+	* @param selector The selector for the variable being assigned.
+	* @return A list of IRTree objects representing the assignment.
+	*/
 	def assignBinaryOperator(op: String, value: BinaryOperation)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		if (value.op == "??"){
 			return Compiler.compile(If(BinaryOperation("==", value.left, NullValue), 
@@ -518,12 +622,14 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 		}
 	}
 
-
-	def assignForce(vari: Variable)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
-		List(ScoreboardOperation(getIRSelector(), "=", vari.getIRSelector()))
-	}
 	/**
-	 * Assign a value to the int variable
+	 * Assigns values to a variable of type int based on the given operator and expression.
+	 *
+	 * @param op The operator to use for the assignment (e.g. "+=", "-=", etc.).
+	 * @param valueE The expression representing the value to assign.
+	 * @param context The context in which the assignment is being made.
+	 * @param selector The selector to assign the value to. Defaults to Selector.self.
+	 * @return A list of IRTree objects representing the assignment operation.
 	 */
 	def assignInt(op: String, valueE: Expression)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		valueE match
@@ -566,8 +672,15 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			case _ => throw new Exception(f"Unknown cast to int: $valueE at \n${valueE.pos.longString}")
 	}
 
+
 	/**
-	 * Assign a value to the int variable
+	 * Assigns values to a variable of type range based on the given operator and expression.
+	 *
+	 * @param op The operator to use for the assignment.
+	 * @param valueE The expression representing the range of values to assign.
+	 * @param context The context in which the assignment is being made.
+	 * @param selector The selector specifying the variable to assign to.
+	 * @return A list of intermediate representation trees representing the assignment operation.
 	 */
 	def assignRange(op: String, valueE: Expression)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		valueE match
@@ -598,6 +711,19 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			case _ => throw new Exception(f"Unknown cast to int: $valueE at \n${valueE.pos.longString}")
 	}
 
+	
+	/**
+	 * Handles a function call for a variable.
+	 *
+	 * @param op The operator used in the function call.
+	 * @param name The name of the function being called.
+	 * @param args The arguments passed to the function call.
+	 * @param typeargs The type arguments passed to the function call.
+	 * @param sel The selector used to access the function.
+	 * @param context The context in which the function call is being made.
+	 * @param selector The selector used to access the variable (defaults to Selector.self).
+	 * @return A list of IRTree nodes representing the function call.
+	 */
 	def handleFunctionCall(op: String, name: Expression, args: List[Expression], typeargs: List[Type], sel: Selector)(implicit context: Context, selector: Selector = Selector.self):List[IRTree] = {
 		if (sel != Selector.self && modifiers.isEntity){
 			val (pref,vari) = Utils.simplifyToVariable(FunctionCallValue(name, args, typeargs, sel))
@@ -625,8 +751,17 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 		}
 	}
 
+	
 	/**
-	 * Assign a value to the string variable
+	 * Assigns a value to variable of type string using the given operator and expression.
+	 * Throws an exception if the "string" feature is not enabled in the current target settings.
+	 *
+	 * @param op The operator to use for the assignment.
+	 * @param valueE The expression representing the value to assign.
+	 * @param context The current context.
+	 * @param selector The current selector.
+	 * @return A list of IRTree nodes representing the assignment operation.
+	 * @throws Exception If the "string" feature is not enabled in the current target settings.
 	 */
 	def assignString(op: String, valueE: Expression)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		if (!Settings.target.hasFeature("string"))throw new Exception("Cannot use string without string feature")
@@ -667,6 +802,15 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 		}
 	}
 
+	/**
+	 * Handles getting the value of an array variable.
+	 *
+	 * @param op the operator used to get the value (e.g. "+=")
+	 * @param name2 the name of the variable
+	 * @param index the index of the array element to get
+	 * @param context the current context
+	 * @return a list of IRTree nodes representing the operation
+	 */
 	def handleArrayGetValue(op: String, name2: Expression, index: List[Expression])(implicit context: Context):List[IRTree] = {
 		if (name2 == VariableValue(Identifier(List("this")), Selector.self)){
 			assign(op, FunctionCallValue(VariableValue("__get__"), index, List()))
@@ -730,6 +874,16 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 		}
 	}
 
+	/**
+	 * Assigns a linked variable to the variable on the given operator and selector.
+	 *
+	 * @param op The operator to use for the assignment.
+	 * @param vari The variable to assign the value from.
+	 * @param oselector The selector to use for the assignment.
+	 * @param context The context in which the assignment is being made.
+	 * @param selector The selector to use for the assignment (defaults to Selector.self).
+	 * @return A list of IRTree objects representing the assignment.
+	 */
 	def assignIntLinkedVariable(op: String, vari: Variable, oselector: Selector)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		vari.getType() match{
 			case FloatType => {
@@ -785,7 +939,13 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 
 
 	/**
-	 * Assign a value to the enum variable
+	 * Assigns a value to variable of type enum using the given operator and expression.
+	 *
+	 * @param op The operator to use for the assignment.
+	 * @param value The expression representing the value to assign.
+	 * @param context The current context.
+	 * @param selector The current selector.
+	 * @return A list of IRTree nodes representing the assignment operation.
 	 */
 	def assignEnum(op: String, value: Expression)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		value match
@@ -808,7 +968,13 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 
 
 	/**
-	 * Assign a value to the float variable
+	 * Assigns a value to variable of type float using the given operator and expression.
+	 *
+	 * @param op The operator to use for the assignment.
+	 * @param value The expression representing the value to assign.
+	 * @param context The current context.
+	 * @param selector The current selector.
+	 * @return A list of IRTree nodes representing the assignment operation.
 	 */
 	def assignFloat(op: String, valueE: Expression)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		valueE match
@@ -887,7 +1053,13 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 	}
 
 	/**
-	 * Assign a value to the float variable
+	 * Assigns a value to variable of type bool using the given operator and expression.
+	 *
+	 * @param op The operator to use for the assignment.
+	 * @param value The expression representing the value to assign.
+	 * @param context The current context.
+	 * @param selector The current selector.
+	 * @return A list of IRTree nodes representing the assignment operation.
 	 */
 	def assignBool(op: String, value: Expression)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		value match
@@ -958,6 +1130,16 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			case _ => throw new Exception(f"Unknown cast to bool $value at \n${value.pos.longString}")
 	}
 
+	/**
+	 * Assigns a linked Variable of type float using the given operator and expression.
+	 *
+	 * @param op The operator to use for the assignment.
+	 * @param vari The variable to assign the value from.
+	 * @param sel The selector to use for the assignment.
+	 * @param context The current context.
+	 * @param selector The current selector.
+	 * @return A list of IRTree nodes representing the assignment operation.
+	 */
 	def assignFloatLinkedVariable(op: String, vari: Variable, sel: Selector)(implicit context: Context, selector: Selector = Selector.self):List[IRTree]={
 		vari.getType() match{
 			case FloatType => {
@@ -1028,6 +1210,15 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 		}
 	}
 
+	/**
+	 * Assigns a value to variable of type tuple using the given operator and expression.
+	 *
+	 * @param op The operator to use for the assignment.
+	 * @param expr2 The expression representing the value to assign.
+	 * @param context The current context.
+	 * @param selector The current selector.
+	 * @return A list of IRTree nodes representing the assignment operation.
+	 */
 	def assignTuple(op: String, expr2: Expression)(implicit context: Context, selector: Selector = Selector.self)={
 		val expr = Utils.simplify(expr2)
 		expr match
@@ -1046,6 +1237,15 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			case v => tupleVari.flatMap(t => t.assign(op, v))
 	}
 
+	/**
+	 * Assigns a value to variable of type array using the given operator and expression.
+	 *
+	 * @param op The operator to use for the assignment.
+	 * @param expr2 The expression representing the value to assign.
+	 * @param context The current context.
+	 * @param selector The current selector.
+	 * @return A list of IRTree nodes representing the assignment operation.
+	 */
 	def assignArray(op: String, expr2: Expression)(implicit context: Context, selector: Selector = Selector.self)={
 		val ArrayType(sub, size) = getType().asInstanceOf[ArrayType]: @unchecked
 		val expr = Utils.simplify(expr2)
@@ -1096,6 +1296,15 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 	}
 
 
+	/**
+	 * Assigns a value to variable of type function using the given operator and expression.
+	 *
+	 * @param op The operator to use for the assignment.
+	 * @param expr The expression representing the value to assign.
+	 * @param context The current context.
+	 * @param selector The current selector.
+	 * @return A list of IRTree nodes representing the assignment operation.
+	 */
 	def assignFunc(op: String, expr: Expression)(implicit context: Context, selector: Selector = Selector.self):List[IRTree]={
 		if (op != "=") throw new Exception(f"Illegal operation with ${name}: $op at \n${expr.pos.longString}")
 		
@@ -1137,11 +1346,28 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			}
 			case _ => throw new Exception(f"Unsupported Operation at \n${expr.pos.longString}")
 	}
+
+	/**
+	 * Removes the entity tag from all the entity.
+	 *
+	 * @param context the context in which the entity tag is to be removed
+	 * @return the compiled code to remove the entity tag
+	 */
 	def removeEntityTag()(implicit context: Context)={
 		Compiler.compile(If(LinkedVariableValue(tupleVari(0)), 
 						CMD(f"tag @a[tag=${tagName}] remove $tagName"), 
 						List(ElseIf(BoolValue(true), CMD(f"tag @e[tag=${tagName}] remove $tagName")))))
 	}
+
+	/**
+	 * Assigns a value to variable of type entity using the given operator and expression.
+	 *
+	 * @param op The operator to use for the assignment.
+	 * @param expr The expression representing the value to assign.
+	 * @param context The current context.
+	 * @param selector The current selector.
+	 * @return A list of IRTree nodes representing the assignment operation.
+	 */
 	def assignEntity(op: String, expr: Expression)(implicit context: Context, selector: Selector = Selector.self):List[IRTree]={
 		expr match{
 			case BinaryOperation("not in", left, right) => {
@@ -1277,6 +1503,13 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 		}
 	}
 
+	/**
+	 * Returns the storage object for the current variable.
+	 * @param keya The key to use for the storage object. Defaults to "json".
+	 * @param context The context in which the storage object is being retrieved.
+	 * @param selector The selector for the storage object. Defaults to Selector.self.
+	 * @return The storage object for the current variable.
+	 */
 	def getStorage(keya: String = "json")(implicit context: Context, selector: Selector = Selector.self) = {
 		val key = if keya == "json" then jsonArrayKey else keya
 		if (modifiers.isEntity){
@@ -1287,6 +1520,13 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 		}
 	}
 
+	/**
+	 * Returns the storage path for the current variable.
+	 * @param keya The key to use for the storage object. Defaults to "json".
+	 * @param context The context in which the storage object is being retrieved.
+	 * @param selector The selector for the storage object. Defaults to Selector.self.
+	 * @return The storage path for the current variable.
+	 */
 	def getStoragePath(keya: String = "json")(implicit context: Context, selector: Selector = Selector.self) = {
 		val key = if keya == "json" then jsonArrayKey else keya
 		if (modifiers.isEntity){
@@ -1298,7 +1538,14 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 	}
 
 	/**
-	 * Assign a value to the float variable
+	 * Assigns a value to variable of type json using the given operator and expression.
+	 *
+	 * @param op The operator to use for the assignment.
+	 * @param value The expression representing the value to assign.
+	 * @param keya The key to use for the storage object. Defaults to "json" meaning to use the default key.
+	 * @param context The current context.
+	 * @param selector The current selector.
+	 * @return A list of IRTree nodes representing the assignment operation.
 	 */
 	def assignJson(op: String, value: Expression, keya: String = "json")(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		val key = if jsonArrayKey != "json" then jsonArrayKey else keya
@@ -1499,6 +1746,15 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			case _ => throw new Exception(f"Unknown cast to json $value at \n${value.pos.longString}")
 	}
 
+	/**
+	 * Assigns a binary operator to a JSON value.
+	 *
+	 * @param op The binary operator to assign.
+	 * @param value The binary operation to assign the operator to.
+	 * @param context The context in which the assignment is made.
+	 * @param selector The selector for the assignment.
+	 * @return A list of IRTree objects representing the assignment.
+	 */
 	def assignBinaryOperatorJson(op: String, value: BinaryOperation)(implicit context: Context, selector: Selector = Selector.self):List[IRTree]={
 		value match
 			case BinaryOperation(op2 @ ("+" | "*"), left, right) if Utils.typeof(right) == JsonType && Utils.typeof(left) != JsonType => {
@@ -1513,6 +1769,16 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			}
 	}
 
+	/**
+	 * Performs an operation by unpacking the JSON value.
+	 *
+	 * @param op The operation to perform.
+	 * @param value The value to perform the operation on.
+	 * @param keya The key for the operation.
+	 * @param context The context in which the operation is performed.
+	 * @param selector The selector for the operation.
+	 * @return A list of IRTree objects representing the operation.
+	 */
 	def jsonUnpackedOperation(op: String, value: Expression, keya: String = "json")(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		value match
 			case BinaryOperation("+" | "*", left, right) if Utils.typeof(right) == JsonType && Utils.typeof(left) != JsonType && Utils.typeof(left) != StringType => {
@@ -1529,7 +1795,13 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 	}
 
 	/**
-	 * Assign a value to the struct variable
+	 * Assigns a value to variable of type struct using the given operator and expression.
+	 *
+	 * @param op The operator to use for the assignment.
+	 * @param value The expression representing the value to assign.
+	 * @param context The current context.
+	 * @param selector The current selector.
+	 * @return A list of IRTree nodes representing the assignment operation.
 	 */
 	def assignStruct(op: String, value: Expression)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		if value == DefaultValue then return List()
@@ -1591,15 +1863,32 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 					case _ => context.getFunction(fullName + "." + Utils.getOpFunctionName(op),  List(value), List(), getType(), false).call()
 	}
 
+	/** 
+	 * Dereferences the variable if it is not a temporary variable or a function argument.
+	 * @param context The context in which the variable is being dereferenced.
+	 * @return An empty list if the variable is a temporary variable or a function argument, otherwise the result of calling the "__remRef" function.
+	 */
 	def deref()(implicit context: Context) = 
 		if (modifiers.hasAttributes("variable.isTemp") || isFunctionArgument) List() else
 		context.getFunction(this.fullName + ".__remRef", List[Expression](), List(), getType(), false).call()
+
+	/** 
+	 * Adds a reference to the variable if it is not a temporary variable or a function argument.
+	 * @param context The context in which the variable is being referenced.
+	 * @return An empty list if the variable is a temporary variable or a function argument, otherwise the result of calling the "__addRef" function.
+	 */
 	def addref()(implicit context: Context)= 
 		if (modifiers.hasAttributes("variable.isTemp")|| isFunctionArgument) List() else
 		context.getFunction(this.fullName + ".__addRef", List[Expression](), List(), getType(), false).call()
 
 	/**
-	 * Assign a value to the struct variable
+	 * Assigns a value to variable of type class using the given operator and expression.
+	 *
+	 * @param op The operator to use for the assignment.
+	 * @param value The expression representing the value to assign.
+	 * @param context The current context.
+	 * @param selector The current selector.
+	 * @return A list of IRTree nodes representing the assignment operation.
 	 */
 	def assignClass(op: String, value: Expression)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		if value == DefaultValue then return List()
@@ -1705,6 +1994,14 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 	}
 
 
+	/**
+	 * Checks if the variable is present in the given expression.
+	 *
+	 * @param expr The expression to check for the variable's presence.
+	 * @param context The context in which the variable is defined.
+	 * @param selector The selector used to select the variable.
+	 * @return True if the variable is present in the expression, false otherwise.
+	 */
 	def isPresentIn(expr: Expression)(implicit context: Context, selector: Selector): Boolean = {
 		expr match
 			case IntValue(value) => false
@@ -1742,64 +2039,104 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 		}
 
 
+	/**
+	 * Checks if the selector is being used correctly.
+	 * @param selector The selector to check. Defaults to Selector.self.
+	 * @throws Exception if the selector is not Selector.self and the variable is not a scoreboard variable, or if the variable is a lazy variable, or if the variable is of type JsonType or RawJsonType.
+	 */
 	def checkSelectorUse()(implicit selector: Selector = Selector.self) = {
 		if (selector != Selector.self) {
-			if (!modifiers.isEntity)throw new Exception("Cannot have selector with not scoreboard variable")
+			if (!modifiers.isEntity) throw new Exception("Cannot have selector with not scoreboard variable")
 			if (modifiers.isLazy) throw new Exception("Cannot have selector with lazy variable")
-			getType() match
+			getType() match {
 				case JsonType => throw new Exception("Cannot have selector for json type")
 				case RawJsonType => throw new Exception("Cannot have selector for rawjson type")
 				case other => {}
+			}
 		}
 	}
+
+	/**
+	 * Gets the selector string for the variable.
+	 * @param selector The selector to use. Defaults to Selector.self.
+	 * @return The selector string for the variable.
+	 * @throws Exception if the selector is not Selector.self and the variable is not a scoreboard variable, or if the variable is a lazy variable, or if the variable is of type JsonType or RawJsonType.
+	 */
 	def getSelector()(implicit selector: Selector = Selector.self): String = {
 		checkSelectorUse()
 
-		if (modifiers.isEntity){
+		if (modifiers.isEntity) {
 			f"${selector} ${scoreboard}"
-		}
-		else{
+		} else {
 			f"${inGameName} ${variableScoreboard}"
 		}
 	}
+
+	/**
+	 * Gets the scoreboard link for the variable.
+	 * @param selector The selector to use. Defaults to Selector.self.
+	 * @return The scoreboard link for the variable.
+	 * @throws Exception if the selector is not Selector.self and the variable is not a scoreboard variable, or if the variable is a lazy variable, or if the variable is of type JsonType or RawJsonType.
+	 */
 	def getIRSelector()(implicit selector: Selector = Selector.self): SBLink = {
 		checkSelectorUse()
 
-		if (modifiers.isEntity){
+		if (modifiers.isEntity) {
 			SBLink(selector.getString()(context), scoreboard)
-		}
-		else{
+		} else {
 			SBLink(inGameName, variableScoreboard)
 		}
 	}
 
+	/**
+	 * Gets the selector name for the variable.
+	 * @param selector The selector to use. Defaults to Selector.self.
+	 * @return The selector name for the variable.
+	 * @throws Exception if the selector is not Selector.self and the variable is not a scoreboard variable, or if the variable is a lazy variable, or if the variable is of type JsonType or RawJsonType.
+	 */
 	def getSelectorName()(implicit selector: Selector = Selector.self): String = {
 		checkSelectorUse()
 
-		if (modifiers.isEntity){
+		if (modifiers.isEntity) {
 			f"${selector}"
-		}
-		else{
+		} else {
 			f"${inGameName}"
 		}
 	}
 
+	/**
+	 * Gets the scoreboard objective for the variable.
+	 * @param selector The selector to use. Defaults to Selector.self.
+	 * @return The scoreboard objective for the variable.
+	 * @throws Exception if the selector is not Selector.self and the variable is not a scoreboard variable, or if the variable is a lazy variable, or if the variable is of type JsonType or RawJsonType.
+	 */
 	def getSelectorObjective()(implicit selector: Selector = Selector.self): String = {
 		checkSelectorUse()
 
-		if (modifiers.isEntity){
+		if (modifiers.isEntity) {
 			f"${scoreboard}"
-		}
-		else{
+		} else {
 			f"${variableScoreboard}"
 		}
-	} 
+	}
 
+	/**
+	 * Gets the selector for an entity variable.
+	 * @return The selector for an entity variable.
+	 */
 	def getEntityVariableSelector(): Selector = {
 		JavaSelector("@e", List(("tag", SelectorIdentifier(tagName))))
 	}
 }
 
+/**
+ * Represents a property set variable that extends the `Variable` class.
+ *
+ * @param context The context of the variable.
+ * @param getter The getter function of the variable.
+ * @param setter The setter function of the variable.
+ * @param variable The variable to be set.
+ */
 class PropertySetVariable(context: Context, getter: Function, setter: Function, variable: Variable) extends Variable(context, "", VoidType, Modifier.newPublic()){
 	override def assign(op: String, value: Expression, allowReassign: Boolean = true)(implicit context: Context, selector: Compilation.Selector.Selector): List[IRTree] = {
 		if (op == ":=") throw new Exception("Operator not supported for Properties")
