@@ -389,9 +389,11 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
 
 
     def getCurrentFunction(): Function = {
+        if variable != null || clazz != null then return null
         if function == null && parent != null then parent.getCurrentFunction() else function
     }
     def getCurrentVariable(): Variable = {
+        if function != null || clazz != null then return null
         if variable == null && parent != null then parent.getCurrentVariable() else variable
     }
     def getCurrentClass(): Class = {

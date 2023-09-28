@@ -14,6 +14,7 @@ import sl.Library.Downloader
 import sys.process._
 import java.util.Locale
 import scala.collection.mutable
+import java.awt.RenderingHints.Key
 
 object Main {
   var version = List(0, 11, 0)
@@ -175,20 +176,32 @@ object Main {
             }
           }
           case "watch" => {
-            while (true) {
-              if (CacheAST.hasChanged()) {
-                if (args.length < 1 && lastBuild == null) then {
-                  Reporter.error(f"Expected 1 argument got: ${args.length - 1}")
-                } else if (args.length < 1 && lastBuild != null) then {
-                  build(lastBuild)
-                  Reporter.ok("Build Completed!")
-                } else {
-                  lastBuild = args(1) + ".slconf"
-                  build(args(1) + ".slconf")
-                  Reporter.ok("Build Completed!")
+            var ended = false
+            new Thread(() => {
+              scala.io.StdIn.readLine()
+              ended = true
+            }).start()
+            while (!ended) {
+              try{
+                if (CacheAST.hasChanged()) {
+                  if (args.length < 1 && lastBuild == null) then {
+                    Reporter.error(f"Expected 1 argument got: ${args.length - 1}")
+                  } else if (args.length < 1 && lastBuild != null) then {
+                    build(lastBuild)
+                    Reporter.ok("Build Completed!")
+                  } else {
+                    lastBuild = args(1) + ".slconf"
+                    build(args(1) + ".slconf")
+                    Reporter.ok("Build Completed!")
+                  }
+                }
+                Thread.sleep(1000)
+              }
+              catch {
+                case other => {
+                  Reporter.error(other.getMessage())
                 }
               }
-              Thread.sleep(1000)
             }
           }
           case ">" | "show" => {

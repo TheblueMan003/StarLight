@@ -72,7 +72,7 @@ object Compiler{
         try{
             instruction match{
                 case FunctionDecl(name3, block, typ2, args2, typevars, modifier) =>{
-                    val name2 = if context.getCurrentClass() != null && name3 == "this" then "__init__" else name3
+                    val name2 = if (context.getCurrentClass() != null || context.getCurrentStructUse()!= null) && name3 == "this" then "__init__" else name3
                     val name = if (name2 == "~") then context.getFreshLambdaName() else name2
                     var fname = context.getFunctionWorkingName(name)
 

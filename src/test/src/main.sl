@@ -1,9 +1,9 @@
 package array
 
-template Test<x = 5, y, z = 10>{
-    
+struct test{
+    def this(){
+        /say hi
+    }
 }
 
-Test<10> test{
-
-}
+test a = new test()
