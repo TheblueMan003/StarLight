@@ -562,6 +562,18 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 		Compiler.compile(value.left) ::: assign(op, value.right)
 	}
 
+	/** Compiles the left-hand side of a sequence assignment and then assigns the right-hand side to this variable using the given operator.
+	*
+	* @param op The operator to use for the assignment.
+	* @param value The sequence value to assign to this variable.
+	* @param context The context in which the assignment is being made.
+	* @param selector The selector for the variable being assigned.
+	* @return A list of IRTree objects representing the assignment.
+	*/
+	def assignSequencePost(op: String, value: SequencePostValue)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
+		assign(op, value.left) ::: Compiler.compile(value.right)
+	}
+
 	/** Compiles a ternary operation and assigns the result to this variable using the given operator.
 	*
 	* @param op The operator to use for the assignment.
@@ -669,6 +681,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			case bin: BinaryOperation => assignBinaryOperator(op, bin)
 			case ter: TernaryOperation => assignTernaryOperator(op, ter)
 			case seq: SequenceValue => assignSequence(op, seq)
+			case seq: SequencePostValue => assignSequencePost(op, seq)
 			case _ => throw new Exception(f"Unknown cast to int: $valueE at \n${valueE.pos.longString}")
 	}
 
@@ -708,6 +721,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			case bin: BinaryOperation => assignBinaryOperator(op, bin)
 			case ter: TernaryOperation => assignTernaryOperator(op, ter)
 			case seq: SequenceValue => assignSequence(op, seq)
+			case seq: SequencePostValue => assignSequencePost(op, seq)
 			case _ => throw new Exception(f"Unknown cast to int: $valueE at \n${valueE.pos.longString}")
 	}
 
@@ -1049,6 +1063,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			case bin: BinaryOperation => assignBinaryOperator(op, bin)
 			case ter: TernaryOperation => assignTernaryOperator(op, ter)
 			case seq: SequenceValue => assignSequence(op, seq)
+			case seq: SequencePostValue => assignSequencePost(op, seq)
 			case _ => throw new Exception(f"Unknown cast to float for $fullName and value $valueE at \n${valueE.pos.longString}")
 	}
 
@@ -1121,6 +1136,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			case bin: BinaryOperation => assignBinaryOperator(op, bin)
 			case ter: TernaryOperation => assignTernaryOperator(op, ter)
 			case seq: SequenceValue => assignSequence(op, seq)
+			case seq: SequencePostValue => assignSequencePost(op, seq)
 			case SelectorValue(sel) => ScoreboardSet(getIRSelector(), 0)::Compiler.compile(If(value, VariableAssigment(List((Right(this), selector)), "=", BoolValue(true)), List()))
 			case other if Utils.typeof(other) == BoolType || Utils.typeof(other) == IntType || Utils.typeof(other) == EntityType => 
 				var vari2 = context.getFreshVariable(BoolType)
@@ -1431,6 +1447,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 						case bin: BinaryOperation => assignBinaryOperator(op, bin)
 						case ter: TernaryOperation => assignTernaryOperator(op, ter)
 						case seq: SequenceValue => assignSequence(op, seq)
+						case seq: SequencePostValue => assignSequencePost(op, seq)
 						case FunctionCallValue(name, args, typeargs, selector) => 
 							//removeEntityTag():::
 							tupleVari.zip(List(BoolValue(false))).flatMap((t, v) => t.assign(op, v)) ::: 
@@ -1467,6 +1484,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 						case bin: BinaryOperation => assignBinaryOperator(op, bin)
 						case ter: TernaryOperation => assignTernaryOperator(op, ter)
 						case seq: SequenceValue => assignSequence(op, seq)
+						case seq: SequencePostValue => assignSequencePost(op, seq)
 						case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 						case _ => throw new Exception(f"No cast from ${expr} to entity at \n${expr.pos.longString}")
 				}
@@ -1495,6 +1513,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 						case bin: BinaryOperation => assignBinaryOperator(op, bin)
 						case ter: TernaryOperation => assignTernaryOperator(op, ter)
 						case seq: SequenceValue => assignSequence(op, seq)
+						case seq: SequencePostValue => assignSequencePost(op, seq)
 						case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 						case _ => throw new Exception(f"No cast from ${expr} to entity at \n${expr.pos.longString}")
 				}
@@ -1846,6 +1865,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 					case bin: BinaryOperation => assignBinaryOperator("=", bin)
 					case ter: TernaryOperation => assignTernaryOperator(op, ter)
 					case seq: SequenceValue => assignSequence(op, seq)
+					case seq: SequencePostValue => assignSequencePost(op, seq)
 					case JsonValue(JsonDictionary(map)) if map.forall(x => tupleVari.exists(y => y.name == x._1)) => {
 						map.flatMap(x => tupleVari.find(y => y.name == x._1).get.assign("=", Utils.jsonToExpr(x._2))).toList
 					}
@@ -1860,6 +1880,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 					case bin: BinaryOperation => assignBinaryOperator(op, bin)
 					case ter: TernaryOperation => assignTernaryOperator(op, ter)
 					case seq: SequenceValue => assignSequence(op, seq)
+					case seq: SequencePostValue => assignSequencePost(op, seq)
 					case _ => context.getFunction(fullName + "." + Utils.getOpFunctionName(op),  List(value), List(), getType(), false).call()
 	}
 
@@ -1985,6 +2006,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 					case bin: BinaryOperation => assignBinaryOperator("=", bin)
 					case ter: TernaryOperation => assignTernaryOperator(op, ter)
 					case seq: SequenceValue => assignSequence(op, seq)
+					case seq: SequencePostValue => assignSequencePost(op, seq)
 					case JsonValue(JsonDictionary(map)) if map.forall(x => tupleVari.exists(y => y.name == x._1)) => {
 						map.flatMap(x => tupleVari.find(y => y.name == x._1).get.assign("=", Utils.jsonToExpr(x._2))).toList
 					}
@@ -2036,6 +2058,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			case CastValue(left, right) => isPresentIn(left)
 			case ForSelect(expr, filter, selector) => isPresentIn(expr) || isPresentIn(selector)
 			case SequenceValue(left, right) => isPresentIn(right)
+			case SequencePostValue(left, right) => isPresentIn(left)
 		}
 
 

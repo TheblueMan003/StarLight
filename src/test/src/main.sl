@@ -1,13 +1,9 @@
-package test
+package array
 
-json t
-
-struct A{
-    int[10] lol
+template Test<x = 5, y, z = 10>{
+    
 }
 
-def test(){
-    A a
-    t = a
-    a = t
+Test<10> test{
+
 }

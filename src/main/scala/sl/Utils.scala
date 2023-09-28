@@ -215,6 +215,7 @@ object Utils{
             case IsType(value, typ) => IsType(subst(value, from, to), typ)
             case DotValue(left, right) => DotValue(subst(left, from, to), subst(right, from, to))
             case SequenceValue(left, right) => SequenceValue(subst(left, from, to), subst(right, from, to))
+            case SequencePostValue(left, right) => SequencePostValue(subst(left, from, to), subst(right, from, to))
             case ArrayGetValue(name, index) => ArrayGetValue(subst(name, from, to), index.map(subst(_, from, to)))
             case VariableValue(name, sel) => VariableValue(name.replaceAllLiterally(from, to), sel)
             case BinaryOperation(op, left, right) => BinaryOperation(op, subst(left, from, to), subst(right, from, to))
@@ -318,6 +319,7 @@ object Utils{
             case LinkedTagValue(tag) => instr
             case DotValue(left, right) => DotValue(subst(left, from, to), subst(right, from, to))
             case SequenceValue(left, right) => SequenceValue(subst(left, from, to), subst(right, from, to))
+            case SequencePostValue(left, right) => SequencePostValue(subst(left, from, to), subst(right, from, to))
             case RawJsonValue(value) => instr
             case EnumIntValue(value) => instr
             case ClassValue(value) => instr
@@ -517,7 +519,7 @@ object Utils{
                 InstructionBlock(list.map(fix(_)(context, set2)))
             }
 
-            case TemplateDecl(name, block, modifier, parent, generics, parentGenerics) => TemplateDecl(name, fix(block), modifier, parent, generics, parentGenerics.map(fix(_)(context, ignore ++ generics.map(Identifier.fromString(_)).toSet)))
+            case TemplateDecl(name, block, modifier, parent, generics, parentGenerics) => TemplateDecl(name, fix(block), modifier, parent, generics, parentGenerics.map(fix(_)(context, ignore ++ generics.map(a => Identifier.fromString(a.name)).toSet)))
             case TemplateUse(iden, name, instr, values) => TemplateUse(iden, name, fix(instr), values.map(fix(_)))
             case TypeDef(defs) => TypeDef(defs.map{case (name, typ, ver) => (name, fix(typ), ver)})
 
@@ -596,6 +598,7 @@ object Utils{
             case PositionValue(x, y, z) => PositionValue(fix(x), fix(y), fix(z))
             case DotValue(left, right) => DotValue(fix(left), fix(right))
             case SequenceValue(left, right) => SequenceValue(fix(left), fix(right))
+            case SequencePostValue(left, right) => SequencePostValue(fix(left), fix(right))
             case JsonValue(content) => JsonValue(fix(content))
             case ArrayGetValue(name, index) => ArrayGetValue(fix(name), index.map(fix(_)))
             case VariableValue(name, sel) => if ignore.contains(name) then instr else
@@ -787,6 +790,7 @@ object Utils{
                 typeof(vari)
             }
             case SequenceValue(left, right) => typeof(right)
+            case SequencePostValue(left, right) => typeof(left)
             case ArrayGetValue(name, index) => {
                 typeof(name) match
                     case ArrayType(inner, size) => inner
@@ -1022,6 +1026,7 @@ object Utils{
                 }
 
             case SequenceValue(left, right) => SequenceValue(left, simplify(right))
+            case SequencePostValue(left, right) => SequencePostValue(simplify(left), right)
             case UnaryOperation(op, left) => {
                 val inner = Utils.simplify(left)
                 (op,inner) match {
@@ -1079,8 +1084,6 @@ object Utils{
                     case (StringValue(a), JsonValue(JsonDictionary(dic))) if op == "in" => BoolValue(dic.contains(a))
                     case (StringValue(a), JsonValue(JsonArray(arr))) if op == "in" => BoolValue(arr.contains(StringValue(a)))
                     case (StringValue(a), StringValue(b)) if op == "in" => BoolValue(b.contains(a))
-                    //case (sel: SelectorValue, other) if op == "in" => SelectorValue(getSelector(BinaryOperation(op, nl, nr), true)._3)
-                    //case (sel: SelectorValue, other) if op == "not in" => SelectorValue(getSelector(BinaryOperation(op, nl, nr), true)._3)
                     case (StringValue(a), IntValue(b)) if op == "*" => StringValue(a * b)
                     case (StringValue(a), JsonValue(JsonString(b))) => StringValue(combine(op, a, b))
                     case (JsonValue(JsonString(a)), StringValue(b)) => StringValue(combine(op, a, b))

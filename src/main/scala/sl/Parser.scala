@@ -291,8 +291,8 @@ object Parser extends StandardTokenParsers {
     *   A parser for a function argument.
     */
   def argument: Parser[Argument] =
-    types ~ identLazy ~ opt("=" ~> exprNoTuple) ^^ { p =>
-      Argument(p._1._2, p._1._1, p._2)
+    types ~ identLazy ~ opt("=" ~> exprNoTuple) ^^ { case typ ~ name ~ value  =>
+      Argument(name, typ, value)
     }
 
   /** Parses a list of function arguments.
@@ -300,6 +300,21 @@ object Parser extends StandardTokenParsers {
     *   A parser for a list of function arguments.
     */
   def arguments: Parser[List[Argument]] = "(" ~> repsep(argument, ",") <~ ")"
+
+  /** Parses a function argument.
+    * @return
+    *   A parser for a function argument.
+    */
+  def templateArgument: Parser[TemplateArgument] =
+    identLazy ~ opt("=" ~> exprBottom) ^^ { case n ~ v =>
+      TemplateArgument(n, v)
+    }
+
+  /** Parses a list of function arguments.
+    * @return
+    *   A parser for a list of function arguments.
+    */
+  def templateArguments: Parser[List[TemplateArgument]] = opt("<" ~> repsep(templateArgument, ",") <~ ">") ^^ {case None =>List();case Some(value)=>value}
 
   def instruction: Parser[Instruction] = positioned(
     functionDecl
@@ -809,7 +824,7 @@ object Parser extends StandardTokenParsers {
     *   A TemplateDecl instruction.
     */
   def templateDesc: Parser[Instruction] = positioned(
-    doc ~ (modifier("template") <~ "template") ~ identLazy ~ typeArgument ~ opt(
+    doc ~ (modifier("template") <~ "template") ~ identLazy ~ templateArguments ~ opt(
       "extends" ~> (ident2 ~ typeArgumentExpression)
     ) ~ instruction ^^ {
       case doc ~ mod ~ name ~ generics ~ Some(
@@ -1183,6 +1198,28 @@ object Parser extends StandardTokenParsers {
       case s ~ i ~ op ~ e =>
         VariableAssigment(List((Left(i), s.getOrElse(Selector.self))), op, e)
     } |
+      ("+" ~ "+") ~> opt(selector <~ ".") ~ identLazy2 ^^ { case s ~ i =>
+        VariableAssigment(
+          List((Left(i), s.getOrElse(Selector.self))),
+          "+=",
+          IntValue(1)
+        )
+      } |
+      ("-" ~ "-") ~> opt(selector <~ ".") ~ identLazy2 ^^ { case s ~ i =>
+        VariableAssigment(
+          List((Left(i), s.getOrElse(Selector.self))),
+          "-=",
+          IntValue(1)
+        )
+      }
+  )
+
+  /** Parser for single variable assignment
+    * @return
+    *   VariableAssigment
+    */
+  def singleVarAssignmentPos: Parser[VariableAssigment] = positioned(
+    (
       opt(selector <~ ".") ~ identLazy2 <~ ("+" ~ "+") ^^ { case s ~ i =>
         VariableAssigment(
           List((Left(i), s.getOrElse(Selector.self))),
@@ -1197,6 +1234,7 @@ object Parser extends StandardTokenParsers {
           IntValue(1)
         )
       }
+    )
   )
 
   /** Parser for variable declaration
@@ -1797,6 +1835,9 @@ object Parser extends StandardTokenParsers {
       | "null" ^^^ NullValue
       | singleVarAssignment ^^ { p =>
         SequenceValue(p, VariableValue(p.name.head._1.left.get, p.name.head._2))
+      }
+      | singleVarAssignmentPos ^^ { p =>
+        SequencePostValue(VariableValue(p.name.head._1.left.get, p.name.head._2), p)
       }
       | tagValue
       | namespacedName
