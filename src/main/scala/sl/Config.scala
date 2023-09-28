@@ -132,7 +132,7 @@ object ConfigLoader{
             f"name=${Settings.outputName}",
             f"namespace=${Settings.name}",
             f"author=${Settings.author}",
-            f"target=${target.replace(".slconfig", "")}",
+            f"target=${target.replace(".slconf", "")}",
             f"scoreboard.variable=${Settings.variableScoreboard}",
             f"scoreboard.value=${Settings.valueScoreboard}",
             f"scoreboard.const=${Settings.constScoreboard}",
