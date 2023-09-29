@@ -1,6 +1,6 @@
 # ==================================================
-# void default.zzz_sl_block.7()
-# a.k.a default.array.__init__
+# void default.zzz_sl_block.1()
+# a.k.a default.object.__remRef.1
 # ==================================================
 
-say hi
+kill

@@ -55,9 +55,9 @@ object StaticAnalyser{
                 val newBlock = check(block)
                 val returnState = hasReturn(newBlock)
                 if returnState == ReturnState.None && typ != VoidType && !modifier.hasAttributes("noReturnCheck")(null) then
-                    Reporter.warning(f"Function $name does not return")
+                    if (Settings.consoleWarningReturn){Reporter.warning(f"Function $name does not return")}
                 if returnState == ReturnState.Partial && typ != VoidType && !modifier.hasAttributes("noReturnCheck")(null) then
-                    Reporter.warning(f"Function $name does not return in all cases")
+                    if (Settings.consoleWarningReturn){Reporter.warning(f"Function $name does not return in all cases")}
                 val finalBlock = returnOne(newBlock)
                 if (finalBlock != newBlock) then
                     modifier.addAtrribute("__returnCheck__", BoolValue(true))

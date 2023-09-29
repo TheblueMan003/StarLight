@@ -95,7 +95,7 @@ object Preparser {
     }
 
     paternsToReplace.foreach(p => text2 = text2.replaceAllLiterally(p._1, p._2))
-    if (name != "" && !silent) {
+    if (name != "" && !silent && Settings.consoleInfoPreParsed) {
       Reporter.ok(f"Preparsed: $name")
     }
 

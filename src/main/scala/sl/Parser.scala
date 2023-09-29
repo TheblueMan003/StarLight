@@ -2314,10 +2314,10 @@ object Parser extends StandardTokenParsers {
     val tokens = new lexical.Scanner(Preparser.parse(file, args))
     phrase(program)(tokens) match {
       case Success(trees, _) =>
-        Reporter.ok(f"Parsed: $file")
+        if (Settings.consoleInfoParsed){Reporter.ok(f"Parsed: $file")}
         Some(StaticAnalyser.handleSleep(StaticAnalyser.check(trees)))
       case e =>
-        println(f"Error in file '${file}'': ${e}")
+        Reporter.error(f"Error in file '${file}'': ${e}")
         None
     }
   }
@@ -2327,7 +2327,7 @@ object Parser extends StandardTokenParsers {
       case Success(trees, _) =>
         StaticAnalyser.check(trees)
       case e =>
-        println(f"Error in file '${string}'': ${e}")
+        Reporter.error(f"Error in file '${string}'': ${e}")
         null
     }
   }
@@ -2346,7 +2346,7 @@ object Parser extends StandardTokenParsers {
     val tokens = new lexical.Scanner(Preparser.parse(file, file, silent))
     phrase(expr)(tokens) match {
       case Success(trees, _) =>
-        if (!silent) {
+        if (!silent && Settings.consoleInfoParsed) {
           Reporter.ok(f"Parsed: $file")
         }
         trees

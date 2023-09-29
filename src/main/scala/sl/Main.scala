@@ -503,10 +503,10 @@ object Main {
       var changed = true
       while (count < 20 && changed) {
         changed = false
-        Reporter.info(f"Iteration ${count}")
+        if (Settings.consoleInfoParsed){Reporter.info(f"Iteration ${count}")}
         var states: mutable.Map[SBLink, ScoreboardState] = null
         if (Settings.optimizeVariableValue) {
-          Reporter.info(f">> Optimizing variable")
+          if (Settings.consoleInfoParsed){Reporter.info(f">> Optimizing variable")}
           val (a, b, s) = sl.IR
             .ScoreboardReduce(output, context.getScoreboardUsedForce())
             .run()
@@ -515,7 +515,7 @@ object Main {
           changed |= b
         }
         if (Settings.optimizeFold) {
-          Reporter.info(f">> Optimizing fold")
+          if (Settings.consoleInfoParsed){Reporter.info(f">> Optimizing fold")}
           val reducer = new FoldReduce(output)
           reducer.state = states
           val (a, b) = reducer.run()
@@ -523,7 +523,7 @@ object Main {
           changed |= b
         }
         if (Settings.optimizeInlining) {
-          Reporter.info(f">> Optimizing calls")
+          if (Settings.consoleInfoParsed){Reporter.info(f">> Optimizing calls")}
           val (a, b) = sl.IR.BlockReduce(output).run()
           output = a
           changed |= b

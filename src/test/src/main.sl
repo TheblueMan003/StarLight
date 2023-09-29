@@ -1,9 +1,6 @@
 package array
 
-struct test{
-    def this(){
-        /say hi
-    }
+def test(){
+    string a = "hello"
+    string b = a[0..2]+"world"
 }
-
-test a = new test()

@@ -98,6 +98,13 @@ object ConfigLoader{
                     case ("export.source", value) => Settings.exportSource = value == "true"
                     case ("export.contextPath", value) => Settings.exportContextPath = value == "true"
 
+                    case ("console.info.parsed", value) => Settings.consoleInfoParsed = value == "true"
+                    case ("console.info.preparsed", value) => Settings.consoleInfoPreParsed = value == "true"
+                    case ("console.info.optimization", value) => Settings.consoleInfoOptimization = value == "true"
+                    case ("console.info.export_path", value) => Settings.consoleInfoExportPath = value == "true"
+                    case ("console.warning.return", value) => Settings.consoleWarningReturn = value == "true"
+                    case ("console.warning.ambiguity", value) => Settings.consoleWarningNameAmbiguity = value == "true"
+
 
                     case ("obfuscate", value)          => Settings.obfuscate = value == "true"
 
@@ -175,6 +182,13 @@ object ConfigLoader{
             f"optimization.variable.global=${Settings.optimizeVariableGlobal}",
             f"optimization.fold=${Settings.optimizeFold}",
             f"optimization.allowRemoveProtected=${Settings.optimizeAllowRemoveProtected}",
+
+            f"console.info.parsed=${Settings.consoleInfoParsed}",
+            f"console.info.preparsed=${Settings.consoleInfoPreParsed}",
+            f"console.info.optimization=${Settings.consoleInfoOptimization}",
+            f"console.info.export_path=${Settings.consoleInfoExportPath}",
+            f"console.warning.return=${Settings.consoleWarningReturn}",
+            f"console.warning.ambiguity=${Settings.consoleWarningNameAmbiguity}",
 
             f"lazyTypeChecking=${Settings.lazyTypeChecking}",
             f"macroConvertToLazy=${Settings.macroConvertToLazy}",

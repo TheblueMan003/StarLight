@@ -15,6 +15,7 @@ import java.io.{ BufferedInputStream, FileInputStream, FileOutputStream }
 import java.util.zip.{ ZipEntry, ZipOutputStream }
 import java.io.File
 import sl.IR.*
+import sl.Settings
 
 object DataPackBuilder{
     var previous = mutable.Map[String, Map[String, List[IRTree]]]()
@@ -33,7 +34,7 @@ object DataPackBuilder{
         )
         
         dirs.foreach(target => {
-            Reporter.ok(f"Building Data Pack: $target")
+            if (Settings.consoleInfoExportPath){Reporter.ok(f"Building Data Pack: $target")}
             if (target.endsWith(".zip/")){
                 makeDPZip(source, target.replaceAllLiterally(".zip/",".zip"), output)
             }

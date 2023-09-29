@@ -797,6 +797,10 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 					}
 					case DefaultValue => List(StringSet(getStorage(), Utils.stringify("")))
 					case JsonValue(JsonString(value)) => List(StringSet(getStorage(), Utils.stringify(value)))
+					case bin: BinaryOperation => assignBinaryOperator(op, bin)
+					case ter: TernaryOperation => assignTernaryOperator(op, ter)
+					case seq: SequenceValue => assignSequence(op, seq)
+					case seq: SequencePostValue => assignSequencePost(op, seq)
 					case other => 
 						handleFunctionCall("=", VariableValue("__string_cast__"), List(other), List(), Selector.self)
 				}

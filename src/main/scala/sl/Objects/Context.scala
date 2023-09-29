@@ -635,7 +635,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
                 if (ret(0) == ret(1)) return Some(ret(0))
                 
                 if (!silent){
-                    Reporter.warning(f"Ambiguous function: $identifier for args: $args in context: $path Matched:\n\t${ret.map(f => f"${f.fullName}(${f.arguments}) from ${f.context.fullPath}").mkString("\n\t")}")
+                    if (Settings.consoleWarningNameAmbiguity){Reporter.warning(f"Ambiguous function: $identifier for args: $args in context: $path Matched:\n\t${ret.map(f => f"${f.fullName}(${f.arguments}) from ${f.context.fullPath}").mkString("\n\t")}")}
                 }
             }
             if (ret.size == 0) return None

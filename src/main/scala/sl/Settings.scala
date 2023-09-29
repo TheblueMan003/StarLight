@@ -62,6 +62,13 @@ class SettingsContext(){
 
     var experimentalMultithread = false
 
+    var consoleInfoParsed = true
+    var consoleInfoPreParsed = true
+    var consoleInfoOptimization = true
+    var consoleInfoExportPath = true
+    var consoleWarningReturn = true
+    var consoleWarningNameAmbiguity = true
+
     var exportDoc = true
     var exportSource = false
     var exportContextPath = true

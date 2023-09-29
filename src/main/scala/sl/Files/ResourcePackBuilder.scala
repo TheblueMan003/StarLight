@@ -9,6 +9,7 @@ import java.io.PrintWriter
 import java.io.File
 import sl.Reporter
 import sl.IR.*
+import sl.Settings
 
 object ResourcePackBuilder{
     var previous = Map[String, List[String]]()
@@ -19,7 +20,7 @@ object ResourcePackBuilder{
         path.endsWith(".py")
     }
     def build(source: List[String], target: String, jsonFiles: List[IRFile])={
-        Reporter.ok(f"Building Resource Pack: $target")
+        if (Settings.consoleInfoExportPath){Reporter.ok(f"Building Resource Pack: $target")}
         if (target.endsWith(".zip/")){
             makeRPZip(source, target.replaceAllLiterally(".zip/",".zip"), jsonFiles)
         }
