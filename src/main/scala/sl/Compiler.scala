@@ -137,6 +137,7 @@ object Compiler{
                     }
                     List()
                 }
+                case ExtensionDecl(name, block, modifier) => List()
                 case TemplateDecl(name, block, modifier, parent, generics, parentGenerics) => {
                     modifier.simplify()
                     if (!meta.firstPass){

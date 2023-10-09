@@ -112,6 +112,7 @@ Attributes can be added to function to specify thing to the compiler.
 Here is a list of used attributes by the compiler:
 - `criterion`: specify the criterion when other than dummy. (JAVA Only)
 - `nbt`: specify the nbt of the variable (for variable of type json & marked as scoreboard)
+- `type`: specify the type of the variable for nbt assigment (for variable of type json & marked as scoreboard) (by default it is infered at asignment location but double is not supported by the inferer and must be specified manually)
 - `name`: force the name of the variable (use for inter compatibility with other datapack)
 - `scoreboard`: force the scoreboard of the variable (use for inter compatibility with other datapack)
 - `versionSpecific`: Append the version to the name of the variable
@@ -123,7 +124,8 @@ Here is a list of used attributes by the compiler:
 Store Normal integer
 
 Supported operation:
-* `=`, `+`, `-`, `*`, `/`, `%`, `<<`, `>>`, `++`, `--`
+* `=`, `+`, `-`, `*`, `/`, `%`, `<<`, `>>`, `++`, `--`, `^`
+Note that `^` is the power operator and not the xor operator.
 
 
 ### float
@@ -197,6 +199,25 @@ Supported operation:
 * `>:=`: Append the json
 * `::=`: Merge the json
 * `-:=`: Remove the json
+* `==`: Compare the json
+* `in`: Check if the json is in the other json
+
+### string (Java Edition Only)
+Store a string value.
+
+Supported operation:
+* `=`: Asign the string
+* `+=`: Append the string
+* `==`: Compare the string
+* `in`: Check if the string is in the other string
+
+Supported function:
+* `string.length()`: Return the length of the string
+* `string.replace(string, string)`: Return the string with the first string replace by the second string
+* `string.contains(string)`: Return true if the string contains the other string
+* `string.startsWith(string)`: Return true if the string start with the other string
+* `string.endsWith(string)`: Return true if the string end with the other string
+* `string.reverse()`: Return the reversed string
 
 ## Flow Controls
 ### If
@@ -724,6 +745,22 @@ template example{
 }
 ```
 The super keyword do not need to be use if the function is not shadowed.
+
+## Type Extension
+Type can be extended with the following syntax:
+```
+extension int{
+    int plusOne(int value){
+        return 1
+    }
+}
+```
+The type will then have the new method:
+```
+int a = 0
+int b = a.plusOne()
+```
+Note that the first argument of the method is always the type itself.
 
 ### Generic Template
 Template can also accept type parameters with the following syntax:

@@ -4,10 +4,7 @@ import sl.{If, SmallValue, Expression, ElseIf}
 import objects.{Context, Variable}
 import objects.types.*
 import sl.*
-import objects.types.IntType
-import objects.types.EntityType
 import objects.Identifier
-import objects.types.BoolType
 import sl.Compilation.Selector.*
 import scala.collection.parallel.CollectionConverters._
 import sl.IR.*
@@ -180,6 +177,7 @@ object Execute{
                             _ => Compiler.compile(FunctionCall("__at__", exec.exprs ::: List(LinkedFunctionValue(context.getFreshBlock(Compiler.compile(exec.block)))), List()))
                         }
                     }
+                    case StringValue(value) => makeExecute(x => PositionedIR(value, x), Compiler.compile(exec.block))
                     case LinkedVariableValue(vari, selector) if vari.getType() == EntityType => {
                         val (prefix, _, selector) = Utils.getSelector(exec.exprs.head)
                         prefix:::makeExecute(x => AtIR(selector.getString(), x), Compiler.compile(exec.block))
@@ -383,8 +381,19 @@ object Execute{
                     if right == right.toInt then (List(), List(IFValueCase(BinaryOperation(op, IntValue(right.toInt), LinkedVariableValue(left, sel))))) else (List(), List(IFTrue))
 
             
-            case BinaryOperation("in", value, LinkedVariableValue(vari, sel)) if vari.getType().isInstanceOf[RangeType] =>
+            case BinaryOperation("in", value, LinkedVariableValue(vari, sel)) if vari.getType().isInstanceOf[RangeType] && Utils.typeof(value).isSubtypeOf(vari.getType()) =>
                 (List(), List(IFValueCase(BinaryOperation("in", value, LinkedVariableValue(vari, sel)))))
+
+            case BinaryOperation("in", left @ LinkedVariableValue(vari2, sel2), right @ LinkedVariableValue(vari, sel)) if vari.getType() == JsonType =>
+                context.requestLibrary("standard.json")
+                getIfCase(FunctionCallValue(VariableValue("standard.json.contains", Selector.self), List(right, left), List()))
+
+            case BinaryOperation("in", value, LinkedVariableValue(vari, sel)) if vari.getType() == JsonType =>
+                (List(), List(IFValueCase(BinaryOperation("in", value, LinkedVariableValue(vari, sel)))))
+
+            case BinaryOperation("==", left, right) if Utils.typeof(left) == JsonType && Utils.typeof(right) == JsonType=>
+                context.requestLibrary("standard.json")
+                getIfCase(FunctionCallValue(VariableValue("standard.json.equals", Selector.self), List(left, right), List()))
 
             case BinaryOperation("==", LinkedVariableValue(left, sel), right) 
                 if right.hasIntValue() && left.getType().isDirectComparable() => 
@@ -542,6 +551,24 @@ object Execute{
                 if !right.getType().isEqualitySupported() && !right.getType().isComparaisonSupported() => 
                     (List(), List(IFNotValueCase(IFValueCase(BinaryOperation("==", LinkedVariableValue(right, sel), IntValue(left.getMuxID()))))))
 
+            case BinaryOperation(op @ ("==" | "!="), LinkedVariableValue(left, sel), StringValue(value)) if left.getType() == StringType => 
+                (List(), List(IFValueCase(BinaryOperation(op, LinkedVariableValue(left, sel), StringValue(value)))))
+
+            case BinaryOperation(op @ ("==" | "!="), StringValue(value), LinkedVariableValue(left, sel)) if left.getType() == StringType => 
+                (List(), List(IFValueCase(BinaryOperation(op, LinkedVariableValue(left, sel), StringValue(value)))))
+
+            case BinaryOperation("in", left, right) if Utils.typeof(left) == StringType || Utils.typeof(right) == StringType => 
+                context.requestLibrary("standard.string")
+                getIfCase(FunctionCallValue(VariableValue("standard.string.contains", Selector.self), List(left, right), List()))
+
+            case BinaryOperation("==", left, right) if Utils.typeof(left) == StringType || Utils.typeof(right) == StringType => 
+                context.requestLibrary("standard.string")
+                getIfCase(FunctionCallValue(VariableValue("standard.string.equals", Selector.self), List(left, right), List()))
+
+            case BinaryOperation("!=", left, right) if Utils.typeof(left) == StringType || Utils.typeof(right) == StringType => 
+                context.requestLibrary("standard.string")
+                getIfCase(UnaryOperation("!", FunctionCallValue(VariableValue("standard.string.equals", Selector.self), List(left, right), List())))
+
             // Error Cases
             case BinaryOperation(">" | "<" | ">=" | "<=" | "==" | "!=", LinkedVariableValue(left, sel), right) 
                 if !left.getType().isEqualitySupported() && !left.getType().isComparaisonSupported() => 
@@ -593,9 +620,22 @@ object Execute{
                 val op = expr.asInstanceOf[BinaryOperation].op
                 val ll = Utils.simplifyToVariable(left)
                 val rr = Utils.simplify(right)
+
+                val tr = Utils.typeof(rr)
+                val tl = Utils.typeof(ll._2)
+
                 rr match
+                    case RangeValue(IntValue(min), IntValue(max), IntValue(1)) if tl == FloatType && tr == RangeType(IntType) =>
+                         (ll._1, List(IFValueCase(BinaryOperation(op, ll._2, RangeValue(FloatValue(min), FloatValue(max), IntValue(1))))))
                     case RangeValue(min, max, IntValue(1)) => (ll._1, List(IFValueCase(BinaryOperation(op, ll._2, rr))))
+
                     case VariableValue(name, selector) => (ll._1, List(IFValueCase(BinaryOperation(op, ll._2, rr))))
+
+                    case LinkedVariableValue(name, selector) if tl == FloatType && tr == RangeType(IntType) => {
+                        val vari = context.getFreshVariable(RangeType(FloatType))
+                        val prev = vari.assign("=", rr)
+                        (ll._1:::prev, List(IFValueCase(BinaryOperation(op, ll._2, LinkedVariableValue(vari)))))
+                    }
                     case LinkedVariableValue(name, selector) => (ll._1, List(IFValueCase(BinaryOperation(op, ll._2, rr))))
                     case other => {
                         val rr2 = Utils.simplifyToVariable(right)
@@ -700,6 +740,7 @@ object Execute{
                 if (Settings.target == MCJava){
                     args.map(Utils.simplify(_)) match
                         case (pos: PositionValue) :: Nil => (List(), List(IFLoaded(pos.getString())))
+                        case (string: StringValue) :: Nil => (List(), List(IFLoaded(string.getString())))
                         case other => throw new Exception(f"Invalid argument to loaded: $other")
                 }
                 else{
@@ -717,6 +758,12 @@ object Execute{
                         case TagValue(block)::Nil => (List(), List(IFBlock("~ ~ ~ "+context.getBlockTag(block).getTag())))
                         case (pos:PositionValue)::LinkedTagValue(block)::Nil => (List(), List(IFBlock(pos.getString()+" "+block.getTag())))
                         case LinkedTagValue(block)::Nil => (List(), List(IFBlock("~ ~ ~ "+block.getTag())))
+
+                        case (pos:StringValue)::(block: NamespacedName)::Nil => (List(), List(IFBlock(pos.getString()+" "+block.getString())))
+                        case (pos:StringValue)::(block: StringValue)::Nil => (List(), List(IFBlock(pos.getString()+" "+block.getString())))
+                        case (pos:StringValue)::TagValue(block)::Nil => (List(), List(IFBlock(pos.getString()+" "+context.getBlockTag(block).getTag())))
+                        case (pos:StringValue)::LinkedTagValue(block)::Nil => (List(), List(IFBlock(pos.getString()+" "+block.getTag())))
+
                         case other => throw new Exception(f"Invalid argument to block: $other")
                 }
                 else if (Settings.target == MCBedrock){
@@ -749,6 +796,22 @@ object Execute{
                             val (p, c) = getIfCase(LinkedVariableValue(tag.testFunction.returnVariable))
                             (prev ::: p, c)
                         }
+
+                        case (pos:StringValue)::(block: NamespacedName)::Nil => (List(), List(IFBlock(pos.getString()+" "+BlockConverter.getBlockName(block.getString())+" "+BlockConverter.getBlockID(block.getString()))))
+                        case (pos:StringValue)::(block: StringValue)::Nil => (List(), List(IFBlock(pos.getString()+" "+BlockConverter.getBlockName(block.getString())+" "+BlockConverter.getBlockID(block.getString()))))
+
+                        case (pos:StringValue)::TagValue(block)::Nil => {
+                            val tag = context.getBlockTag(block)
+                            val prev = makeExecute(f => PositionedIR(pos.getString(), f), tag.testFunction.call(List(), null, Selector.self, "="))
+                            val (p, c) = getIfCase(LinkedVariableValue(tag.testFunction.returnVariable))
+                            (prev ::: p, c)
+                        }
+                        case (pos:StringValue)::LinkedTagValue(tag)::Nil => {
+                            val prev = makeExecute(f => PositionedIR(pos.getString(), f), tag.testFunction.call(List(), null, Selector.self, "="))
+                            val (p, c) = getIfCase(LinkedVariableValue(tag.testFunction.returnVariable))
+                            (prev ::: p, c)
+                        }
+
                         case other => throw new Exception(f"Invalid argument to block: $other")
                 }
                 else {
@@ -894,7 +957,7 @@ object Execute{
             case other => {        
                 val expr = Utils.simplify(swit.value)
                 Utils.typeof(expr) match
-                    case IntType | FloatType | BoolType | FuncType(_, _) | EnumType(_) | StructType(_, _) | ClassType(_, _) => {
+                    case IntType | FloatType | BoolType | StringType | FuncType(_, _) | EnumType(_) | StructType(_, _) | ClassType(_, _) => {
                         val cases2 = flattenSwitchCase(swit.cases).map(c => SwitchCase(Utils.simplify(c.expr), c.instr, Utils.simplify(c.cond)))
 
                         val hasDefaultCase = cases2.exists(c => c.expr == DefaultValue || c.cond != BoolValue(true))
@@ -1059,6 +1122,13 @@ case class IFValueCase(val value: Expression) extends IFCase{
                             true)
                     }
                 }
+            }
+
+            case BinaryOperation("==", LinkedVariableValue(left, sel1), StringValue(value)) => {
+                IfStorage(left.getStoragePath(), f"{json:\"$value\"}", block)
+            }
+            case BinaryOperation("!=", LinkedVariableValue(left, sel1), StringValue(value)) => {
+                IfStorage(left.getStoragePath(), f"{json:\"$value\"}", block, true)
             }
 
             case BinaryOperation(">" | "<" | ">=" | "<=" | "==", LinkedVariableValue(left, sel1), LinkedVariableValue(right, sel2))=> {
@@ -1268,7 +1338,12 @@ case class IFValueCase(val value: Expression) extends IFCase{
             case BinaryOperation("in", SelectorValue(sel1), SelectorValue(sel2)) => {
                 IfEntity(sel1.merge(sel2).getString(), block)
             }
-            
+            case BinaryOperation("in", JsonValue(json), LinkedVariableValue(vari, sel2)) if vari.getType() == JsonType => {
+                IfStorage(vari.getStoragePath(), json.getNbt(), block)
+            }
+            case BinaryOperation("in", StringValue(path), LinkedVariableValue(vari, sel2)) if vari.getType() == JsonType  => {
+                IfStorage(vari.getStoragePath(), path, block)
+            }
 
             case a => throw new Exception(f"ERROR IFVALUECASE NOT HANDLED: $a")
         }
@@ -1308,6 +1383,7 @@ case class IFNotValueCase(val value: IFCase) extends IFCase{
             case IfBlock(value, block, invert) => IfBlock(value, block, !invert)
             case IfBlocks(value, block, invert) => IfBlocks(value, block, !invert)
             case IfLoaded(value, block, invert) => IfLoaded(value, block, !invert)
+            case IfStorage(path, value, block, invert) => IfStorage(path, value, block, !invert)
             case EmptyIR => EmptyIR
             case other => other
         }

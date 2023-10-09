@@ -51,7 +51,7 @@ class SettingsContext(){
     var lazyTypeChecking = false
     var macroConvertToLazy = true
 
-    var optimize = true
+    var optimize = false
     var optimizeInlining = true
     var optimizeDeduplication = true
     var optimizeVariableValue = true

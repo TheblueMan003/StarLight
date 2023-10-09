@@ -47,6 +47,7 @@ object Parser extends StandardTokenParsers {
     "%=",
     "?=",
     ":=",
+    "^=",
     "%",
     "@",
     "@e",
@@ -111,6 +112,7 @@ object Parser extends StandardTokenParsers {
     "in",
     "not",
     "def",
+    "extension",
     "package",
     "struct",
     "enum",
@@ -162,6 +164,15 @@ object Parser extends StandardTokenParsers {
   def block: Parser[Instruction] = positioned(
     "{" ~> rep(instruction <~ opt(";")) <~ "}" ^^ (p => InstructionBlock(p))
   )
+
+  /** Parses a block for extension of instructions enclosed in curly braces.
+    * @return
+    *   A parser for an instruction block.
+    */
+  def blockExtension: Parser[Instruction] = positioned(
+    "{" ~> rep(functionDecl <~ opt(";")) <~ "}" ^^ (p => InstructionBlock(p))
+  )
+
 
   /** Parses an assignment operator.
     * @return
@@ -325,6 +336,7 @@ object Parser extends StandardTokenParsers {
       | assertInstr
       | packageInstr
       | structDecl
+      | extensionDecl
       | caseStruct
       | classDecl
       | interfaceDecl
@@ -787,6 +799,16 @@ object Parser extends StandardTokenParsers {
       "extends" ~> ident2
     ) ~ block ^^ { case doc ~ mod ~ iden ~ typeargs ~ par ~ block =>
       StructDecl(iden, typeargs, block, mod.withDoc(doc), par)
+    }
+  )
+
+  /** Parses a regular extension declaration.
+    * @return
+    *   A ExtensionDecl instruction.
+    */
+  def extensionDecl: Parser[Instruction] = positioned(
+    doc ~ (modifier("extension") <~ "extension") ~ types ~ blockExtension ^^ { 
+      case doc ~ mod ~ typ ~ block => ExtensionDecl(typ, block, mod.withDoc(doc))
     }
   )
 
@@ -1946,13 +1968,28 @@ object Parser extends StandardTokenParsers {
     * @return
     *   The parsed Expression.
     */
+  def exprLeftRange: Parser[Expression] = positioned(
+    (".." ~> ternaryOperator ~ opt("by" ~> ternaryOperator)) ^^ {
+      case e ~ None                 => RangeValue(IntValue(Int.MinValue), e, IntValue(1));
+      case e1 ~ Some(e2)     => RangeValue(IntValue(Int.MinValue), e1, e2);
+    }
+    | ternaryOperator
+  )
+
+  /** Parses an expression that may contain a range operator (..) with optional
+    * step (by).
+    * @return
+    *   The parsed Expression.
+    */
   def exprRange: Parser[Expression] = positioned(
-    ternaryOperator ~ opt(
-      ".." ~> ternaryOperator ~ opt("by" ~> ternaryOperator)
+    exprLeftRange ~ opt(
+      ".." ~> opt(ternaryOperator) ~ opt("by" ~> ternaryOperator)
     ) ^^ {
       case e ~ None                 => e;
-      case e1 ~ Some(e2 ~ None)     => RangeValue(e1, e2, IntValue(1));
-      case e1 ~ Some(e2 ~ Some(e3)) => RangeValue(e1, e2, e3)
+      case e1 ~ Some(Some(e2) ~ None)     => RangeValue(e1, e2, IntValue(1));
+      case e1 ~ Some(None ~ None)     => RangeValue(e1, IntValue(Int.MaxValue), IntValue(1));
+      case e1 ~ Some(Some(e2) ~ Some(e3)) => RangeValue(e1, e2, e3)
+      case e1 ~ Some(None ~ Some(e3)) => RangeValue(e1, IntValue(Int.MaxValue), e3)
     }
   )
 

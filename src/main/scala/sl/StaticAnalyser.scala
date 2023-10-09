@@ -240,6 +240,7 @@ object StaticAnalyser{
     def convertDoWhileToFunction(loop: DoWhileLoop): Instruction = {
         val mod = Modifier.newPrivate()
         mod.isAsync = true
+        mod.isLazy = true
         val loopExit = InstructionList(List(getAssignment("--await_callback--", VariableValue("-exit-loop-"))))
         val init = If(getComparaison("-setup-loop-", BoolValue(false)), InstructionList(List(getAssignment("-setup-loop-", BoolValue(true)), getDeclaration("-exit-loop-", VariableValue("--await_callback--"), FuncType(List(), VoidType)))), List())
         val block =  InstructionList(List(init, loop.block, If(loop.cond, InstructionList(List(Await(FunctionCall(Identifier.fromString("--async_while--"), List(), List()), InstructionList(List())))), List(ElseIf(BoolValue(true), loopExit)))))

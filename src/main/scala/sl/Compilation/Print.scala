@@ -13,7 +13,26 @@ private lazy val colorMap = Utils.getConfig("color.csv")
                             .map{case a :: b :: c :: Nil => (a, (b,c)); case _ =>throw new Exception("WHAT")}
                             .toMap
 
+private lazy val colorCodeMap = Utils.getConfig("color.csv")
+                            .map(l => l.split(";").toList)
+                            .filter(_.size == 3)
+                            .map{case a :: b :: c :: Nil => (c, b); case _ =>throw new Exception("WHAT")}
+                            .toMap
+
 object Print{
+    def convertMinecraftColorCodes(input: String): List[TupleValue] = {
+        val pattern = "§[0-9a-f]".r
+        val parts = pattern.split(input)
+        
+        val colorCodes = pattern.findAllIn(input).toList
+
+        val tuples = for ((text, code) <- parts.zipAll(colorCodes, "", "")) yield {
+        val colorName = colorCodeMap.getOrElse(code.substring(1), "reset")
+        (text, colorName)
+        }
+
+        tuples.toList.map{case (a,b) => TupleValue(List(StringValue(a), StringValue(b)))}
+    }
     def toRawJson(expr: List[Expression])(implicit ctx: Context): (List[IRTree], RawJsonValue) = {
         val res = expr.map(toRawJson(_, true))
         val prefix = res.map(_._1).flatten
@@ -35,15 +54,21 @@ object Print{
             case TagValue(value) => (List(), List(PrintString(f"#$value", col, mod)))
             case LinkedTagValue(value) => (List(), List(PrintString(f"#$value", col, mod)))
             case StringValue(value) => 
-                val reg = "[a-zA-Z0-9_]+(\\.[a-zA-Z0-9_]+)+".r
-                val matched = reg.findFirstMatchIn(value) 
-                matched match
-                    case Some(v) if v.matched == value => {
-                        (List(), List(PrintTranslate(f"$value", RawJsonValue(List()), col, mod)))
-                    }
-                    case _ => 
-                        val str = value.replace("\\","\\\\")
-                        (List(), List(PrintString(f"$str", col, mod)))
+                if (value.contains("§")){
+                    val tuples = TupleValue(convertMinecraftColorCodes(value))
+                    toRawJson(tuples)
+                }
+                else{
+                    val reg = "[a-zA-Z0-9_]+(\\.[a-zA-Z0-9_]+)+".r
+                    val matched = reg.findFirstMatchIn(value) 
+                    matched match
+                        case Some(v) if v.matched == value => {
+                            (List(), List(PrintTranslate(f"$value", RawJsonValue(List()), col, mod)))
+                        }
+                        case _ => 
+                            val str = value.replace("\\","\\\\")
+                            (List(), List(PrintString(f"$str", col, mod)))
+                }
             case value: NamespacedName => (List(), List(PrintString(f"${value.getString()}", col, mod)))
             case VariableValue(name, sel) => {
                 ctx.tryGetVariable(name) match
@@ -278,7 +303,13 @@ case class PrintSelector(val selector: Selector, val color: PrintColor, val modi
 }
 case class PrintNBT(val vari: Variable, val color: PrintColor, val modifier: TextModdifier) extends Printable{
     def toJava()(implicit ctx: Context): String = 
-        f"{\"nbt\": \"${vari.jsonArrayKey}\", \"storage\":\"${vari.getStoragePath()}\",${modifier.toJava()}, ${color.toJava()}}"
+        val source = vari.getStoragePath()
+        if (source.startsWith("@")){
+            f"{\"nbt\": \"${vari.jsonArrayKey}\", \"entity\":\"${vari.getStoragePath()}\",${modifier.toJava()}, ${color.toJava()}}"
+        }
+        else{
+            f"{\"nbt\": \"${vari.jsonArrayKey}\", \"storage\":\"${vari.getStoragePath()}\",${modifier.toJava()}, ${color.toJava()}}"
+        }
     def toBedrock()(implicit ctx: Context): String = {
         ???
     }

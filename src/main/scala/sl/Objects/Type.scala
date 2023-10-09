@@ -2,10 +2,11 @@ package objects.types
 
 import scala.util.parsing.input.Positional
 import objects.Context
-import objects.{Struct, Class, Variable, CompilerFunction}
+import objects.{Struct, Class, Variable, CompilerFunction, OptionalFunction}
 import sl.Expression
 import sl.*
 import objects.Modifier
+import objects.Identifier
 
 trait Typed(typ: Type) {
   def getType(): Type = {
@@ -25,28 +26,13 @@ abstract class Type extends Positional {
   def isComparaisonSupported(): Boolean
   def isEqualitySupported(): Boolean
 
-  def generateCompilerFunction(
+  def generateExtensionFunction(
       variable: Variable
-  )(implicit context: Context) = {
-    if (variable.modifiers.isLazy) {
+  )(implicit context: Context): Unit = {
       context.addFunction(
         "toString",
-        CompilerFunction(
-          context,
-          "toString",
-          List(),
-          StringType,
-          Modifier.newPublic(),
-          (args: List[Expression], ctx: Context) => {
-            args match {
-              case Nil => (List(), StringValue(variable.lazyValue.toString()))
-              case other =>
-                throw new Exception(f"Illegal Arguments $other for toString")
-            }
-          }
-        )
+        OptionalFunction(context, variable, "toString", "standard.string", Identifier.fromString("standard.string.cast"), List(), StringType, Modifier.newPublic())
       )
-    }
   }
 }
 
@@ -177,175 +163,34 @@ object StringType extends Type {
       case _            => false
   }
   override def getName()(implicit context: Context): String = "string"
-  override def generateCompilerFunction(
+  override def generateExtensionFunction(
       variable: Variable
   )(implicit context: Context): Unit = {
-    super.generateCompilerFunction(variable)
-    if (variable.modifiers.isLazy) {
-      context.addFunction(
-        "substring",
-        CompilerFunction(
-          context,
-          "substring",
-          List(Argument("start", IntType, None)),
-          StringType,
-          Modifier.newPublic(),
-          (args: List[Expression], ctx: Context) => {
-            args match {
-              case IntValue(start) :: Nil =>
-                (
-                  List(),
-                  StringValue(
-                    variable.lazyValue
-                      .asInstanceOf[StringValue]
-                      .value
-                      .substring(start)
-                  )
-                )
-              case other =>
-                throw new Exception(f"Illegal Arguments $other for substring")
-            }
-          }
-        )
-      )
-
-      context.addFunction(
-        "substring",
-        CompilerFunction(
-          context,
-          "substring",
-          List(
-            Argument("start", IntType, None),
-            Argument("end", IntType, None)
-          ),
-          StringType,
-          Modifier.newPublic(),
-          (args: List[Expression], ctx: Context) => {
-            args match {
-              case IntValue(start) :: IntValue(end) :: Nil =>
-                (
-                  List(),
-                  StringValue(
-                    variable.lazyValue
-                      .asInstanceOf[StringValue]
-                      .value
-                      .substring(start, end)
-                  )
-                )
-              case other =>
-                throw new Exception(f"Illegal Arguments $other for substring")
-            }
-          }
-        )
-      )
-
-      context.addFunction(
-        "length",
-        CompilerFunction(
-          context,
-          "length",
-          List(),
-          IntType,
-          Modifier.newPublic(),
-          (args: List[Expression], ctx: Context) => {
-            args match {
-              case Nil =>
-                (
-                  List(),
-                  IntValue(
-                    variable.lazyValue.asInstanceOf[StringValue].value.length
-                  )
-                )
-              case other =>
-                throw new Exception(f"Illegal Arguments $other for length")
-            }
-          }
-        )
-      )
-
-      context.addFunction(
-        "contains",
-        CompilerFunction(
-          context,
-          "contains",
-          List(Argument("predicate", StringType, None)),
-          BoolType,
-          Modifier.newPublic(),
-          (args: List[Expression], ctx: Context) => {
-            args match {
-              case StringValue(pred) :: Nil =>
-                (
-                  List(),
-                  BoolValue(
-                    variable.lazyValue
-                      .asInstanceOf[StringValue]
-                      .value
-                      .contains(pred)
-                  )
-                )
-              case other =>
-                throw new Exception(f"Illegal Arguments $other for contains")
-            }
-          }
-        )
-      )
-
-      context.addFunction(
-        "replace",
-        CompilerFunction(
-          context,
-          "replace",
-          List(
-            Argument("predicate", StringType, None),
-            Argument("to", StringType, None)
-          ),
-          StringType,
-          Modifier.newPublic(),
-          (args: List[Expression], ctx: Context) => {
-            args match {
-              case StringValue(pred) :: StringValue(to) :: Nil =>
-                (
-                  List(),
-                  StringValue(
-                    variable.lazyValue
-                      .asInstanceOf[StringValue]
-                      .value
-                      .replaceAllLiterally(pred, to)
-                  )
-                )
-              case other =>
-                throw new Exception(f"Illegal Arguments $other for replace")
-            }
-          }
-        )
-      )
-
-      context.addFunction(
-        "hash",
-        CompilerFunction(
-          context,
-          "hash",
-          List(),
-          IntType,
-          Modifier.newPublic(),
-          (args: List[Expression], ctx: Context) => {
-            args match {
-              case Nil =>
-                (
-                  List(),
-                  IntValue(
-                    scala.util.hashing.MurmurHash3.stringHash(
-                      variable.lazyValue.asInstanceOf[StringValue].value
-                    )
-                  )
-                )
-              case other =>
-                throw new Exception(f"Illegal Arguments $other for hash")
-            }
-          }
-        )
-      )
-    }
+    super.generateExtensionFunction(variable)
+    context.addFunction(
+      "length",
+      OptionalFunction(context, variable, "toString", "standard.string", Identifier.fromString("standard.string.length"), List(), StringType, Modifier.newPublic())
+    )
+    context.addFunction(
+      "contains",
+      OptionalFunction(context, variable, "toString", "standard.string", Identifier.fromString("standard.string.contains"), List(Argument("other", StringType, None)), BoolType, Modifier.newPublic())
+    )
+    context.addFunction(
+      "startsWith",
+      OptionalFunction(context, variable, "toString", "standard.string", Identifier.fromString("standard.string.startsWith"), List(Argument("other", StringType, None)), BoolType, Modifier.newPublic())
+    )
+    context.addFunction(
+      "endsWith",
+      OptionalFunction(context, variable, "toString", "standard.string", Identifier.fromString("standard.string.endsWith"), List(Argument("other", StringType, None)), BoolType, Modifier.newPublic())
+    )
+    context.addFunction(
+      "reverse",
+      OptionalFunction(context, variable, "toString", "standard.string", Identifier.fromString("standard.string.reverse"), List(), StringType, Modifier.newPublic())
+    )
+    context.addFunction(
+      "replace",
+      OptionalFunction(context, variable, "toString", "standard.string", Identifier.fromString("standard.string.replace"), List(Argument("other", StringType, None), Argument("to", StringType, None)), StringType, Modifier.newPublic())
+    )
   }
   override def isDirectComparable(): Boolean = false
   override def isDirectEqualitable(): Boolean = false

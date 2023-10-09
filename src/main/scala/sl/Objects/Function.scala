@@ -321,7 +321,8 @@ class LazyFunction(context: Context, _contextName: String, name: String, argumen
 
         if (ret != null) sub.addVariable("_ret", ret)
         if (ret == null){
-            sub.addVariable("_ret", new Variable(sub, "_ret", typ, Modifier.newPrivate()))
+            val variret = sub.getFreshVariable(typ)
+            block = Utils.substReturn(block, variret)(!modifiers.hasAttributes("__returnCheck__"), retSel)
             pref:::sl.Compiler.compile(block.unBlockify())(if modifiers.hasAttributes("inline") then ctx else sub)
         }
         else if (op == "="){
@@ -387,7 +388,7 @@ class MacroFunction(context: Context, _contextName: String, name: String, argume
 
     override def generateArgument()(implicit ctx: Context):Unit = {
         super.generateArgument()
-        context.push(name).getAllVariable().filterNot(x => x == returnVariable || x == vari).map(x => x.makeJson(fullName))
+        context.push(name).getAllVariable(mutable.Set(), true).filterNot(x => x == returnVariable || x == vari).map(x => x.makeJson(_contextName))
     }
 
     override def exists(): Boolean = Settings.target.hasFeature("macro") && wasUsedWithJson
@@ -528,6 +529,31 @@ class ClassFunction(_contextName: String, variable: Variable, function: Function
     }
 }
 
+class OptionalFunction(context: Context, variable: Variable, name: String, lib: String, fct: Identifier, arguments: List[Argument], typ: Type, _modifier: Modifier) extends Function(context, context.getPath()+"."+name, name, arguments, typ, _modifier){
+    override def exists()= false
+
+    override def getContent(): List[IRTree] = List()
+    override def getName(): String = name
+
+    def call(args2: List[Expression], ret: Variable = null, retSel: Selector = Selector.self, op: String = "=")(implicit ctx: Context): List[IRTree] = {
+        context.requestLibrary(lib)
+        val args = LinkedVariableValue(variable) :: args2
+        val function = context.getFunction(fct, args, List(), VoidType)
+        function.call(ret, retSel, op)(ctx)
+    }
+}
+
+class ExtensionFunction(context: Context, variable: Variable, fct: Function) extends Function(context, fct.contextName, fct.name, fct.arguments, fct.getType(), fct.modifiers){
+    override def exists()= false
+
+    override def getContent(): List[IRTree] = List()
+    override def getName(): String = fct.name
+
+    def call(args2: List[Expression], ret: Variable = null, retSel: Selector = Selector.self, op: String = "=")(implicit ctx: Context): List[IRTree] = {
+        val args = LinkedVariableValue(variable) :: args2
+        fct.call(args, ret, retSel, op)(ctx)
+    }
+}
 
 class CompilerFunction(context: Context, name: String, arguments: List[Argument], typ: Type, _modifier: Modifier, val body: (List[Expression], Context)=>(List[IRTree],Expression), val isValue: Boolean = true) extends Function(context, context.getPath()+"."+name, name, arguments, typ, _modifier){
     generateArgument()(context.push(name, this))

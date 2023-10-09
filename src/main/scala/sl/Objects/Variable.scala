@@ -141,9 +141,11 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			}
 			isFunctionArgument |= parent.isFunctionArgument
 		}
-		if (!context.getCurrentFunction().isInstanceOf[CompilerFunction]){
-			//typ.generateCompilerFunction(this)(context.push(name))
-		}
+		
+		typ.generateExtensionFunction(this)(context.push(name))
+		context.getAllExtension(typ).foreach(f => {
+			context.push(name).addFunction(f.name, ExtensionFunction(f.context, this, f))
+		})
 
 		typ match
 			case StructType(struct, sub) => {
@@ -502,24 +504,29 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 	 * @return A List of instructions.
 	 */
 	def defaultAssign(expr: Expression)(implicit context: Context, selector: Selector = Selector.self) = {
-		if (Settings.target == MCBedrock){
-			if (modifiers.isEntity){
-				Compiler.compile(If(BinaryOperation("!=", LinkedVariableValue(this, selector), NullValue), 
-				InstructionList(List()),
-				List(ElseIf(BoolValue(true), VariableAssigment(List((Right(this), selector)), "=", expr)))))
-			}
-			else{
-				List()
-			}
-		}
-		else if (Settings.target == MCJava){
-			getType() match
-				case TupleType(_) => Execute.makeExecute(checkNull, assign("=", expr) ::: assign("=", CastValue(IntValue(1), getType())))
-				case StructType(_, _) => Execute.makeExecute(checkNull, assign("=", expr) ::: assign("=", CastValue(IntValue(1), getType())))
-				case _ => Execute.makeExecute(checkNull, assign("=", expr))
+		if (!modifiers.isEntity && parentFunction != null && expr == DefaultValue){
+			assign("=", DefaultValue)
 		}
 		else{
-			???
+			if (Settings.target == MCBedrock){
+				if (modifiers.isEntity){
+					Compiler.compile(If(BinaryOperation("!=", LinkedVariableValue(this, selector), NullValue), 
+					InstructionList(List()),
+					List(ElseIf(BoolValue(true), VariableAssigment(List((Right(this), selector)), "=", expr)))))
+				}
+				else{
+					List()
+				}
+			}
+			else if (Settings.target == MCJava){
+				getType() match
+					case TupleType(_) => Execute.makeExecute(checkNull, assign("=", expr) ::: assign("=", CastValue(IntValue(1), getType())))
+					case StructType(_, _) => Execute.makeExecute(checkNull, assign("=", expr) ::: assign("=", CastValue(IntValue(1), getType())))
+					case _ => Execute.makeExecute(checkNull, assign("=", expr))
+			}
+			else{
+				???
+			}
 		}
 	}
 
@@ -788,11 +795,17 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 						val (prev,vari) = Utils.simplifyToVariable(name)
 						prev ::: List(StringCopy(getStorage(), vari.vari.getStorage(), min, max))
 					}
+					case ArrayGetValue(name, List(IntValue(min))) => {
+						val (prev,vari) = Utils.simplifyToVariable(name)
+						prev ::: List(StringCopy(getStorage(), vari.vari.getStorage(), min, min))
+					}
 					case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 					case LinkedVariableValue(vari, selector) => {
 						vari.getType() match
 							case StringType => List(StringCopy(getStorage(), vari.getStorage()(context, selector)))
-							case other => handleFunctionCall("=", VariableValue("__string_cast__"), List(LinkedVariableValue(vari, selector)), List(), Selector.self)
+							case other => 
+								context.requestLibrary("standard.string")
+								handleFunctionCall("=", VariableValue("standard.string.cast"), List(LinkedVariableValue(vari, selector)), List(), Selector.self)
 							//case other => throw new Exception(f"Cannot assign $other to string at \n${valueE.pos.longString}")
 					}
 					case DefaultValue => List(StringSet(getStorage(), Utils.stringify("")))
@@ -802,19 +815,30 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 					case seq: SequenceValue => assignSequence(op, seq)
 					case seq: SequencePostValue => assignSequencePost(op, seq)
 					case other => 
-						handleFunctionCall("=", VariableValue("__string_cast__"), List(other), List(), Selector.self)
+						context.requestLibrary("standard.string")
+						handleFunctionCall("=", VariableValue("standard.string.cast"), List(other), List(), Selector.self)
 				}
 			case "+=" => {
 				valueE match{
-					case StringValue(value) => handleFunctionCall("=", VariableValue("__string_concat__"), List(LinkedVariableValue(this), StringValue(value)), List(), Selector.self)
+					case StringValue(value) => 
+						context.requestLibrary("standard.string")
+						handleFunctionCall("=", VariableValue("standard.string.concat"), List(LinkedVariableValue(this), StringValue(value)), List(), Selector.self)
 					case LinkedVariableValue(vari, selector) => {
-						handleFunctionCall("=", VariableValue("__string_concat__"), List(LinkedVariableValue(this), LinkedVariableValue(vari, selector)), List(), Selector.self)
+						context.requestLibrary("standard.string")
+						handleFunctionCall("=", VariableValue("standard.string.concat"), List(LinkedVariableValue(this), LinkedVariableValue(vari, selector)), List(), Selector.self)
 					}
 					case _ => {
 						val vari = context.getFreshVariable(StringType)
 						vari.assign("=", valueE) ::: assign("+=", LinkedVariableValue(vari))
 					}
 				}
+			}
+			case "*=" => {
+				Utils.typeof(valueE) match
+					case IntType => 
+						context.requestLibrary("standard.string")
+						handleFunctionCall("=", VariableValue("standard.string.multiply"), List(LinkedVariableValue(this), valueE), List(), Selector.self)
+				
 			}
 			case other => throw new Exception(f"Cannot assign use op: $other with int at \n${valueE.pos.longString}")
 		}
@@ -874,6 +898,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 										case JsonType => {
 											assignJson("=", LinkedVariableValue(vari.withKey(vari.getSubKey(str))))
 										}
+										case FuncType(sources, output) => List(StorageRead(getIRSelector(), vari.getStorage(vari.getSubKey(str)), 1))
 								case other => assign(op, FunctionCallValue(VariableValue(vari.fullName+".get"), index, List()))
 							}
 						}
@@ -1345,6 +1370,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 				vari.getType() match
 					case other if Utils.fix(other)(context, Set()).isSubtypeOf(Utils.fix(getType())(context, Set())) => List(ScoreboardOperation(getIRSelector(), op, vari.getIRSelector()(sel)))
 					case IntType => List(ScoreboardOperation(getIRSelector(), op, vari.getIRSelector()(sel)))
+					case JsonType => List(StorageRead(getIRSelector(), vari.getStorage()))
 					case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()} at \n${expr.pos.longString}")
 			}
 			case LambdaValue(args, instr, ctx) => {
@@ -1431,15 +1457,18 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 														CMD(f"tag @a[tag=${vari.tagName}] add $tagName"), 
 														List(ElseIf(BoolValue(true), CMD(f"tag @e[tag=${vari.tagName}] add $tagName")))))
 								}
+								case ClassType(clazz, sub) => {
+									// Remove tag to previous entities
+									removeEntityTag():::
+									// Add tag to new entities
+									Compiler.compile(With(LinkedVariableValue(vari, sel), BoolValue(false), BoolValue(true), VariableAssigment(List((Right(this), selector)), "=", SelectorValue(Selector.self)), EmptyInstruction))
+								}
 								case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()} at \n${expr.pos.longString}")
 						}
 						case NullValue => {
-							val vari = context.getVariable(name)
-
-							// Remove tag to previous entities
 							removeEntityTag()
 						}
-						case DefaultValue => List()
+						case DefaultValue => removeEntityTag()
 						case SelectorValue(value) => {
 							// Remove tag to previous entities
 							removeEntityTag():::
@@ -1642,7 +1671,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 					}
 					case other => throw new Exception(f"Illegal operation with json ${name}: $op at \n${value.pos.longString}")
 				}
-			case DefaultValue => List(StorageSet(getStorage(key), StorageString("")))
+			case DefaultValue => List(StorageSet(getStorage(key), StorageString("{}")))
 			case VariableValue(name, sel) => withKey(key).assign(op, context.resolveVariable(value))
 			case NullValue => List(StorageSet(getStorage(key), StorageString("{}")))
 			case LinkedVariableValue(vari, sel) => 
@@ -1657,30 +1686,30 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 							case other => jsonUnpackedOperation(op, value, key)
 						}
 					}
-					case IntType | BoolType | EnumType(_) => {
+					case IntType | BoolType | EnumType(_) | FuncType(_, _) => {
 						op match{
-							case "=" => List(StorageSet(getStorage(key), StorageScoreboard(vari.getIRSelector()(sel), "int", 1)))
-							case ">:=" => List(StorageSet(getStorage("tmp"), StorageScoreboard(vari.getIRSelector()(sel), "int", 1)), 
+							case "=" => List(StorageSet(getStorage(key), StorageScoreboard(vari.getIRSelector()(sel), modifiers.getAttributesString("type", ()=> "int"), 1)))
+							case ">:=" => List(StorageSet(getStorage("tmp"), StorageScoreboard(vari.getIRSelector()(sel), modifiers.getAttributesString("type", ()=> "int"), 1)), 
 											StorageAppend(getStorage(key), getStorage("tmp")))
-							case "<:=" => List(StorageSet(getStorage("tmp"), StorageScoreboard(vari.getIRSelector()(sel), "int", 1)), 
+							case "<:=" => List(StorageSet(getStorage("tmp"), StorageScoreboard(vari.getIRSelector()(sel), modifiers.getAttributesString("type", ()=> "int"), 1)), 
 											StoragePrepend(getStorage(key), getStorage("tmp")))
-							case "::=" => List(StorageSet(getStorage("tmp"), StorageScoreboard(vari.getIRSelector()(sel), "int", 1)), 
+							case "::=" => List(StorageSet(getStorage("tmp"), StorageScoreboard(vari.getIRSelector()(sel), modifiers.getAttributesString("type", ()=> "int"), 1)), 
 											StorageMerge(getStorage(key), getStorage("tmp")))
-							case "-:=" => List(StorageSet(getStorage("tmp"), StorageScoreboard(vari.getIRSelector()(sel), "int", 1)), 
+							case "-:=" => List(StorageSet(getStorage("tmp"), StorageScoreboard(vari.getIRSelector()(sel), modifiers.getAttributesString("type", ()=> "int"), 1)), 
 											StorageRemove(getStorage(key), getStorage("tmp")))
 							case other => jsonUnpackedOperation(op, value, key)
 						}
 					}
 					case FloatType => {
 						op match{
-							case "=" => List(StorageSet(getStorage(key), StorageScoreboard(vari.getIRSelector()(sel), "float", 1f/Settings.floatPrec)))
-							case ">:=" => List(StorageSet(getStorage("tmp"), StorageScoreboard(vari.getIRSelector()(sel), "float", 1f/Settings.floatPrec)), 
+							case "=" => List(StorageSet(getStorage(key), StorageScoreboard(vari.getIRSelector()(sel), modifiers.getAttributesString("type", ()=> "float"), 1f/Settings.floatPrec)))
+							case ">:=" => List(StorageSet(getStorage("tmp"), StorageScoreboard(vari.getIRSelector()(sel), modifiers.getAttributesString("type", ()=> "float"), 1f/Settings.floatPrec)), 
 											StorageAppend(getStorage(key), getStorage("tmp")))
-							case "<:=" => List(StorageSet(getStorage("tmp"), StorageScoreboard(vari.getIRSelector()(sel), "float", 1f/Settings.floatPrec)), 
+							case "<:=" => List(StorageSet(getStorage("tmp"), StorageScoreboard(vari.getIRSelector()(sel), modifiers.getAttributesString("type", ()=> "float"), 1f/Settings.floatPrec)), 
 											StoragePrepend(getStorage(key), getStorage("tmp")))
-							case "::=" => List(StorageSet(getStorage("tmp"), StorageScoreboard(vari.getIRSelector()(sel), "float", 1f/Settings.floatPrec)),	
+							case "::=" => List(StorageSet(getStorage("tmp"), StorageScoreboard(vari.getIRSelector()(sel), modifiers.getAttributesString("type", ()=> "float"), 1f/Settings.floatPrec)),	
 											StorageMerge(getStorage(key), getStorage("tmp")))
-							case "-:=" => List(StorageSet(getStorage("tmp"), StorageScoreboard(vari.getIRSelector()(sel), "float", 1f/Settings.floatPrec)), 
+							case "-:=" => List(StorageSet(getStorage("tmp"), StorageScoreboard(vari.getIRSelector()(sel), modifiers.getAttributesString("type", ()=> "float"), 1f/Settings.floatPrec)), 
 											StorageRemove(getStorage(key), getStorage("tmp")))
 							case other => jsonUnpackedOperation(op, value, key)
 						}
@@ -1701,7 +1730,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 								vari.tupleVari.flatMap(v => withKey(key + "." + v.name).assignJson(op, LinkedVariableValue(v, sel)))
 							case other => {
 								val tmp = context.getFreshVariable(JsonType)
-								tmp.assign("=", value):::assignJson("=", LinkedVariableValue(tmp), keya)
+								tmp.assign("=", value):::assignJson(op, LinkedVariableValue(tmp), keya)
 							}
 						}
 					}
@@ -1873,7 +1902,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 					case JsonValue(JsonDictionary(map)) if map.forall(x => tupleVari.exists(y => y.name == x._1)) => {
 						map.flatMap(x => tupleVari.find(y => y.name == x._1).get.assign("=", Utils.jsonToExpr(x._2))).toList
 					}
-					case ArrayGetValue(name, index) if Utils.typeof(value) == JsonType => {
+					case ArrayGetValue(name, index) if Utils.typeof(value) == JsonType || Utils.typeof(value) == getType() => {
 						handleArrayGetValue(op, name, index)
 					}
 					case _ => context.getFunction(fullName + ".__set__", List(value), List(), getType(), false).call()

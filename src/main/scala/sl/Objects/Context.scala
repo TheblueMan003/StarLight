@@ -28,6 +28,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
     private val variables = mutable.Map[String, Variable]()
     private val properties = mutable.Map[String, Property]()
     private val functions = mutable.Map[String, List[Function]]()
+    private val extensions = mutable.Map[Type, List[Function]]()
     private val structs = mutable.Map[String, Struct]()
     private val classes = mutable.Map[String, Class]()
     private val templates = mutable.Map[String, Template]()
@@ -479,20 +480,49 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
             variable.fullName
         }
     }
-    def getAllVariable(set: mutable.Set[Context], array: ArrayBuffer[Variable]): Unit = {
+    def getAllVariable(set: mutable.Set[Context], array: ArrayBuffer[Variable], strict: Boolean): Unit = {
+        if set.contains(this) then return
+        set.add(this)
+        if (!strict){
+            inheritted.foreach(x => {
+                if (x != null && !set.contains(x)){
+                    x.getAllVariable(set, array, strict)
+                }
+            })
+        }
+        array.appendAll(variables.values)
+        child.filter(_._2.parent == this).foreach(_._2.getAllVariable(set, array, strict))
+    }
+    def getAllVariable(set: mutable.Set[Context] = mutable.Set(), strict: Boolean = false):List[Variable] = {
+        val array = ArrayBuffer[Variable]()
+        getAllVariable(set, array, strict)
+        array.toList
+    }
+
+
+    def addExtension(name: Type, function: List[Function]): Unit = synchronized{
+        if (!extensions.contains(name)){
+            extensions.addOne(name, List())
+        }
+
+        extensions(name) = function ::: extensions(name)
+    }
+    def getAllExtension(typ: Type, set: mutable.Set[Context], array: ArrayBuffer[Function]): Unit = {
         if set.contains(this) then return
         set.add(this)
         inheritted.foreach(x => {
             if (x != null && !set.contains(x)){
-                x.getAllVariable(set, array)
+                x.getAllExtension(typ, set, array)
             }
         })
-        array.appendAll(variables.values)
-        child.filter(_._2.parent == this).foreach(_._2.getAllVariable(set, array))
+        array.appendAll(extensions.getOrElse(typ, List()))
+        if (parent != null){
+            parent.getAllExtension(typ, set, array)
+        }
     }
-    def getAllVariable(set: mutable.Set[Context] = mutable.Set()):List[Variable] = {
-        val array = ArrayBuffer[Variable]()
-        getAllVariable(set, array)
+    def getAllExtension(typ: Type):List[Function] = {
+        val array = ArrayBuffer[Function]()
+        getAllExtension(typ, mutable.Set[Context](), array)
         array.toList
     }
 
@@ -522,8 +552,8 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
                     val vari = tryGetVariable(name)
                     vari match{
                         case Some(vari) => LinkedVariableValue(vari, sel)
-                        case None if Utils.typeof(value)(this).isInstanceOf[FuncType] =>{
-                            val typ = Utils.typeof(value)(this).asInstanceOf[FuncType]
+                        case None if Utils.typeof(value)(this, true).isInstanceOf[FuncType] =>{
+                            val typ = Utils.typeof(value)(this, true).asInstanceOf[FuncType]
                             val fct = getFunction(name, typ.sources, List(), typ.output, true, false).asInstanceOf[ConcreteFunction]
                             LinkedFunctionValue(fct)
                         }
@@ -554,7 +584,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
                     if (vari.modifiers.isLazy){
                         vari.lazyValue match
                             case LambdaValue(args2, instr, context) => {
-                                Some((context.getFreshLambda(args2, args.map(Utils.typeof(_)(this)), output, instr, false), args))
+                                Some((context.getFreshLambda(args2, args.map(Utils.typeof(_)(this, true)), output, instr, false), args))
                             }
                             case VariableValue(name, sel) => tryGetFunction(name, args, typeargs, output, concrete, silent)
                             case LinkedVariableValue(vari, selector) => {
@@ -572,7 +602,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
                 }
                 case _ => 
                     try{
-                        tryGetFunctionFromType(identifier, args.map(Utils.typeof(_)(this)), typeargs, output, concrete, silent) match{
+                        tryGetFunctionFromType(identifier, args.map(Utils.typeof(_)(this, true)), typeargs, output, concrete, silent) match{
                             case Some(fct) => Some((fct, args))
                             case None => None
                         }
@@ -611,7 +641,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
             if (identifier.toString().startsWith("@")) return Some(getFunctionTags(mapFunctionTag(identifier)))
             val fcts3 = getElementList(_.functions)(identifier)
             val fcts2 = handleSuper(identifier, fcts3)
-            //println(fcts2.map(_.fullName))
+            
             val fcts = fcts2.filter(f => !fcts2.exists(g => g.overridedFunction == f))
             if (fcts.size == 0) return None
             

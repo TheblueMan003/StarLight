@@ -52,6 +52,9 @@ case class EnumDecl(val name: String, val fields: List[EnumField], val values: L
 case class PredicateDecl(val name: String, val args: List[Argument], val block: JSONElement, val modifier: Modifier) extends Instruction {
   override def toString() = f"predicate ${name} (${args}) $block"
 }
+case class ExtensionDecl(val name: Type, val block: Instruction, val modifier: Modifier) extends Instruction {
+  override def toString() = f"extension ${name} ${block}"
+}
 
 case class FunctionDecl(val name: String, val block: Instruction, val typ: Type, val args: List[Argument], val typeArgs: List[String], val modifier: Modifier) extends Instruction {
   override def toString() = f"def ${name}(${args.mkString(", ")}) ${block}"

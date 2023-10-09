@@ -69,19 +69,29 @@ def lazy aligned(void=>void fct){
 }
 
 def lazy __at__(float x, float y, float z, void=>void fct){
-    import mc.pointer as pointer
-    import cmd.tp as tp
-    int px = x
-    int py = y
-    int pz = z
-    entity p = pointer.newPointer(){
-        tp.absolute(px, py, pz)
+    if (Compiler.isBedrock()){
+        import mc.pointer as pointer
+        import cmd.tp as tp
+        int px = x
+        int py = y
+        int pz = z
+        entity p = pointer.newPointer(){
+            tp.absolute(px, py, pz)
+        }
+        at(p){
+            fct()
+        }
+        with(p){
+            /kill @s
+        }
     }
-    at(p){
-        fct()
-    }
-    with(p){
-        /kill @s
+    if (Compiler.isJava()){
+        def macro inner(float x, float y, float z){
+            at("$(x) $(y) $(z)"){
+                fct()
+            }
+        }
+        inner(x, y, z)
     }
 }
 
@@ -198,12 +208,6 @@ class object{
     }
 }
 
-def macro string __string_concat__(string a, string b){
-    return "$(a)$(b)"
-}
-def macro string __string_cast__(mcobject a){
-    return "$(a)"
-}
 def lazy __assert__(bool cond, void=>void f){
     if (cond){
         f()

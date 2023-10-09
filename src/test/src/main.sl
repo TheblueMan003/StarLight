@@ -1,6 +1,14 @@
 package array
 
+import standard.string as st
+
+extension (int,int){
+    int inc((int,int) a){
+        return a[0] + a[1]
+    }
+}
+
 def test(){
-    string a = "hello"
-    string b = a[0..2]+"world"
+    int a,b 
+    a ^= 2
 }
