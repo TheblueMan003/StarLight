@@ -75,10 +75,10 @@ object ContextBuilder{
                 context.addTemplate(new Template(context, name, modifier, block.unBlockify(), parentName, generics, parentGenerics))
             }
             case ExtensionDecl(typ, block, modifier) => {
-                val id = context.getFreshId()
-                Compiler.compile(Package(id, block), Meta(true, false))(context)
+                val id = context.getFreshContext()
+                Compiler.compile(block.unBlockify(), Meta(true, false))(id)
                 val ctyp = context.getType(typ)
-                context.addExtension(ctyp, context.root.push(id).getAllFunction().map(f => f._2))
+                context.addExtension(ctyp, id.getAllFunction().filter(x => x._2.context == id))
             }
             case TypeDef(defs) => {
                 defs.foreach{

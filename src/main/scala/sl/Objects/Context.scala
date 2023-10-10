@@ -28,7 +28,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
     private val variables = mutable.Map[String, Variable]()
     private val properties = mutable.Map[String, Property]()
     private val functions = mutable.Map[String, List[Function]]()
-    private val extensions = mutable.Map[Type, List[Function]]()
+    private val extensions = mutable.Map[Type, List[(String, Function)]]()
     private val structs = mutable.Map[String, Struct]()
     private val classes = mutable.Map[String, Class]()
     private val templates = mutable.Map[String, Template]()
@@ -500,14 +500,14 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
     }
 
 
-    def addExtension(name: Type, function: List[Function]): Unit = synchronized{
+    def addExtension(name: Type, function: List[(String,Function)]): Unit = synchronized{
         if (!extensions.contains(name)){
             extensions.addOne(name, List())
         }
 
         extensions(name) = function ::: extensions(name)
     }
-    def getAllExtension(typ: Type, set: mutable.Set[Context], array: ArrayBuffer[Function]): Unit = {
+    def getAllExtension(typ: Type, set: mutable.Set[Context], array: ArrayBuffer[(String, Function)]): Unit = {
         if set.contains(this) then return
         set.add(this)
         inheritted.foreach(x => {
@@ -520,8 +520,8 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
             parent.getAllExtension(typ, set, array)
         }
     }
-    def getAllExtension(typ: Type):List[Function] = {
-        val array = ArrayBuffer[Function]()
+    def getAllExtension(typ: Type):List[(String, Function)] = {
+        val array = ArrayBuffer[(String, Function)]()
         getAllExtension(typ, mutable.Set[Context](), array)
         array.toList
     }
@@ -647,16 +647,17 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
             
             if (fcts.size == 1) return Some(fcts.head)
             val filtered = fcts.filter(fct => args.size >= fct.minArgCount && args.size <= fct.maxArgCount && (fct.isInstanceOf[ConcreteFunction] || !concrete))
-            
             if (filtered.length == 1) return Some(filtered.head)
             if (filtered.size == 0) return None
-            val ret = handleOverride(filtered.filterNot(x => x.modifiers.isAbstract).map(f => (f.arguments.zip(args).map((a, v)=> v.getDistance(a.typ)(this)).reduceOption(_ + _).getOrElse(0), f))
-                              .groupBy(_._1)
-                              .toList
-                              .sortBy(_._1)
-                              .head._2
-                              .map(_._2)
-                              .sortBy(f => f.context.fullPath.distanceTo(this.fullPath)))
+            val ret = handleOverride(filtered.filterNot(x => x.modifiers.isAbstract).map(f => 
+                (f.arguments.zip(args).map((a, v)=> v.getDistance(a.typ)(this)).reduceOption(_ + _).getOrElse(0)
+                 + (if output != VoidType then f.getType().getDistance(output)(this) else 0), f))
+                        .groupBy(_._1)
+                        .toList
+                        .sortBy(_._1)
+                        .head._2
+                        .map(_._2)
+                        .sortBy(f => f.context.fullPath.distanceTo(this.fullPath)))
             
             if (ret.size > 1 && ret(0).contextName.length() == ret(1).contextName.length()) {
                 if (ret(0).modifiers.isVirtual && !ret(1).modifiers.isVirtual) return Some(ret(1))

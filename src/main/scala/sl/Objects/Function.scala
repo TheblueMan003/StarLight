@@ -43,8 +43,8 @@ abstract class Function(context: Context, val contextName: String, name: String,
     var age = 0
     val wasMovedToBlock = context.isInLazyCall() || parentFunction != null || parentVariable != null || modifiers.protection==Protection.Private || Settings.obfuscate
     override lazy val fullName: String = if (wasMovedToBlock) then context.fctCtx.getFreshId() else context.getPath() + "." + name
-    val minArgCount = getMinArgCount(arguments)
-    val maxArgCount = getMaxArgCount(arguments)
+    var minArgCount = getMinArgCount(arguments)
+    var maxArgCount = getMaxArgCount(arguments)
     var argumentsVariables: List[Variable] = List()
     val clazz = context.getCurrentClass()
     var overridedFunction: Function = null
@@ -66,7 +66,7 @@ abstract class Function(context: Context, val contextName: String, name: String,
     def markAsStringUsed()={
         stringUsed = true
     }
-    private def getMaxArgCount(args: List[Argument]): Int = {
+    protected def getMaxArgCount(args: List[Argument]): Int = {
         if args.length == 0 then 0 else
         args.last.typ match
             case ParamsType => Integer.MAX_VALUE
@@ -97,7 +97,7 @@ abstract class Function(context: Context, val contextName: String, name: String,
 
     def canBeCallAtCompileTime = false
 
-    private def getMinArgCount(args: List[Argument], stopped: Boolean = false): Int = {
+    protected def getMinArgCount(args: List[Argument], stopped: Boolean = false): Int = {
         args match{
             case head::tail => {
                 head.defValue match
@@ -544,6 +544,9 @@ class OptionalFunction(context: Context, variable: Variable, name: String, lib: 
 }
 
 class ExtensionFunction(context: Context, variable: Variable, fct: Function) extends Function(context, fct.contextName, fct.name, fct.arguments, fct.getType(), fct.modifiers){
+    minArgCount = getMinArgCount(arguments.drop(1))
+    maxArgCount = getMaxArgCount(arguments.drop(1))
+
     override def exists()= false
 
     override def getContent(): List[IRTree] = List()

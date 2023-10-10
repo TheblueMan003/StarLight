@@ -143,8 +143,8 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 		}
 		
 		typ.generateExtensionFunction(this)(context.push(name))
-		context.getAllExtension(typ).foreach(f => {
-			context.push(name).addFunction(f.name, ExtensionFunction(f.context, this, f))
+		context.getAllExtension(typ).foreach((n,f) => {
+			context.push(name).addFunction(n, ExtensionFunction(f.context, this, f))
 		})
 
 		typ match
@@ -976,7 +976,45 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 					}
 				}
 			}
-			case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()}")
+			case other => castVariable(op, vari, oselector)
+		}
+	}
+
+	def castVariable(op: String, vari: Variable, oselector: Selector)(implicit context: Context, selector: Selector = Selector.self) = {
+		try{
+			val fct = vari.context.push(vari.name).getFunction(Identifier.fromString("__cast__"), List(), List(), getType())
+			if (fct._1.getType().isSubtypeOf(getType()) || fct._1.getType() == getType()){
+				if (vari.modifiers.isEntity && modifiers.isEntity && (oselector != Selector.self || selector != Selector.self)){
+					val tmp = context.getFreshVariable(getType())
+					Compiler.compile(With(SelectorValue(oselector), BoolValue(false), BoolValue(true), VariableAssigment(List((Right(tmp), Selector.self)), "=", FunctionCallValue(LinkedFunctionValue(fct._1), fct._2, List(), Selector.self)), null)):::
+						assign(op, LinkedVariableValue(tmp))
+				}
+				else if (vari.modifiers.isEntity && oselector != Selector.self){
+					if (op == "="){
+						Compiler.compile(With(SelectorValue(oselector), BoolValue(false), BoolValue(true), VariableAssigment(List((Right(this), selector)), op, FunctionCallValue(LinkedFunctionValue(fct._1), fct._2, List(), selector)), null))
+					}
+					else{
+						val tmp = context.getFreshVariable(getType())
+						Compiler.compile(With(SelectorValue(oselector), BoolValue(false), BoolValue(true), VariableAssigment(List((Right(tmp), Selector.self)), "=", FunctionCallValue(LinkedFunctionValue(fct._1), fct._2, List(), Selector.self)), null)):::
+							assign(op, LinkedVariableValue(tmp))
+					}
+				}
+				else{
+					if (op == "="){
+						fct.call(this, selector, op)
+					}
+					else{
+						val tmp = context.getFreshVariable(getType())
+						fct.call(tmp, Selector.self, "=") ::: assign(op, LinkedVariableValue(tmp))
+					}
+				}
+			}
+			else{
+				throw new Exception(f"Cannot assign ${vari.fullName} of type ${vari.getType()} to $fullName of type ${getType()}. Cast found but not compatible. ${fct._1.getType()} vs ${getType()}")
+			}
+		}
+		catch{
+			case e: FunctionNotFoundException => throw new Exception(f"Cannot assign ${vari.fullName} of type ${vari.getType()} to $fullName of type ${getType()}: $e")
 		}
 	}
 
@@ -1251,7 +1289,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 				op match
 					case "=" | "+=" | "-=" | "*=" | "/=" | "%=" => List(ScoreboardOperation(getIRSelector(), op, vari.getIRSelector()(sel)))
 					case otherOp => throw new Exception(f"Cannot assign ${vari.fullName} of type ${vari.getType()} to $fullName of type ${getType()} with operator $otherOp")
-			case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()}")
+			case other => castVariable(op, vari, sel)
 		}
 	}
 
@@ -1273,7 +1311,12 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 					tupleVari.zip(vari.tupleVari).flatMap((t,v) => t.assign(op, LinkedVariableValue(v, sel)))
 				}
 				else{
-					tupleVari.flatMap(t => t.assign(op, expr))
+					try{
+						castVariable(op, vari, sel)
+					}
+					catch{
+						case e: Exception => tupleVari.flatMap(t => t.assign(op, expr))
+					}
 				}
 			}
 			case VariableValue(vari, sel) => assign(op, context.resolveVariable(expr))
@@ -1309,7 +1352,12 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 							tupleVari.zip(vari.tupleVari).flatMap((t,v) => t.assign(op, LinkedVariableValue(v, sel)))
 						}
 						else{
-							tupleVari.flatMap(t => t.assign(op, expr))
+							try{
+								castVariable(op, vari, sel)
+							}
+							catch{
+								case e: Exception => tupleVari.flatMap(t => t.assign(op, expr))
+							}
 						}
 					}
 			}
@@ -1371,7 +1419,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 					case other if Utils.fix(other)(context, Set()).isSubtypeOf(Utils.fix(getType())(context, Set())) => List(ScoreboardOperation(getIRSelector(), op, vari.getIRSelector()(sel)))
 					case IntType => List(ScoreboardOperation(getIRSelector(), op, vari.getIRSelector()(sel)))
 					case JsonType => List(StorageRead(getIRSelector(), vari.getStorage()))
-					case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()} at \n${expr.pos.longString}")
+					case other => castVariable(op, vari, sel)
 			}
 			case LambdaValue(args, instr, ctx) => {
 				val typ = getType().asInstanceOf[FuncType]
@@ -1463,7 +1511,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 									// Add tag to new entities
 									Compiler.compile(With(LinkedVariableValue(vari, sel), BoolValue(false), BoolValue(true), VariableAssigment(List((Right(this), selector)), "=", SelectorValue(Selector.self)), EmptyInstruction))
 								}
-								case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()} at \n${expr.pos.longString}")
+								case other => castVariable(op, vari, sel)
 						}
 						case NullValue => {
 							removeEntityTag()
@@ -1725,13 +1773,19 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 						}
 					}
 					case StructType(struct, sub) => {
-						op match{
-							case "=" => 
-								vari.tupleVari.flatMap(v => withKey(key + "." + v.name).assignJson(op, LinkedVariableValue(v, sel)))
-							case other => {
-								val tmp = context.getFreshVariable(JsonType)
-								tmp.assign("=", value):::assignJson(op, LinkedVariableValue(tmp), keya)
-							}
+						try{
+							castVariable(op, vari, sel)
+						}
+						catch{
+							case e: Exception => 
+								op match{
+									case "=" => 
+										vari.tupleVari.flatMap(v => withKey(key + "." + v.name).assignJson(op, LinkedVariableValue(v, sel)))
+									case other => {
+										val tmp = context.getFreshVariable(JsonType)
+										tmp.assign("=", value):::assignJson(op, LinkedVariableValue(tmp), keya)
+									}
+								}
 						}
 					}
 					case ArrayType(inner, size) => {
@@ -1745,7 +1799,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 							}
 						}
 					}
-					case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()} at \n${value.pos.longString}")
+					case other => castVariable(op, vari, sel)
 				}
 			case FunctionCallValue(name, args, typeargs, selector) => withKey(key).handleFunctionCall(op, name, args, typeargs, selector)
 			case ArrayGetValue(name, index) => withKey(key).handleArrayGetValue(op, name, index)
@@ -1870,7 +1924,12 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 									tupleVari.flatMap(v => v.assign("=", LinkedVariableValue(vari.withKey(vari.getSubKey(v.name)), sel)))
 								}
 								case other => {
-									context.getFunction(this.name + ".__set__", List(value), List(), getType(), false).call()
+									try{
+										context.getFunction(this.name + ".__set__", List(value), List(), getType(), false).call()
+									}
+									catch{
+										case e: Exception => castVariable(op, vari, sel)
+									}
 								}
 						}
 					}
@@ -1978,6 +2037,17 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 					case LinkedVariableValue(vari, sel) if vari.getType().isSubtypeOf(getType()) || vari.getType() == getType()=> {
 						deref() ::: List(ScoreboardOperation(getIRSelector(), op, vari.getIRSelector()(sel))) ::: addref()
 					}
+					case LinkedVariableValue(vari, sel) if vari.name == "__totalRefCount" => {
+						List(ScoreboardOperation(getIRSelector(), op, vari.getIRSelector()(sel)))
+					}
+					case LinkedVariableValue(vari, sel) => {
+						try{
+							context.getFunction(name + ".__set__", List(value), List(), getType(), false).call()
+						}
+						catch{
+							case e: Exception => castVariable(op, vari, sel)
+						}
+					}
 					case VariableValue(name, sel) => assignClass(op, context.resolveVariable(value))
 					case ConstructorCall(name2, args, typeArg) if name2.toString() == "@@@" => {
 						val ClassType(clazz, sub) = getType(): @unchecked
@@ -2031,9 +2101,6 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 					}
 					case NullValue => deref() ::: List(ScoreboardSet(getIRSelector(), 0))
 					case DefaultValue => List(ScoreboardSet(getIRSelector(), 0))
-					case LinkedVariableValue(vari, sel) if vari.name == "__totalRefCount" => {
-						List(ScoreboardOperation(getIRSelector(), op, vari.getIRSelector()(sel)))
-					}
 					case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 					case ArrayGetValue(name, index) => handleArrayGetValue(op, name, index)
 					case bin: BinaryOperation => assignBinaryOperator("=", bin)
@@ -2044,6 +2111,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 						map.flatMap(x => tupleVari.find(y => y.name == x._1).get.assign("=", Utils.jsonToExpr(x._2))).toList
 					}
 					case _ => context.getFunction(name + ".__set__", List(value), List(), getType(), false).call()
+						
 			}
 			case _ => assignStruct(op, value)
 	}
