@@ -2,7 +2,7 @@ package sl
 
 import objects.{Context, ConcreteFunction, GenericFunction, LazyFunction, Modifier, Struct, Class, Template, Variable, Enum, EnumField, Predicate, Property}
 import objects.Identifier
-import objects.types.{VoidType, TupleType, IdentifierType, ArrayType, IntType, FuncType, RangeType, StructType}
+import objects.types.{VoidType, TupleType, IdentifierType, ArrayType, IntType, FuncType, RangeType, StructType, ClassType}
 import sl.Compilation.Execute
 import sl.Compilation.Selector.Selector
 import objects.types.JsonType
@@ -224,31 +224,46 @@ object Compiler{
                     modifier.simplify()
                     val names = names2.map(n => if n == "@@@" then context.getFreshId() else n)
                     if (typ == IdentifierType("val", List()) || typ == IdentifierType("var", List())){
-                        if (typ == IdentifierType("val", List())) modifier.isConst = true
-                        Utils.simplify(expr) match
-                            case TupleValue(values) if values.size == names.size => {
-                                names.zip(values.map(Utils.typeof(_))).map((name, typ2) => {
-                                    val vari = new Variable(context, name, context.getType(typ2), modifier)
-                                    context.addVariable(vari)
-                                    vari.generate()
-                                })
-                            }
-                            case LinkedVariableValue(vari, selector) if vari.tupleVari.size == names.size => {
-                                names.zip(vari.tupleVari.map(_.getType())).map((name, typ2) => {
-                                    val vari = new Variable(context, name, context.getType(typ2), modifier)
-                                    context.addVariable(vari)
-                                    vari.generate()
-                                })
+                        expr match{
+                            case FunctionCallValue(VariableValue(name, sel), args, typeargs, selector) if (context.tryGetTemplate(name) != None) => {
+                                val templ = context.tryGetTemplate(name)
+                                
+                                val LambdaValue(argsFct, instr, _) = args.last
+                                val tname = names2.head
+                                val fctName = templ.get.modifiers.getAttributesString("main", () => "main")
+                                val boot = templ.get.modifiers.getAttributesString("boot", () => "start")
+
+                                val r = TemplateUse(name, tname, InstructionBlock(List(FunctionDecl(fctName, instr, VoidType, List(), List(), Modifier.newPublic()))), args.dropRight(1))
+                                Compiler.compile(r) ::: Compiler.compile(FunctionCall(Identifier.fromString(f"$tname.$boot"), List(), List()))
                             }
                             case other => {
-                                val typ = Utils.typeof(other)
-                                names.map(name => {
-                                    val vari = new Variable(context, name, context.getType(typ), modifier)
-                                    context.addVariable(vari)
-                                    vari.generate()
-                                })
+                                if (typ == IdentifierType("val", List())) modifier.isConst = true
+                                Utils.simplify(expr) match
+                                    case TupleValue(values) if values.size == names.size => {
+                                        names.zip(values.map(Utils.typeof(_))).map((name, typ2) => {
+                                            val vari = new Variable(context, name, context.getType(typ2), modifier)
+                                            context.addVariable(vari)
+                                            vari.generate()
+                                        })
+                                    }
+                                    case LinkedVariableValue(vari, selector) if vari.tupleVari.size == names.size => {
+                                        names.zip(vari.tupleVari.map(_.getType())).map((name, typ2) => {
+                                            val vari = new Variable(context, name, context.getType(typ2), modifier)
+                                            context.addVariable(vari)
+                                            vari.generate()
+                                        })
+                                    }
+                                    case other => {
+                                        val typ = Utils.typeof(other)
+                                        names.map(name => {
+                                            val vari = new Variable(context, name, context.getType(typ), modifier)
+                                            context.addVariable(vari)
+                                            vari.generate()
+                                        })
+                                    }
+                                compile(VariableAssigment(names.map(f => (Left[Identifier, Variable](Identifier.fromString(f)), Selector.self)), op, expr))
                             }
-                        compile(VariableAssigment(names.map(f => (Left[Identifier, Variable](Identifier.fromString(f)), Selector.self)), op, expr))
+                        }
                     }
                     else{
                         names.map(name => {
@@ -470,16 +485,28 @@ object Compiler{
                 }
                 case FunctionCall(name, args, typeargs) => {
                     context.tryGetVariable(name) match
-                        case Some(vari) if vari.getType().isInstanceOf[StructType] => {
+                        case Some(vari) if vari.getType().isInstanceOf[StructType] || vari.getType().isInstanceOf[ClassType] => {
                             Compiler.compile(FunctionCall(name.child("__apply__"), args, typeargs))
                         }
                         case other => {
-                            val uargs = args.map(Utils.simplify)
-                            val (fct,cargs) = context.getFunction(name, uargs, typeargs, VoidType)
-                            if (fct != null && fct.modifiers.hasAttributes("compileAtCall")){
-                                fct.asInstanceOf[ConcreteFunction].compile()
+                            val templ = context.tryGetTemplate(name)
+                            if (templ != None){
+                                val LambdaValue(argsFct, instr, _) = args.last
+                                val tname = context.getFreshLambdaName()
+                                val fctName = templ.get.modifiers.getAttributesString("main", () => "main")
+                                val boot = templ.get.modifiers.getAttributesString("boot", () => "start")
+
+                                val r = TemplateUse(name, tname, InstructionBlock(List(FunctionDecl(fctName, instr, VoidType, List(), List(), Modifier.newPublic()))), args.dropRight(1))
+                                Compiler.compile(r) ::: Compiler.compile(FunctionCall(Identifier.fromString(f"$tname.$boot"), List(), List()))
                             }
-                            (fct, cargs).call()
+                            else{
+                                val uargs = args.map(Utils.simplify)
+                                val (fct,cargs) = context.getFunction(name, uargs, typeargs, VoidType)
+                                if (fct != null && fct.modifiers.hasAttributes("compileAtCall")){
+                                    fct.asInstanceOf[ConcreteFunction].compile()
+                                }
+                                (fct, cargs).call()
+                            }
                     }
                 }
                 case LinkedFunctionCall(name, args, ret) => {
