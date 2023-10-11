@@ -29,6 +29,13 @@ object ReturnState{
 
 
 object StaticAnalyser{
+    /**
+     * Checks the given instruction for any issues and returns a new instruction.
+     * The returned instruction will have position information attached to it.
+     *
+     * @param instruction The instruction to check.
+     * @return A new instruction.
+     */
     def check(instruction: Instruction): Instruction = Utils.positioned(instruction, {
         instruction match
             case Package(name, block) => Package(name, check(block))
@@ -48,9 +55,9 @@ object StaticAnalyser{
                 val newBlock = check(block)
                 val returnState = hasReturn(newBlock)
                 if returnState == ReturnState.None && typ != VoidType && !modifier.hasAttributes("noReturnCheck")(null) then
-                    Reporter.warning(f"Function $name does not return")
+                    if (Settings.consoleWarningReturn){Reporter.warning(f"Function $name does not return")}
                 if returnState == ReturnState.Partial && typ != VoidType && !modifier.hasAttributes("noReturnCheck")(null) then
-                    Reporter.warning(f"Function $name does not return in all cases")
+                    if (Settings.consoleWarningReturn){Reporter.warning(f"Function $name does not return in all cases")}
                 val finalBlock = returnOne(newBlock)
                 if (finalBlock != newBlock) then
                     modifier.addAtrribute("__returnCheck__", BoolValue(true))
@@ -66,6 +73,12 @@ object StaticAnalyser{
             case TemplateUse(template, name, block, values) => TemplateUse(template, name, check(block), values)
             case _ => instruction
     })
+    /**
+     * Determines if the given instruction has a return statement.
+     *
+     * @param instruction the instruction to check for a return statement
+     * @return a ReturnState indicating if the instruction has a return statement and if it is reachable
+     */
     def hasReturn(instruction: Instruction): ReturnState = {
         instruction match
             case InstructionBlock(instructions) => 
@@ -94,6 +107,11 @@ object StaticAnalyser{
             case ForGenerate(key, provider, instr) => hasReturn(instr)
             case _ => ReturnState.None
     }
+    /**
+     * Returns an instruction that return only once per path.
+     * @param instruction the instruction to be positioned
+     * @return an instruction that return only once per path.
+     */
     def returnOne(instruction: Instruction): Instruction = Utils.positioned(instruction, {
         instruction match
             case Package(name, block) => throw new Exception("Package cannot return")
@@ -150,20 +168,57 @@ object StaticAnalyser{
             }
             lst.reverse
     }
+    /**
+     * Returns a variable declaration instruction with the given name, value, and type.
+     *
+     * @param name The name of the variable.
+     * @param value The value of the variable.
+     * @param typ The type of the variable. Defaults to IntType.
+     * @return The variable declaration instruction.
+     */
     def getDeclaration(name: String, value: Expression, typ: Type = IntType): Instruction = {
         VariableDecl(List(name), typ, Modifier.newPrivate(), "=", value)
     }
+
+    /**
+     * Returns a variable assignment instruction with the given name and value.
+     *
+     * @param name The name of the variable.
+     * @param value The value to assign to the variable.
+     * @return The variable assignment instruction.
+     */
     def getAssignment(name: String, value: Expression): Instruction = {
         VariableAssigment(List((Left(Identifier.fromString(name)), Selector.self)), "=", value)
     }
+
+    /**
+     * Returns a comparison expression that compares the given variable with the given value using the "==" operator.
+     *
+     * @param name The name of the variable to compare.
+     * @param value The value to compare the variable with.
+     * @return The comparison expression.
+     */
     def getComparaison(name: String, value: Expression): Expression = {
         BinaryOperation("==", VariableValue(name), value)
     }
 
+    /**
+     * Handles a sleep instruction by returning a new instruction that waits for the sleep to complete.
+     *
+     * @param instruction The sleep instruction to handle.
+     * @return The new instruction that waits for the sleep to complete.
+     */
     def handleSleep(instruction: Instruction):Instruction = {
         val (newInstr, changed) = handleSleep(instruction, List())
         newInstr
     }
+
+    /**
+     * Converts a while loop into an asynchronous function that can be awaited.
+     *
+     * @param loop The while loop to convert.
+     * @return The new instruction block that contains the asynchronous function and the call to it.
+     */
     def convertWhileToFunction(loop: WhileLoop): Instruction = {
         val mod = Modifier.newPrivate()
         mod.isAsync = true
@@ -176,9 +231,16 @@ object StaticAnalyser{
         val newBlock = InstructionBlock(List(getDeclaration("-setup-loop-", BoolValue(false), BoolType), func, If(loop.cond, call, List())))
         newBlock
     }
+    /**
+     * Converts a DoWhileLoop to an asynchronous function call using Await and FunctionDecl.
+     *
+     * @param loop The DoWhileLoop to convert.
+     * @return The converted InstructionBlock.
+     */
     def convertDoWhileToFunction(loop: DoWhileLoop): Instruction = {
         val mod = Modifier.newPrivate()
         mod.isAsync = true
+        mod.isLazy = true
         val loopExit = InstructionList(List(getAssignment("--await_callback--", VariableValue("-exit-loop-"))))
         val init = If(getComparaison("-setup-loop-", BoolValue(false)), InstructionList(List(getAssignment("-setup-loop-", BoolValue(true)), getDeclaration("-exit-loop-", VariableValue("--await_callback--"), FuncType(List(), VoidType)))), List())
         val block =  InstructionList(List(init, loop.block, If(loop.cond, InstructionList(List(Await(FunctionCall(Identifier.fromString("--async_while--"), List(), List()), InstructionList(List())))), List(ElseIf(BoolValue(true), loopExit)))))
@@ -188,12 +250,27 @@ object StaticAnalyser{
         val newBlock = InstructionBlock(List(getDeclaration("-setup-loop-", BoolValue(false), BoolType), func, call))
         newBlock
     }
+
+    /**
+     * Determines if an Instruction needs to be converted to an asynchronous function call.
+     *
+     * @param inst The Instruction to check.
+     * @return True if the Instruction needs to be converted, false otherwise.
+     */
     def needConversion(inst: Instruction): Boolean = {
         Utils.contains(inst, x => x match
             case Await(_, _) => true
             case Sleep(_, _) => true
             case _ => false)
     }
+
+    /**
+     * Handles a sleep instruction by returning the instruction and a boolean indicating the rest of the program was consumed.
+     *
+     * @param instruction The sleep instruction to handle.
+     * @param rest The remaining instructions in the program.
+     * @return A tuple containing the instruction and a boolean indicating whether the rest of the program was consumed.
+     */
     def handleSleep(instruction: Instruction, rest: List[Instruction]): (Instruction, Boolean) = {
         val ret = instruction match
             case Sleep(time, continuation) => 
@@ -368,5 +445,4 @@ object StaticAnalyser{
             case other => (other, false)
         (Utils.positioned(instruction, ret._1), ret._2)
     }
-
 }

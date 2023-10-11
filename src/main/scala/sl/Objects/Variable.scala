@@ -9,8 +9,20 @@ import sl.Compilation.Array
 import sl.IR.*
 
 private val entityTypeSubVariable = List((BoolType, "isPlayer"), (IntType, "binding"))
+/**
+ * This object provides an extension method for the Either type, which is used to represent a value that can be one of two types.
+ * The extension method provides two functions:
+ * 1. get() - returns the Variable object represented by the Either value, using the given context to resolve any identifiers or properties.
+ * 2. path() - returns a string representation of the path to the Variable object represented by the Either value, using the given context to resolve any identifiers or properties.
+ */
 object Variable {
 	extension (value: Either[Identifier, Variable]) {
+		/**
+		 * Returns the Variable object represented by the Either value, using the given context to resolve any identifiers or properties.
+		 *
+		 * @param context The context to use for resolving any identifiers or properties.
+		 * @return The Variable object represented by the Either value.
+		 */
 		def get()(implicit context: Context):Variable = {
 			value match{
 				case Left(value) => {
@@ -21,6 +33,13 @@ object Variable {
 				case Right(value) => value
 			}
 		}
+
+		/**
+		 * Returns a string representation of the path to the Variable object represented by the Either value, using the given context to resolve any identifiers or properties.
+		 *
+		 * @param context The context to use for resolving any identifiers or properties.
+		 * @return A string representation of the path to the Variable object represented by the Either value.
+		 */
 		def path()(implicit context: Context):String = {
 			value match{
 				case Left(value) => value.toString()
@@ -29,6 +48,13 @@ object Variable {
 		}
 	}
 }
+/**
+ * Represents a variable in the StarLight programming language.
+ * @param context The context in which the variable is defined.
+ * @param name The name of the variable.
+ * @param typ The type of the variable.
+ * @param _modifier The modifier of the variable.
+ */
 class Variable(context: Context, name: String, var typ: Type, _modifier: Modifier) extends CObject(context, name, _modifier) with Typed(typ){
 	val parentFunction = context.getCurrentFunction()
 	var tupleVari: List[Variable] = List()
@@ -52,12 +78,24 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 
 	override def toString(): String = f"$modifiers ${getType()} $fullName"
 
+	/**
+	 * Returns a new Variable object with the specified key.
+	 *
+	 * @param key The key to set for the new Variable object.
+	 * @return A new Variable object with the specified key.
+	 */
 	def withKey(key: String)={
 		val vari = Variable(context, name, typ, _modifier)
 		vari.jsonArrayKey = key
 		vari
 	}
 
+	/**
+	 * Returns the subkey for the specified key.
+	 *
+	 * @param key The key to get the subkey for.
+	 * @return The subkey for the specified key.
+	 */
 	def getSubKey(key: String) = {
 		if (key.endsWith("]") && key.startsWith("[")){
 			jsonArrayKey + key
@@ -67,11 +105,20 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 		}
 	}
 
+	/**
+	 * This method generates a JSON object for the variable with the given prefix.
+	 * @param prefix The prefix to be stripped from the full name of the variable.
+	 */
 	def makeJson(prefix: String) = {
 		typ = JsonType
 		jsonArrayKey = fullName.stripPrefix(prefix+".")
 	}
-
+	/**
+	 * This method generates code for the variable.
+	 * @param isStructFunctionArgument A boolean indicating whether the variable is a struct function argument.
+	 * @param skipClassCheck A boolean indicating whether to skip the class check.
+	 * @param context The context in which the variable is being generated.
+	 */
 	def generate(isStructFunctionArgument: Boolean = false, skipClassCheck: Boolean = false)(implicit context: Context):Unit = {
 		if (wasGenerated)return
 		val parent = context.getCurrentVariable()
@@ -89,14 +136,16 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 		
 
 		if (parent != null){
-			if (!isFunctionArgument){
+			if (!isFunctionArgument && !parent.tupleVari.contains(this)){
 				parent.tupleVari = parent.tupleVari ::: List(this)
 			}
 			isFunctionArgument |= parent.isFunctionArgument
 		}
-		if (!context.getCurrentFunction().isInstanceOf[CompilerFunction]){
-			//typ.generateCompilerFunction(this)(context.push(name))
-		}
+		
+		typ.generateExtensionFunction(this)(context.push(name))
+		context.getAllExtension(typ).foreach((n,f) => {
+			context.push(name).addFunction(n, ExtensionFunction(f.context, this, f))
+		})
 
 		typ match
 			case StructType(struct, sub) => {
@@ -128,7 +177,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			case ArrayType(inner, size) => {
 				size match
 					case IntValue(size) => {
-						val ctx = context.push(name)
+						val ctx = context.push(name, this)
 						tupleVari = Range(0, size).map(i => ctx.addVariable(new Variable(ctx, f"$i", inner, _modifier))).toList
 						tupleVari.map(_.generate()(ctx))
 
@@ -139,7 +188,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 					case TupleValue(values) if values.forall(x => x.isInstanceOf[IntValue])=> {
 						val sizes = values.map(x => x.asInstanceOf[IntValue].value)
 						val size = sizes.reduce(_ * _)
-						val ctx = context.push(name)
+						val ctx = context.push(name, this)
 						
 						val indexes = sizes.map(Range(0, _))
 									.foldLeft(List[List[Int]](List()))((acc, b) => b.flatMap(v => acc.map(_ ::: List(v))).toList)
@@ -153,17 +202,17 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 					case other => throw new Exception(f"Cannot have a array with size: $other")
 			}
 			case TupleType(sub) => {
-				val ctx = context.push(name)
+				val ctx = context.push(name, this)
 				tupleVari = sub.zipWithIndex.map((t, i) => ctx.addVariable(new Variable(ctx, f"_$i", t, _modifier)))
 				tupleVari.map(_.generate()(ctx))
 			}
 			case EntityType => {
-				val ctx = context.push(name)
+				val ctx = context.push(name, this)
 				tupleVari = entityTypeSubVariable.map((t, n) => ctx.addVariable(new Variable(ctx, n, t, _modifier)))
 				tupleVari.map(_.generate()(ctx))
 			}
 			case RangeType(sub) => {
-				val ctx = context.push(name)
+				val ctx = context.push(name, this)
 				tupleVari = List(ctx.addVariable(new Variable(ctx, f"min", sub, _modifier)), ctx.addVariable(new Variable(ctx, f"max", sub, _modifier)))
 				tupleVari.map(_.generate()(ctx))
 			}
@@ -173,6 +222,16 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 
 
 
+	/**
+	 * Assigns a value to this variable.
+	 *
+	 * @param op The assignment operator.
+	 * @param value The value to assign.
+	 * @param allowReassign Whether reassignment is allowed.
+	 * @param context The context in which the assignment is made.
+	 * @param selector The selector for the variable.
+	 * @return A list of intermediate representation trees representing the assignment.
+	 */
 	def assign(op: String, value: Expression, allowReassign: Boolean = true)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		if (modifiers.isConst && wasAssigned && !allowReassign) throw new Exception(f"Cannot reassign variable $fullName at \n${value.pos.longString}")
 		val ret = if (modifiers.isLazy){
@@ -211,10 +270,6 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 							return value2._1
 						}
 				}
-				/*case EntityType if !value.isInstanceOf[SelectorValue] => {
-					val (tree, ctx, sel) = Utils.getSelector(value, false)
-					tree ::: assign(op, SelectorValue(sel))
-				}*/
 				case other => {
 					Utils.simplify(value) match{
 						case LambdaValue(args, body, ctx) if args.size == 0 => {
@@ -428,60 +483,128 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 		ret
 	}
 
+	/**
+	 * Checks if the variable is null and run the tree if it is.
+	 * 
+	 * @param tree The tree to run if the variable is null.
+	 * @param selector The Selector to use for the instruction. Defaults to Selector.self.
+	 * @return A List of instructions.
+	 */
 	def checkNull(tree: IRTree)(implicit selector: Selector = Selector.self) = 
 		getType() match
 			case EntityType => IfEntity(f"@e[tag=$tagName]", tree, true)
 			case _ => IfScoreboard(getIRSelector(), "=", getIRSelector(), tree, true)
-	
 
+	/**
+	 * Generates a default assignment instruction for the Variable.
+	 * 
+	 * @param expr The Expression to assign to the Variable.
+	 * @param context The Context to use for the instruction.
+	 * @param selector The Selector to use for the instruction. Defaults to Selector.self.
+	 * @return A List of instructions.
+	 */
 	def defaultAssign(expr: Expression)(implicit context: Context, selector: Selector = Selector.self) = {
-		if (Settings.target == MCBedrock){
-			if (modifiers.isEntity){
-				Compiler.compile(If(BinaryOperation("!=", LinkedVariableValue(this, selector), NullValue), 
-				InstructionList(List()),
-				List(ElseIf(BoolValue(true), VariableAssigment(List((Right(this), selector)), "=", expr)))))
-			}
-			else{
-				List()
-			}
-		}
-		else if (Settings.target == MCJava){
-			getType() match
-				case TupleType(_) => Execute.makeExecute(checkNull, assign("=", expr) ::: assign("=", CastValue(IntValue(1), getType())))
-				case StructType(_, _) => Execute.makeExecute(checkNull, assign("=", expr) ::: assign("=", CastValue(IntValue(1), getType())))
-				case _ => Execute.makeExecute(checkNull, assign("=", expr))
+		if (!modifiers.isEntity && parentFunction != null && expr == DefaultValue){
+			assign("=", DefaultValue)
 		}
 		else{
-			???
+			if (Settings.target == MCBedrock){
+				if (modifiers.isEntity){
+					Compiler.compile(If(BinaryOperation("!=", LinkedVariableValue(this, selector), NullValue), 
+					InstructionList(List()),
+					List(ElseIf(BoolValue(true), VariableAssigment(List((Right(this), selector)), "=", expr)))))
+				}
+				else{
+					List()
+				}
+			}
+			else if (Settings.target == MCJava){
+				getType() match
+					case TupleType(_) => Execute.makeExecute(checkNull, assign("=", expr) ::: assign("=", CastValue(IntValue(1), getType())))
+					case StructType(_, _) => Execute.makeExecute(checkNull, assign("=", expr) ::: assign("=", CastValue(IntValue(1), getType())))
+					case _ => Execute.makeExecute(checkNull, assign("=", expr))
+			}
+			else{
+				???
+			}
 		}
 	}
 
+	/**
+	 * Generates an assignment instruction for the Variable without checking for types.
+	 * 
+	 * @param vari The LinkedVariableValue to assign to the Variable.
+	 * @param context The Context to use for the instruction.
+	 * @param selector The Selector to use for the instruction. Defaults to Selector.self.
+	 * @return A List of instructions.
+	 */
 	def assignUnchecked(vari: LinkedVariableValue)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		val LinkedVariableValue(v, sl) = vari
 		List(ScoreboardOperation(getIRSelector(), "=", v.getIRSelector()(sl)))
 	}
 
-	/**
-	 * Assign the value to a tmp variable then apply op with the variable.
-	 */
+	
+	/** Assigns a temporary variable to the result of an expression and then assigns the temporary variable to this variable using the given operator.
+	*
+	* @param op The operator to use for the assignment.
+	* @param expr The expression to assign to the temporary variable.
+	* @param context The context in which the assignment is being made.
+	* @param selector The selector for the variable being assigned.
+	* @return A list of IRTree objects representing the assignment.
+	*/
 	def assignTmp(op: String, expr: Expression)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		val vari = context.getFreshVariable(getType())
 		vari.assign("=", expr) ::: assign(op, LinkedVariableValue(vari))
 	}
 
+	/** Compiles the left-hand side of a sequence assignment and then assigns the right-hand side to this variable using the given operator.
+	*
+	* @param op The operator to use for the assignment.
+	* @param value The sequence value to assign to this variable.
+	* @param context The context in which the assignment is being made.
+	* @param selector The selector for the variable being assigned.
+	* @return A list of IRTree objects representing the assignment.
+	*/
 	def assignSequence(op: String, value: SequenceValue)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		Compiler.compile(value.left) ::: assign(op, value.right)
 	}
+
+	/** Compiles the left-hand side of a sequence assignment and then assigns the right-hand side to this variable using the given operator.
+	*
+	* @param op The operator to use for the assignment.
+	* @param value The sequence value to assign to this variable.
+	* @param context The context in which the assignment is being made.
+	* @param selector The selector for the variable being assigned.
+	* @return A list of IRTree objects representing the assignment.
+	*/
+	def assignSequencePost(op: String, value: SequencePostValue)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
+		assign(op, value.left) ::: Compiler.compile(value.right)
+	}
+
+	/** Compiles a ternary operation and assigns the result to this variable using the given operator.
+	*
+	* @param op The operator to use for the assignment.
+	* @param value The ternary operation to assign to this variable.
+	* @param context The context in which the assignment is being made.
+	* @param selector The selector for the variable being assigned.
+	* @return A list of IRTree objects representing the assignment.
+	*/
 	def assignTernaryOperator(op: String, value: TernaryOperation)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
-		Compiler.compile(If(value.left, 
+		Compiler.compile(If(value.left,
 			VariableAssigment(List((Right(this), selector)), op, value.middle),
 			List(
 				ElseIf(BoolValue(true), VariableAssigment(List((Right(this), selector)), op, value.right))
 			)))
 	}
-	/**
-	 * Assign binary operator to the variable.
-	 */
+
+	/** Compiles a binary operation and assigns the result to this variable using the given operator.
+	*
+	* @param op The operator to use for the assignment.
+	* @param value The binary operation to assign to this variable.
+	* @param context The context in which the assignment is being made.
+	* @param selector The selector for the variable being assigned.
+	* @return A list of IRTree objects representing the assignment.
+	*/
 	def assignBinaryOperator(op: String, value: BinaryOperation)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		if (value.op == "??"){
 			return Compiler.compile(If(BinaryOperation("==", value.left, NullValue), 
@@ -518,12 +641,14 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 		}
 	}
 
-
-	def assignForce(vari: Variable)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
-		List(ScoreboardOperation(getIRSelector(), "=", vari.getIRSelector()))
-	}
 	/**
-	 * Assign a value to the int variable
+	 * Assigns values to a variable of type int based on the given operator and expression.
+	 *
+	 * @param op The operator to use for the assignment (e.g. "+=", "-=", etc.).
+	 * @param valueE The expression representing the value to assign.
+	 * @param context The context in which the assignment is being made.
+	 * @param selector The selector to assign the value to. Defaults to Selector.self.
+	 * @return A list of IRTree objects representing the assignment operation.
 	 */
 	def assignInt(op: String, valueE: Expression)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		valueE match
@@ -563,11 +688,19 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			case bin: BinaryOperation => assignBinaryOperator(op, bin)
 			case ter: TernaryOperation => assignTernaryOperator(op, ter)
 			case seq: SequenceValue => assignSequence(op, seq)
+			case seq: SequencePostValue => assignSequencePost(op, seq)
 			case _ => throw new Exception(f"Unknown cast to int: $valueE at \n${valueE.pos.longString}")
 	}
 
+
 	/**
-	 * Assign a value to the int variable
+	 * Assigns values to a variable of type range based on the given operator and expression.
+	 *
+	 * @param op The operator to use for the assignment.
+	 * @param valueE The expression representing the range of values to assign.
+	 * @param context The context in which the assignment is being made.
+	 * @param selector The selector specifying the variable to assign to.
+	 * @return A list of intermediate representation trees representing the assignment operation.
 	 */
 	def assignRange(op: String, valueE: Expression)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		valueE match
@@ -595,9 +728,23 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			case bin: BinaryOperation => assignBinaryOperator(op, bin)
 			case ter: TernaryOperation => assignTernaryOperator(op, ter)
 			case seq: SequenceValue => assignSequence(op, seq)
+			case seq: SequencePostValue => assignSequencePost(op, seq)
 			case _ => throw new Exception(f"Unknown cast to int: $valueE at \n${valueE.pos.longString}")
 	}
 
+	
+	/**
+	 * Handles a function call for a variable.
+	 *
+	 * @param op The operator used in the function call.
+	 * @param name The name of the function being called.
+	 * @param args The arguments passed to the function call.
+	 * @param typeargs The type arguments passed to the function call.
+	 * @param sel The selector used to access the function.
+	 * @param context The context in which the function call is being made.
+	 * @param selector The selector used to access the variable (defaults to Selector.self).
+	 * @return A list of IRTree nodes representing the function call.
+	 */
 	def handleFunctionCall(op: String, name: Expression, args: List[Expression], typeargs: List[Type], sel: Selector)(implicit context: Context, selector: Selector = Selector.self):List[IRTree] = {
 		if (sel != Selector.self && modifiers.isEntity){
 			val (pref,vari) = Utils.simplifyToVariable(FunctionCallValue(name, args, typeargs, sel))
@@ -625,8 +772,17 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 		}
 	}
 
+	
 	/**
-	 * Assign a value to the string variable
+	 * Assigns a value to variable of type string using the given operator and expression.
+	 * Throws an exception if the "string" feature is not enabled in the current target settings.
+	 *
+	 * @param op The operator to use for the assignment.
+	 * @param valueE The expression representing the value to assign.
+	 * @param context The current context.
+	 * @param selector The current selector.
+	 * @return A list of IRTree nodes representing the assignment operation.
+	 * @throws Exception If the "string" feature is not enabled in the current target settings.
 	 */
 	def assignString(op: String, valueE: Expression)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		if (!Settings.target.hasFeature("string"))throw new Exception("Cannot use string without string feature")
@@ -639,23 +795,37 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 						val (prev,vari) = Utils.simplifyToVariable(name)
 						prev ::: List(StringCopy(getStorage(), vari.vari.getStorage(), min, max))
 					}
+					case ArrayGetValue(name, List(IntValue(min))) => {
+						val (prev,vari) = Utils.simplifyToVariable(name)
+						prev ::: List(StringCopy(getStorage(), vari.vari.getStorage(), min, min))
+					}
 					case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 					case LinkedVariableValue(vari, selector) => {
 						vari.getType() match
 							case StringType => List(StringCopy(getStorage(), vari.getStorage()(context, selector)))
-							case other => handleFunctionCall("=", VariableValue("__string_cast__"), List(LinkedVariableValue(vari, selector)), List(), Selector.self)
+							case other => 
+								context.requestLibrary("standard.string")
+								handleFunctionCall("=", VariableValue("standard.string.cast"), List(LinkedVariableValue(vari, selector)), List(), Selector.self)
 							//case other => throw new Exception(f"Cannot assign $other to string at \n${valueE.pos.longString}")
 					}
 					case DefaultValue => List(StringSet(getStorage(), Utils.stringify("")))
 					case JsonValue(JsonString(value)) => List(StringSet(getStorage(), Utils.stringify(value)))
+					case bin: BinaryOperation => assignBinaryOperator(op, bin)
+					case ter: TernaryOperation => assignTernaryOperator(op, ter)
+					case seq: SequenceValue => assignSequence(op, seq)
+					case seq: SequencePostValue => assignSequencePost(op, seq)
 					case other => 
-						handleFunctionCall("=", VariableValue("__string_cast__"), List(other), List(), Selector.self)
+						context.requestLibrary("standard.string")
+						handleFunctionCall("=", VariableValue("standard.string.cast"), List(other), List(), Selector.self)
 				}
 			case "+=" => {
 				valueE match{
-					case StringValue(value) => handleFunctionCall("=", VariableValue("__string_concat__"), List(LinkedVariableValue(this), StringValue(value)), List(), Selector.self)
+					case StringValue(value) => 
+						context.requestLibrary("standard.string")
+						handleFunctionCall("=", VariableValue("standard.string.concat"), List(LinkedVariableValue(this), StringValue(value)), List(), Selector.self)
 					case LinkedVariableValue(vari, selector) => {
-						handleFunctionCall("=", VariableValue("__string_concat__"), List(LinkedVariableValue(this), LinkedVariableValue(vari, selector)), List(), Selector.self)
+						context.requestLibrary("standard.string")
+						handleFunctionCall("=", VariableValue("standard.string.concat"), List(LinkedVariableValue(this), LinkedVariableValue(vari, selector)), List(), Selector.self)
 					}
 					case _ => {
 						val vari = context.getFreshVariable(StringType)
@@ -663,10 +833,26 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 					}
 				}
 			}
+			case "*=" => {
+				Utils.typeof(valueE) match
+					case IntType => 
+						context.requestLibrary("standard.string")
+						handleFunctionCall("=", VariableValue("standard.string.multiply"), List(LinkedVariableValue(this), valueE), List(), Selector.self)
+				
+			}
 			case other => throw new Exception(f"Cannot assign use op: $other with int at \n${valueE.pos.longString}")
 		}
 	}
 
+	/**
+	 * Handles getting the value of an array variable.
+	 *
+	 * @param op the operator used to get the value (e.g. "+=")
+	 * @param name2 the name of the variable
+	 * @param index the index of the array element to get
+	 * @param context the current context
+	 * @return a list of IRTree nodes representing the operation
+	 */
 	def handleArrayGetValue(op: String, name2: Expression, index: List[Expression])(implicit context: Context):List[IRTree] = {
 		if (name2 == VariableValue(Identifier(List("this")), Selector.self)){
 			assign(op, FunctionCallValue(VariableValue("__get__"), index, List()))
@@ -702,16 +888,17 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 							index match{
 								case List(StringValue(str)) => 
 									getType() match
-										case IntType => List(CommandIR(f"execute store result score ${getSelector()} ${getSelectorObjective()} run data get storage ${vari.fullName} json.${str} 1"))
-										case FloatType => List(CommandIR(f"execute store result score ${getSelector()} ${getSelectorObjective()} run data get storage ${vari.fullName} json.${str} 1000"))
-										case BoolType => List(CommandIR(f"execute store result score ${getSelector()} ${getSelectorObjective()} run data get storage ${vari.fullName} json.${str} 1"))
-										case StringType => ???
+										case IntType => List(StorageRead(getIRSelector(), vari.getStorage(vari.getSubKey(str)), 1))
+										case FloatType => List(StorageRead(getIRSelector(), vari.getStorage(vari.getSubKey(str)), Settings.floatPrec))
+										case BoolType => List(StorageRead(getIRSelector(), vari.getStorage(vari.getSubKey(str)), 1))
+										case StringType => assign(op, LinkedVariableValue(vari.withKey(vari.getSubKey(str))))
 										case StructType(struct, sub) => {
 											tupleVari.flatMap(x => x.handleArrayGetValue(op, name, List(StringValue(str+"."+x.name))))
 										}
 										case JsonType => {
 											assignJson("=", LinkedVariableValue(vari.withKey(vari.getSubKey(str))))
 										}
+										case FuncType(sources, output) => List(StorageRead(getIRSelector(), vari.getStorage(vari.getSubKey(str)), 1))
 								case other => assign(op, FunctionCallValue(VariableValue(vari.fullName+".get"), index, List()))
 							}
 						}
@@ -730,6 +917,16 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 		}
 	}
 
+	/**
+	 * Assigns a linked variable to the variable on the given operator and selector.
+	 *
+	 * @param op The operator to use for the assignment.
+	 * @param vari The variable to assign the value from.
+	 * @param oselector The selector to use for the assignment.
+	 * @param context The context in which the assignment is being made.
+	 * @param selector The selector to use for the assignment (defaults to Selector.self).
+	 * @return A list of IRTree objects representing the assignment.
+	 */
 	def assignIntLinkedVariable(op: String, vari: Variable, oselector: Selector)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		vari.getType() match{
 			case FloatType => {
@@ -779,13 +976,57 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 					}
 				}
 			}
-			case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()}")
+			case other => castVariable(op, vari, oselector)
+		}
+	}
+
+	def castVariable(op: String, vari: Variable, oselector: Selector)(implicit context: Context, selector: Selector = Selector.self) = {
+		try{
+			val fct = vari.context.push(vari.name).getFunction(Identifier.fromString("__cast__"), List(), List(), getType())
+			if (fct._1.getType().isSubtypeOf(getType()) || fct._1.getType() == getType()){
+				if (vari.modifiers.isEntity && modifiers.isEntity && (oselector != Selector.self || selector != Selector.self)){
+					val tmp = context.getFreshVariable(getType())
+					Compiler.compile(With(SelectorValue(oselector), BoolValue(false), BoolValue(true), VariableAssigment(List((Right(tmp), Selector.self)), "=", FunctionCallValue(LinkedFunctionValue(fct._1), fct._2, List(), Selector.self)), null)):::
+						assign(op, LinkedVariableValue(tmp))
+				}
+				else if (vari.modifiers.isEntity && oselector != Selector.self){
+					if (op == "="){
+						Compiler.compile(With(SelectorValue(oselector), BoolValue(false), BoolValue(true), VariableAssigment(List((Right(this), selector)), op, FunctionCallValue(LinkedFunctionValue(fct._1), fct._2, List(), selector)), null))
+					}
+					else{
+						val tmp = context.getFreshVariable(getType())
+						Compiler.compile(With(SelectorValue(oselector), BoolValue(false), BoolValue(true), VariableAssigment(List((Right(tmp), Selector.self)), "=", FunctionCallValue(LinkedFunctionValue(fct._1), fct._2, List(), Selector.self)), null)):::
+							assign(op, LinkedVariableValue(tmp))
+					}
+				}
+				else{
+					if (op == "="){
+						fct.call(this, selector, op)
+					}
+					else{
+						val tmp = context.getFreshVariable(getType())
+						fct.call(tmp, Selector.self, "=") ::: assign(op, LinkedVariableValue(tmp))
+					}
+				}
+			}
+			else{
+				throw new Exception(f"Cannot assign ${vari.fullName} of type ${vari.getType()} to $fullName of type ${getType()}. Cast found but not compatible. ${fct._1.getType()} vs ${getType()}")
+			}
+		}
+		catch{
+			case e: FunctionNotFoundException => throw new Exception(f"Cannot assign ${vari.fullName} of type ${vari.getType()} to $fullName of type ${getType()}: $e")
 		}
 	}
 
 
 	/**
-	 * Assign a value to the enum variable
+	 * Assigns a value to variable of type enum using the given operator and expression.
+	 *
+	 * @param op The operator to use for the assignment.
+	 * @param value The expression representing the value to assign.
+	 * @param context The current context.
+	 * @param selector The current selector.
+	 * @return A list of IRTree nodes representing the assignment operation.
 	 */
 	def assignEnum(op: String, value: Expression)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		value match
@@ -808,7 +1049,13 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 
 
 	/**
-	 * Assign a value to the float variable
+	 * Assigns a value to variable of type float using the given operator and expression.
+	 *
+	 * @param op The operator to use for the assignment.
+	 * @param value The expression representing the value to assign.
+	 * @param context The current context.
+	 * @param selector The current selector.
+	 * @return A list of IRTree nodes representing the assignment operation.
 	 */
 	def assignFloat(op: String, valueE: Expression)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		valueE match
@@ -883,11 +1130,18 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			case bin: BinaryOperation => assignBinaryOperator(op, bin)
 			case ter: TernaryOperation => assignTernaryOperator(op, ter)
 			case seq: SequenceValue => assignSequence(op, seq)
+			case seq: SequencePostValue => assignSequencePost(op, seq)
 			case _ => throw new Exception(f"Unknown cast to float for $fullName and value $valueE at \n${valueE.pos.longString}")
 	}
 
 	/**
-	 * Assign a value to the float variable
+	 * Assigns a value to variable of type bool using the given operator and expression.
+	 *
+	 * @param op The operator to use for the assignment.
+	 * @param value The expression representing the value to assign.
+	 * @param context The current context.
+	 * @param selector The current selector.
+	 * @return A list of IRTree nodes representing the assignment operation.
 	 */
 	def assignBool(op: String, value: Expression)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		value match
@@ -949,6 +1203,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			case bin: BinaryOperation => assignBinaryOperator(op, bin)
 			case ter: TernaryOperation => assignTernaryOperator(op, ter)
 			case seq: SequenceValue => assignSequence(op, seq)
+			case seq: SequencePostValue => assignSequencePost(op, seq)
 			case SelectorValue(sel) => ScoreboardSet(getIRSelector(), 0)::Compiler.compile(If(value, VariableAssigment(List((Right(this), selector)), "=", BoolValue(true)), List()))
 			case other if Utils.typeof(other) == BoolType || Utils.typeof(other) == IntType || Utils.typeof(other) == EntityType => 
 				var vari2 = context.getFreshVariable(BoolType)
@@ -958,6 +1213,16 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			case _ => throw new Exception(f"Unknown cast to bool $value at \n${value.pos.longString}")
 	}
 
+	/**
+	 * Assigns a linked Variable of type float using the given operator and expression.
+	 *
+	 * @param op The operator to use for the assignment.
+	 * @param vari The variable to assign the value from.
+	 * @param sel The selector to use for the assignment.
+	 * @param context The current context.
+	 * @param selector The current selector.
+	 * @return A list of IRTree nodes representing the assignment operation.
+	 */
 	def assignFloatLinkedVariable(op: String, vari: Variable, sel: Selector)(implicit context: Context, selector: Selector = Selector.self):List[IRTree]={
 		vari.getType() match{
 			case FloatType => {
@@ -1024,10 +1289,19 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 				op match
 					case "=" | "+=" | "-=" | "*=" | "/=" | "%=" => List(ScoreboardOperation(getIRSelector(), op, vari.getIRSelector()(sel)))
 					case otherOp => throw new Exception(f"Cannot assign ${vari.fullName} of type ${vari.getType()} to $fullName of type ${getType()} with operator $otherOp")
-			case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()}")
+			case other => castVariable(op, vari, sel)
 		}
 	}
 
+	/**
+	 * Assigns a value to variable of type tuple using the given operator and expression.
+	 *
+	 * @param op The operator to use for the assignment.
+	 * @param expr2 The expression representing the value to assign.
+	 * @param context The current context.
+	 * @param selector The current selector.
+	 * @return A list of IRTree nodes representing the assignment operation.
+	 */
 	def assignTuple(op: String, expr2: Expression)(implicit context: Context, selector: Selector = Selector.self)={
 		val expr = Utils.simplify(expr2)
 		expr match
@@ -1037,7 +1311,12 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 					tupleVari.zip(vari.tupleVari).flatMap((t,v) => t.assign(op, LinkedVariableValue(v, sel)))
 				}
 				else{
-					tupleVari.flatMap(t => t.assign(op, expr))
+					try{
+						castVariable(op, vari, sel)
+					}
+					catch{
+						case e: Exception => tupleVari.flatMap(t => t.assign(op, expr))
+					}
 				}
 			}
 			case VariableValue(vari, sel) => assign(op, context.resolveVariable(expr))
@@ -1046,6 +1325,15 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			case v => tupleVari.flatMap(t => t.assign(op, v))
 	}
 
+	/**
+	 * Assigns a value to variable of type array using the given operator and expression.
+	 *
+	 * @param op The operator to use for the assignment.
+	 * @param expr2 The expression representing the value to assign.
+	 * @param context The current context.
+	 * @param selector The current selector.
+	 * @return A list of IRTree nodes representing the assignment operation.
+	 */
 	def assignArray(op: String, expr2: Expression)(implicit context: Context, selector: Selector = Selector.self)={
 		val ArrayType(sub, size) = getType().asInstanceOf[ArrayType]: @unchecked
 		val expr = Utils.simplify(expr2)
@@ -1057,12 +1345,21 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 					case _ => throw new Exception(f"Cannot assign tuple of size ${value.size} to array of size $size at \n${expr2.pos.longString}")
 			}
 			case LinkedVariableValue(vari, sel) => {
-				if (vari.getType().isSubtypeOf(getType())){
-					tupleVari.zip(vari.tupleVari).flatMap((t,v) => t.assign(op, LinkedVariableValue(v, sel)))
-				}
-				else{
-					tupleVari.flatMap(t => t.assign(op, expr))
-				}
+				vari.getType() match
+					case JsonType => tupleVari.zipWithIndex.flatMap((t, i) => t.assign(op, LinkedVariableValue(vari.withKey(vari.getSubKey(f"[$i]")), sel)))
+					case other => {
+						if (vari.getType().isSubtypeOf(getType())){
+							tupleVari.zip(vari.tupleVari).flatMap((t,v) => t.assign(op, LinkedVariableValue(v, sel)))
+						}
+						else{
+							try{
+								castVariable(op, vari, sel)
+							}
+							catch{
+								case e: Exception => tupleVari.flatMap(t => t.assign(op, expr))
+							}
+						}
+					}
 			}
 			case JsonValue(JsonArray(array)) => {
 				if (array.size != tupleVari.size) throw new Exception(f"Cannot assign array of size ${array.size} to array of size ${tupleVari.size} at \n${expr2.pos.longString}")
@@ -1092,6 +1389,15 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 	}
 
 
+	/**
+	 * Assigns a value to variable of type function using the given operator and expression.
+	 *
+	 * @param op The operator to use for the assignment.
+	 * @param expr The expression representing the value to assign.
+	 * @param context The current context.
+	 * @param selector The current selector.
+	 * @return A list of IRTree nodes representing the assignment operation.
+	 */
 	def assignFunc(op: String, expr: Expression)(implicit context: Context, selector: Selector = Selector.self):List[IRTree]={
 		if (op != "=") throw new Exception(f"Illegal operation with ${name}: $op at \n${expr.pos.longString}")
 		
@@ -1112,7 +1418,8 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 				vari.getType() match
 					case other if Utils.fix(other)(context, Set()).isSubtypeOf(Utils.fix(getType())(context, Set())) => List(ScoreboardOperation(getIRSelector(), op, vari.getIRSelector()(sel)))
 					case IntType => List(ScoreboardOperation(getIRSelector(), op, vari.getIRSelector()(sel)))
-					case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()} at \n${expr.pos.longString}")
+					case JsonType => List(StorageRead(getIRSelector(), vari.getStorage()))
+					case other => castVariable(op, vari, sel)
 			}
 			case LambdaValue(args, instr, ctx) => {
 				val typ = getType().asInstanceOf[FuncType]
@@ -1133,11 +1440,28 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			}
 			case _ => throw new Exception(f"Unsupported Operation at \n${expr.pos.longString}")
 	}
+
+	/**
+	 * Removes the entity tag from all the entity.
+	 *
+	 * @param context the context in which the entity tag is to be removed
+	 * @return the compiled code to remove the entity tag
+	 */
 	def removeEntityTag()(implicit context: Context)={
 		Compiler.compile(If(LinkedVariableValue(tupleVari(0)), 
 						CMD(f"tag @a[tag=${tagName}] remove $tagName"), 
 						List(ElseIf(BoolValue(true), CMD(f"tag @e[tag=${tagName}] remove $tagName")))))
 	}
+
+	/**
+	 * Assigns a value to variable of type entity using the given operator and expression.
+	 *
+	 * @param op The operator to use for the assignment.
+	 * @param expr The expression representing the value to assign.
+	 * @param context The current context.
+	 * @param selector The current selector.
+	 * @return A list of IRTree nodes representing the assignment operation.
+	 */
 	def assignEntity(op: String, expr: Expression)(implicit context: Context, selector: Selector = Selector.self):List[IRTree]={
 		expr match{
 			case BinaryOperation("not in", left, right) => {
@@ -1181,15 +1505,18 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 														CMD(f"tag @a[tag=${vari.tagName}] add $tagName"), 
 														List(ElseIf(BoolValue(true), CMD(f"tag @e[tag=${vari.tagName}] add $tagName")))))
 								}
-								case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()} at \n${expr.pos.longString}")
+								case ClassType(clazz, sub) => {
+									// Remove tag to previous entities
+									removeEntityTag():::
+									// Add tag to new entities
+									Compiler.compile(With(LinkedVariableValue(vari, sel), BoolValue(false), BoolValue(true), VariableAssigment(List((Right(this), selector)), "=", SelectorValue(Selector.self)), EmptyInstruction))
+								}
+								case other => castVariable(op, vari, sel)
 						}
 						case NullValue => {
-							val vari = context.getVariable(name)
-
-							// Remove tag to previous entities
 							removeEntityTag()
 						}
-						case DefaultValue => List()
+						case DefaultValue => removeEntityTag()
 						case SelectorValue(value) => {
 							// Remove tag to previous entities
 							removeEntityTag():::
@@ -1201,6 +1528,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 						case bin: BinaryOperation => assignBinaryOperator(op, bin)
 						case ter: TernaryOperation => assignTernaryOperator(op, ter)
 						case seq: SequenceValue => assignSequence(op, seq)
+						case seq: SequencePostValue => assignSequencePost(op, seq)
 						case FunctionCallValue(name, args, typeargs, selector) => 
 							//removeEntityTag():::
 							tupleVari.zip(List(BoolValue(false))).flatMap((t, v) => t.assign(op, v)) ::: 
@@ -1237,6 +1565,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 						case bin: BinaryOperation => assignBinaryOperator(op, bin)
 						case ter: TernaryOperation => assignTernaryOperator(op, ter)
 						case seq: SequenceValue => assignSequence(op, seq)
+						case seq: SequencePostValue => assignSequencePost(op, seq)
 						case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 						case _ => throw new Exception(f"No cast from ${expr} to entity at \n${expr.pos.longString}")
 				}
@@ -1265,6 +1594,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 						case bin: BinaryOperation => assignBinaryOperator(op, bin)
 						case ter: TernaryOperation => assignTernaryOperator(op, ter)
 						case seq: SequenceValue => assignSequence(op, seq)
+						case seq: SequencePostValue => assignSequencePost(op, seq)
 						case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 						case _ => throw new Exception(f"No cast from ${expr} to entity at \n${expr.pos.longString}")
 				}
@@ -1273,6 +1603,13 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 		}
 	}
 
+	/**
+	 * Returns the storage object for the current variable.
+	 * @param keya The key to use for the storage object. Defaults to "json".
+	 * @param context The context in which the storage object is being retrieved.
+	 * @param selector The selector for the storage object. Defaults to Selector.self.
+	 * @return The storage object for the current variable.
+	 */
 	def getStorage(keya: String = "json")(implicit context: Context, selector: Selector = Selector.self) = {
 		val key = if keya == "json" then jsonArrayKey else keya
 		if (modifiers.isEntity){
@@ -1283,6 +1620,13 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 		}
 	}
 
+	/**
+	 * Returns the storage path for the current variable.
+	 * @param keya The key to use for the storage object. Defaults to "json".
+	 * @param context The context in which the storage object is being retrieved.
+	 * @param selector The selector for the storage object. Defaults to Selector.self.
+	 * @return The storage path for the current variable.
+	 */
 	def getStoragePath(keya: String = "json")(implicit context: Context, selector: Selector = Selector.self) = {
 		val key = if keya == "json" then jsonArrayKey else keya
 		if (modifiers.isEntity){
@@ -1294,7 +1638,14 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 	}
 
 	/**
-	 * Assign a value to the float variable
+	 * Assigns a value to variable of type json using the given operator and expression.
+	 *
+	 * @param op The operator to use for the assignment.
+	 * @param value The expression representing the value to assign.
+	 * @param keya The key to use for the storage object. Defaults to "json" meaning to use the default key.
+	 * @param context The current context.
+	 * @param selector The current selector.
+	 * @return A list of IRTree nodes representing the assignment operation.
 	 */
 	def assignJson(op: String, value: Expression, keya: String = "json")(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		val key = if jsonArrayKey != "json" then jsonArrayKey else keya
@@ -1368,7 +1719,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 					}
 					case other => throw new Exception(f"Illegal operation with json ${name}: $op at \n${value.pos.longString}")
 				}
-			case DefaultValue => List(StorageSet(getStorage(key), StorageString("")))
+			case DefaultValue => List(StorageSet(getStorage(key), StorageString("{}")))
 			case VariableValue(name, sel) => withKey(key).assign(op, context.resolveVariable(value))
 			case NullValue => List(StorageSet(getStorage(key), StorageString("{}")))
 			case LinkedVariableValue(vari, sel) => 
@@ -1383,56 +1734,72 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 							case other => jsonUnpackedOperation(op, value, key)
 						}
 					}
-					case IntType | BoolType | EnumType(_) => {
+					case IntType | BoolType | EnumType(_) | FuncType(_, _) => {
 						op match{
-							case "=" => List(StorageSet(getStorage(key), StorageScoreboard(vari.getIRSelector()(sel), "int", 1)))
-							case ">:=" => List(StorageSet(StorageStorage(fullName, "tmp"), StorageScoreboard(vari.getIRSelector()(sel), "int", 1)), 
-											StorageAppend(getStorage(key), StorageStorage(fullName, "tmp")))
-							case "<:=" => List(StorageSet(StorageStorage(fullName, "tmp"), StorageScoreboard(vari.getIRSelector()(sel), "int", 1)), 
-											StoragePrepend(getStorage(key), StorageStorage(fullName, "tmp")))
-							case "::=" => List(StorageSet(StorageStorage(fullName, "tmp"), StorageScoreboard(vari.getIRSelector()(sel), "int", 1)), 
-											StorageMerge(getStorage(key), StorageStorage(fullName, "tmp")))
-							case "-:=" => List(StorageSet(StorageStorage(fullName, "tmp"), StorageScoreboard(vari.getIRSelector()(sel), "int", 1)), 
-											StorageRemove(getStorage(key), StorageStorage(fullName, "tmp")))
+							case "=" => List(StorageSet(getStorage(key), StorageScoreboard(vari.getIRSelector()(sel), modifiers.getAttributesString("type", ()=> "int"), 1)))
+							case ">:=" => List(StorageSet(getStorage("tmp"), StorageScoreboard(vari.getIRSelector()(sel), modifiers.getAttributesString("type", ()=> "int"), 1)), 
+											StorageAppend(getStorage(key), getStorage("tmp")))
+							case "<:=" => List(StorageSet(getStorage("tmp"), StorageScoreboard(vari.getIRSelector()(sel), modifiers.getAttributesString("type", ()=> "int"), 1)), 
+											StoragePrepend(getStorage(key), getStorage("tmp")))
+							case "::=" => List(StorageSet(getStorage("tmp"), StorageScoreboard(vari.getIRSelector()(sel), modifiers.getAttributesString("type", ()=> "int"), 1)), 
+											StorageMerge(getStorage(key), getStorage("tmp")))
+							case "-:=" => List(StorageSet(getStorage("tmp"), StorageScoreboard(vari.getIRSelector()(sel), modifiers.getAttributesString("type", ()=> "int"), 1)), 
+											StorageRemove(getStorage(key), getStorage("tmp")))
 							case other => jsonUnpackedOperation(op, value, key)
 						}
 					}
 					case FloatType => {
 						op match{
-							case "=" => List(StorageSet(getStorage(key), StorageScoreboard(vari.getIRSelector()(sel), "float", 1f/Settings.floatPrec)))
-							case ">:=" => List(StorageSet(StorageStorage(fullName, "tmp"), StorageScoreboard(vari.getIRSelector()(sel), "float", 1f/Settings.floatPrec)), 
-											StorageAppend(getStorage(key), StorageStorage(fullName, "tmp")))
-							case "<:=" => List(StorageSet(StorageStorage(fullName, "tmp"), StorageScoreboard(vari.getIRSelector()(sel), "float", 1f/Settings.floatPrec)), 
-											StoragePrepend(getStorage(key), StorageStorage(fullName, "tmp")))
-							case "::=" => List(StorageSet(StorageStorage(fullName, "tmp"), StorageScoreboard(vari.getIRSelector()(sel), "float", 1f/Settings.floatPrec)),	
-											StorageMerge(getStorage(key), StorageStorage(fullName, "tmp")))
-							case "-:=" => List(StorageSet(StorageStorage(fullName, "tmp"), StorageScoreboard(vari.getIRSelector()(sel), "float", 1f/Settings.floatPrec)), 
-											StorageRemove(getStorage(key), StorageStorage(fullName, "tmp")))
+							case "=" => List(StorageSet(getStorage(key), StorageScoreboard(vari.getIRSelector()(sel), modifiers.getAttributesString("type", ()=> "float"), 1f/Settings.floatPrec)))
+							case ">:=" => List(StorageSet(getStorage("tmp"), StorageScoreboard(vari.getIRSelector()(sel), modifiers.getAttributesString("type", ()=> "float"), 1f/Settings.floatPrec)), 
+											StorageAppend(getStorage(key), getStorage("tmp")))
+							case "<:=" => List(StorageSet(getStorage("tmp"), StorageScoreboard(vari.getIRSelector()(sel), modifiers.getAttributesString("type", ()=> "float"), 1f/Settings.floatPrec)), 
+											StoragePrepend(getStorage(key), getStorage("tmp")))
+							case "::=" => List(StorageSet(getStorage("tmp"), StorageScoreboard(vari.getIRSelector()(sel), modifiers.getAttributesString("type", ()=> "float"), 1f/Settings.floatPrec)),	
+											StorageMerge(getStorage(key), getStorage("tmp")))
+							case "-:=" => List(StorageSet(getStorage("tmp"), StorageScoreboard(vari.getIRSelector()(sel), modifiers.getAttributesString("type", ()=> "float"), 1f/Settings.floatPrec)), 
+											StorageRemove(getStorage(key), getStorage("tmp")))
 							case other => jsonUnpackedOperation(op, value, key)
 						}
 					}
 					case StringType => {
 						op match{
-							case "=" => List(StorageSet(getStorage(key), StorageStorage(vari.fullName, "value")))
-							case ">:=" => List(StorageAppend(getStorage(key), StorageStorage(vari.fullName, "value")))
-							case "<:=" => List(StoragePrepend(getStorage(key), StorageStorage(vari.fullName, "value")))
-							case "::=" => List(StorageMerge(getStorage(key), StorageStorage(vari.fullName, "value")))
-							case "-:=" => List(StorageRemove(getStorage(key), StorageStorage(vari.fullName, "value")))
+							case "=" => List(StorageSet(getStorage(key), vari.getStorage()))
+							case ">:=" => List(StorageAppend(getStorage(key), vari.getStorage()))
+							case "<:=" => List(StoragePrepend(getStorage(key), vari.getStorage()))
+							case "::=" => List(StorageMerge(getStorage(key), vari.getStorage()))
+							case "-:=" => List(StorageRemove(getStorage(key), vari.getStorage()))
 							case other => jsonUnpackedOperation(op, value, key)
 						}
 					}
 					case StructType(struct, sub) => {
+						try{
+							castVariable(op, vari, sel)
+						}
+						catch{
+							case e: Exception => 
+								op match{
+									case "=" => 
+										vari.tupleVari.flatMap(v => withKey(key + "." + v.name).assignJson(op, LinkedVariableValue(v, sel)))
+									case other => {
+										val tmp = context.getFreshVariable(JsonType)
+										tmp.assign("=", value):::assignJson(op, LinkedVariableValue(tmp), keya)
+									}
+								}
+						}
+					}
+					case ArrayType(inner, size) => {
 						op match{
-							case "=" => vari.tupleVari.flatMap(v => {
-											vari.assignJson(op, LinkedVariableValue(withKey(key + "." + v.name), sel))
-										})
+							case "=" => 
+								assign("=", JsonValue(JsonArray(List()))):::
+								vari.tupleVari.flatMap(v => assignJson(">:=", LinkedVariableValue(v, sel)))
 							case other => {
 								val tmp = context.getFreshVariable(JsonType)
 								tmp.assign("=", value):::assignJson("=", LinkedVariableValue(tmp), keya)
 							}
 						}
 					}
-					case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()} at \n${value.pos.longString}")
+					case other => castVariable(op, vari, sel)
 				}
 			case FunctionCallValue(name, args, typeargs, selector) => withKey(key).handleFunctionCall(op, name, args, typeargs, selector)
 			case ArrayGetValue(name, index) => withKey(key).handleArrayGetValue(op, name, index)
@@ -1473,9 +1840,27 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 					case "-:=" => List(StorageRemove(getStorage(key), StorageString(value.getString())))
 					case other => jsonUnpackedOperation(op, value, key)
 				}
+			case PositionValue(_,_,_) | SelectorValue(_) | TagValue(_) | LinkedTagValue(_) | NamespacedName(_, _) => 
+				op match{
+					case "=" => List(StorageSet(getStorage(key), StorageString(Utils.stringify(value.getString()))))
+					case ">:=" => List(StorageAppend(getStorage(key), StorageString(Utils.stringify(value.getString()))))
+					case "<:=" => List(StoragePrepend(getStorage(key), StorageString(Utils.stringify(value.getString()))))
+					case "::=" => List(StorageMerge(getStorage(key), StorageString(Utils.stringify(value.getString()))))
+					case "-:=" => List(StorageRemove(getStorage(key), StorageString(Utils.stringify(value.getString()))))
+					case other => jsonUnpackedOperation(op, value, key)
+				}
 			case _ => throw new Exception(f"Unknown cast to json $value at \n${value.pos.longString}")
 	}
 
+	/**
+	 * Assigns a binary operator to a JSON value.
+	 *
+	 * @param op The binary operator to assign.
+	 * @param value The binary operation to assign the operator to.
+	 * @param context The context in which the assignment is made.
+	 * @param selector The selector for the assignment.
+	 * @return A list of IRTree objects representing the assignment.
+	 */
 	def assignBinaryOperatorJson(op: String, value: BinaryOperation)(implicit context: Context, selector: Selector = Selector.self):List[IRTree]={
 		value match
 			case BinaryOperation(op2 @ ("+" | "*"), left, right) if Utils.typeof(right) == JsonType && Utils.typeof(left) != JsonType => {
@@ -1490,6 +1875,16 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			}
 	}
 
+	/**
+	 * Performs an operation by unpacking the JSON value.
+	 *
+	 * @param op The operation to perform.
+	 * @param value The value to perform the operation on.
+	 * @param keya The key for the operation.
+	 * @param context The context in which the operation is performed.
+	 * @param selector The selector for the operation.
+	 * @return A list of IRTree objects representing the operation.
+	 */
 	def jsonUnpackedOperation(op: String, value: Expression, keya: String = "json")(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		value match
 			case BinaryOperation("+" | "*", left, right) if Utils.typeof(right) == JsonType && Utils.typeof(left) != JsonType && Utils.typeof(left) != StringType => {
@@ -1506,7 +1901,13 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 	}
 
 	/**
-	 * Assign a value to the struct variable
+	 * Assigns a value to variable of type struct using the given operator and expression.
+	 *
+	 * @param op The operator to use for the assignment.
+	 * @param value The expression representing the value to assign.
+	 * @param context The current context.
+	 * @param selector The current selector.
+	 * @return A list of IRTree nodes representing the assignment operation.
 	 */
 	def assignStruct(op: String, value: Expression)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		if value == DefaultValue then return List()
@@ -1520,10 +1921,15 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 						else{
 							vari.getType() match
 								case JsonType => {
-									tupleVari.flatMap(vari => vari.assign("=", ArrayGetValue(value, List(StringValue(vari.name)))))
+									tupleVari.flatMap(v => v.assign("=", LinkedVariableValue(vari.withKey(vari.getSubKey(v.name)), sel)))
 								}
 								case other => {
-									context.getFunction(this.name + ".__set__", List(value), List(), getType(), false).call()
+									try{
+										context.getFunction(this.name + ".__set__", List(value), List(), getType(), false).call()
+									}
+									catch{
+										case e: Exception => castVariable(op, vari, sel)
+									}
 								}
 						}
 					}
@@ -1551,10 +1957,11 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 					case bin: BinaryOperation => assignBinaryOperator("=", bin)
 					case ter: TernaryOperation => assignTernaryOperator(op, ter)
 					case seq: SequenceValue => assignSequence(op, seq)
+					case seq: SequencePostValue => assignSequencePost(op, seq)
 					case JsonValue(JsonDictionary(map)) if map.forall(x => tupleVari.exists(y => y.name == x._1)) => {
 						map.flatMap(x => tupleVari.find(y => y.name == x._1).get.assign("=", Utils.jsonToExpr(x._2))).toList
 					}
-					case ArrayGetValue(name, index) if Utils.typeof(value) == JsonType => {
+					case ArrayGetValue(name, index) if Utils.typeof(value) == JsonType || Utils.typeof(value) == getType() => {
 						handleArrayGetValue(op, name, index)
 					}
 					case _ => context.getFunction(fullName + ".__set__", List(value), List(), getType(), false).call()
@@ -1565,18 +1972,36 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 					case bin: BinaryOperation => assignBinaryOperator(op, bin)
 					case ter: TernaryOperation => assignTernaryOperator(op, ter)
 					case seq: SequenceValue => assignSequence(op, seq)
+					case seq: SequencePostValue => assignSequencePost(op, seq)
 					case _ => context.getFunction(fullName + "." + Utils.getOpFunctionName(op),  List(value), List(), getType(), false).call()
 	}
 
+	/** 
+	 * Dereferences the variable if it is not a temporary variable or a function argument.
+	 * @param context The context in which the variable is being dereferenced.
+	 * @return An empty list if the variable is a temporary variable or a function argument, otherwise the result of calling the "__remRef" function.
+	 */
 	def deref()(implicit context: Context) = 
 		if (modifiers.hasAttributes("variable.isTemp") || isFunctionArgument) List() else
 		context.getFunction(this.fullName + ".__remRef", List[Expression](), List(), getType(), false).call()
+
+	/** 
+	 * Adds a reference to the variable if it is not a temporary variable or a function argument.
+	 * @param context The context in which the variable is being referenced.
+	 * @return An empty list if the variable is a temporary variable or a function argument, otherwise the result of calling the "__addRef" function.
+	 */
 	def addref()(implicit context: Context)= 
 		if (modifiers.hasAttributes("variable.isTemp")|| isFunctionArgument) List() else
 		context.getFunction(this.fullName + ".__addRef", List[Expression](), List(), getType(), false).call()
 
 	/**
-	 * Assign a value to the struct variable
+	 * Assigns a value to variable of type class using the given operator and expression.
+	 *
+	 * @param op The operator to use for the assignment.
+	 * @param value The expression representing the value to assign.
+	 * @param context The current context.
+	 * @param selector The current selector.
+	 * @return A list of IRTree nodes representing the assignment operation.
 	 */
 	def assignClass(op: String, value: Expression)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
 		if value == DefaultValue then return List()
@@ -1611,6 +2036,17 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 				value match
 					case LinkedVariableValue(vari, sel) if vari.getType().isSubtypeOf(getType()) || vari.getType() == getType()=> {
 						deref() ::: List(ScoreboardOperation(getIRSelector(), op, vari.getIRSelector()(sel))) ::: addref()
+					}
+					case LinkedVariableValue(vari, sel) if vari.name == "__totalRefCount" => {
+						List(ScoreboardOperation(getIRSelector(), op, vari.getIRSelector()(sel)))
+					}
+					case LinkedVariableValue(vari, sel) => {
+						try{
+							context.getFunction(name + ".__set__", List(value), List(), getType(), false).call()
+						}
+						catch{
+							case e: Exception => castVariable(op, vari, sel)
+						}
 					}
 					case VariableValue(name, sel) => assignClass(op, context.resolveVariable(value))
 					case ConstructorCall(name2, args, typeArg) if name2.toString() == "@@@" => {
@@ -1665,23 +2101,30 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 					}
 					case NullValue => deref() ::: List(ScoreboardSet(getIRSelector(), 0))
 					case DefaultValue => List(ScoreboardSet(getIRSelector(), 0))
-					case LinkedVariableValue(vari, sel) if vari.name == "__totalRefCount" => {
-						List(ScoreboardOperation(getIRSelector(), op, vari.getIRSelector()(sel)))
-					}
 					case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 					case ArrayGetValue(name, index) => handleArrayGetValue(op, name, index)
 					case bin: BinaryOperation => assignBinaryOperator("=", bin)
 					case ter: TernaryOperation => assignTernaryOperator(op, ter)
 					case seq: SequenceValue => assignSequence(op, seq)
+					case seq: SequencePostValue => assignSequencePost(op, seq)
 					case JsonValue(JsonDictionary(map)) if map.forall(x => tupleVari.exists(y => y.name == x._1)) => {
 						map.flatMap(x => tupleVari.find(y => y.name == x._1).get.assign("=", Utils.jsonToExpr(x._2))).toList
 					}
 					case _ => context.getFunction(name + ".__set__", List(value), List(), getType(), false).call()
+						
 			}
 			case _ => assignStruct(op, value)
 	}
 
 
+	/**
+	 * Checks if the variable is present in the given expression.
+	 *
+	 * @param expr The expression to check for the variable's presence.
+	 * @param context The context in which the variable is defined.
+	 * @param selector The selector used to select the variable.
+	 * @return True if the variable is present in the expression, false otherwise.
+	 */
 	def isPresentIn(expr: Expression)(implicit context: Context, selector: Selector): Boolean = {
 		expr match
 			case IntValue(value) => false
@@ -1716,67 +2159,108 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			case CastValue(left, right) => isPresentIn(left)
 			case ForSelect(expr, filter, selector) => isPresentIn(expr) || isPresentIn(selector)
 			case SequenceValue(left, right) => isPresentIn(right)
+			case SequencePostValue(left, right) => isPresentIn(left)
 		}
 
 
+	/**
+	 * Checks if the selector is being used correctly.
+	 * @param selector The selector to check. Defaults to Selector.self.
+	 * @throws Exception if the selector is not Selector.self and the variable is not a scoreboard variable, or if the variable is a lazy variable, or if the variable is of type JsonType or RawJsonType.
+	 */
 	def checkSelectorUse()(implicit selector: Selector = Selector.self) = {
 		if (selector != Selector.self) {
-			if (!modifiers.isEntity)throw new Exception("Cannot have selector with not scoreboard variable")
+			if (!modifiers.isEntity) throw new Exception("Cannot have selector with not scoreboard variable")
 			if (modifiers.isLazy) throw new Exception("Cannot have selector with lazy variable")
-			getType() match
+			getType() match {
 				case JsonType => throw new Exception("Cannot have selector for json type")
 				case RawJsonType => throw new Exception("Cannot have selector for rawjson type")
 				case other => {}
+			}
 		}
 	}
+
+	/**
+	 * Gets the selector string for the variable.
+	 * @param selector The selector to use. Defaults to Selector.self.
+	 * @return The selector string for the variable.
+	 * @throws Exception if the selector is not Selector.self and the variable is not a scoreboard variable, or if the variable is a lazy variable, or if the variable is of type JsonType or RawJsonType.
+	 */
 	def getSelector()(implicit selector: Selector = Selector.self): String = {
 		checkSelectorUse()
 
-		if (modifiers.isEntity){
+		if (modifiers.isEntity) {
 			f"${selector} ${scoreboard}"
-		}
-		else{
+		} else {
 			f"${inGameName} ${variableScoreboard}"
 		}
 	}
+
+	/**
+	 * Gets the scoreboard link for the variable.
+	 * @param selector The selector to use. Defaults to Selector.self.
+	 * @return The scoreboard link for the variable.
+	 * @throws Exception if the selector is not Selector.self and the variable is not a scoreboard variable, or if the variable is a lazy variable, or if the variable is of type JsonType or RawJsonType.
+	 */
 	def getIRSelector()(implicit selector: Selector = Selector.self): SBLink = {
 		checkSelectorUse()
 
-		if (modifiers.isEntity){
+		if (modifiers.isEntity) {
 			SBLink(selector.getString()(context), scoreboard)
-		}
-		else{
+		} else {
 			SBLink(inGameName, variableScoreboard)
 		}
 	}
 
+	/**
+	 * Gets the selector name for the variable.
+	 * @param selector The selector to use. Defaults to Selector.self.
+	 * @return The selector name for the variable.
+	 * @throws Exception if the selector is not Selector.self and the variable is not a scoreboard variable, or if the variable is a lazy variable, or if the variable is of type JsonType or RawJsonType.
+	 */
 	def getSelectorName()(implicit selector: Selector = Selector.self): String = {
 		checkSelectorUse()
 
-		if (modifiers.isEntity){
+		if (modifiers.isEntity) {
 			f"${selector}"
-		}
-		else{
+		} else {
 			f"${inGameName}"
 		}
 	}
 
+	/**
+	 * Gets the scoreboard objective for the variable.
+	 * @param selector The selector to use. Defaults to Selector.self.
+	 * @return The scoreboard objective for the variable.
+	 * @throws Exception if the selector is not Selector.self and the variable is not a scoreboard variable, or if the variable is a lazy variable, or if the variable is of type JsonType or RawJsonType.
+	 */
 	def getSelectorObjective()(implicit selector: Selector = Selector.self): String = {
 		checkSelectorUse()
 
-		if (modifiers.isEntity){
+		if (modifiers.isEntity) {
 			f"${scoreboard}"
-		}
-		else{
+		} else {
 			f"${variableScoreboard}"
 		}
-	} 
+	}
 
+	/**
+	 * Gets the selector for an entity variable.
+	 * @return The selector for an entity variable.
+	 */
 	def getEntityVariableSelector(): Selector = {
 		JavaSelector("@e", List(("tag", SelectorIdentifier(tagName))))
 	}
 }
 
+/**
+ * Represents a property set variable that extends the `Variable` class.
+ *
+ * @param context The context of the variable.
+ * @param getter The getter function of the variable.
+ * @param setter The setter function of the variable.
+ * @param variable The variable to be set.
+ */
 class PropertySetVariable(context: Context, getter: Function, setter: Function, variable: Variable) extends Variable(context, "", VoidType, Modifier.newPublic()){
 	override def assign(op: String, value: Expression, allowReassign: Boolean = true)(implicit context: Context, selector: Compilation.Selector.Selector): List[IRTree] = {
 		if (op == ":=") throw new Exception("Operator not supported for Properties")

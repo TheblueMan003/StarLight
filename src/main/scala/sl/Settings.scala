@@ -51,7 +51,7 @@ class SettingsContext(){
     var lazyTypeChecking = false
     var macroConvertToLazy = true
 
-    var optimize = true
+    var optimize = false
     var optimizeInlining = true
     var optimizeDeduplication = true
     var optimizeVariableValue = true
@@ -61,6 +61,13 @@ class SettingsContext(){
     var optimizeAllowRemoveProtected = false
 
     var experimentalMultithread = false
+
+    var consoleInfoParsed = true
+    var consoleInfoPreParsed = true
+    var consoleInfoOptimization = true
+    var consoleInfoExportPath = true
+    var consoleWarningReturn = true
+    var consoleWarningNameAmbiguity = true
 
     var exportDoc = true
     var exportSource = false

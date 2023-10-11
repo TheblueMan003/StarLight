@@ -7,7 +7,7 @@ import sl.*
 
 object Selector{
     private val bedrockElement = List("x", "y", "z", "dx", "dy", "dz", "r", "rm", "scores", "tag", "name", "type", "family", "rx", "rxm", "ry", "rym", "l", "lm", "m", "c", "hasitem")
-    private val javaElement = List("x", "y", "z", "dx", "dy", "dz", "distance", "scores", "tag", "team", "name", "type", "predicate", "x_rotation‌", "y_rotation‌", "level", "gamemode", "advancements‌", "limit", "sort", "nbt")
+    private val javaElement = List("x", "y", "z", "dx", "dy", "dz", "distance", "scores", "tag", "team", "name", "type", "predicate", "x_rotation", "y_rotation", "level", "gamemode", "advancements", "limit", "sort", "nbt")
 
     def parse(prefix: String, filters: List[(String, SelectorFilterValue)]): Selector = {
         if (filters.forall((k,v) => javaElement.contains(k))){
@@ -105,13 +105,13 @@ case class BedrockSelector(val prefix: String, val filters: List[(String, Select
             }
             case "rx" => {
                 lst.find(_._1 == "rxm") match
-                    case None => List(("x_rotation‌", makeLower(value)))
-                    case Some(v2) => List(("x_rotation‌", makeRange(value, v2._2)))
+                    case None => List(("x_rotation", makeLower(value)))
+                    case Some(v2) => List(("x_rotation", makeRange(value, v2._2)))
             }
             case "ry" => {
                 lst.find(_._1 == "rym") match
-                    case None => List(("y_rotation‌", makeLower(value)))
-                    case Some(v2) => List(("y_rotation‌", makeRange(value, v2._2)))
+                    case None => List(("y_rotation", makeLower(value)))
+                    case Some(v2) => List(("y_rotation", makeRange(value, v2._2)))
             }
             case "l" => {
                 lst.find(_._1 == "lm") match

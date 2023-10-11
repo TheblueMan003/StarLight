@@ -28,6 +28,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
     private val variables = mutable.Map[String, Variable]()
     private val properties = mutable.Map[String, Property]()
     private val functions = mutable.Map[String, List[Function]]()
+    private val extensions = mutable.Map[Type, List[(String, Function)]]()
     private val structs = mutable.Map[String, Struct]()
     private val classes = mutable.Map[String, Class]()
     private val templates = mutable.Map[String, Template]()
@@ -389,9 +390,11 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
 
 
     def getCurrentFunction(): Function = {
+        if variable != null || clazz != null then return null
         if function == null && parent != null then parent.getCurrentFunction() else function
     }
     def getCurrentVariable(): Variable = {
+        if function != null || clazz != null then return null
         if variable == null && parent != null then parent.getCurrentVariable() else variable
     }
     def getCurrentClass(): Class = {
@@ -477,20 +480,49 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
             variable.fullName
         }
     }
-    def getAllVariable(set: mutable.Set[Context], array: ArrayBuffer[Variable]): Unit = {
+    def getAllVariable(set: mutable.Set[Context], array: ArrayBuffer[Variable], strict: Boolean): Unit = {
+        if set.contains(this) then return
+        set.add(this)
+        if (!strict){
+            inheritted.foreach(x => {
+                if (x != null && !set.contains(x)){
+                    x.getAllVariable(set, array, strict)
+                }
+            })
+        }
+        array.appendAll(variables.values)
+        child.filter(_._2.parent == this).foreach(_._2.getAllVariable(set, array, strict))
+    }
+    def getAllVariable(set: mutable.Set[Context] = mutable.Set(), strict: Boolean = false):List[Variable] = {
+        val array = ArrayBuffer[Variable]()
+        getAllVariable(set, array, strict)
+        array.toList
+    }
+
+
+    def addExtension(name: Type, function: List[(String,Function)]): Unit = synchronized{
+        if (!extensions.contains(name)){
+            extensions.addOne(name, List())
+        }
+
+        extensions(name) = function ::: extensions(name)
+    }
+    def getAllExtension(typ: Type, set: mutable.Set[Context], array: ArrayBuffer[(String, Function)]): Unit = {
         if set.contains(this) then return
         set.add(this)
         inheritted.foreach(x => {
             if (x != null && !set.contains(x)){
-                x.getAllVariable(set, array)
+                x.getAllExtension(typ, set, array)
             }
         })
-        array.appendAll(variables.values)
-        child.filter(_._2.parent == this).foreach(_._2.getAllVariable(set, array))
+        array.appendAll(extensions.getOrElse(typ, List()))
+        if (parent != null){
+            parent.getAllExtension(typ, set, array)
+        }
     }
-    def getAllVariable(set: mutable.Set[Context] = mutable.Set()):List[Variable] = {
-        val array = ArrayBuffer[Variable]()
-        getAllVariable(set, array)
+    def getAllExtension(typ: Type):List[(String, Function)] = {
+        val array = ArrayBuffer[(String, Function)]()
+        getAllExtension(typ, mutable.Set[Context](), array)
         array.toList
     }
 
@@ -520,8 +552,8 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
                     val vari = tryGetVariable(name)
                     vari match{
                         case Some(vari) => LinkedVariableValue(vari, sel)
-                        case None if Utils.typeof(value)(this).isInstanceOf[FuncType] =>{
-                            val typ = Utils.typeof(value)(this).asInstanceOf[FuncType]
+                        case None if Utils.typeof(value)(this, true).isInstanceOf[FuncType] =>{
+                            val typ = Utils.typeof(value)(this, true).asInstanceOf[FuncType]
                             val fct = getFunction(name, typ.sources, List(), typ.output, true, false).asInstanceOf[ConcreteFunction]
                             LinkedFunctionValue(fct)
                         }
@@ -552,7 +584,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
                     if (vari.modifiers.isLazy){
                         vari.lazyValue match
                             case LambdaValue(args2, instr, context) => {
-                                Some((context.getFreshLambda(args2, args.map(Utils.typeof(_)(this)), output, instr, false), args))
+                                Some((context.getFreshLambda(args2, args.map(Utils.typeof(_)(this, true)), output, instr, false), args))
                             }
                             case VariableValue(name, sel) => tryGetFunction(name, args, typeargs, output, concrete, silent)
                             case LinkedVariableValue(vari, selector) => {
@@ -570,7 +602,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
                 }
                 case _ => 
                     try{
-                        tryGetFunctionFromType(identifier, args.map(Utils.typeof(_)(this)), typeargs, output, concrete, silent) match{
+                        tryGetFunctionFromType(identifier, args.map(Utils.typeof(_)(this, true)), typeargs, output, concrete, silent) match{
                             case Some(fct) => Some((fct, args))
                             case None => None
                         }
@@ -609,22 +641,23 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
             if (identifier.toString().startsWith("@")) return Some(getFunctionTags(mapFunctionTag(identifier)))
             val fcts3 = getElementList(_.functions)(identifier)
             val fcts2 = handleSuper(identifier, fcts3)
-            //println(fcts2.map(_.fullName))
+            
             val fcts = fcts2.filter(f => !fcts2.exists(g => g.overridedFunction == f))
             if (fcts.size == 0) return None
             
             if (fcts.size == 1) return Some(fcts.head)
             val filtered = fcts.filter(fct => args.size >= fct.minArgCount && args.size <= fct.maxArgCount && (fct.isInstanceOf[ConcreteFunction] || !concrete))
-            
             if (filtered.length == 1) return Some(filtered.head)
             if (filtered.size == 0) return None
-            val ret = handleOverride(filtered.filterNot(x => x.modifiers.isAbstract).map(f => (f.arguments.zip(args).map((a, v)=> v.getDistance(a.typ)(this)).reduceOption(_ + _).getOrElse(0), f))
-                              .groupBy(_._1)
-                              .toList
-                              .sortBy(_._1)
-                              .head._2
-                              .map(_._2)
-                              .sortBy(f => f.context.fullPath.distanceTo(this.fullPath)))
+            val ret = handleOverride(filtered.filterNot(x => x.modifiers.isAbstract).map(f => 
+                (f.arguments.zip(args).map((a, v)=> v.getDistance(a.typ)(this)).reduceOption(_ + _).getOrElse(0)
+                 + (if output != VoidType then f.getType().getDistance(output)(this) else 0), f))
+                        .groupBy(_._1)
+                        .toList
+                        .sortBy(_._1)
+                        .head._2
+                        .map(_._2)
+                        .sortBy(f => f.context.fullPath.distanceTo(this.fullPath)))
             
             if (ret.size > 1 && ret(0).contextName.length() == ret(1).contextName.length()) {
                 if (ret(0).modifiers.isVirtual && !ret(1).modifiers.isVirtual) return Some(ret(1))
@@ -633,7 +666,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
                 if (ret(0) == ret(1)) return Some(ret(0))
                 
                 if (!silent){
-                    Reporter.warning(f"Ambiguous function: $identifier for args: $args in context: $path Matched:\n\t${ret.map(f => f"${f.fullName}(${f.arguments}) from ${f.context.fullPath}").mkString("\n\t")}")
+                    if (Settings.consoleWarningNameAmbiguity){Reporter.warning(f"Ambiguous function: $identifier for args: $args in context: $path Matched:\n\t${ret.map(f => f"${f.fullName}(${f.arguments}) from ${f.context.fullPath}").mkString("\n\t")}")}
                 }
             }
             if (ret.size == 0) return None
@@ -1025,7 +1058,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
 
 
 
-    def addObjectFrom(name: String, alias: String, other: Context) = {
+    def addObjectFrom(name: String, newName: Identifier, other: Context): Unit = {
         if (name == "_"){
             other.classes.foreach((k, v) =>{
                 classes.addOne(k, v)
@@ -1057,7 +1090,8 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
                 typedefs.addOne(k, v)
             })
         }
-        else{
+        else if (newName.isSingleton()){
+            val alias = newName.head()
             if (other.classes.contains(name)){
                 classes.addOne(alias, other.classes(name))
                 child.addOne(alias, other.push(name))
@@ -1086,6 +1120,11 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
             else{
                 throw new ObjectNotFoundException(f"$name Not Found in ${other.getPath()}")
             }
+        }
+        else{
+            val head = newName.head()
+            val tail = newName.drop()
+            val ctx = push(head).addObjectFrom(name, tail, other)
         }
     }
 

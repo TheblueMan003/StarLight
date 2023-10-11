@@ -8,10 +8,10 @@ scoreboard players set default.int.tuple_unpacking_nested_tuples.getResult-0.tup
 scoreboard players set default.int.tuple_unpacking_nested_tuples.getResult-0.tuple._0._1 tbms.var 2
 scoreboard players set default.int.tuple_unpacking_nested_tuples.getResult-0.tuple._1._0 tbms.var 3140
 scoreboard players set default.int.tuple_unpacking_nested_tuples.getResult-0.tuple._1._1 tbms.var 2718
-execute unless score default.int.tuple_unpacking_nested_tuples.getResult-0.a tbms.var = default.int.tuple_unpacking_nested_tuples.getResult-0.a tbms.var run scoreboard players set default.int.tuple_unpacking_nested_tuples.getResult-0.a tbms.var 0
-execute unless score default.int.tuple_unpacking_nested_tuples.getResult-0.b tbms.var = default.int.tuple_unpacking_nested_tuples.getResult-0.b tbms.var run scoreboard players set default.int.tuple_unpacking_nested_tuples.getResult-0.b tbms.var 0
-execute unless score default.int.tuple_unpacking_nested_tuples.getResult-0.x tbms.var = default.int.tuple_unpacking_nested_tuples.getResult-0.x tbms.var run scoreboard players set default.int.tuple_unpacking_nested_tuples.getResult-0.x tbms.var 0
-execute unless score default.int.tuple_unpacking_nested_tuples.getResult-0.y tbms.var = default.int.tuple_unpacking_nested_tuples.getResult-0.y tbms.var run scoreboard players set default.int.tuple_unpacking_nested_tuples.getResult-0.y tbms.var 0
+scoreboard players set default.int.tuple_unpacking_nested_tuples.getResult-0.a tbms.var 0
+scoreboard players set default.int.tuple_unpacking_nested_tuples.getResult-0.b tbms.var 0
+scoreboard players set default.int.tuple_unpacking_nested_tuples.getResult-0.x tbms.var 0
+scoreboard players set default.int.tuple_unpacking_nested_tuples.getResult-0.y tbms.var 0
 scoreboard players operation default.int.tuple_unpacking_nested_tuples.getResult-0.c._0 tbms.var = default.int.tuple_unpacking_nested_tuples.getResult-0.tuple._0._0 tbms.var
 scoreboard players operation default.int.tuple_unpacking_nested_tuples.getResult-0.c._1 tbms.var = default.int.tuple_unpacking_nested_tuples.getResult-0.tuple._0._1 tbms.var
 scoreboard players operation default.int.tuple_unpacking_nested_tuples.getResult-0.d._0 tbms.var = default.int.tuple_unpacking_nested_tuples.getResult-0.tuple._1._0 tbms.var

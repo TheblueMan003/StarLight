@@ -17,6 +17,12 @@ class Class(context: Context, name: String, val generics: List[String], _modifie
     var definingType = ClassType(this, List())
     private var wasGenerated = false
 
+    def checkIfShouldGenerate()={
+        if (Utils.contains(block, x => x match {case FunctionDecl(name, block, typ, args, typeArgs, modifier) => modifier.isStatic; case _ => false})){
+            generate()
+        }
+    }
+
     lazy val hasOwnInnit = getAllFunctions().exists(f => f._1 == "__init__" && f._2.clazz == this)
 
     lazy val cacheGVFunctions = getAllFunctions()
@@ -101,11 +107,14 @@ class Class(context: Context, name: String, val generics: List[String], _modifie
                 .filter(_.getter == null)
                 .filter(_.modifiers.protection == Protection.Public)
                 .foreach(vari => 
-                    vari.getter = ConcreteFunction(ctx, ctx.getPath()+f".__get_${vari.name}", f"__get_${vari.name}", List(), vari.getType(), vari.modifiers, Return(LinkedVariableValue(vari)), false)
+                    var mod = Modifier.newPrivate()
+                    mod = mod.combine(vari.modifiers) 
+                    mod.protection = Protection.Private
+                    vari.getter = ConcreteFunction(ctx, ctx.getPath()+f".__get_${vari.name}", f"__get_${vari.name}", List(), vari.getType(), mod, Return(LinkedVariableValue(vari)), false)
                     vari.getter.generateArgument()(ctx)
                     ctx.addFunction(f"__get_${vari.name}", vari.getter)
 
-                    vari.setter = ConcreteFunction(ctx, ctx.getPath()+f".__set_${vari.name}", f"__set_${vari.name}", List(new Argument("value", vari.getType(), None)), VoidType, vari.modifiers, VariableAssigment(List((Right(vari), Selector.self)), "=", VariableValue("value")), false)
+                    vari.setter = ConcreteFunction(ctx, ctx.getPath()+f".__set_${vari.name}", f"__set_${vari.name}", List(new Argument("value", vari.getType(), None)), VoidType, mod, VariableAssigment(List((Right(vari), Selector.self)), "=", VariableValue("value")), false)
                     vari.setter.generateArgument()(ctx)
                     ctx.addFunction(f"__set_${vari.name}", vari.setter)
                 )
@@ -165,12 +174,12 @@ class Class(context: Context, name: String, val generics: List[String], _modifie
                     val deco = ClassFunction(ctx.getPath()+"."+name, vari, fct, this)
                     ctx.addFunction(name, deco)
                 })
-            cacheGVVariables.map(vari => {
-                    val getter = ClassFunction(ctx.getPath()+"."+vari.getter.name, vari, vari.getter, this)
-                    ctx.addFunction(vari.getter.name, getter)
-                    val setter = ClassFunction(ctx.getPath()+"."+vari.setter.name, vari, vari.setter, this)
-                    ctx.addFunction(vari.setter.name, setter)
-                    ctx.addProperty(Property(vari.name, getter, setter, vari))
+            cacheGVVariables.map(vari2 => {
+                    val getter = ClassFunction(ctx.getPath()+"."+vari2.getter.name, vari, vari2.getter, this)
+                    ctx.addFunction(vari2.getter.name, getter)
+                    val setter = ClassFunction(ctx.getPath()+"."+vari2.setter.name, vari, vari2.setter, this)
+                    ctx.addFunction(vari2.setter.name, setter)
+                    ctx.addProperty(Property(vari2.name, getter, setter, vari2))
                 })
         }
         else{

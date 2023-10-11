@@ -72,7 +72,7 @@ object Compiler{
         try{
             instruction match{
                 case FunctionDecl(name3, block, typ2, args2, typevars, modifier) =>{
-                    val name2 = if context.getCurrentClass() != null && name3 == "this" then "__init__" else name3
+                    val name2 = if (context.getCurrentClass() != null || context.getCurrentStructUse()!= null) && name3 == "this" then "__init__" else name3
                     val name = if (name2 == "~") then context.getFreshLambdaName() else name2
                     var fname = context.getFunctionWorkingName(name)
 
@@ -131,10 +131,13 @@ object Compiler{
                             case None => null
                             case Some(p) => Identifier.fromString(p)
                         
-                        context.addClass(new Class(context, name, generics, modifier, block.unBlockify(), parentName, parentGenerics, interfaces.map(x => (Identifier.fromString(x._1), x._2)), entity))
+                        val c = new Class(context, name, generics, modifier, block.unBlockify(), parentName, parentGenerics, interfaces.map(x => (Identifier.fromString(x._1), x._2)), entity)
+                        context.addClass(c)
+                        c.checkIfShouldGenerate()
                     }
                     List()
                 }
+                case ExtensionDecl(name, block, modifier) => List()
                 case TemplateDecl(name, block, modifier, parent, generics, parentGenerics) => {
                     modifier.simplify()
                     if (!meta.firstPass){
@@ -281,7 +284,7 @@ object Compiler{
                         List()
                     }
                     if (value != null){
-                        context.addObjectFrom(value, if alias == null then value else alias, context.root.push(lib))
+                        context.addObjectFrom(value, Identifier.fromString(if alias == null then value else alias), context.root.push(lib))
                     }
                     else{
                         val last = Identifier.fromString(lib).values.last
@@ -514,7 +517,14 @@ object Compiler{
                     (fct, cargs).call()
                 }
                 case Await(func, continuation) => {
-                    Compiler.compile(FunctionCall(func.name, func.args ::: List(LambdaValue(List(), continuation, context)), func.typeargs))
+                    func match
+                        case FunctionCall(name, args, typeargs) => {
+                            Compiler.compile(FunctionCall(name, args ::: List(LambdaValue(List(), continuation, context)), typeargs))
+                        }
+                        case LinkedFunctionCall(fun, args, ret) => {
+                            Compiler.compile(LinkedFunctionCall(fun, args ::: List(LambdaValue(List(), continuation, context)), ret))
+                        }
+                        case other => throw new Exception(f"Unexpected await value: $other")
                 }
                 case Assert(cond, continutation) => {
                     val simp = Utils.simplify(cond)

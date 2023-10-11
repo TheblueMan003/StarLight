@@ -15,6 +15,10 @@ case class Argument(val name: String, val typ: Type, val defValue: Option[Expres
   override def toString() = if (defValue.isDefined) then f"$typ $name = ${defValue.get}" else f"$typ $name"
 }
 
+case class TemplateArgument(val name: String, val defValue: Option[Expression]){
+  override def toString() = if (defValue.isDefined) then f"$name = ${defValue.get}" else f"$name"
+}
+
 case class CPosition(_line: Int, _column: Int, _lineContents: String) extends Position{
   override def lineContents = _lineContents
   override def column = _column
@@ -48,11 +52,14 @@ case class EnumDecl(val name: String, val fields: List[EnumField], val values: L
 case class PredicateDecl(val name: String, val args: List[Argument], val block: JSONElement, val modifier: Modifier) extends Instruction {
   override def toString() = f"predicate ${name} (${args}) $block"
 }
+case class ExtensionDecl(val name: Type, val block: Instruction, val modifier: Modifier) extends Instruction {
+  override def toString() = f"extension ${name} ${block}"
+}
 
 case class FunctionDecl(val name: String, val block: Instruction, val typ: Type, val args: List[Argument], val typeArgs: List[String], val modifier: Modifier) extends Instruction {
   override def toString() = f"def ${name}(${args.mkString(", ")}) ${block}"
 }
-case class TemplateDecl(val name: String, val block: Instruction, val modifier: Modifier, val parent: Option[String], val generics: List[String], val parentGenerics: List[Expression]) extends Instruction {
+case class TemplateDecl(val name: String, val block: Instruction, val modifier: Modifier, val parent: Option[String], val generics: List[TemplateArgument], val parentGenerics: List[Expression]) extends Instruction {
   override def toString() = f"template ${name} ${block}"
 }
 case class TagDecl(val name: String, val values: List[Expression], val modifier: Modifier, val typ: TagType) extends Instruction {
@@ -185,7 +192,7 @@ case class With(val expr: Expression, val isat: Expression, val cond: Expression
 case class Sleep(val time: Expression, val continuation: Instruction) extends Instruction {
   override def toString() = f"sleep($time)\n$continuation"
 }
-case class Await(val func: FunctionCall, val continuation: Instruction) extends Instruction {
+case class Await(val func: Instruction, val continuation: Instruction) extends Instruction {
   override def toString() = f"await($func)\n$continuation"
 }
 case class Assert(val time: Expression, val continuation: Instruction) extends Instruction {

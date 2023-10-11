@@ -43,8 +43,8 @@ abstract class Function(context: Context, val contextName: String, name: String,
     var age = 0
     val wasMovedToBlock = context.isInLazyCall() || parentFunction != null || parentVariable != null || modifiers.protection==Protection.Private || Settings.obfuscate
     override lazy val fullName: String = if (wasMovedToBlock) then context.fctCtx.getFreshId() else context.getPath() + "." + name
-    val minArgCount = getMinArgCount(arguments)
-    val maxArgCount = getMaxArgCount(arguments)
+    var minArgCount = getMinArgCount(arguments)
+    var maxArgCount = getMaxArgCount(arguments)
     var argumentsVariables: List[Variable] = List()
     val clazz = context.getCurrentClass()
     var overridedFunction: Function = null
@@ -66,7 +66,7 @@ abstract class Function(context: Context, val contextName: String, name: String,
     def markAsStringUsed()={
         stringUsed = true
     }
-    private def getMaxArgCount(args: List[Argument]): Int = {
+    protected def getMaxArgCount(args: List[Argument]): Int = {
         if args.length == 0 then 0 else
         args.last.typ match
             case ParamsType => Integer.MAX_VALUE
@@ -97,7 +97,7 @@ abstract class Function(context: Context, val contextName: String, name: String,
 
     def canBeCallAtCompileTime = false
 
-    private def getMinArgCount(args: List[Argument], stopped: Boolean = false): Int = {
+    protected def getMinArgCount(args: List[Argument], stopped: Boolean = false): Int = {
         args match{
             case head::tail => {
                 head.defValue match
@@ -272,8 +272,7 @@ class ConcreteFunction(context: Context, _contextName: String, name: String, arg
     }
 }
 
-class BlockFunction(context: Context, _contextName: String, name: String, arguments: List[Argument], var body: List[IRTree]) extends Function(context, _contextName, name, arguments, VoidType, Modifier.newPrivate()){
-    val parentFunction = context.getCurrentFunction()
+class BlockFunction(context: Context, _contextName: String, name: String, arguments: List[Argument], var body: List[IRTree]) extends Function(context, _contextName, name, arguments, VoidType, Modifier.newPrivate()){    
     def call(args2: List[Expression], ret: Variable = null, retSel: Selector = Selector.self, op: String = "=")(implicit ctx: Context): List[IRTree] = {
         parentFunction match{
             case mc: MacroFunction => {
@@ -284,6 +283,7 @@ class BlockFunction(context: Context, _contextName: String, name: String, argume
                 argMap(args2).flatMap(p => p._1.assign("=", p._2)) :::
                     List(BlockCall(Settings.target.getFunctionName(fullName), fullName, null))
             }
+        }
     }
 
     def exists(): Boolean = true
@@ -321,7 +321,8 @@ class LazyFunction(context: Context, _contextName: String, name: String, argumen
 
         if (ret != null) sub.addVariable("_ret", ret)
         if (ret == null){
-            sub.addVariable("_ret", new Variable(sub, "_ret", typ, Modifier.newPrivate()))
+            val variret = sub.getFreshVariable(typ)
+            block = Utils.substReturn(block, variret)(!modifiers.hasAttributes("__returnCheck__"), retSel)
             pref:::sl.Compiler.compile(block.unBlockify())(if modifiers.hasAttributes("inline") then ctx else sub)
         }
         else if (op == "="){
@@ -347,6 +348,7 @@ class LazyFunction(context: Context, _contextName: String, name: String, argumen
 
 class MacroFunction(context: Context, _contextName: String, name: String, arguments: List[Argument], typ: Type, _modifier: Modifier, _body: Instruction) extends ConcreteFunction(context, _contextName, name, arguments, typ, _modifier, _body, false){
     val vari = context.push(name).getFreshVariable(JsonType)
+    var wasUsedWithJson = false
 
     override def call(args: List[Expression], ret: Variable = null, retSel: Selector = Selector.self, op: String = "=")(implicit ctx: Context): List[IRTree] = {
         val mapped = argMap(args).map((v,e) => (v, Utils.simplify(e)))
@@ -356,7 +358,7 @@ class MacroFunction(context: Context, _contextName: String, name: String, argume
         }
 
         if (Settings.macroConvertToLazy && mapped.forall((v,e) => isSimpleValue(e))){
-            val r = Compiler.compile(mapped.foldLeft(_body){case (block, (v, e)) => Utils.subst(block, "$("+v.name+")", e.toString())})
+            val r = Compiler.compile(mapped.foldLeft(Utils.substReturn(_body, ret)(!modifiers.hasAttributes("__returnCheck__"), retSel)){case (block, (v, e)) => Utils.subst(block, "$("+v.name+")", e.toString())})
             if (ret != null){
                 r ::: ret.assign(op, LinkedVariableValue(returnVariable))(context, retSel)
             }
@@ -365,6 +367,7 @@ class MacroFunction(context: Context, _contextName: String, name: String, argume
             }
         }
         else{
+            wasUsedWithJson = true
             if (!Settings.target.hasFeature("macro")) throw new Exception(f"Macro are not supported on your target. Missing lazy key word?")
             val r = mapped.flatMap((v,e) => vari.withKey("json."+v.name).assign("=", e)) ::: List(BlockCall(Settings.target.getFunctionName(fullName), fullName, f"with ${vari.getStorage()}"))
             if (ret != null){
@@ -378,17 +381,17 @@ class MacroFunction(context: Context, _contextName: String, name: String, argume
 
     def isSimpleValue(expr: Expression) = {
         expr match
-            case _: (IntValue | FloatValue | StringValue | BoolValue | JsonValue) => true
+            case _: (IntValue | FloatValue | StringValue | BoolValue | JsonValue | PositionValue | SelectorValue | TagValue | LinkedTagValue | NamespacedName) => true
             case NullValue => true
             case _ => false
     }
 
     override def generateArgument()(implicit ctx: Context):Unit = {
         super.generateArgument()
-        context.push(name).getAllVariable().filterNot(x => x == returnVariable || x == vari).map(x => x.makeJson(fullName))
+        context.push(name).getAllVariable(mutable.Set(), true).filterNot(x => x == returnVariable || x == vari).map(x => x.makeJson(_contextName))
     }
 
-    override def exists(): Boolean = Settings.target.hasFeature("macro")
+    override def exists(): Boolean = Settings.target.hasFeature("macro") && wasUsedWithJson
 }
 
 class MultiplexFunction(context: Context, _contextName: String, name: String, arguments: List[Argument], typ: Type) extends ConcreteFunction(context, _contextName, name, arguments, typ, objects.Modifier.newPrivate(), sl.InstructionList(List()), false){
@@ -509,7 +512,7 @@ class ClassFunction(_contextName: String, variable: Variable, function: Function
         var pre = List[IRTree]()
         val comp = if (variable.modifiers.isEntity){
             val vari = ctx.getFreshVariable(IntType)
-            pre = vari.assignForce(variable)
+            pre = vari.assignUnchecked(LinkedVariableValue(variable))
             vari
         }
         else{
@@ -526,6 +529,34 @@ class ClassFunction(_contextName: String, variable: Variable, function: Function
     }
 }
 
+class OptionalFunction(context: Context, variable: Variable, name: String, lib: String, fct: Identifier, arguments: List[Argument], typ: Type, _modifier: Modifier) extends Function(context, context.getPath()+"."+name, name, arguments, typ, _modifier){
+    override def exists()= false
+
+    override def getContent(): List[IRTree] = List()
+    override def getName(): String = name
+
+    def call(args2: List[Expression], ret: Variable = null, retSel: Selector = Selector.self, op: String = "=")(implicit ctx: Context): List[IRTree] = {
+        context.requestLibrary(lib)
+        val args = LinkedVariableValue(variable) :: args2
+        val function = context.getFunction(fct, args, List(), VoidType)
+        function.call(ret, retSel, op)(ctx)
+    }
+}
+
+class ExtensionFunction(context: Context, variable: Variable, fct: Function) extends Function(context, fct.contextName, fct.name, fct.arguments, fct.getType(), fct.modifiers){
+    minArgCount = getMinArgCount(arguments.drop(1))
+    maxArgCount = getMaxArgCount(arguments.drop(1))
+
+    override def exists()= false
+
+    override def getContent(): List[IRTree] = List()
+    override def getName(): String = fct.name
+
+    def call(args2: List[Expression], ret: Variable = null, retSel: Selector = Selector.self, op: String = "=")(implicit ctx: Context): List[IRTree] = {
+        val args = LinkedVariableValue(variable) :: args2
+        fct.call(args, ret, retSel, op)(ctx)
+    }
+}
 
 class CompilerFunction(context: Context, name: String, arguments: List[Argument], typ: Type, _modifier: Modifier, val body: (List[Expression], Context)=>(List[IRTree],Expression), val isValue: Boolean = true) extends Function(context, context.getPath()+"."+name, name, arguments, typ, _modifier){
     generateArgument()(context.push(name, this))

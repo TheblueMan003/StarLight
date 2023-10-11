@@ -98,6 +98,28 @@ case class IfScoreboardMatch(left: SBLink, min: Int, max: Int, statement: IRTree
     def getStatements = statement
     def withStatements(nstatement: IRTree): IRExecute = IfScoreboardMatch(left, min, max, nstatement, invert)
 }
+case class IfStorage(target: String, path: String, statement: IRTree, invert: Boolean = false) extends IRTree with IRExecute{
+    def condition={
+        if invert then 
+            f"unless data storage $target $path"
+        else
+            f"if data storage $target $path"
+    }
+    def getString(): String = {
+        "execute "+condition + (statement match
+            case a: IRExecute => " "+a.getExecuteString()
+            case _ => " run "+statement.getString()
+        )
+    }
+    def getExecuteString(): String = {
+        condition + (statement match
+            case a: IRExecute => " "+a.getExecuteString()
+            case _ => " run "+statement.getString()
+        )
+    }
+    def getStatements = statement
+    def withStatements(nstatement: IRTree): IRExecute = IfStorage(target, path, nstatement, invert)
+}
 case class IfEntity(selector: String, statement: IRTree, invert: Boolean = false) extends IRTree with IRExecute{
     def condition={
         if invert then 

@@ -77,6 +77,7 @@ object Utils{
             case ClassDecl(name, generics, block, modifier, parent, parentGenerics, interfaces, entity) => ClassDecl(name, generics, substReturn(block, to), modifier, parent, parentGenerics, interfaces, entity)
             case FunctionDecl(name, block, typ, args, typeargs, modifier) => FunctionDecl(name, substReturn(block, to), typ, args, typeargs, modifier)
             case PredicateDecl(name, args, block, modifier) => instr
+            case ExtensionDecl(name, block, modifier) => instr
             case TagDecl(name, values, modifier, typ) => instr
             case ForGenerate(key, provider, instr) => ForGenerate(key, provider, substReturn(instr, to))
             case ForEach(key, provider, instr) => ForEach(key, provider, substReturn(instr, to))
@@ -139,6 +140,7 @@ object Utils{
             case ClassDecl(name, generics, block, modifier, parent, parentGenerics, interfaces, entity) => ClassDecl(name, generics, subst(block, from, to), modifier, parent, parentGenerics, interfaces, entity)
             case FunctionDecl(name, block, typ, args, typeargs, modifier) => FunctionDecl(name, subst(block, from, to), typ, args, typeargs, modifier)
             case PredicateDecl(name, args, block, modifier) => PredicateDecl(name, args, block, modifier)
+            case ExtensionDecl(name, block, modifier) => ExtensionDecl(name, subst(block, from, to), modifier)
             case VariableDecl(name, _type, modifier, op, expr) => VariableDecl(name, _type, modifier, op, subst(expr, from, to))
             case TagDecl(name, values, modifier, typ) => TagDecl(name, values.map(subst(_, from, to)), modifier, typ)
             case ForGenerate(key, provider, instr) => ForGenerate(key, subst(provider, from, to), subst(instr, from, to))
@@ -178,7 +180,7 @@ object Utils{
             case With(expr, isAt, cond, block, elze) => With(subst(expr, from, to), subst(isAt, from, to), subst(cond, from, to), subst(block, from, to), subst(elze, from, to))
 
             case Sleep(time, continuation) => Sleep(subst(time, from, to), subst(continuation, from, to))
-            case Await(func, continuation) => Await(subst(func, from, to).asInstanceOf[FunctionCall], subst(continuation, from, to))
+            case Await(func, continuation) => Await(subst(func, from, to), subst(continuation, from, to))
             case Assert(condition, continuation) => Assert(subst(condition, from, to), subst(continuation, from, to))
             case Switch(cond, cases, cv) => Switch(subst(cond, from, to), cases.map{case x: SwitchCase => SwitchCase(subst(x.expr, from, to), subst(x.instr, from, to), subst(x.cond, from, to));
                                                                                     case x: SwitchForGenerate => SwitchForGenerate(x.key, subst(x.provider, from, to), SwitchCase(subst(x.instr.expr, from, to), subst(x.instr.instr, from, to), subst(x.instr.cond, from, to)));
@@ -215,6 +217,7 @@ object Utils{
             case IsType(value, typ) => IsType(subst(value, from, to), typ)
             case DotValue(left, right) => DotValue(subst(left, from, to), subst(right, from, to))
             case SequenceValue(left, right) => SequenceValue(subst(left, from, to), subst(right, from, to))
+            case SequencePostValue(left, right) => SequencePostValue(subst(left, from, to), subst(right, from, to))
             case ArrayGetValue(name, index) => ArrayGetValue(subst(name, from, to), index.map(subst(_, from, to)))
             case VariableValue(name, sel) => VariableValue(name.replaceAllLiterally(from, to), sel)
             case BinaryOperation(op, left, right) => BinaryOperation(op, subst(left, from, to), subst(right, from, to))
@@ -236,6 +239,7 @@ object Utils{
             case StructDecl(name, generics, block, modifier, parent) => StructDecl(name.replaceAllLiterally(from, to), generics, subst(block, from, to), modifier, parent)
             case ClassDecl(name, generics, block, modifier, parent, parentGenerics, interfaces, entity) =>
                 ClassDecl(name.replaceAllLiterally(from, to), generics, subst(block, from, to), modifier, parent, parentGenerics, interfaces, entity.map((k,v) => (k, subst(v, from, to))))
+            case ExtensionDecl(name, block, modifier) => ExtensionDecl(name, subst(block, from, to), modifier)
             case FunctionDecl(name, block, typ, args, typeargs, modifier) => {
                 if (args.exists(x => x.name == from)){
                     instr
@@ -290,7 +294,7 @@ object Utils{
             case With(expr, isAt, cond, block, elze) => With(subst(expr, from, to), subst(isAt, from, to), subst(cond, from, to), subst(block, from, to), subst(elze, from, to))
 
             case Sleep(time, continuation) => Sleep(subst(time, from, to), subst(continuation, from, to))
-            case Await(func, continuation) => Await(subst(func, from, to).asInstanceOf[FunctionCall], subst(continuation, from, to))
+            case Await(func, continuation) => Await(subst(func, from, to), subst(continuation, from, to))
             case Assert(cond, continuation) => Assert(subst(cond, from, to), subst(continuation, from, to))
             case Switch(cond, cases, cv) => Switch(subst(cond, from, to), cases.map{case x: SwitchCase => SwitchCase(subst(x.expr, from, to), subst(x.instr, from, to), subst(x.cond, from, to));
                                                                                     case x: SwitchForGenerate => SwitchForGenerate(x.key, subst(x.provider, from, to), SwitchCase(subst(x.instr.expr, from, to), subst(x.instr.instr, from, to), subst(x.instr.cond, from, to)));
@@ -318,6 +322,7 @@ object Utils{
             case LinkedTagValue(tag) => instr
             case DotValue(left, right) => DotValue(subst(left, from, to), subst(right, from, to))
             case SequenceValue(left, right) => SequenceValue(subst(left, from, to), subst(right, from, to))
+            case SequencePostValue(left, right) => SequencePostValue(subst(left, from, to), subst(right, from, to))
             case RawJsonValue(value) => instr
             case EnumIntValue(value) => instr
             case ClassValue(value) => instr
@@ -368,6 +373,7 @@ object Utils{
             case Package(name, block) => Package(name, subst(block, from, to))
             case StructDecl(name, generics, block, modifier, parent) => StructDecl(name, generics, subst(block, from, to), modifier, parent)
             case ClassDecl(name, generics, block, modifier, parent, parentGenerics, interfaces, entity) => ClassDecl(name, generics, subst(block, from, to), modifier, parent, parentGenerics, interfaces, entity)
+            case ExtensionDecl(name, block, modifier) => ExtensionDecl(name, subst(block, from, to), modifier)
             case FunctionDecl(name, block, typ, args, typeargs, modifier) => {
                 if (args.exists(x => x.name == from)){
                     instr
@@ -414,7 +420,7 @@ object Utils{
             case Execute(typ, expr, block) => Execute(typ, expr.map(subst(_, from, to)), subst(block, from, to))
             case With(expr, isAt, cond, block, elze) => With(subst(expr, from, to), subst(isAt, from, to), subst(cond, from, to), subst(block, from, to), subst(elze, from, to))
             case Sleep(time, continuation) => Sleep(subst(time, from, to), subst(continuation, from, to))
-            case Await(func, continuation) => Await(subst(func, from, to).asInstanceOf[FunctionCall], subst(continuation, from, to))
+            case Await(func, continuation) => Await(subst(func, from, to), subst(continuation, from, to))
             case Assert(cond, continuation) => Assert(subst(cond, from, to), subst(continuation, from, to))
             case Switch(cond, cases, cv) => Switch(subst(cond, from, to), cases.map{case x: SwitchCase => SwitchCase(subst(x.expr, from, to), subst(x.instr, from, to), x.cond);
                                                                                     case x: SwitchForGenerate => SwitchForGenerate(x.key, subst(x.provider, from, to), SwitchCase(subst(x.instr.expr, from, to), subst(x.instr.instr, from, to), x.instr.cond));
@@ -428,6 +434,7 @@ object Utils{
             case Package(name, block) => Package(name, rmFunctions(block))
             case StructDecl(name, generics, block, modifier, parent) => StructDecl(name, generics, rmFunctions(block), modifier, parent)
             case ClassDecl(name, generics, block, modifier, parent, parentGenerics, interfaces, entity) => ClassDecl(name, generics, rmFunctions(block), modifier, parent, parentGenerics, interfaces, entity)
+            case ExtensionDecl(name, block, modifier) => ExtensionDecl(name, rmFunctions(block), modifier)
             case fct: FunctionDecl => if predicate(fct) then InstructionList(List()) else instr
             case PredicateDecl(name, args, block, modifier) => instr
             case TagDecl(name, values, modifier, typ) => instr
@@ -499,6 +506,7 @@ object Utils{
             case Package(name, block) => Package(name, fix(block))
             case StructDecl(name, generics, block, modifier, parent) => StructDecl(name, generics, fix(block), modifier, parent)
             case ClassDecl(name, generics, block, modifier, parent, parentGenerics, interfaces, entity) => ClassDecl(name, generics, fix(block), modifier, parent, parentGenerics.map(fix), interfaces.map(x => (x._1, x._2.map(fix(_)))), entity)
+            case ExtensionDecl(name, block, modifier) => ExtensionDecl(name, fix(block), modifier)
             case FunctionDecl(name, block, typ, args, typeargs, modifier) => FunctionDecl(name, fix(block)(context, ignore ++ args.map(a => Identifier.fromString(a.name)).toSet), typ, args, typeargs, modifier)
             case PredicateDecl(name, args, block, modifier) => PredicateDecl(name, args, fix(block), modifier)
             case EnumDecl(name, fields, values, modifier) => EnumDecl(name, fields, values.map(v => EnumValue(v.name, v.fields.map(fix(_)))), modifier)
@@ -517,7 +525,7 @@ object Utils{
                 InstructionBlock(list.map(fix(_)(context, set2)))
             }
 
-            case TemplateDecl(name, block, modifier, parent, generics, parentGenerics) => TemplateDecl(name, fix(block), modifier, parent, generics, parentGenerics.map(fix(_)(context, ignore ++ generics.map(Identifier.fromString(_)).toSet)))
+            case TemplateDecl(name, block, modifier, parent, generics, parentGenerics) => TemplateDecl(name, fix(block), modifier, parent, generics, parentGenerics.map(fix(_)(context, ignore ++ generics.map(a => Identifier.fromString(a.name)).toSet)))
             case TemplateUse(iden, name, instr, values) => TemplateUse(iden, name, fix(instr), values.map(fix(_)))
             case TypeDef(defs) => TypeDef(defs.map{case (name, typ, ver) => (name, fix(typ), ver)})
 
@@ -548,7 +556,7 @@ object Utils{
             case Execute(typ, expr, block) => Execute(typ, expr.map(fix(_)), fix(block))
             case With(expr, isAt, cond, block, elze) => With(fix(expr), fix(isAt), fix(cond), fix(block), fix(elze))
             case Sleep(time, continuation) => Sleep(fix(time), fix(continuation))
-            case Await(func, continuation) => Await(fix(func).asInstanceOf[FunctionCall], fix(continuation))
+            case Await(func, continuation) => Await(fix(func), fix(continuation))
             case Assert(cond, continuation) => Assert(fix(cond), fix(continuation))
             case Switch(cond, cases, cv) => Switch(fix(cond), cases.map{case x: SwitchCase => SwitchCase(fix(x.expr), fix(x.instr), fix(x.cond));
                                                                         case x: SwitchForGenerate => SwitchForGenerate(x.key, fix(x.provider), SwitchCase(fix(x.instr.expr), fix(x.instr.instr), fix(x.instr.cond)));
@@ -596,6 +604,7 @@ object Utils{
             case PositionValue(x, y, z) => PositionValue(fix(x), fix(y), fix(z))
             case DotValue(left, right) => DotValue(fix(left), fix(right))
             case SequenceValue(left, right) => SequenceValue(fix(left), fix(right))
+            case SequencePostValue(left, right) => SequencePostValue(fix(left), fix(right))
             case JsonValue(content) => JsonValue(fix(content))
             case ArrayGetValue(name, index) => ArrayGetValue(fix(name), index.map(fix(_)))
             case VariableValue(name, sel) => if ignore.contains(name) then instr else
@@ -763,7 +772,7 @@ object Utils{
             }
     }
 
-    def typeof(expr: Expression)(implicit context: Context): Type = {
+    def typeof(expr: Expression)(implicit context: Context, noError: Boolean = false): Type = {
         expr match
             case IntValue(value) => IntType
             case FloatValue(value) => FloatType
@@ -787,6 +796,7 @@ object Utils{
                 typeof(vari)
             }
             case SequenceValue(left, right) => typeof(right)
+            case SequencePostValue(left, right) => typeof(left)
             case ArrayGetValue(name, index) => {
                 typeof(name) match
                     case ArrayType(inner, size) => inner
@@ -798,6 +808,13 @@ object Utils{
                             case head::Nil => sub.foldRight(sub.head)((a,b) => combineType(a, b))
                             case other => throw new Exception(f"Cannot access tuple with $other")
                         }
+                    case StructType(struct, sub) => {
+                        simplify(name) match
+                            case LinkedVariableValue(vari, selector) => typeof(FunctionCallValue(VariableValue(vari.fullName+"."+"__get__"), index, List(), selector))
+                            case other => throw new Exception(f"Cannot access struct with $other")
+                    }
+                    case StringType => StringType
+                        
                     case other => throw new Exception(f"Illegal array access of $name of type $other")
             }
             case LinkedFunctionValue(fct) => FuncType(fct.arguments.map(_.typ), fct.getType())
@@ -821,7 +838,14 @@ object Utils{
                     }
                     case Some(value) => value.getType()
             }
-            case BinaryOperation(op, left, right) => combineType(op, typeof(left), typeof(right), expr)
+            case BinaryOperation(op, left, right) => 
+                try{
+                    combineType(op, typeof(left), typeof(right), expr)
+                }
+                catch{
+                    case e: Exception => 
+                        if noError then AnyType else throw new Exception(f"Cannot combine types ${typeof(left)} and ${typeof(right)} in $expr")
+                }
             case TernaryOperation(left, middle, right) => typeof(middle)
             case UnaryOperation(op, left) => BoolType
             case TupleValue(values) => TupleType(values.map(typeof(_)))
@@ -842,6 +866,8 @@ object Utils{
             case RangeValue(min, max, delta) => RangeType(typeof(min))
             case LinkedVariableValue(vari, sel) => vari.getType()
             case ForSelect(expr, filter, selector) => BoolType
+            case _ if noError => AnyType
+            case other => throw new Exception(f"Cannot get type of $other")
     }
     def forceString(expr: Expression)(implicit context: Context): String = {
         expr match
@@ -1022,6 +1048,7 @@ object Utils{
                 }
 
             case SequenceValue(left, right) => SequenceValue(left, simplify(right))
+            case SequencePostValue(left, right) => SequencePostValue(simplify(left), right)
             case UnaryOperation(op, left) => {
                 val inner = Utils.simplify(left)
                 (op,inner) match {
@@ -1079,9 +1106,8 @@ object Utils{
                     case (StringValue(a), JsonValue(JsonDictionary(dic))) if op == "in" => BoolValue(dic.contains(a))
                     case (StringValue(a), JsonValue(JsonArray(arr))) if op == "in" => BoolValue(arr.contains(StringValue(a)))
                     case (StringValue(a), StringValue(b)) if op == "in" => BoolValue(b.contains(a))
-                    //case (sel: SelectorValue, other) if op == "in" => SelectorValue(getSelector(BinaryOperation(op, nl, nr), true)._3)
-                    //case (sel: SelectorValue, other) if op == "not in" => SelectorValue(getSelector(BinaryOperation(op, nl, nr), true)._3)
                     case (StringValue(a), IntValue(b)) if op == "*" => StringValue(a * b)
+                    case (IntValue(b), StringValue(a)) if op == "*" => StringValue(a * b)
                     case (StringValue(a), JsonValue(JsonString(b))) => StringValue(combine(op, a, b))
                     case (JsonValue(JsonString(a)), StringValue(b)) => StringValue(combine(op, a, b))
                     case (JsonValue(a), JsonValue(b)) => JsonValue(combine(op, a, b))
@@ -1739,17 +1765,34 @@ object Utils{
                         val e = context.getFreshVariable(EntityType)
                         val selector = SelectorValue(JavaSelector("@e", List(("tag", SelectorIdentifier(clazz.getTag())))))
 
-                        (
-                            Compiler.compile(With(
-                                selector, 
-                                BoolValue(false), 
-                                BinaryOperation("==", LinkedVariableValue(vari, sel), LinkedVariableValue(context.root.push("object").getVariable("__ref"))),
-                                VariableAssigment(List((Right(e), Selector.self)), "=", SelectorValue(Selector.self)),
-                                null
-                            )),
-                            clazz.context.push(clazz.name),
-                            JavaSelector("@e", List(("tag", SelectorIdentifier(e.tagName))))
-                        )
+                        if (vari.modifiers.isEntity){
+                            val tmp = context.getFreshVariable(ClassType(clazz, sub))
+                            (
+                                tmp.assign("=", LinkedVariableValue(vari, sel)):::
+                                Compiler.compile(With(
+                                    selector, 
+                                    BoolValue(false), 
+                                    BinaryOperation("==", LinkedVariableValue(tmp, sel), LinkedVariableValue(context.root.push("object").getVariable("__ref"))),
+                                    VariableAssigment(List((Right(e), Selector.self)), "=", SelectorValue(Selector.self)),
+                                    null
+                                )),
+                                clazz.context.push(clazz.name),
+                                JavaSelector("@e", List(("tag", SelectorIdentifier(e.tagName))))
+                            )
+                        }
+                        else{
+                            (
+                                Compiler.compile(With(
+                                    selector, 
+                                    BoolValue(false), 
+                                    BinaryOperation("==", LinkedVariableValue(vari, sel), LinkedVariableValue(context.root.push("object").getVariable("__ref"))),
+                                    VariableAssigment(List((Right(e), Selector.self)), "=", SelectorValue(Selector.self)),
+                                    null
+                                )),
+                                clazz.context.push(clazz.name),
+                                JavaSelector("@e", List(("tag", SelectorIdentifier(e.tagName))))
+                            )
+                        }
                     }
                     case _ => throw new Exception(f"Not a selector: $expr")
             case TupleValue(values) => ???
@@ -1761,9 +1804,9 @@ object Utils{
             case BinaryOperation("in", left, right) => 
                 val (p1, ctx1, s1) = getSelector(left)
                 right match{
-                    case Tuple(lst) => {
+                    case TupleValue(lst) => {
                         val c2 = lst.map(getSelector(_))
-                        (p1 ::: c2.map(_._1), ctx2, c2.foldLeft(s1)((a,b)=>a.merge(b._3)))
+                        (p1 ::: c2.flatMap(_._1), ctx1, c2.foldLeft(s1)((a,b)=>a.merge(b._3)))
                     }
                     case other => {
                         val (p2, ctx2, s2) = getSelector(right)
@@ -1774,9 +1817,9 @@ object Utils{
             case BinaryOperation("not in", left, right) => 
                 val (p1, ctx1, s1) = getSelector(left)
                 right match{
-                    case Tuple(lst) => {
+                    case TupleValue(lst) => {
                         val c2 = lst.map(getSelector(_))
-                        (p1 ::: c2.map(_._1), ctx2, c2.foldLeft(s1)((a,b)=>a.merge(b._3.invert())))
+                        (p1 ::: c2.flatMap(_._1), ctx1, c2.foldLeft(s1)((a,b)=>a.merge(b._3.invert())))
                     }
                     case other => {
                         val (p2, ctx2, s2) = getSelector(right)

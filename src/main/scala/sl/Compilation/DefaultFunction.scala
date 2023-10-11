@@ -318,7 +318,8 @@ object DefaultFunction{
                     }
                     case other => throw new Exception(f"Illegal Arguments $other for getEntitySelector")
                 }
-            }
+            },
+            false
         ))
         ctx.addFunction("getContextName", CompilerFunction(ctx, "getContextName", 
             List(),
@@ -738,6 +739,44 @@ object DefaultFunction{
                 },
                 false
             ))
+        ctx.addFunction("insertMacro", CompilerFunction(ctx, "insertMacro", 
+                List(Argument("name", MCObjectType, None), Argument("vari", MCObjectType, None), Argument("cmd", FuncType(List(), VoidType), None)),
+                VoidType,
+                Modifier.newPublic(),
+                (args: List[Expression],ctx: Context) => {
+                    args match{
+                        case VariableValue(args2, sel1):: s ::LambdaValue(arg, instr, ctx2)::Nil => {
+                            val name = ctx.getFreshLambdaName()
+                            val args = List(Argument(args2.toString().replace("$",""), MCObjectType, None))
+                            val mod = Modifier.newPublic()
+                            mod.isMacro = true
+                            val gen = InstructionList(List(
+                                FunctionDecl(name, instr, VoidType, args, List(), mod),
+                                FunctionCall(Identifier.fromString(name), List(s), List())
+                            ))
+                            val ret = Compiler.compile(gen)(ctx2)
+                            (ret, NullValue)
+                        }
+                        case TupleValue(names):: TupleValue(replaces) ::LambdaValue(arg, instr, ctx2)::Nil => {
+                            val name = ctx.getFreshId()
+                            val args = names.map{
+                                case VariableValue(name, sel1) => Argument(name.toString().replace("$",""), MCObjectType, None)
+                                case other => throw new Exception("Illegal Arguments")
+                            }
+                            val mod = Modifier.newPublic()
+                            mod.isMacro = true
+                            val gen = InstructionList(List(
+                                FunctionDecl(name, instr, VoidType, args, List(), mod),
+                                FunctionCall(Identifier.fromString(name), replaces, List())
+                            ))
+                            val ret = Compiler.compile(gen)(ctx2)
+                            (ret, NullValue)
+                        }
+                        case other => throw new Exception(f"Illegal Arguments $other for macro")
+                    }
+                },
+                false
+            ))
         ctx.addFunction("print", CompilerFunction(ctx, "print", 
                 List(Argument("name", MCObjectType, None)),
                 VoidType,
@@ -782,6 +821,14 @@ object DefaultFunction{
                     args match{
                         case StringValue(src)::StringValue(from)::StringValue(to)::Nil => {
                             (List(), StringValue(src.replace(from, to)))
+                        }
+                        case RawJsonValue(value)::StringValue(from)::StringValue(to)::Nil => {
+                            (List(), RawJsonValue(
+                                value.map{
+                                    case PrintString(text, color, modifier) => PrintString(text.replace(from, to), color, modifier)
+                                    case other => other
+                                }
+                            ))
                         }
                         case other => throw new Exception(f"Illegal Arguments $other for replace")
                     }
