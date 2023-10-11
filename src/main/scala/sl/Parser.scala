@@ -1889,6 +1889,13 @@ object Parser extends StandardTokenParsers {
         t
       )
     }
+    | identLazy2 ~ typeVariables ~ block ^^ { case f ~ t ~ b =>
+      FunctionCallValue(
+        VariableValue(f),
+        List(LambdaValue(List(), b, null)),
+        t
+      )
+    }
       | identLazy2 ~ rep1(
         (typeVariables <~ "(") ~ repsep(exprNoTuple, ",") <~ ")"
       ) ^^ { case f ~ a =>

@@ -3,9 +3,8 @@ package test
 import utils.Process
 
 def test(){
-    Process test{
-        def main(){
-            /say hi
-        }
+    var a = Process{
+        /say hi
     }
+    a.stop()
 }
