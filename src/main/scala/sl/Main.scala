@@ -17,7 +17,7 @@ import scala.collection.mutable
 import java.awt.RenderingHints.Key
 
 object Main {
-  var version = List(0, 11, 0)
+  var version = List(0, 12, 0)
   private var lastIR: List[IRFile] = null
   private var lastContxt: Context = null
   private var interpreter: Interpreter = null
