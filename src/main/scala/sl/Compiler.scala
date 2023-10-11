@@ -467,16 +467,28 @@ object Compiler{
                 }
                 case FunctionCall(name, args, typeargs) => {
                     context.tryGetVariable(name) match
-                        case Some(vari) if vari.getType().isInstanceOf[StructType] => {
+                        case Some(vari) if vari.getType().isInstanceOf[StructType] || vari.getType().isInstanceOf[ClassType] => {
                             Compiler.compile(FunctionCall(name.child("__apply__"), args, typeargs))
                         }
                         case other => {
-                            val uargs = args.map(Utils.simplify)
-                            val (fct,cargs) = context.getFunction(name, uargs, typeargs, VoidType)
-                            if (fct != null && fct.modifiers.hasAttributes("compileAtCall")){
-                                fct.asInstanceOf[ConcreteFunction].compile()
+                            val templ = context.tryGetTemplate(name)
+                            if (templ != None){
+                                val LambdaValue(argsFct, instr, context) = args.last
+                                val tname = context.getFreshLambdaName()
+                                val fctName = templ.get.modifiers.getAttributesString("main", () => "main")
+                                val boot = templ.get.modifiers.getAttributesString("boot", () => "start")
+
+                                val r = TemplateUse(name, tname, InstructionBlock(List(FunctionDecl(fctName, instr, VoidType, List(), List(), Modifier.newPublic()))), args.dropRight(1))
+                                Compiler.compile(r) ::: Compiler.compile(FunctionCall(Identifier.fromString(f"$tname.$boot"), List(), List()))
                             }
-                            (fct, cargs).call()
+                            else{
+                                val uargs = args.map(Utils.simplify)
+                                val (fct,cargs) = context.getFunction(name, uargs, typeargs, VoidType)
+                                if (fct != null && fct.modifiers.hasAttributes("compileAtCall")){
+                                    fct.asInstanceOf[ConcreteFunction].compile()
+                                }
+                                (fct, cargs).call()
+                            }
                     }
                 }
                 case LinkedFunctionCall(name, args, ret) => {

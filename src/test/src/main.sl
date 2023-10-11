@@ -1,11 +1,11 @@
 package test
 
-def macro test(int a){
-    /say $(a)
-}
+import utils.Process
 
-def lol(){
-    int c
-    test(5)
-    test(c)
+def test(){
+    Process test{
+        def main(){
+            /say hi
+        }
+    }
 }
