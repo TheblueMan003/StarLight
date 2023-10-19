@@ -167,35 +167,11 @@ object StringType extends Type {
       variable: Variable
   )(implicit context: Context): Unit = {
     super.generateExtensionFunction(variable)
-    context.addFunction(
-      "length",
-      OptionalFunction(context, variable, "toString", "standard.string", Identifier.fromString("standard.string.length"), List(), StringType, Modifier.newPublic())
-    )
-    context.addFunction(
-      "contains",
-      OptionalFunction(context, variable, "toString", "standard.string", Identifier.fromString("standard.string.contains"), List(Argument("other", StringType, None)), BoolType, Modifier.newPublic())
-    )
-    context.addFunction(
-      "startsWith",
-      OptionalFunction(context, variable, "toString", "standard.string", Identifier.fromString("standard.string.startsWith"), List(Argument("other", StringType, None)), BoolType, Modifier.newPublic())
-    )
-    context.addFunction(
-      "endsWith",
-      OptionalFunction(context, variable, "toString", "standard.string", Identifier.fromString("standard.string.endsWith"), List(Argument("other", StringType, None)), BoolType, Modifier.newPublic())
-    )
-    context.addFunction(
-      "reverse",
-      OptionalFunction(context, variable, "toString", "standard.string", Identifier.fromString("standard.string.reverse"), List(), StringType, Modifier.newPublic())
-    )
-    context.addFunction(
-      "replace",
-      OptionalFunction(context, variable, "toString", "standard.string", Identifier.fromString("standard.string.replace"), List(Argument("other", StringType, None), Argument("to", StringType, None)), StringType, Modifier.newPublic())
-    )
   }
   override def isDirectComparable(): Boolean = false
-  override def isDirectEqualitable(): Boolean = false
+  override def isDirectEqualitable(): Boolean = true
   override def isComparaisonSupported(): Boolean = false
-  override def isEqualitySupported(): Boolean = false
+  override def isEqualitySupported(): Boolean = true
 }
 object BoolType extends Type {
   override def toString(): String = "bool"
@@ -212,6 +188,8 @@ object BoolType extends Type {
   override def isSubtypeOf(other: Type)(implicit context: Context): Boolean = {
     other match
       case BoolType     => true
+      case IntType      => true
+      case FloatType    => true
       case AnyType      => true
       case MCObjectType => true
       case _            => false

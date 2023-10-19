@@ -8,7 +8,7 @@ import objects.Identifier
 import scala.collection.parallel.CollectionConverters._
 
 object ContextBuilder{
-    val defaultLib = List("__init__")
+    val defaultLib = List("__init__", "__extensions__")
 
     def build(name: String, insts: List[Instruction]):Context = {
         if (Settings.experimentalMultithread){

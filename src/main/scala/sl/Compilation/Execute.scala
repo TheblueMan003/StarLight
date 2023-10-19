@@ -333,6 +333,24 @@ object Execute{
             case BinaryOperation(op, left, VariableValue(right, sel)) =>
                 getIfCase(BinaryOperation(op, left, context.resolveVariable(VariableValue(right, sel))))
 
+            case BinaryOperation(op @ ("==" | "!="), LinkedVariableValue(left, sel), StringValue(value)) if left.getType() == StringType => 
+                (List(), List(IFValueCase(BinaryOperation(op, LinkedVariableValue(left, sel), StringValue(value)))))
+
+            case BinaryOperation(op @ ("==" | "!="), StringValue(value), LinkedVariableValue(left, sel)) if left.getType() == StringType => 
+                (List(), List(IFValueCase(BinaryOperation(op, LinkedVariableValue(left, sel), StringValue(value)))))
+
+            case BinaryOperation("in", left, right) if Utils.typeof(left) == StringType || Utils.typeof(right) == StringType => 
+                context.requestLibrary("standard.string")
+                getIfCase(FunctionCallValue(VariableValue("standard.string.contains", Selector.self), List(left, right), List()))
+
+            case BinaryOperation("==", left, right) if Utils.typeof(left) == StringType || Utils.typeof(right) == StringType => 
+                context.requestLibrary("standard.string")
+                getIfCase(FunctionCallValue(VariableValue("standard.string.equals", Selector.self), List(left, right), List()))
+
+            case BinaryOperation("!=", left, right) if Utils.typeof(left) == StringType || Utils.typeof(right) == StringType => 
+                context.requestLibrary("standard.string")
+                getIfCase(UnaryOperation("!", FunctionCallValue(VariableValue("standard.string.equals", Selector.self), List(left, right), List())))
+
             // Tuple
             // Float with int
             case BinaryOperation(op @ ("==" | ">" | "<" | ">=" | "<="), LinkedVariableValue(left, sel1), LinkedVariableValue(right, sel2))
@@ -440,6 +458,9 @@ object Execute{
                 if left.hasIntValue() && right.getType().isDirectEqualitable() && checkComparaison(Utils.typeof(left), right.getType())=> 
                     checkComparaisonError(right.getType(), Utils.typeof(left), expr)
                     (List(), List(IFValueCase(expr)))
+
+
+            
 
 
             case BinaryOperation("==", LinkedVariableValue(left, sel), NullValue) 
@@ -550,24 +571,6 @@ object Execute{
             case BinaryOperation("!=", LinkedFunctionValue(left: ConcreteFunction), LinkedVariableValue(right, sel))
                 if !right.getType().isEqualitySupported() && !right.getType().isComparaisonSupported() => 
                     (List(), List(IFNotValueCase(IFValueCase(BinaryOperation("==", LinkedVariableValue(right, sel), IntValue(left.getMuxID()))))))
-
-            case BinaryOperation(op @ ("==" | "!="), LinkedVariableValue(left, sel), StringValue(value)) if left.getType() == StringType => 
-                (List(), List(IFValueCase(BinaryOperation(op, LinkedVariableValue(left, sel), StringValue(value)))))
-
-            case BinaryOperation(op @ ("==" | "!="), StringValue(value), LinkedVariableValue(left, sel)) if left.getType() == StringType => 
-                (List(), List(IFValueCase(BinaryOperation(op, LinkedVariableValue(left, sel), StringValue(value)))))
-
-            case BinaryOperation("in", left, right) if Utils.typeof(left) == StringType || Utils.typeof(right) == StringType => 
-                context.requestLibrary("standard.string")
-                getIfCase(FunctionCallValue(VariableValue("standard.string.contains", Selector.self), List(left, right), List()))
-
-            case BinaryOperation("==", left, right) if Utils.typeof(left) == StringType || Utils.typeof(right) == StringType => 
-                context.requestLibrary("standard.string")
-                getIfCase(FunctionCallValue(VariableValue("standard.string.equals", Selector.self), List(left, right), List()))
-
-            case BinaryOperation("!=", left, right) if Utils.typeof(left) == StringType || Utils.typeof(right) == StringType => 
-                context.requestLibrary("standard.string")
-                getIfCase(UnaryOperation("!", FunctionCallValue(VariableValue("standard.string.equals", Selector.self), List(left, right), List())))
 
             // Error Cases
             case BinaryOperation(">" | "<" | ">=" | "<=" | "==" | "!=", LinkedVariableValue(left, sel), right) 
@@ -720,11 +723,11 @@ object Execute{
                 if Settings.metaVariable.find(_._1 == name.toString()).get._2() then (List(), List(IFTrue)) else (List(), List(IFFalse))
             }
             case FunctionCallValue(name, args, typeargs, sel) if name.toString() == "Compiler.isEqualitySupported" => {
-                val check = typeargs.head.isEqualitySupported()
+                val check = context.getType(typeargs.head).isEqualitySupported()
                 if check then (List(), List(IFTrue)) else (List(), List(IFFalse))
             }
             case FunctionCallValue(name, args, typeargs, sel) if name.toString() == "Compiler.isComparaisonSupported" => {
-                val check = typeargs.head.isComparaisonSupported()
+                val check = context.getType(typeargs.head).isComparaisonSupported()
                 if check then (List(), List(IFTrue)) else (List(), List(IFFalse))
             }
             case FunctionCallValue(name, args, typeargs, sel) if name.toString() == "Compiler.isVariable" => {

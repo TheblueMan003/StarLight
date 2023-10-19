@@ -26,6 +26,19 @@ object Main {
 
   def main(args: Array[String]): Unit = {
     Locale.setDefault(Locale.US)
+    try{
+      Library.Downloader.download("https://raw.githubusercontent.com/TheblueMan003/StarLight/main/version.txt", "bin/version.txt")
+      val newVersion = Utils.getFileLines("bin/version.txt").head.split("\\.").map(_.toInt)
+      if (newVersion(0) > version(0) || newVersion(1) > version(1) || newVersion(2) > version(2)){
+        Reporter.warning(f"New version available: ${newVersion(0)}.${newVersion(1)}.${newVersion(2)}")
+      }
+    }
+    catch{
+      case e => {
+        Reporter.error("Failled to check for new version")
+      }
+    }
+
     if (args.length == 0) {
       mainLoop()
     } else {

@@ -743,8 +743,9 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
             addFunction(name.toString(), function)
         }
         else{
+            val head = name.head()
             val tail = name.drop()
-            addFunction(tail, function)
+            push(head).addFunction(tail, function)
         }
     }
     def addFunction(name: String, function: Function): Function = synchronized{
@@ -1158,15 +1159,15 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
                 Some(value)
             }
     }
-    protected def tryGetElementNoCheck[T](mapGetter: (Context)=>mutable.Map[String, T])(identifier: Identifier, down: Boolean = false)(depth: Int = 0): Option[T] = {
+    protected def tryGetElementNoCheck[T](mapGetter: (Context)=>mutable.Map[String, T])(identifier: Identifier, down: Boolean = false, up: Boolean = false)(depth: Int = 0): Option[T] = {
         if (depth > 200)return None
-        val value = tryGetElementInner(mapGetter)(identifier, down)(depth + 1)
+        val value = tryGetElementInner(mapGetter)(identifier, down, up)(depth + 1)
         value match
-            case None => inheritted.map(_.tryGetElementNoCheck(mapGetter)(identifier, down)(depth + 1)).filter(x => x != None).headOption.getOrElse(None)
+            case None => inheritted.map(_.tryGetElementNoCheck(mapGetter)(identifier, down, up)(depth + 1)).filter(x => x != None).headOption.getOrElse(None)
             case Some(_) => value
     }
 
-    private def tryGetElementInner[T](mapGetter: (Context)=>mutable.Map[String, T])(identifier: Identifier, down: Boolean = false)(depth: Int = 0): Option[T] = {
+    private def tryGetElementInner[T](mapGetter: (Context)=>mutable.Map[String, T])(identifier: Identifier, down: Boolean = false, up: Boolean = false)(depth: Int = 0): Option[T] = {
         val map = mapGetter(this)
 
         // Check if single word
@@ -1178,7 +1179,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
             }
             // Check parent
             else if (parent != null && !down){
-                parent.tryGetElementNoCheck(mapGetter)(identifier, down)(depth + 1)
+                parent.tryGetElementNoCheck(mapGetter)(identifier, down, true)(depth + 1)
             }
             else{
                 None
@@ -1187,32 +1188,32 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
         else{
             // Check if child has begin
             if (child.contains(identifier.head())){
-                val ret = child(identifier.head()).tryGetElementNoCheck(mapGetter)(identifier.drop(), true)(depth + 1)
+                val ret = child(identifier.head()).tryGetElementNoCheck(mapGetter)(identifier.drop(), true, up)(depth + 1)
                 if (ret != None) return ret
             }
             // Check parent
             if (parent != null && !down){
-                val ret = parent.tryGetElementNoCheck(mapGetter)(identifier, down)(depth + 1)
+                val ret = parent.tryGetElementNoCheck(mapGetter)(identifier, down, true)(depth + 1)
                 if (ret != None) return ret
             }
             if (name == identifier.head() && child.contains(identifier.drop().head())){
-                val ret = child(identifier.drop().head()).tryGetElementNoCheck(mapGetter)(identifier.drop().drop(), true)(depth + 1)
+                val ret = child(identifier.drop().head()).tryGetElementNoCheck(mapGetter)(identifier.drop().drop(), true, up)(depth + 1)
                 if (ret != None) return ret
             }
-            if (root == this && child.contains(identifier.head())){
-                val ret = child(identifier.head()).tryGetElementNoCheck(mapGetter)(identifier, true)(depth + 1)
+            /*if (root == this && child.contains(identifier.head())){
+                val ret = child(identifier.head()).tryGetElementNoCheck(mapGetter)(identifier, true, up)(depth + 1)
                 if (ret != None) return ret
-            }
+            }*/
             None
         }
     }
 
-    private def getElementList[T](mapGetter: (Context)=>mutable.Map[String, List[T]])(identifier: Identifier, down: Boolean = false): List[T] = {
-        val value = getElementListInner(mapGetter)(identifier, down)
-        (inheritted.flatMap(_.getElementList(mapGetter)(identifier, down)) ::: value).distinct
+    private def getElementList[T](mapGetter: (Context)=>mutable.Map[String, List[T]])(identifier: Identifier, down: Boolean = false, up: Boolean = false): List[T] = {
+        val value = getElementListInner(mapGetter)(identifier, down, up)
+        (inheritted.flatMap(_.getElementList(mapGetter)(identifier, down, up)) ::: value).distinct
     }
 
-    private def getElementListInner[T](mapGetter: (Context)=>mutable.Map[String, List[T]])(identifier: Identifier, down: Boolean = false): List[T] = {
+    private def getElementListInner[T](mapGetter: (Context)=>mutable.Map[String, List[T]])(identifier: Identifier, down: Boolean = false, up: Boolean = false): List[T] = {
         val map = mapGetter(this)
         // Check if single word
         if (identifier.isSingleton()){
@@ -1223,7 +1224,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
             }
             // Check parent
             if (parent != null && !down){
-                lst = lst ::: parent.getElementList(mapGetter)(identifier, down)
+                lst = lst ::: parent.getElementList(mapGetter)(identifier, down, true)
             }
 
             lst
@@ -1232,18 +1233,18 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
             var lst = List[T]()
             // Check if child has begin
             if (child.contains(identifier.head())){
-                lst = lst ::: child(identifier.head()).getElementList(mapGetter)(identifier.drop(), true)
+                lst = lst ::: child(identifier.head()).getElementList(mapGetter)(identifier.drop(), true, up)
             }
             // Check parent
-            if (parent != null && !down){
-                lst = lst ::: parent.getElementList(mapGetter)(identifier, down)
+            if (parent != null && !down){                
+                lst = lst ::: parent.getElementList(mapGetter)(identifier, down, true)
             }
-            if (name == identifier.head() && child.contains(identifier.drop().head())){
-                lst = lst ::: child(identifier.drop().head()).getElementList(mapGetter)(identifier.drop().drop(), true)
+            if (name == identifier.head() && child.contains(identifier.drop().head()) && root == this){
+                lst = lst ::: child(identifier.drop().head()).getElementList(mapGetter)(identifier.drop().drop(), true, up)
             }
-            if (root == this && child.contains(identifier.head())){
-                lst = lst ::: child(identifier.head()).getElementList(mapGetter)(identifier, true)
-            }
+            /*if (root == this && child.contains(identifier.head())){
+                lst = lst ::: child(identifier.head()).getElementList(mapGetter)(identifier, true, up)
+            }*/
             lst
         }
     }

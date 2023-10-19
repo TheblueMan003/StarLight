@@ -312,10 +312,10 @@ case class StringCopy(target: StorageVariable, value: StorageVariable, start: In
             s"data modify $target set string $value $start"
         }
         else if (start == Int.MinValue){
-            s"data modify $target set string $value 0 $end"
+            s"data modify $target set string $value 0 ${end + 1}"
         }
         else{
-            s"data modify $target set string $value $start $end"
+            s"data modify $target set string $value $start ${end + 1}"
         }
     }
 }

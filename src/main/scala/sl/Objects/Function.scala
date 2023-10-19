@@ -276,6 +276,7 @@ class BlockFunction(context: Context, _contextName: String, name: String, argume
     def call(args2: List[Expression], ret: Variable = null, retSel: Selector = Selector.self, op: String = "=")(implicit ctx: Context): List[IRTree] = {
         parentFunction match{
             case mc: MacroFunction => {
+                modifiers.isMacro = true
                 argMap(args2).flatMap(p => p._1.assign("=", p._2)) :::
                     List(BlockCall(Settings.target.getFunctionName(fullName), fullName, f"with ${mc.vari.getStorage()}"))
             }
@@ -536,10 +537,17 @@ class OptionalFunction(context: Context, variable: Variable, name: String, lib: 
     override def getName(): String = name
 
     def call(args2: List[Expression], ret: Variable = null, retSel: Selector = Selector.self, op: String = "=")(implicit ctx: Context): List[IRTree] = {
-        context.requestLibrary(lib)
-        val args = LinkedVariableValue(variable) :: args2
-        val function = context.getFunction(fct, args, List(), VoidType)
-        function.call(ret, retSel, op)(ctx)
+        if (variable != null){
+            context.requestLibrary(lib)
+            val args = LinkedVariableValue(variable) :: args2
+            val function = context.getFunction(fct, args, List(), VoidType)
+            function.call(ret, retSel, op)(ctx)
+        }
+        else{
+            context.requestLibrary(lib)
+            val function = context.getFunction(fct, args2, List(), VoidType)
+            function.call(ret, retSel, op)(ctx)
+        }
     }
 }
 
@@ -606,7 +614,7 @@ class GenericFunction(context: Context, _contextName: String, name: String, argu
 
     def generateForTypes(typevars: List[Type])={
         if (!implemented.contains(typevars)){
-            if (typevars.size != generics.size) throw new Exception("Wrong number of type variables")
+            if (typevars.size != generics.size) throw new Exception(f"Wrong number of type variables. Got: $typevars expected: $generics")
             
             val hash = scala.util.hashing.MurmurHash3.stringHash(typevars.mkString(","))
             val ctx = context.push(name+"--"+hash, this)

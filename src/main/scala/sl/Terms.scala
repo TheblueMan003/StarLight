@@ -59,6 +59,9 @@ case class ExtensionDecl(val name: Type, val block: Instruction, val modifier: M
 case class FunctionDecl(val name: String, val block: Instruction, val typ: Type, val args: List[Argument], val typeArgs: List[String], val modifier: Modifier) extends Instruction {
   override def toString() = f"def ${name}(${args.mkString(", ")}) ${block}"
 }
+case class OptionalFunctionDecl(val name: Identifier, val source: Identifier, val library: Identifier, val typ: Type, val args: List[Argument], val typeArgs: List[String], val modifier: Modifier) extends Instruction {
+  override def toString() = f"def ${name}(${args.mkString(", ")})"
+}
 case class TemplateDecl(val name: String, val block: Instruction, val modifier: Modifier, val parent: Option[String], val generics: List[TemplateArgument], val parentGenerics: List[Expression]) extends Instruction {
   override def toString() = f"template ${name} ${block}"
 }
@@ -204,7 +207,9 @@ case object Continue extends Instruction {
 case object Break extends Instruction {
   override def toString() = f"break"
 }
-
+case class DotCall(val left: Expression, val right: FunctionCall) extends Instruction{
+  override def toString(): String = f"$left.$right"
+}
 
 case class JSONFile(val name: String, val json: Expression, val modifier: Modifier) extends Instruction {
   override def toString() = f"jsonfile $name"

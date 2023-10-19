@@ -144,7 +144,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 		
 		typ.generateExtensionFunction(this)(context.push(name))
 		context.getAllExtension(typ).foreach((n,f) => {
-			context.push(name).addFunction(n, ExtensionFunction(f.context, this, f))
+			context.push(name).addFunction(Identifier.fromString(f.name), ExtensionFunction(f.context, this, f))
 		})
 
 		typ match
@@ -858,63 +858,98 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			assign(op, FunctionCallValue(VariableValue("__get__"), index, List()))
 		}
 		else{
-			val (prev,name) = Utils.simplifyToVariable(name2)
-			prev ::: (
-			name match{
-				case LinkedVariableValue(vari, sel) => {
-					vari.getType() match
-						case ArrayType(sub, IntValue(size)) => {
-							index.map(Utils.simplify(_)) match
-								case IntValue(i)::Nil => {
-									if (i >= size || i < 0) then throw new Exception(f"Index out of Bound for array $name: $i not in 0..$size at \n${name2.pos.longString}")
-									assign(op, LinkedVariableValue(vari.tupleVari(i)))
-								}
-								case _ => assign(op, FunctionCallValue(VariableValue(vari.fullName+".get"), index, List()))
+			name2 match
+				case pos: PositionValue => {
+					getType() match
+						case JsonType => {
+							index match
+								case List(StringValue(key2)) if  op == "=" => List(StorageSet(getStorage(jsonArrayKey), StorageBlock(pos.getString(), key2)))
+								case List(StringValue(key2)) if  op == "<:=" => List(StoragePrepend(getStorage(jsonArrayKey), StorageBlock(pos.getString(), key2)))
+								case List(StringValue(key2)) if  op == ":>=" => List(StorageAppend(getStorage(jsonArrayKey), StorageBlock(pos.getString(), key2)))
+								case List(StringValue(key2)) if  op == "::=" => List(StorageMerge(getStorage(jsonArrayKey), StorageBlock(pos.getString(), key2)))
+								case List(StringValue(key2)) if  op == "-:=" => List(StorageRemove(getStorage(jsonArrayKey), StorageBlock(pos.getString(), key2)))
+								case _ => throw new Exception(f"Cannot use $index as index for json")
 						}
-						case ArrayType(sub, TupleValue(sizes)) => {
-							index.map(Utils.simplify(_)) match
-								case TupleValue(indexes)::Nil if indexes.forall(_.isInstanceOf[IntValue]) => {
-									vari.indexedVari.find(x => x._2 == TupleValue(indexes)) match{
-										case Some((vari, _)) => assign(op, LinkedVariableValue(vari))
-										case None => throw new Exception(f"Index out of Bound for array $name: $indexes not in $sizes at \n${name2.pos.longString}")
+						case other => {
+							val vari = context.getFreshVariable(JsonType)
+							vari.handleArrayGetValue("=", name2, index) ::: assign(op, LinkedVariableValue(vari))
+						}
+				}
+				case pos: SelectorValue => {
+					getType() match
+						case JsonType => {
+							index match
+								case List(StringValue(key2)) if  op == "=" => List(StorageSet(getStorage(jsonArrayKey), StorageEntity(pos.getString(), key2)))
+								case List(StringValue(key2)) if  op == "<:=" => List(StoragePrepend(getStorage(jsonArrayKey), StorageEntity(pos.getString(), key2)))
+								case List(StringValue(key2)) if  op == ":>=" => List(StorageAppend(getStorage(jsonArrayKey), StorageEntity(pos.getString(), key2)))
+								case List(StringValue(key2)) if  op == "::=" => List(StorageMerge(getStorage(jsonArrayKey), StorageEntity(pos.getString(), key2)))
+								case List(StringValue(key2)) if  op == "-:=" => List(StorageRemove(getStorage(jsonArrayKey), StorageEntity(pos.getString(), key2)))
+								case _ => throw new Exception(f"Cannot use $index as index for json")
+						}
+						case other => {
+							val vari = context.getFreshVariable(JsonType)
+							vari.handleArrayGetValue("=", name2, index) ::: assign(op, LinkedVariableValue(vari))
+						}
+				}
+				case other => {
+					val (prev,name) = Utils.simplifyToVariable(name2)
+					prev ::: (
+					name match{
+						case LinkedVariableValue(vari, sel) => {
+							vari.getType() match
+								case ArrayType(sub, IntValue(size)) => {
+									index.map(Utils.simplify(_)) match
+										case IntValue(i)::Nil => {
+											if (i >= size || i < 0) then throw new Exception(f"Index out of Bound for array $name: $i not in 0..$size at \n${name2.pos.longString}")
+											assign(op, LinkedVariableValue(vari.tupleVari(i)))
+										}
+										case _ => assign(op, FunctionCallValue(VariableValue(vari.fullName+".get"), index, List()))
+								}
+								case ArrayType(sub, TupleValue(sizes)) => {
+									index.map(Utils.simplify(_)) match
+										case TupleValue(indexes)::Nil if indexes.forall(_.isInstanceOf[IntValue]) => {
+											vari.indexedVari.find(x => x._2 == TupleValue(indexes)) match{
+												case Some((vari, _)) => assign(op, LinkedVariableValue(vari))
+												case None => throw new Exception(f"Index out of Bound for array $name: $indexes not in $sizes at \n${name2.pos.longString}")
+											}
+										}
+										case TupleValue(indexes)::Nil => {
+											assign(op, FunctionCallValue(VariableValue(vari.fullName+".get"), indexes, List()))
+										}
+										case _ => assign(op, FunctionCallValue(VariableValue(vari.fullName+".get"), index, List()))
+								}
+								case JsonType if op == "=" => {
+									index match{
+										case List(StringValue(str)) => 
+											getType() match
+												case IntType => List(StorageRead(getIRSelector(), vari.getStorage(vari.getSubKey(str)), 1))
+												case FloatType => List(StorageRead(getIRSelector(), vari.getStorage(vari.getSubKey(str)), Settings.floatPrec))
+												case BoolType => List(StorageRead(getIRSelector(), vari.getStorage(vari.getSubKey(str)), 1))
+												case StringType => assign(op, LinkedVariableValue(vari.withKey(vari.getSubKey(str))))
+												case StructType(struct, sub) => {
+													tupleVari.flatMap(x => x.handleArrayGetValue(op, name, List(StringValue(str+"."+x.name))))
+												}
+												case JsonType => {
+													assignJson("=", LinkedVariableValue(vari.withKey(vari.getSubKey(str))))
+												}
+												case FuncType(sources, output) => List(StorageRead(getIRSelector(), vari.getStorage(vari.getSubKey(str)), 1))
+										case other => assign(op, FunctionCallValue(VariableValue(vari.fullName+".get"), index, List()))
 									}
 								}
-								case TupleValue(indexes)::Nil => {
-									assign(op, FunctionCallValue(VariableValue(vari.fullName+".get"), indexes, List()))
+								case TupleType(sub) => {
+									index match
+										case List(IntValue(i)) => assign(op, LinkedVariableValue(vari.tupleVari(i)))
+										case index::Nil => 
+											val id=Identifier.fromString("key")
+											Compiler.compile(Switch(index, List(SwitchForEach(id, RangeValue(IntValue(0), IntValue(sub.size-1), IntValue(1)), SwitchCase(VariableValue(id), VariableAssigment(List((Right(this), sel)), op, ArrayGetValue(LinkedVariableValue(vari), List(VariableValue(id)))), BoolValue(true))))))
+										case other => throw new Exception(f"Cannot use $other as index for tuple")
 								}
-								case _ => assign(op, FunctionCallValue(VariableValue(vari.fullName+".get"), index, List()))
+								case other => assign(op, FunctionCallValue(VariableValue(vari.fullName+".__get__"), index, List()))
 						}
-						case JsonType if op == "=" => {
-							index match{
-								case List(StringValue(str)) => 
-									getType() match
-										case IntType => List(StorageRead(getIRSelector(), vari.getStorage(vari.getSubKey(str)), 1))
-										case FloatType => List(StorageRead(getIRSelector(), vari.getStorage(vari.getSubKey(str)), Settings.floatPrec))
-										case BoolType => List(StorageRead(getIRSelector(), vari.getStorage(vari.getSubKey(str)), 1))
-										case StringType => assign(op, LinkedVariableValue(vari.withKey(vari.getSubKey(str))))
-										case StructType(struct, sub) => {
-											tupleVari.flatMap(x => x.handleArrayGetValue(op, name, List(StringValue(str+"."+x.name))))
-										}
-										case JsonType => {
-											assignJson("=", LinkedVariableValue(vari.withKey(vari.getSubKey(str))))
-										}
-										case FuncType(sources, output) => List(StorageRead(getIRSelector(), vari.getStorage(vari.getSubKey(str)), 1))
-								case other => assign(op, FunctionCallValue(VariableValue(vari.fullName+".get"), index, List()))
-							}
-						}
-						case TupleType(sub) => {
-							index match
-								case List(IntValue(i)) => assign(op, LinkedVariableValue(vari.tupleVari(i)))
-								case index::Nil => 
-									val id=Identifier.fromString("key")
-									Compiler.compile(Switch(index, List(SwitchForEach(id, RangeValue(IntValue(0), IntValue(sub.size-1), IntValue(1)), SwitchCase(VariableValue(id), VariableAssigment(List((Right(this), sel)), op, ArrayGetValue(LinkedVariableValue(vari), List(VariableValue(id)))), BoolValue(true))))))
-								case other => throw new Exception(f"Cannot use $other as index for tuple")
-						}
-						case other => assign(op, FunctionCallValue(VariableValue(vari.fullName+".__get__"), index, List()))
+					}
+					)
 				}
 			}
-			)
-		}
 	}
 
 	/**
@@ -1617,6 +1652,29 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 		}
 		else{
 			StorageStorage(fullName.replaceAll("([A-Z])","-$1").toLowerCase(), key)
+		}
+	}
+
+	/**
+	 * Returns the storage object for the current variable.
+	 * @param keya The key to use for the storage object. Defaults to "json".
+	 * @param context The context in which the storage object is being retrieved.
+	 * @param selector The selector for the storage object. Defaults to Selector.self.
+	 * @return The storage object for the current variable.
+	 */
+	def getStorageValue(keya: String = "json")(implicit context: Context, selector: Selector = Selector.self) = {
+		getType() match{
+			case JsonType => {
+				val key = if keya == "json" then jsonArrayKey else keya
+				if (modifiers.isEntity){
+					StorageEntity(getSelectorName().toString(), if (key.startsWith("json."))then key.substring(5) else key)
+				}
+				else{
+					StorageStorage(fullName.replaceAll("([A-Z])","-$1").toLowerCase(), key)
+				}
+			}
+			case FloatType => StorageScoreboard(getIRSelector(), "float", 1/Settings.floatPrec)
+			case other => StorageScoreboard(getIRSelector(), "int", 1)
 		}
 	}
 

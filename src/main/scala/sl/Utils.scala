@@ -76,6 +76,7 @@ object Utils{
             case StructDecl(name, generics, block, modifier, parent) => StructDecl(name, generics, substReturn(block, to), modifier, parent)
             case ClassDecl(name, generics, block, modifier, parent, parentGenerics, interfaces, entity) => ClassDecl(name, generics, substReturn(block, to), modifier, parent, parentGenerics, interfaces, entity)
             case FunctionDecl(name, block, typ, args, typeargs, modifier) => FunctionDecl(name, substReturn(block, to), typ, args, typeargs, modifier)
+            case OptionalFunctionDecl(name, source, library, typ, args, typeArgs, modifier) => OptionalFunctionDecl(name, source, library, typ, args, typeArgs, modifier)
             case PredicateDecl(name, args, block, modifier) => instr
             case ExtensionDecl(name, block, modifier) => instr
             case TagDecl(name, values, modifier, typ) => instr
@@ -99,6 +100,7 @@ object Utils{
             case If(cond, ifBlock, elseBlock) => If(cond, substReturn(ifBlock, to), elseBlock.map(substReturn(_,  to).asInstanceOf[ElseIf]))
             case CMD(value) => instr
             case FunctionCall(name, args, typeargs) => instr
+            case DotCall(expr, fct) => instr
             case FreeConstructorCall(expr) => instr
             case ArrayAssigment(name, index, op, value) => instr
             case LinkedFunctionCall(name, args, vari) => instr
@@ -139,6 +141,7 @@ object Utils{
             case StructDecl(name, generics, block, modifier, parent) => StructDecl(name, generics, subst(block, from, to), modifier, parent)
             case ClassDecl(name, generics, block, modifier, parent, parentGenerics, interfaces, entity) => ClassDecl(name, generics, subst(block, from, to), modifier, parent, parentGenerics, interfaces, entity)
             case FunctionDecl(name, block, typ, args, typeargs, modifier) => FunctionDecl(name, subst(block, from, to), typ, args, typeargs, modifier)
+            case OptionalFunctionDecl(name, source, library, typ, args, typeArgs, modifier) => OptionalFunctionDecl(name, source, library, typ, args, typeArgs, modifier)
             case PredicateDecl(name, args, block, modifier) => PredicateDecl(name, args, block, modifier)
             case ExtensionDecl(name, block, modifier) => ExtensionDecl(name, subst(block, from, to), modifier)
             case VariableDecl(name, _type, modifier, op, expr) => VariableDecl(name, _type, modifier, op, subst(expr, from, to))
@@ -162,6 +165,7 @@ object Utils{
             case If(cond, ifBlock, elseBlock) => If(subst(cond, from, to), subst(ifBlock, from, to), elseBlock.map(subst(_, from, to).asInstanceOf[ElseIf]))
             case CMD(value) => CMD(value)
             case FunctionCall(name, args, typeargs) => FunctionCall(name.replaceAllLiterally(from, to), args.map(subst(_, from, to)), typeargs)
+            case DotCall(expr, fct) => DotCall(subst(expr, from, to), subst(fct, from, to).asInstanceOf[FunctionCall])
             case FreeConstructorCall(expr) => FreeConstructorCall(subst(expr, from, to))
             case LinkedFunctionCall(name, args, vari) => LinkedFunctionCall(name, args.map(subst(_, from, to)), vari)
             case ArrayAssigment(name, index, op, value) => {
@@ -248,6 +252,14 @@ object Utils{
                     FunctionDecl(name.replaceAllLiterally(from, to), subst(block, from, to), typ, args, typeargs, modifier)
                 }
             }
+            case OptionalFunctionDecl(name, source, library, typ, args, typeArgs, modifier) => {
+                if (args.exists(x => x.name == from)){
+                    instr
+                }
+                else{
+                    OptionalFunctionDecl(name.replaceAllLiterally(from, to), source, library, typ, args, typeArgs, modifier)
+                }
+            }
             case PredicateDecl(name, args, block, modifier) => {
                 if (args.exists(x => x.name == from)){
                     instr
@@ -278,6 +290,7 @@ object Utils{
             case If(cond, ifBlock, elseBlock) => If(subst(cond, from, to), subst(ifBlock, from, to), elseBlock.map(subst(_, from, to).asInstanceOf[ElseIf]))
             case CMD(value) => CMD(value.replaceAllLiterally(from, to))
             case FunctionCall(name, args, typeargs) => FunctionCall(name.toString().replaceAllLiterally(from, to), args.map(subst(_, from, to)), typeargs)
+            case DotCall(expr, fct) => DotCall(subst(expr, from, to), subst(fct, from, to).asInstanceOf[FunctionCall])
             case LinkedFunctionCall(name, args, vari) => LinkedFunctionCall(name, args.map(subst(_, from, to)), vari)
             case FreeConstructorCall(expr) => FreeConstructorCall(subst(expr, from, to))
             case VariableAssigment(name, op, expr) => VariableAssigment(name.map((l,s) => (subst(l, from, to), s)), op, subst(expr, from, to))
@@ -382,6 +395,14 @@ object Utils{
                     FunctionDecl(name, subst(block, from, to), typ, args, typeargs, modifier)
                 }
             }
+            case OptionalFunctionDecl(name, source, library, typ, args, typeArgs, modifier) => {
+                if (args.exists(x => x.name == from)){
+                    instr
+                }
+                else{
+                    OptionalFunctionDecl(name, source, library, typ, args, typeArgs, modifier)
+                }
+            }
             case PredicateDecl(name, args, block, modifier) => instr
             case TagDecl(name, values, modifier, typ) => TagDecl(name, values.map(subst(_, from, to)), modifier, typ)
             case Import(lib, value, alias) => instr
@@ -404,6 +425,7 @@ object Utils{
             case If(cond, ifBlock, elseBlock) => If(subst(cond, from, to), subst(ifBlock, from, to), elseBlock.map(subst(_, from, to).asInstanceOf[ElseIf]))
             case CMD(value) => instr
             case FunctionCall(name, args, typeargs) => FunctionCall(name, args.map(subst(_, from, to)), typeargs)
+            case DotCall(expr, fct) => DotCall(subst(expr, from, to), subst(fct, from, to).asInstanceOf[FunctionCall])
             case LinkedFunctionCall(name, args, vari) => LinkedFunctionCall(name, args.map(subst(_, from, to)), vari)
             case FreeConstructorCall(expr) => FreeConstructorCall(subst(expr, from, to))
             case VariableAssigment(name, op, expr) => VariableAssigment(name, op, subst(expr, from, to))
@@ -436,6 +458,7 @@ object Utils{
             case ClassDecl(name, generics, block, modifier, parent, parentGenerics, interfaces, entity) => ClassDecl(name, generics, rmFunctions(block), modifier, parent, parentGenerics, interfaces, entity)
             case ExtensionDecl(name, block, modifier) => ExtensionDecl(name, rmFunctions(block), modifier)
             case fct: FunctionDecl => if predicate(fct) then InstructionList(List()) else instr
+            case OptionalFunctionDecl(name, source, library, typ, args, typeArgs, modifier) => instr
             case PredicateDecl(name, args, block, modifier) => instr
             case TagDecl(name, values, modifier, typ) => instr
             case EnumDecl(name, fields, values, modifier) => EnumDecl(name, fields, values, modifier)
@@ -455,6 +478,7 @@ object Utils{
             case If(cond, ifBlock, elseBlock) => If(cond, rmFunctions(ifBlock), elseBlock.map(rmFunctions(_).asInstanceOf[ElseIf]))
             case CMD(value) => instr
             case FunctionCall(name, args, typeargs) => instr
+            case DotCall(expr, fct) => instr
             case LinkedFunctionCall(name, args, vari) => instr
             case FreeConstructorCall(expr) => instr
             case VariableAssigment(name, op, expr) => instr
@@ -508,6 +532,7 @@ object Utils{
             case ClassDecl(name, generics, block, modifier, parent, parentGenerics, interfaces, entity) => ClassDecl(name, generics, fix(block), modifier, parent, parentGenerics.map(fix), interfaces.map(x => (x._1, x._2.map(fix(_)))), entity)
             case ExtensionDecl(name, block, modifier) => ExtensionDecl(name, fix(block), modifier)
             case FunctionDecl(name, block, typ, args, typeargs, modifier) => FunctionDecl(name, fix(block)(context, ignore ++ args.map(a => Identifier.fromString(a.name)).toSet), typ, args, typeargs, modifier)
+            case OptionalFunctionDecl(name, source, library, typ, args, typeArgs, modifier) => OptionalFunctionDecl(name, source, library, typ, args, typeArgs, modifier)
             case PredicateDecl(name, args, block, modifier) => PredicateDecl(name, args, fix(block), modifier)
             case EnumDecl(name, fields, values, modifier) => EnumDecl(name, fields, values.map(v => EnumValue(v.name, v.fields.map(fix(_)))), modifier)
             case VariableDecl(name, _type, modifier, op, expr) => VariableDecl(name, fix(_type), modifier, op, fix(expr))
@@ -539,6 +564,7 @@ object Utils{
                     case None => FunctionCall(name, argF, typeargs)
                 }
             }
+            case DotCall(expr, fct) => DotCall(fix(expr), fix(fct)(context, ignore + fct.name.toString()).asInstanceOf[FunctionCall])
             case LinkedFunctionCall(name, args, vari) => LinkedFunctionCall(name, args.map(fix(_)), vari)
             case FreeConstructorCall(expr) => FreeConstructorCall(fix(expr))
             case VariableAssigment(name, op, expr) => VariableAssigment(name.map{case (v, s) => (fix(v),s)}, op, fix(expr))
@@ -746,6 +772,15 @@ object Utils{
                 (vari.assign("=", other), LinkedVariableValue(vari))
             }
     }
+    def simplifyToStorage(expr: Expression)(implicit context: Context): (List[IRTree], StorageValue) = {
+        expr match{
+            case VariableValue(name, sel) => simplifyToStorage(context.resolveVariable(expr))
+            case LinkedVariableValue(name, sel) => (List(), name.getStorageValue())
+            case ArrayGetValue(SelectorValue(sel), List(StringValue(key))) => (List(), StorageEntity(sel.getString(), key))
+            case ArrayGetValue(pos: PositionValue, List(StringValue(key))) => (List(), StorageBlock(pos.getString(), key))
+        }
+    }
+
     def simplifyToLazyVariable(expr: Expression)(implicit context: Context): (List[IRTree], LinkedVariableValue) = {
         expr match
             case VariableValue(name, sel) => simplifyToLazyVariable(context.resolveVariable(expr))

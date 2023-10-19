@@ -1,6 +1,6 @@
 package sl
 
-import objects.{Context, ConcreteFunction, GenericFunction, LazyFunction, Modifier, Struct, Class, Template, Variable, Enum, EnumField, Predicate, Property}
+import objects.{Context, ConcreteFunction, GenericFunction, LazyFunction, Modifier, Struct, Class, Template, Variable, Enum, EnumField, Predicate, Property, OptionalFunction}
 import objects.Identifier
 import objects.types.{VoidType, TupleType, IdentifierType, ArrayType, IntType, FuncType, RangeType, StructType, ClassType}
 import sl.Compilation.Execute
@@ -111,6 +111,13 @@ object Compiler{
                             func.generateArgument()(context)
                         }
                     }
+                    List()
+                }
+                case OptionalFunctionDecl(name, source, library, typ, args, typeArgs, modifier) => {
+                    context.addFunction(
+                        name,
+                        OptionalFunction(context, null, name.toString(), library.toString(), source, args, typ, modifier)
+                    )
                     List()
                 }
                 case StructDecl(name, generics, block, modifier, parent) => {
@@ -228,7 +235,7 @@ object Compiler{
                             case FunctionCallValue(VariableValue(name, sel), args, typeargs, selector) if (context.tryGetTemplate(name) != None) => {
                                 val templ = context.tryGetTemplate(name)
                                 
-                                val LambdaValue(argsFct, instr, _) = args.last
+                                val LambdaValue(argsFct, instr, _) = args.last : @unchecked
                                 val tname = names2.head
                                 val fctName = templ.get.modifiers.getAttributesString("main", () => "main")
                                 val boot = templ.get.modifiers.getAttributesString("boot", () => "start")
@@ -491,7 +498,7 @@ object Compiler{
                         case other => {
                             val templ = context.tryGetTemplate(name)
                             if (templ != None){
-                                val LambdaValue(argsFct, instr, _) = args.last
+                                val LambdaValue(argsFct, instr, _) = args.last : @unchecked
                                 val tname = context.getFreshLambdaName()
                                 val fctName = templ.get.modifiers.getAttributesString("main", () => "main")
                                 val boot = templ.get.modifiers.getAttributesString("boot", () => "start")
@@ -508,6 +515,20 @@ object Compiler{
                                 (fct, cargs).call()
                             }
                     }
+                }
+                case DotCall(expr, FunctionCall(name, args, typeargs)) => {
+                    Utils.simplify(expr) match
+                        case LinkedVariableValue(vari, sel) => {
+                            compile(FunctionCall(Identifier.fromString(vari.fullName+"."+name), args, typeargs))
+                        }
+                        case IntValue(_) | FloatValue(_) | BoolValue(_) | StringValue(_) | JsonValue(_) | RawJsonValue(_) | SelectorValue(_) => {
+                            val (prev, vari) = Utils.simplifyToLazyVariable(expr)
+                            prev ::: compile(FunctionCall(Identifier.fromString(vari.vari.fullName+"."+name), args, typeargs))
+                        }
+                        case other => {
+                            val (prev, vari) = Utils.simplifyToVariable(expr)
+                            prev ::: compile(FunctionCall(Identifier.fromString(vari.vari.fullName+"."+name), args, typeargs))
+                        }
                 }
                 case LinkedFunctionCall(name, args, ret) => {
                     val uargs = args.map(Utils.simplify)

@@ -170,7 +170,7 @@ object Parser extends StandardTokenParsers {
     *   A parser for an instruction block.
     */
   def blockExtension: Parser[Instruction] = positioned(
-    "{" ~> rep(functionDecl <~ opt(";")) <~ "}" ^^ (p => InstructionBlock(p))
+    "{" ~> rep((functionDecl | optFunctionDecl) <~ opt(";")) <~ "}" ^^ (p => InstructionBlock(p))
   )
 
 
@@ -181,11 +181,11 @@ object Parser extends StandardTokenParsers {
   def assignmentOp: Parser[String] =
     ("=" | "+=" | "-=" | "*=" | "/=" | ":=" | "%=" | "^=" | "|=" | "&=" | "<<=" | ">>=" | "::=" | ">:=" | "<:=" | "-:=")
 
-  def ident2: Parser[String] = rep1sep(subident, ".") ^^ { p =>
-    p.reduce(_ + "." + _)
-  }
   def subident: Parser[String] = opt("$") ~ ident ^^ { case _1 ~ _2 =>
     _1.getOrElse("") + _2
+  }
+  def ident2: Parser[String] = rep1sep(subident, ".") ^^ { p =>
+    p.reduce(_ + "." + _)
   }
   def subident2: Parser[String] = "$" ~ ident ^^ { case _1 ~ _2 => _1 + _2 }
   def identLazy: Parser[String] = subident ~ rep(subident2) ^^ { p =>
@@ -195,6 +195,23 @@ object Parser extends StandardTokenParsers {
   def identLazy2: Parser[String] = rep1sep(identLazy, ".") ^^ { p =>
     p.reduce(_ + "." + _)
   }
+
+
+  def keyword_or_subident: Parser[String] = opt("$") ~ (ident | anyKeyword) ^^ { case _1 ~ _2 =>
+    _1.getOrElse("") + _2
+  }
+  def keyword_or_ident2: Parser[String] = rep1sep(keyword_or_subident, ".") ^^ { p =>
+    p.reduce(_ + "." + _)
+  }
+  def keyword_or_subident2: Parser[String] = "$" ~ (ident | anyKeyword) ^^ { case _1 ~ _2 => _1 + _2 }
+  def keyword_or_identLazy: Parser[String] = keyword_or_subident ~ rep(keyword_or_subident2) ^^ { p =>
+    (p._1 :: p._2).reduce(_ + _)
+  }
+  def keyword_or_identLazyForce: Parser[String] = "$" ~> (ident | anyKeyword) ^^ { "$" + _ }
+  def keyword_or_identLazy2: Parser[String] = rep1sep(keyword_or_identLazy, ".") ^^ { p =>
+    p.reduce(_ + "." + _)
+  }
+
 
   /** Parses a lazy identifier for a command.
     * @return
@@ -330,6 +347,7 @@ object Parser extends StandardTokenParsers {
   def instruction: Parser[Instruction] = positioned(
     functionDecl
       | functionCall
+      | dotFunctionCall
       | selectorFunctionCall
       | sleepInstr
       | awaitInstr
@@ -422,6 +440,34 @@ object Parser extends StandardTokenParsers {
           FunctionDecl(n, i, t, a, at, mod.withDoc(doc))
       }
 
+  /** Parses a function declaration and returns a FunctionDecl object.
+    *
+    * @return
+    *   A Parser object that parses a function declaration and returns a
+    *   FunctionDecl object.
+    */
+  def optFunctionDecl: Parser[OptionalFunctionDecl] =
+    ((((doc ~ ("def" ~> modifier(
+        "function"
+      ))) ~ identLazy2 ~ typeArgument)) ~ arguments ~ "from" ~ identLazy2 ~ "as" ~ identLazy2) ^^ {
+        case doc ~ mod ~ n ~ at ~ a ~ _ ~ lib ~ _ ~ alias=>
+          OptionalFunctionDecl(
+            alias,
+            n,
+            lib,
+            VoidType,
+            a,
+            at,
+            mod.withDoc(doc)
+          )
+      }
+      | ((((doc ~ (opt("def") ~> modifier(
+        "function"
+      ))) ~ types) ~ identLazy ~ typeArgument) ~ arguments ~ "from" ~ identLazy2 ~ "as" ~ identLazy2) ^^ {
+        case doc ~ mod ~ t ~ n ~ at ~ a ~ _ ~ lib ~ _ ~ alias =>
+          OptionalFunctionDecl(alias,n,lib, t, a, at, mod.withDoc(doc))
+      }
+
   /** Parses a function instruction and returns an Instruction object.
     *
     * @return
@@ -439,7 +485,7 @@ object Parser extends StandardTokenParsers {
     *   A Parser object that parses a function call and returns a FunctionCall
     *   object.
     */
-  def functionCall: Parser[FunctionCall] =
+  def functionCall: Parser[FunctionCall] = positioned(
     (((identFunction ~ typeVariables <~ "(") ~ repsep(
       exprNoTuple,
       ","
@@ -452,7 +498,14 @@ object Parser extends StandardTokenParsers {
       )) <~ ")") ^^ { case f ~ t ~ e => FunctionCall(f, e, t) } // Function Call
       | (identFunction ~ typeVariables) ~ block ^^ { case f ~ t ~ b =>
         FunctionCall(f, List(LambdaValue(List(), b, null)), t)
-      } // Function Call
+      }
+  )
+
+  def dotFunctionCall: Parser[Instruction] = {
+    exprBottom ~ "." ~ functionCall ^^ { case e ~ _ ~ f =>
+      DotCall(e, f)
+    }
+  }
 
   /** Parses a selector function call and returns an Instruction object.
     *
@@ -460,10 +513,11 @@ object Parser extends StandardTokenParsers {
     *   A Parser object that parses a selector function call and returns an
     *   Instruction object.
     */
-  def selectorFunctionCall: Parser[Instruction] =
+  def selectorFunctionCall: Parser[Instruction] = positioned(
     selector ~ "." ~ functionCall ^^ { case s ~ _ ~ f =>
-      With(SelectorValue(s), BoolValue(false), BoolValue(true), f, null)
+      DotCall(SelectorValue(s), f)
     }
+  )
 
   /** Parses a continuation and returns an Instruction object.
     *
@@ -1444,7 +1498,7 @@ object Parser extends StandardTokenParsers {
     *   a Parser for a selector filter identifier value
     */
   def sfIdentifier: Parser[SelectorFilterValue] =
-    identLazy2 ^^ (SelectorIdentifier(_))
+    keyword_or_identLazy2 ^^ (SelectorIdentifier(_))
 
   /** Parses a selector filter tag value
     * @return
@@ -1562,23 +1616,13 @@ object Parser extends StandardTokenParsers {
     *   A Parser for a namespaced name.
     */
   def namespacedName =
-    identLazy ~ ":" ~ identLazy2 ~ opt(blockData) ~ opt(json) ^^ {
+    keyword_or_identLazy ~ ":" ~ keyword_or_identLazy2 ~ opt(blockData) ~ opt(json) ^^ {
       case a ~ _ ~ b ~ d ~ j =>
         NamespacedName(
           a + ":" + b + d.getOrElse(""),
           JsonValue(j.getOrElse(JsonNull))
         )
     }
-
-  /** Parses a namespaced name without block data.
-    *
-    * @return
-    *   A Parser for a namespaced name without block data.
-    */
-  def namespacedName2 = opt(identLazy <~ ":") ~ identLazy2 ^^ { case a ~ c =>
-    if a.isEmpty then NamespacedName(c, JsonValue(JsonNull))
-    else NamespacedName(a.get + ":" + c, JsonValue(JsonNull))
-  }
 
   /** Parses a valid coordinate number.
     *

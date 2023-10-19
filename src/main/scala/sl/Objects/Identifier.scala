@@ -23,6 +23,9 @@ case class Identifier(values: List[String]) {
   def size(): Int = {
     values.size
   }
+  def last(): String = {
+    values.last
+  }
   def isSingleton() = {
     values.size == 1
   }

@@ -189,6 +189,24 @@ if (@s in set){
 }
 ```
 
+Entity variable & Selector support the following functions:
+* `entity.effect.<effect>()`: Give the entity the effect (duration is infinite)
+* `entity.effect.<effect>(int duration)`: Give the entity the effect for the duration
+* `entity.effect.<effect>(int duration, int amplifier)`: Give the entity the effect for the duration with the amplifier
+* `entity.effect.<effect>(int duration, int amplifier, bool showParticles)`: Give the entity the effect for the duration with the amplifier and showParticles
+* `entity.effect.clear<effect>()`: Clear the effect from the entity
+* `entity.effect.clear()`: Clear all the effect from the entity
+* `entity.tag.add(string tag)`: Add the tag to all the entity in the variable/selector
+* `entity.tag.remove(string tag)`: Remove the tag to all the entity in the variable/selector
+* `entity.count()`: Return the number of entity in the variable/selector
+* `entity.kill()`: Kill all the entity in the variable/selector
+* `entity.despawn()`: Despawn all the entity in the variable/selector
+* `entity.swap(entity other)`: Swap the entity in the variable/selector with the entity in the other variable/selector
+* `entity.teleport(entity other)`: Teleport the entity in the variable/selector to the entity in the other variable/selector
+* `entity.teleport(mcposition pos)`: Teleport the entity in the variable/selector to the position
+* `entity.teleport(mcposition pos, float yaw, float pitch)`: Teleport the entity in the variable/selector to the position with the yaw and pitch
+
+
 ### json (Java Edition Only)
 Store a json value. The json value can be either a json object, a json array, a json string, a json number, a json boolean. 
 When it is marked as scoreboard, the behavior is undefined unless the "nbt" attribute is set. In case, the json will be stored as nbt on the current entity.
@@ -217,6 +235,13 @@ Supported function:
 * `string.contains(string)`: Return true if the string contains the other string
 * `string.startsWith(string)`: Return true if the string start with the other string
 * `string.endsWith(string)`: Return true if the string end with the other string
+* `string.indefOf(string)`: Return the index of the first occurence of the string
+* `string.lastIndexOf(string)`: Return the index of the last occurence of the string
+* `string.toUpper()`: Return the string in upper case
+* `string.toLower()`: Return the string in lower case
+* `string.leftTrim()`: Return the string without the leading space
+* `string.rightTrim()`: Return the string without the trailing space
+* `string.trim()`: Return the string without the leading and trailing space
 * `string.reverse()`: Return the reversed string
 
 ## Flow Controls
@@ -761,6 +786,14 @@ int a = 0
 int b = a.plusOne()
 ```
 Note that the first argument of the method is always the type itself.
+
+It is possible to add extension without importing the library with the following syntax:
+```
+extension string{
+    def standard.string.length(string s) from standard.string as length
+}
+```
+This will add the method length to the string type. The method will be call length and will be from the standard.string library. The library will only be imported if the method is used.
 
 ### Generic Template
 Template can also accept type parameters with the following syntax:
