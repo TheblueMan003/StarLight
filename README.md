@@ -205,6 +205,19 @@ Entity variable & Selector support the following functions:
 * `entity.teleport(entity other)`: Teleport the entity in the variable/selector to the entity in the other variable/selector
 * `entity.teleport(mcposition pos)`: Teleport the entity in the variable/selector to the position
 * `entity.teleport(mcposition pos, float yaw, float pitch)`: Teleport the entity in the variable/selector to the position with the yaw and pitch
+* `entity.sum(int score)`: Return the sum of the score of all the entity in the variable/selector
+* `entity.max(int score)`: Return the max of the score of all the entity in the variable/selector
+* `entity.min(int score)`: Return the min of the score of all the entity in the variable/selector
+* `entity.avg(int score)`: Return the avg of the score of all the entity in the variable/selector
+* `entity.winner(int score)`: Return the entity with the max score
+* `entity.loser(int score)`: Return the entity with the min score
+* `entity.withWinner(int score, void=>void f)`: Execute the function on the entity with the max score
+* `entity.withLoser(int score, void=>void f)`: Execute the function on the entity with the min score
+* `entity.forEachOrderedAscending(int score, void=>void f)`: Execute the function on the entity in ascending order
+* `entity.forEachOrderedDescending(int score, void=>void f)`: Execute the function on the entity in descending order
+* `entity.forEachOrdered(int score, bool ascending, void=>void f)`: Execute the function on the entity in the specified order
+* `entity.onNewHighScore(int score, int previous, void=>void f)`: Execute the function on the entity when the score is a new high score
+* `entity.onNewLowScore`: Execute the function on the entity when the score is a new low score
 
 
 ### json (Java Edition Only)
