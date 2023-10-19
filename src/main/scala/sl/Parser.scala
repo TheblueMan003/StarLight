@@ -463,7 +463,7 @@ object Parser extends StandardTokenParsers {
       }
       | ((((doc ~ (opt("def") ~> modifier(
         "function"
-      ))) ~ types) ~ identLazy ~ typeArgument) ~ arguments ~ "from" ~ identLazy2 ~ "as" ~ identLazy2) ^^ {
+      ))) ~ types) ~ identLazy2 ~ typeArgument) ~ arguments ~ "from" ~ identLazy2 ~ "as" ~ identLazy2) ^^ {
         case doc ~ mod ~ t ~ n ~ at ~ a ~ _ ~ lib ~ _ ~ alias =>
           OptionalFunctionDecl(alias,n,lib, t, a, at, mod.withDoc(doc))
       }
