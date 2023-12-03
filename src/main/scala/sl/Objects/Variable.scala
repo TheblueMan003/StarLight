@@ -795,9 +795,23 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 						val (prev,vari) = Utils.simplifyToVariable(name)
 						prev ::: List(StringCopy(getStorage(), vari.vari.getStorage(), min, max))
 					}
+					case ArrayGetValue(name, List(RangeValue(a, b, IntValue(1)))) if Utils.typeof(a).isSubtypeOf(IntType) && Utils.typeof(b).isSubtypeOf(IntType) => {
+						context.requestLibrary("standard.string")
+						handleFunctionCall("=", VariableValue("standard.string.slice"), List(name, a, b), List(), Selector.self)
+					}
 					case ArrayGetValue(name, List(IntValue(min))) => {
-						val (prev,vari) = Utils.simplifyToVariable(name)
-						prev ::: List(StringCopy(getStorage(), vari.vari.getStorage(), min, min))
+						if (min >= 0){
+							val (prev,vari) = Utils.simplifyToVariable(name)
+							prev ::: List(StringCopy(getStorage(), vari.vari.getStorage(), min, min))
+						}
+						else{
+							context.requestLibrary("standard.string")
+							handleFunctionCall("=", VariableValue("standard.string.charAt"), List(name, IntValue(min)), List(), Selector.self)
+						}
+					}
+					case ArrayGetValue(name, List(a)) if Utils.typeof(a).isSubtypeOf(IntType)=> {
+						context.requestLibrary("standard.string")
+						handleFunctionCall("=", VariableValue("standard.string.charAt"), List(name, a), List(), Selector.self)
 					}
 					case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 					case LinkedVariableValue(vari, selector) => {
@@ -1193,11 +1207,11 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 				}
 			case UnaryOperation("!", value) => {
 				op match{
-					case _ if isPresentIn(value )=> {
+					case _ if isPresentIn(value)=> {
 						val vari = context.getFreshVariable(BoolType)
 						vari.assign("=", UnaryOperation("!", value)) ::: assign(op, LinkedVariableValue(vari))
 					}
-					case "=" => assignBool("=", BoolValue(true)) ::: Compiler.compile(If(value, VariableAssigment(List((Right(this), selector)), "=", BoolValue(true)), List()))
+					case "=" => assignBool("=", BoolValue(true)) ::: Compiler.compile(If(value, VariableAssigment(List((Right(this), selector)), "=", BoolValue(false)), List()))
 					case other => 
 						val (prev, vari) = Utils.simplifyToVariable(value)
 						prev ::: assignBool(op, vari)

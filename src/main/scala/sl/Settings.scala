@@ -178,19 +178,19 @@ case object MCBedrock extends Target{
     def hasFeature(feature: String): Boolean = features.contains(feature)
 
     def getFunctionPath(path: String): String = {
-        "/functions/" + path.replaceAll("([A-Z])","-$1").toLowerCase().replaceAllLiterally(".","/") + ".mcfunction"
+        "/functions/" + path.replaceAll("([A-Z])","_$1").toLowerCase().replaceAllLiterally(".","/").replaceAllLiterally("-","_") + ".mcfunction"
     }
     def getPredicatePath(path: String): String = {
         throw new Exception("Predicate not supported on bedrock!")
     }
     def getFunctionName(path: String): String = {
-        path.replaceAll("([A-Z])","-$1").toLowerCase().replaceAllLiterally(".","/")
+        path.replaceAll("([A-Z])","_$1").toLowerCase().replaceAllLiterally(".","/").replaceAllLiterally("-","_")
     }
     def getJsonPath(path: String): String = {
-        "/" + path.replaceAllLiterally(".","/") + ".json"
+        "/" + path.replaceAllLiterally(".","/").replaceAllLiterally("-","_") + ".json"
     }
     def getRPJsonPath(path: String): String = {
-        "/" + path.replaceAllLiterally(".","/")+ ".json"
+        "/" + path.replaceAllLiterally(".","/").replaceAllLiterally("-","_") + ".json"
     }
     def getExtraFiles(context: Context): List[IRFile] = {
         val ticks = context.getAllFunction().map(_._2)
@@ -210,12 +210,27 @@ case object MCBedrock extends Target{
                             List(CommentsIR("\n "+"="*17+"USER SCOREBOARD"+"="*18+"\n ")):::
                             context.getAllVariable().filter(_.modifiers.isEntity).map(v => CommandIR(f"scoreboard objectives add ${v.scoreboard} dummy")):::
                             List(CommentsIR("\n "+"="*18+"INITIALISATION"+"="*18+"\n ")):::
+                            context.getAllVariable().filter(v => !v.modifiers.isEntity && !v.modifiers.isLazy && v.getType() != VoidType).map(v => ScoreboardAdd(v.getIRSelector(), 0)):::
+                            List(CommentsIR("\n "+"="*23+"LOAD"+"="*23+"\n ")):::
+                            List(CommandIR(f"function ${context.root.getPath()}/__load__"))
+
+        val rstScore = List(CommentsIR("\n "+"="*15+"COMPILER SCOREBOARD"+"="*16+"\n "),
+                            CommandIR(f"scoreboard objectives add ${Settings.tmpScoreboard} dummy"),
+                            CommandIR(f"scoreboard objectives add ${Settings.valueScoreboard} dummy"),
+                            CommandIR(f"scoreboard objectives add ${Settings.constScoreboard} dummy"),
+                            CommandIR(f"scoreboard objectives add ${Settings.variableScoreboard} dummy"),
+                            CommentsIR("\n "+"="*20+"CONSTANTS"+"="*21+"\n "))::: 
+                            context.getAllConstant().map(v => ScoreboardSet(SBLink(f"c$v", Settings.constScoreboard), v)):::
+                            List(CommentsIR("\n "+"="*17+"USER SCOREBOARD"+"="*18+"\n ")):::
+                            context.getAllVariable().filter(_.modifiers.isEntity).map(v => CommandIR(f"scoreboard objectives add ${v.scoreboard} dummy")):::
+                            List(CommentsIR("\n "+"="*18+"INITIALISATION"+"="*18+"\n ")):::
                             context.getAllVariable().filter(v => !v.modifiers.isEntity && !v.modifiers.isLazy && v.getType() != VoidType).map(v => ScoreboardSet(v.getIRSelector(), 0)):::
                             List(CommentsIR("\n "+"="*23+"LOAD"+"="*23+"\n ")):::
                             List(CommandIR(f"function ${context.root.getPath()}/__load__"))
 
         List(IRFile(f"manifest.json", f"manifest.json", List(JsonIR(getManifestContent())), List(), true),
             IRFile(f"functions/__init__.mcfunction", "__init__", dfScore, List(), false, false),
+            IRFile(f"functions/__reset__.mcfunction", "__reset__", rstScore, List(), false, false),
             IRFile("functions/tick.json", "functions/tick.json", List(JsonIR("{"+ f"\t\"values\":[$ticks]"+ "}")), List(),true))
     }
 

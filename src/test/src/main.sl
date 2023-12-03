@@ -1,17 +1,9 @@
 package main
 
-import utils.Process
-import standard.collections.List
-
-List<int>[100] lst
-
-def start(){
-    "test".toLower()
-}
+import standard::print
 
 def test(){
-    @p.effect.slowness()
-    @s.tag.add("test")
-    @s.tag.add("test2")
-    @s.swap(@p)
+    int a
+    print(a + 1)
+    List<int> test
 }

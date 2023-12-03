@@ -715,6 +715,19 @@ object DefaultFunction{
                 }
             }
         ))
+        ctx.addFunction("getStorage", CompilerFunction(ctx, "getStorage", 
+            List(Argument("name", MCObjectType, None)),
+            StringType,
+            Modifier.newPublic(),
+            (args: List[Expression],ctx: Context) => {
+                args match{
+                    case LinkedVariableValue(name, _) :: Nil => {
+                        (List(), StringValue(name.getStorage().toString()))
+                    }
+                    case other => throw new Exception(f"Illegal Arguments $other for getStorage")
+                }
+            }
+        ))
         ctx.addFunction("insert", CompilerFunction(ctx, "insert", 
                 List(Argument("name", MCObjectType, None), Argument("vari", MCObjectType, None), Argument("cmd", FuncType(List(), VoidType), None)),
                 VoidType,
@@ -981,6 +994,28 @@ object DefaultFunction{
                                 (ret.take(ret.length - 1) ::: List(CommandIR(f"execute store result score ${varj.getSelector()(sel)} run "+ret.last.getString())), NullValue)
                             }
                             case other => throw new Exception(f"Illegal Arguments $other for cmdstore")
+                        }
+                    },
+                false
+                ))
+            ctx.addFunction("cmdsuccess", CompilerFunction(ctx, "cmdsuccess", 
+                    List(Argument("vari", MCObjectType, None), Argument("cmd", FuncType(List(), VoidType), None)),
+                    VoidType,
+                    Modifier.newPublic(),
+                    (args: List[Expression],ctx: Context) => {
+                        args match{
+                            case LinkedVariableValue(vari, sel)::LambdaValue(arg, instr, ctx2)::Nil => {
+                                val ret = Compiler.compile(instr)(ctx2)
+                                ctx.addScoreboardUsedForce(vari.getIRSelector())
+                                (ret.take(ret.length - 1) ::: List(CommandIR(f"execute store success score ${vari.getSelector()(sel)} run "+ret.last.getString())), NullValue)
+                            }
+                            case VariableValue(vari, sel)::LambdaValue(arg, instr, ctx2)::Nil => {
+                                val ret = Compiler.compile(instr)(ctx2)
+                                val varj = ctx.getVariable(vari)
+                                ctx.addScoreboardUsedForce(varj.getIRSelector())
+                                (ret.take(ret.length - 1) ::: List(CommandIR(f"execute store success score ${varj.getSelector()(sel)} run "+ret.last.getString())), NullValue)
+                            }
+                            case other => throw new Exception(f"Illegal Arguments $other for cmdsuccess")
                         }
                     },
                 false

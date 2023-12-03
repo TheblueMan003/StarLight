@@ -311,11 +311,17 @@ case class StringCopy(target: StorageVariable, value: StorageVariable, start: In
         else if (end == Int.MaxValue){
             s"data modify $target set string $value $start"
         }
-        else if (start == Int.MinValue){
+        else if (start == Int.MinValue && end >= 0){
             s"data modify $target set string $value 0 ${end + 1}"
         }
-        else{
+        else if (end >= 0){
             s"data modify $target set string $value $start ${end + 1}"
+        }
+        else if (start == Int.MinValue){
+            s"data modify $target set string $value 0 $end"
+        }
+        else{
+            s"data modify $target set string $value $start $end"
         }
     }
 }
