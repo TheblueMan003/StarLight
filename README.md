@@ -1,3 +1,5 @@
+# Examples
+You can find some examples projects here: https://github.com/TheblueMan003/StarLightExamples
 # Libraries
 This is the repo for the main compiler. The Libraries are located here: https://github.com/TheblueMan003/StarLightLibraries/
 # Notation
