@@ -432,6 +432,9 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
         if (names.contains(name)) throw new Exception(f"$name already defined in ${getPath()}")
         names.add(name)
     }
+    def hasName(name: String): Boolean = synchronized{
+        names.contains(name)
+    }
 
 
 
@@ -516,7 +519,8 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
             }
         })
         array.appendAll(extensions.getOrElse(typ, List()))
-        if (parent != null){
+        if (parent != null && !set.contains(parent)){
+            set.add(parent)
             parent.getAllExtension(typ, set, array)
         }
     }

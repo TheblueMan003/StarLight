@@ -167,6 +167,21 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 				}
 				else{
 					sl.Compiler.compile(block)(ctx)
+
+					// Add __eq__ & __ne__ functions if needed
+					if (!ctx.hasName("__eq__")){
+						val inner = tupleVari.map(v => BinaryOperation("==", LinkedVariableValue(v), VariableValue(Identifier.fromString("other."+v.name))))
+							.reduce((a,b) => BinaryOperation("&&", a, b))
+
+						val fct = LazyFunction(ctx, ctx.getPath()+".__eq__", "__eq__", List(Argument("other", StructType(struct, sub), None)), BoolType, Modifier.newPublic(), Return(inner))
+						fct.generateArgument()(ctx)
+						ctx.addFunction(Identifier.fromString("__eq__"), fct)
+					}
+					if (!ctx.hasName("__ne__")){
+						val fct = LazyFunction(ctx, ctx.getPath()+".__ne__", "__ne__", List(Argument("other", StructType(struct, sub), None)), BoolType, Modifier.newPublic(), Return(UnaryOperation("!", FunctionCallValue(VariableValue(Identifier.fromString("__eq__")), List(VariableValue(Identifier.fromString("other"))), List(), Selector.self))))
+						fct.generateArgument()(ctx)
+						ctx.addFunction(Identifier.fromString("__ne__"), fct)
+					}
 				}
 				
 				tupleVari.foreach(vari => vari.modifiers = vari.modifiers.combine(modifiers))
@@ -936,7 +951,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 									index match{
 										case List(StringValue(str)) => 
 											getType() match
-												case IntType => List(StorageRead(getIRSelector(), vari.getStorage(vari.getSubKey(str)), 1))
+												case IntType | EnumType(_) => List(StorageRead(getIRSelector(), vari.getStorage(vari.getSubKey(str)), 1))
 												case FloatType => List(StorageRead(getIRSelector(), vari.getStorage(vari.getSubKey(str)), Settings.floatPrec))
 												case BoolType => List(StorageRead(getIRSelector(), vari.getStorage(vari.getSubKey(str)), 1))
 												case StringType => assign(op, LinkedVariableValue(vari.withKey(vari.getSubKey(str))))

@@ -2,8 +2,15 @@ package main
 
 import standard::print
 
-def test(){
+struct A{
     int a
-    print(a + 1)
-    List<int> test
+    int b
+}
+def test(){
+    A a
+    A b
+
+    if (a != b){
+        ./say hi
+    }
 }
