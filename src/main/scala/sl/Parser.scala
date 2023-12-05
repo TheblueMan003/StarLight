@@ -1167,7 +1167,7 @@ object Parser extends StandardTokenParsers {
       doc ~ modifier("blocktag") ~ "blocktag" ~ identLazy2 ~ "{" ~ repsep(
         tagentry,
         ","
-      ) ~ "}" ^^ { case d ~ m ~ _ ~ n ~ _ ~ c ~ _ =>
+      )  ~ (opt(",") ~> "}") ^^ { case d ~ m ~ _ ~ n ~ _ ~ c ~ _ =>
         TagDecl(n, c, m.withDoc(d), objects.BlockTag)
       }
     ) |
@@ -1175,7 +1175,7 @@ object Parser extends StandardTokenParsers {
         doc ~ modifier("entitytag") ~ "entitytag" ~ identLazy2 ~ "{" ~ repsep(
           tagentry,
           ","
-        ) ~ "}" ^^ { case d ~ m ~ _ ~ n ~ _ ~ c ~ _ =>
+        ) ~ (opt(",") ~> "}") ^^ { case d ~ m ~ _ ~ n ~ _ ~ c ~ _ =>
           TagDecl(n, c, m.withDoc(d), objects.EntityTag)
         }
       ) |
@@ -1183,7 +1183,7 @@ object Parser extends StandardTokenParsers {
         doc ~ modifier("itemtag") ~ "itemtag" ~ identLazy2 ~ "{" ~ repsep(
           tagentry,
           ","
-        ) ~ "}" ^^ { case d ~ m ~ _ ~ n ~ _ ~ c ~ _ =>
+        ) ~ (opt(",") ~> "}") ^^ { case d ~ m ~ _ ~ n ~ _ ~ c ~ _ =>
           TagDecl(n, c, m.withDoc(d), objects.ItemTag)
         }
       )
@@ -1204,7 +1204,7 @@ object Parser extends StandardTokenParsers {
   def enumInstr: Parser[EnumDecl] = positioned(
     (doc ~ modifier("enum") ~ ("enum" ~> identLazy) ~ opt(
       "(" ~> repsep(enumField, ",") <~ ")"
-    ) <~ "{") ~ repsep(enumValue, ",") <~ "}" ^^ { case doc ~ mod ~ n ~ f ~ v =>
+    ) <~ "{") ~ repsep(enumValue, ",") <~ opt(",") <~ "}" ^^ { case doc ~ mod ~ n ~ f ~ v =>
       EnumDecl(n, f.getOrElse(List()), v, mod.withDoc(doc))
     }
   )
