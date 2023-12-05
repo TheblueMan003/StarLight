@@ -347,6 +347,10 @@ for(int a=0;a < 10;a+=1){
 
 }
 
+for(int a in 0..10 by 2){
+
+}
+
 while(a > 0){
 
 }
@@ -428,7 +432,7 @@ or with
 
 Arugment can also have default value:
 ```
-def hello(int a = 0){
+void hello(int a = 0){
 }
 ```
 
@@ -462,7 +466,7 @@ Note that Lambda refere to the variable outside of it by reference & not by valu
 
 You can call a variable of type function with the following syntax:
 ```
-def fct(void=>void arg){
+void fct(void=>void arg){
     /say befor
     arg()
     /say after
@@ -476,7 +480,7 @@ With the latter syntax the lambda is always the rightmost argument of the functi
 ### Function Tags
 Function can also belong to a tag by adding an name prefixed by `@`:
 ```
-def @tagExample test(){
+@tagExample void test(){
 
 }
 ```
@@ -490,7 +494,7 @@ Note that tags are global across the code context.
 ### Attributes
 Attributes can be added to function to specify thing to the compiler.
 ```
-def [tag.order=10] @tick test(){
+[tag.order=10] @tick void test(){
 
 }
 ```
@@ -569,7 +573,7 @@ Here is a list of used attributes by the compiler:
 ## Async Programming
 You can "pause" the execute of a function with sleep. For Instance, the following code will print "hello" and wait 20 ticks before printing "world":
 ```
-def example(){
+void example(){
     print("hello")
     sleep 20
     print("world")
@@ -578,12 +582,12 @@ def example(){
 If you call the above function inside another function, the calling function won't have its execution paused. To have the calling function be also pause the called function must be mark as `async` and the `await` keyword must be used a the call site.
 For example:
 ```
-def async foo(){
+async void foo(){
     print("hello")
     sleep 20
     print("world")
 }
-def bar(){
+void bar(){
     print("hello")
     await foo()
     print("world")
@@ -626,16 +630,23 @@ struct vector3{
     int y
     int z
 
+    // Constructor
     vector3(int x, int y, int z){
         this.x = x
         this.y = y
         this.z = z
     }
 
+    // operator overloading
     vector3 operator += (vector other){
         x += other.x
         y += other.y
         z += other.z
+    }
+
+    // method
+    int sum(){
+        return x + y + z
     }
 }
 ```
@@ -681,7 +692,7 @@ Struct can also accept type parameters with the following syntax:
 struct Struct<T>{
     T vari
 
-    def this(T value){
+    Struct(T value){
         vari = value
     }
 }
@@ -705,7 +716,7 @@ Class can also accept type parameters with the following syntax:
 class Class<T>{
     T vari
 
-    def this(T value){
+    Class(T value){
         vari = value
     }
 }
@@ -717,7 +728,7 @@ Class<int> example = new Class<int>(0)
 Class use an entity, to store data. By default it use a marker entity but you can change it with the following syntax:
 ```
 class Cow with minecraft:cow for mcjava with minecraft:pig for mcbedrock{
-    def this(){
+    Cow(){
 
     }
 }
@@ -738,16 +749,16 @@ In this case, if a method is use it will take the one from A.
 To have proper method override you need to use `abstract`,`virtual`,`overriding` keyword like in c#.
 ```
 class A{
-    public abstract foo()
-    public virtual bar(){
+    public abstract void foo()
+    public virtual void bar(){
         /say I'm a
     }
 }
 class B extends A{
-    public override foo(){
+    public override void foo(){
         /say hi
     }
-    public override bar(){
+    public override void bar(){
         /say I'm b
         super.bar()
     }
@@ -762,7 +773,7 @@ a.bar() // call bar from B
 Templates are ways of having static class with inherritance.
 ```
 template example{
-    def test(){
+    void test(){
 
     }
 }
@@ -773,7 +784,7 @@ template example2 extends example{
 Template can be "Apply" with the following syntax:
 ```
 example2 foo{
-    def bar(){
+    void bar(){
         test()
     }
 }
@@ -781,11 +792,11 @@ example2 foo{
 
 Additionnaly, you can access the other of the template with the super keyword:
 ```
-def foo(){
+void foo(){
     ...
 }
 template example{
-    def foo(){
+    void foo(){
         super.foo()
     }
 }
@@ -811,7 +822,7 @@ Note that the first argument of the method is always the type itself.
 It is possible to add extension without importing the library with the following syntax:
 ```
 extension string{
-    def standard.string.length(string s) from standard.string as length
+    void standard.string.length(string s) from standard.string as length
 }
 ```
 This will add the method length to the string type. The method will be call length and will be from the standard.string library. The library will only be imported if the method is used.
@@ -822,7 +833,7 @@ Template can also accept type parameters with the following syntax:
 template example<T, U>{
     T vari = U
 
-    def __init__(T value){
+    void foo(T value){
         vari = value
     }
 }
@@ -835,7 +846,7 @@ example<int, 0> instance
 ### Macro Functions
 Macro functions only work for Minecraft Java and follow the same logic as in Datapack. A command with a $<variable> inside it will be replace by the value of the variable. Note that <variable> will not be usable inside the macro function as a variable for optimization purpose.
 ```
-def macro test(int a){
+macro void test(int a){
     /say $(a)
 }
 test(0)
@@ -847,7 +858,7 @@ With the `macroConvertToLazy` Compiler setting activated the function will be co
 ### Lazy Functions
 Lazy functions are also not exported into the output code. Instead when they are called, there content is replace at the call site.
 ```
-def lazy test(int a){
+lazy void test(int a){
     int b = a
 }
 test(0)
