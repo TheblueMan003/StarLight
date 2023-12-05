@@ -541,6 +541,44 @@ object Compiler{
                 case If(BinaryOperation("||", left, right), ifBlock, elseBlock) => {
                     compile(If(left, ifBlock, ElseIf(right, ifBlock) :: elseBlock), meta)
                 }
+                case For(typ, key, provider, instr) => {
+                    provider match
+                        case RangeValue(min, max, jump) => {
+                            val vari = context.getFreshVariable(typ)
+                            vari.assign("=", min)
+                            Execute.whileLoop(WhileLoop(BinaryOperation("<=", LinkedVariableValue(vari), max), InstructionList(List(
+                                        VariableDecl(List(key), typ, Modifier.newPrivate(), "=", LinkedVariableValue(vari)),
+                                        instr,
+                                        VariableAssigment(List((Right(vari), Selector.self)), "+=", jump)
+                                    ))))
+                        }
+                        case VariableValue(variName, selector) => {
+                            val classOpt = context.tryGetClass(variName)
+                            classOpt match{
+                                case Some(clazz) =>
+                                    Execute.withInstr(With(provider, BoolValue(false), BoolValue(true), InstructionList(List(
+                                        VariableDecl(List(key), typ, Modifier.newPrivate(), "=", VariableValue("this")),
+                                        instr
+                                    )), EmptyInstruction))
+                                case other => {
+                                    val (tree1,ite) = Utils.simplifyToLazyVariable(provider)
+                                    val (tree2,vari) = Utils.simplifyToLazyVariable(FunctionCallValue(VariableValue(ite.vari.fullName+".getIterator"), List(), List()))
+                                    tree1 ::: tree2 ::: Execute.whileLoop(WhileLoop(FunctionCallValue(VariableValue(vari.vari.fullName+".hasNext"), List(), List()), InstructionList(List(
+                                        VariableDecl(List(key), typ, Modifier.newPrivate(), "=", FunctionCallValue(VariableValue(vari.vari.fullName+".next"), List(), List())),
+                                        instr
+                                    ))))
+                                }
+                            }
+                        }
+                        case other => {
+                            val (tree1,ite) = Utils.simplifyToLazyVariable(provider)
+                            val (tree2,vari) = Utils.simplifyToLazyVariable(FunctionCallValue(VariableValue(ite.vari.fullName+".getIterator"), List(), List()))
+                            tree1 ::: tree2 ::: Execute.whileLoop(WhileLoop(FunctionCallValue(VariableValue(vari.vari.fullName+".hasNext"), List(), List()), InstructionList(List(
+                                VariableDecl(List(key), typ, Modifier.newPrivate(), "=", FunctionCallValue(VariableValue(vari.vari.fullName+".next"), List(), List())),
+                                instr
+                            ))))
+                        }
+                }
                 case ifb: If => Execute.ifs(ifb)
                 case swit: Switch => Execute.switch(swit)
                 case whl: WhileLoop => Execute.whileLoop(whl)

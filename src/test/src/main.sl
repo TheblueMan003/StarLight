@@ -2,15 +2,23 @@ package main
 
 import standard::print
 
-struct A{
-    int a
-    int b
+class C{
+    C(){
+        print("C")
+    }
+    void test(){
+
+    }
+    bool operator>=(C c){
+        return true
+    }
 }
 def test(){
-    A a
-    A b
-
-    if (a != b){
-        ./say hi
+    C c = new C()
+    if (c >= c){
+        print("true")
+    }
+    else{
+        print("false")
     }
 }

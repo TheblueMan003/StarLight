@@ -117,6 +117,7 @@ object Utils{
                 }
             case WhileLoop(cond, instr) => WhileLoop(cond, substReturn(instr, to))
             case DoWhileLoop(cond, instr) => DoWhileLoop(cond, substReturn(instr, to))
+            case For(typ, key, provider, instr) => For(typ, key, provider, substReturn(instr, to))
             case Break => instr
             case Continue => instr
 
@@ -177,6 +178,7 @@ object Utils{
             case Return(value) => Return(subst(value, from, to))
             case WhileLoop(cond, instr) => WhileLoop(subst(cond, from, to), subst(instr, from, to))
             case DoWhileLoop(cond, instr) => DoWhileLoop(subst(cond, from, to), subst(instr, from, to))
+            case For(typ, key, provider, instr) => For(typ, key, subst(provider, from, to), subst(instr, from, to))
             case Break => instr
             case Continue => instr
 
@@ -300,6 +302,7 @@ object Utils{
             case Return(value) => Return(subst(value, from, to))
             case WhileLoop(cond, instr) => WhileLoop(subst(cond, from, to), subst(instr, from, to))
             case DoWhileLoop(cond, instr) => DoWhileLoop(subst(cond, from, to), subst(instr, from, to))
+            case For(typ, key, provider, instr) => For(typ, key, subst(provider, from, to), subst(instr, from, to))
             case Break => instr
             case Continue => instr
 
@@ -435,6 +438,7 @@ object Utils{
             case Return(value) => Return(subst(value, from, to))
             case WhileLoop(cond, instr) => WhileLoop(subst(cond, from, to), subst(instr, from, to))
             case DoWhileLoop(cond, instr) => DoWhileLoop(subst(cond, from, to), subst(instr, from, to))
+            case For(typ, key, provider, instr) => For(typ, key, subst(provider, from, to), subst(instr, from, to))
             case Break => instr
             case Continue => instr
             case JSONFile(name, json, mod) => instr
@@ -486,6 +490,7 @@ object Utils{
             case Return(value) => instr
             case WhileLoop(cond, instr) => WhileLoop(cond, rmFunctions(instr))
             case DoWhileLoop(cond, instr) => DoWhileLoop(cond, rmFunctions(instr))
+            case For(typ, key, provider, instr) => For(typ, key, provider, rmFunctions(instr))
             case Break => instr
             case Continue => instr
             case JSONFile(name, json, mod) => instr
@@ -572,6 +577,7 @@ object Utils{
             case Return(value) => Return(fix(value))
             case WhileLoop(cond, instr) => WhileLoop(fix(cond), fix(instr))
             case DoWhileLoop(cond, instr) => DoWhileLoop(fix(cond), fix(instr))
+            case For(typ, key, provider, instr) => For(fix(typ), key, fix(provider), fix(instr))
             case Break => instr
             case Continue => instr
             case JSONFile(name, json, mod) => instr
@@ -1875,6 +1881,7 @@ object Utils{
     }
     def getOpFunctionName(op: String)={
         op match{
+            case "=" => "__set__"
             case "+=" => "__add__"
             case "-=" => "__sub__"
             case "*=" => "__mul__"

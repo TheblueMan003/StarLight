@@ -154,7 +154,8 @@ object Parser extends StandardTokenParsers {
     "sleep",
     "async",
     "await",
-    "assert"
+    "assert",
+    "operator"
   )
 
   /** Parses a block of instructions enclosed in curly braces.
@@ -163,6 +164,14 @@ object Parser extends StandardTokenParsers {
     */
   def block: Parser[Instruction] = positioned(
     "{" ~> rep(instruction <~ opt(";")) <~ "}" ^^ (p => InstructionBlock(p))
+  )
+
+  /** Parses a block of instructions enclosed in curly braces.
+    * @return
+    *   A parser for an instruction block.
+    */
+  def classBlock: Parser[Instruction] = positioned(
+    "{" ~> rep(classInstruction <~ opt(";")) <~ "}" ^^ (p => InstructionBlock(p))
   )
 
   /** Parses a block for extension of instructions enclosed in curly braces.
@@ -368,7 +377,7 @@ object Parser extends StandardTokenParsers {
       | ifs
       | "return" ~> opt(expr) ^^ { case e => Return(e.getOrElse(NullValue)) }
       | block
-      | switch | whileLoop | doWhileLoop | forLoop | repeatLoop | jsonFile
+      | switch | whileLoop | doWhileLoop | forLoop | forEachLoop | repeatLoop | jsonFile
       | "as" ~ "(" ~> exprNoTuple ~ ")" ~ instruction ^^ { case e ~ _ ~ i =>
         With(e, BoolValue(false), BoolValue(true), i, null)
       }
@@ -394,6 +403,33 @@ object Parser extends StandardTokenParsers {
       | throwError
       | tryCatchFinalyBlock
       | constructorCall ^^ { case c => FreeConstructorCall(c) }
+  )
+
+  def classInstruction: Parser[Instruction] = positioned(
+    functionDecl 
+      | constructorDecl
+      | operatorFunctionDecl
+      | structDecl
+      | extensionDecl
+      | caseStruct
+      | classDecl
+      | interfaceDecl
+      | caseClassDecl
+      | templateUse
+      | propertyDeclaration
+      | varDeclaration
+      | ifs
+      | jsonFile
+      | enumInstr
+      | forgenerate
+      | importShortInst
+      | importInst
+      | fromImportInst
+      | templateDesc
+      | typedef
+      | foreach
+      | predicate
+      | blocktag
   )
 
   /** Parses a function declaration and returns a FunctionDecl object.
@@ -438,6 +474,40 @@ object Parser extends StandardTokenParsers {
       ))) ~ types) ~ identLazy ~ typeArgument) ~ arguments) ~ functionInstruction ^^ {
         case doc ~ mod ~ t ~ n ~ at ~ a ~ i =>
           FunctionDecl(n, i, t, a, at, mod.withDoc(doc))
+      }
+
+    /** Parses a function declaration and returns a FunctionDecl object.
+    *
+    * @return
+    *   A Parser object that parses a function declaration and returns a
+    *   FunctionDecl object.
+    */
+  def constructorDecl: Parser[FunctionDecl] =
+    ((((doc ~ (modifier("function")))) ~ identLazy ~ typeArgument) ~ arguments) ~ functionInstruction ^^ {
+        case doc ~ mod ~ n ~ at ~ a ~ i =>
+          FunctionDecl("__init__", i, VoidType, a, at, mod.withDoc(doc))
+      }
+
+  def operator: Parser[String] = assignmentOp | "==" | "!=" | "<" | "<=" | ">" | ">="
+
+  /** Parses a function declaration and returns a FunctionDecl object.
+    *
+    * @return
+    *   A Parser object that parses a function declaration and returns a
+    *   FunctionDecl object.
+    */
+  def operatorFunctionDecl: Parser[FunctionDecl] =
+    ((((doc ~ ("def" ~> modifier(
+        "function"
+      ))) ~ "operator" ~ operator ~ typeArgument)) ~ arguments) ~ functionInstruction ^^ {
+        case doc ~ mod ~ _ ~ op ~ at ~ a ~ i =>
+          FunctionDecl(Utils.getOpFunctionName(op), i, VoidType, a, at, mod.withDoc(doc))
+      }
+      | ((((doc ~ (opt("def") ~> modifier(
+        "function"
+      ))) ~ types) ~ "operator" ~ operator ~ typeArgument) ~ arguments) ~ functionInstruction ^^ {
+        case doc ~ mod ~ t ~ _ ~ op ~ at ~ a ~ i =>
+          FunctionDecl(Utils.getOpFunctionName(op), i, t, a, at, mod.withDoc(doc))
       }
 
   /** Parses a function declaration and returns a FunctionDecl object.
@@ -689,7 +759,7 @@ object Parser extends StandardTokenParsers {
   def classDecl: Parser[Instruction] = positioned(
     doc ~ (modifier("class") <~ "class") ~ identLazy ~ typeArgument ~ opt(
       "extends" ~> ident2 ~ typeVariables
-    ) ~ interfaces ~ rep("with" ~> namespacedName ~ "for" ~ ident) ~ block ^^ {
+    ) ~ interfaces ~ rep("with" ~> namespacedName ~ "for" ~ ident) ~ classBlock ^^ {
       case doc ~ mod ~ iden ~ typeargs ~ par ~ interface ~ entity ~ block =>
         ClassDecl(
           iden,
@@ -714,7 +784,7 @@ object Parser extends StandardTokenParsers {
       "interface"
     ) <~ "interface") ~ identLazy ~ typeArgument ~ opt(
       "extends" ~> ident2 ~ typeVariables
-    ) ~ interfaces ~ block ^^ {
+    ) ~ interfaces ~ classBlock ^^ {
       case doc ~ mod ~ iden ~ typeargs ~ par ~ interface ~ block =>
         ClassDecl(
           iden,
@@ -739,7 +809,7 @@ object Parser extends StandardTokenParsers {
       "case"
     ) ~ "class") ~ identLazy ~ typeArgument ~ arguments ~ opt(
       "extends" ~> ident2 ~ typeVariables
-    ) ~ interfaces ~ rep("with" ~> namespacedName ~ "for" ~ ident) ~ block ^^ {
+    ) ~ interfaces ~ rep("with" ~> namespacedName ~ "for" ~ ident) ~ classBlock ^^ {
       case doc ~ mod ~ iden ~ typeargs ~ arguments ~ par ~ interface ~ entity ~ block =>
         val fieldsDecl = arguments.map { case Argument(n, t, _) =>
           VariableDecl(List(n), t, Modifier.newPublic(), null, null)
@@ -851,7 +921,7 @@ object Parser extends StandardTokenParsers {
   def structDecl: Parser[Instruction] = positioned(
     doc ~ (modifier("struct") <~ "struct") ~ identLazy ~ typeArgument ~ opt(
       "extends" ~> ident2
-    ) ~ block ^^ { case doc ~ mod ~ iden ~ typeargs ~ par ~ block =>
+    ) ~ classBlock ^^ { case doc ~ mod ~ iden ~ typeargs ~ par ~ block =>
       StructDecl(iden, typeargs, block, mod.withDoc(doc), par)
     }
   )
@@ -1003,6 +1073,15 @@ object Parser extends StandardTokenParsers {
           )
         )
       )
+  )
+
+  /** Parses a for loop.
+    * @return
+    *   An InstructionBlock containing a ForLoop and a WhileLoop.
+    */
+  def forEachLoop: Parser[Instruction] = positioned(
+    ("for" ~ "(" ~ types ~ ident2 ~ "in" ~ exprNoTuple ~ ")" ~ instruction) ^^
+      { case _ ~ _ ~ t ~ n ~ _ ~ e ~ _ ~ i => For(t, n, e, i) }
   )
 
   /** Parses a repeat loop.

@@ -171,7 +171,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 					// Add __eq__ & __ne__ functions if needed
 					if (!ctx.hasName("__eq__")){
 						val inner = tupleVari.map(v => BinaryOperation("==", LinkedVariableValue(v), VariableValue(Identifier.fromString("other."+v.name))))
-							.reduce((a,b) => BinaryOperation("&&", a, b))
+							.reduceOption((a,b) => BinaryOperation("&&", a, b)).getOrElse(BoolValue(true))
 
 						val fct = LazyFunction(ctx, ctx.getPath()+".__eq__", "__eq__", List(Argument("other", StructType(struct, sub), None)), BoolType, Modifier.newPublic(), Return(inner))
 						fct.generateArgument()(ctx)

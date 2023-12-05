@@ -626,7 +626,13 @@ struct vector3{
     int y
     int z
 
-    def __add__(vector other){
+    vector3(int x, int y, int z){
+        this.x = x
+        this.y = y
+        this.z = z
+    }
+
+    vector3 operator += (vector other){
         x += other.x
         y += other.y
         z += other.z
@@ -640,7 +646,7 @@ vector3 b
 a.x = 0
 a += b
 ```
-Here is the list of possible operator overloading:
+Here is the list of possible operator overloading: (Left is the hidden method name, right is the operator)
 * `__set__`: `=`
 * `__add__`: `+=`
 * `__sub__`: `-=`

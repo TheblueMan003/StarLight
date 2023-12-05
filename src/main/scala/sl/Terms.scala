@@ -78,7 +78,10 @@ case class ForGenerate(val key: String, val provider: Expression, val instr: Ins
   override def toString() = f"forgenerate($key, $provider)$instr"
 }
 case class ForEach(val key: Identifier, val provider: Expression, val instr: Instruction) extends Instruction {
-  override def toString() = f"foreach($key, $provider)$instr"
+  override def toString() = f"foreach($key in $provider)$instr"
+}
+case class For(val typ: Type, val key: String, val provider: Expression, val instr: Instruction) extends Instruction {
+  override def toString() = f"for($typ $key in $provider)$instr"
 }
 
 case class VariableDecl(val name: List[String], val _type: Type, val modifier: Modifier, val op: String, val expr: Expression) extends Instruction {
