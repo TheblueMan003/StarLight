@@ -13,7 +13,7 @@ class C{
         return true
     }
 }
-def test(){
+def test(a: int){
     C c = new C()
     if (c >= c){
         print("true")

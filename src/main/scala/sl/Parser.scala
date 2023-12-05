@@ -328,9 +328,8 @@ object Parser extends StandardTokenParsers {
     *   A parser for a function argument.
     */
   def argument: Parser[Argument] =
-    types ~ identLazy ~ opt("=" ~> exprNoTuple) ^^ { case typ ~ name ~ value  =>
-      Argument(name, typ, value)
-    }
+    types ~ identLazy ~ opt("=" ~> exprNoTuple) ^^ { case typ ~ name ~ value  => Argument(name, typ, value) } |
+    identLazy ~ ":" ~ types ~ opt("=" ~> exprNoTuple) ^^ { case name ~ _ ~ typ ~ value  => Argument(name, typ, value) }
 
   /** Parses a list of function arguments.
     * @return
