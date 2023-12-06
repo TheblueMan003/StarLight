@@ -155,7 +155,9 @@ object Parser extends StandardTokenParsers {
     "async",
     "await",
     "assert",
-    "operator"
+    "operator",
+    "break",
+    "delete"
   )
 
   /** Parses a block of instructions enclosed in curly braces.
@@ -375,6 +377,7 @@ object Parser extends StandardTokenParsers {
       | "%%%" ~> stringLit2 <~ "%%%" ^^ { p => CMD(p) }
       | ifs
       | "return" ~> opt(expr) ^^ { case e => Return(e.getOrElse(NullValue)) }
+      | "break" ^^^ Break
       | block
       | switch | whileLoop | doWhileLoop | forLoop | forEachLoop | repeatLoop | jsonFile
       | "as" ~ "(" ~> exprNoTuple ~ ")" ~ instruction ^^ { case e ~ _ ~ i =>
@@ -402,6 +405,7 @@ object Parser extends StandardTokenParsers {
       | throwError
       | tryCatchFinalyBlock
       | constructorCall ^^ { case c => FreeConstructorCall(c) }
+      | destructorCall
   )
 
   def classInstruction: Parser[Instruction] = positioned(
@@ -487,7 +491,7 @@ object Parser extends StandardTokenParsers {
           FunctionDecl("__init__", i, VoidType, a, at, mod.withDoc(doc))
       }
 
-  def operator: Parser[String] = assignmentOp | "==" | "!=" | "<" | "<=" | ">" | ">="
+  def operator: Parser[String] = assignmentOp | "==" | "!=" | "<" | "<=" | ">" | ">=" | "delete" | ("("~")" ^^^ "()")
 
   /** Parses a function declaration and returns a FunctionDecl object.
     *
@@ -1961,6 +1965,23 @@ object Parser extends StandardTokenParsers {
         exprNoTuple,
         ","
       ) <~ ")") ^^ { case f ~ t ~ a => ConstructorCall(f, a, t) }
+
+  /** Parses a constructor call expression, which can take one of the following
+    * forms:
+    *   - "new" followed by type variables and a list of expressions in
+    *     parentheses.
+    *   - "new" followed by non-recursive types and a list of expressions in
+    *     square brackets.
+    *   - "new" followed by an identifier, type variables, a list of expressions
+    *     in parentheses, and a block.
+    *   - "new" followed by an identifier, type variables, and a list of
+    *     expressions in parentheses. Returns a ConstructorCall object.
+    *
+    * @return
+    *   A Parser that returns a ConstructorCall object.
+    */
+  def destructorCall: Parser[DestructorCall] =
+    "delete" ~> expr ^^ { case e => DestructorCall(e) }
 
   /** Parses a simple expression
     *

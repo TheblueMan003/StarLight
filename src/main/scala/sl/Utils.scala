@@ -102,6 +102,7 @@ object Utils{
             case FunctionCall(name, args, typeargs) => instr
             case DotCall(expr, fct) => instr
             case FreeConstructorCall(expr) => instr
+            case DestructorCall(expr) => instr
             case ArrayAssigment(name, index, op, value) => instr
             case LinkedFunctionCall(name, args, vari) => instr
             case VariableAssigment(name, op, expr) => instr
@@ -168,6 +169,7 @@ object Utils{
             case FunctionCall(name, args, typeargs) => FunctionCall(name.replaceAllLiterally(from, to), args.map(subst(_, from, to)), typeargs)
             case DotCall(expr, fct) => DotCall(subst(expr, from, to), subst(fct, from, to).asInstanceOf[FunctionCall])
             case FreeConstructorCall(expr) => FreeConstructorCall(subst(expr, from, to))
+            case DestructorCall(expr) => DestructorCall(subst(expr, from, to))
             case LinkedFunctionCall(name, args, vari) => LinkedFunctionCall(name, args.map(subst(_, from, to)), vari)
             case ArrayAssigment(name, index, op, value) => {
                 ArrayAssigment(subst(name, from, to), index.map(subst(_, from, to)), op, subst(value, from, to))
@@ -295,6 +297,7 @@ object Utils{
             case DotCall(expr, fct) => DotCall(subst(expr, from, to), subst(fct, from, to).asInstanceOf[FunctionCall])
             case LinkedFunctionCall(name, args, vari) => LinkedFunctionCall(name, args.map(subst(_, from, to)), vari)
             case FreeConstructorCall(expr) => FreeConstructorCall(subst(expr, from, to))
+            case DestructorCall(expr) => DestructorCall(subst(expr, from, to))
             case VariableAssigment(name, op, expr) => VariableAssigment(name.map((l,s) => (subst(l, from, to), s)), op, subst(expr, from, to))
             case ArrayAssigment(name, index, op, value) => {
                 ArrayAssigment(subst(name, from, to), index.map(subst(_, from, to)), op, subst(value, from, to))
@@ -431,6 +434,7 @@ object Utils{
             case DotCall(expr, fct) => DotCall(subst(expr, from, to), subst(fct, from, to).asInstanceOf[FunctionCall])
             case LinkedFunctionCall(name, args, vari) => LinkedFunctionCall(name, args.map(subst(_, from, to)), vari)
             case FreeConstructorCall(expr) => FreeConstructorCall(subst(expr, from, to))
+            case DestructorCall(expr) => DestructorCall(subst(expr, from, to))
             case VariableAssigment(name, op, expr) => VariableAssigment(name, op, subst(expr, from, to))
             case ArrayAssigment(name, index, op, value) => {
                 ArrayAssigment(name, index.map(subst(_, from, to)), op, subst(value, from, to))
@@ -485,6 +489,7 @@ object Utils{
             case DotCall(expr, fct) => instr
             case LinkedFunctionCall(name, args, vari) => instr
             case FreeConstructorCall(expr) => instr
+            case DestructorCall(expr) => instr
             case VariableAssigment(name, op, expr) => instr
             case ArrayAssigment(name, index, op, value) => instr
             case Return(value) => instr
@@ -572,6 +577,7 @@ object Utils{
             case DotCall(expr, fct) => DotCall(fix(expr), fix(fct)(context, ignore + fct.name.toString()).asInstanceOf[FunctionCall])
             case LinkedFunctionCall(name, args, vari) => LinkedFunctionCall(name, args.map(fix(_)), vari)
             case FreeConstructorCall(expr) => FreeConstructorCall(fix(expr))
+            case DestructorCall(expr) => DestructorCall(fix(expr))
             case VariableAssigment(name, op, expr) => VariableAssigment(name.map{case (v, s) => (fix(v),s)}, op, fix(expr))
             case ArrayAssigment(name, index, op, expr) => ArrayAssigment(fix(name), index.map(fix(_)), op, fix(expr))
             case Return(value) => Return(fix(value))
@@ -792,9 +798,8 @@ object Utils{
             case VariableValue(name, sel) => simplifyToLazyVariable(context.resolveVariable(expr))
             case LinkedVariableValue(name, sel) => (List(), LinkedVariableValue(name, sel))
             case FunctionCallValue(VariableValue(name, sel), args, typeargs, selector) => {
-                val vari = context.getFreshVariable(typeof(expr))
-
                 val fct = context.getFunction(name, args, typeargs, VoidType)
+                val vari = context.getFreshVariable(fct._1.getTrueType())
 
                 vari.modifiers.isLazy = !fct._1.modifiers.hasAttributes("requiresVariable")
                 
@@ -858,7 +863,7 @@ object Utils{
                         
                     case other => throw new Exception(f"Illegal array access of $name of type $other")
             }
-            case LinkedFunctionValue(fct) => FuncType(fct.arguments.map(_.typ), fct.getType())
+            case LinkedFunctionValue(fct) => FuncType(fct.arguments.map(_.typ), fct.getTrueType())
             case DefaultValue => throw new Exception(f"default value has no type")
             case NullValue => AnyType
             case VariableValue(name, sel) => {
@@ -870,7 +875,7 @@ object Utils{
                             case None => {
                                 try{
                                     val fct = context.getFunction(name)
-                                    FuncType(fct.arguments.map(_.typ), fct.getType())
+                                    FuncType(fct.arguments.map(_.typ), fct.getTrueType())
                                 }catch{
                                     _ => AnyType
                                 }
@@ -893,7 +898,7 @@ object Utils{
             case FunctionCallValue(name, args, typeargs, selector) => {
                 try{
                     name match
-                        case VariableValue(name, sel) => context.getFunction(name, args, typeargs, AnyType)._1.getType()
+                        case VariableValue(name, sel) => context.getFunction(name, args, typeargs, AnyType)._1.getTrueType()
                         case other => typeof(name) match
                             case FuncType(sources, output) => output
                             case other => throw new Exception(f"Cannot call $other")
@@ -910,6 +915,7 @@ object Utils{
             case _ if noError => AnyType
             case other => throw new Exception(f"Cannot get type of $other")
     }
+    case class ForceStringConversionException(expr: Expression) extends Exception(f"Cannot convert $expr to string")
     def forceString(expr: Expression)(implicit context: Context): String = {
         expr match
             case IntValue(value) => value.toString()
@@ -921,7 +927,7 @@ object Utils{
             case VariableValue(name, sel) => name.toString()
             case BinaryOperation("+", left, right) => forceString(left) + forceString(right)
             case UnaryOperation("-", left) => "-"+forceString(left)
-            case other => throw new Exception(f"Cannot convert $other to string")
+            case other => throw new ForceStringConversionException(other)
     }
 
     def combineType(op: String, t1: Type, t2: Type, expr: Expression): Type = {
@@ -1896,6 +1902,8 @@ object Utils{
             case "!=" => "__ne__"
             case ">"  => "__gt__"
             case ">=" => "__ge__"
+            case "delete" => "__destroy__"
+            case "()" => "__apply__"
         }
     }
     def invertOperator(op: String)={

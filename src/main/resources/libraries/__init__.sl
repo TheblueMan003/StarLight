@@ -95,6 +95,15 @@ def lazy __at__(float x, float y, float z, void=>void fct){
     }
 }
 
+def lazy __at__(string mx, float x, string my, float y, string mz, float z, void=>void fct){
+    def macro inner(string mx, float x, string my, float y, string mz, float z){
+        at("$(mx)$(x) $(my)$(y) $(mz)$(z)"){
+            fct()
+        }
+    }
+    inner(mx, x, my, y, mz, z)
+}
+
 template Template{
 }
 
@@ -109,11 +118,20 @@ class object{
     }
     def virtual __destroy__(){
     }
+    def __delete__(){
+        __destroy__()
+        /kill
+    }
     def __remRef(){
         if (__refCount > 0) __refCount--
         if (__refCount == 0){
-            __destroy__()
-            /kill
+            __delete__()
+        }
+    }
+
+    if (Compiler.isJava()){
+        virtual string toString(){
+            return "object@" + __ref
         }
     }
 

@@ -173,6 +173,9 @@ case class InstructionBlock(val list: List[Instruction]) extends Instruction {
 case class FreeConstructorCall(val expr: Expression) extends Instruction{
     override def toString() = f"new ${expr}()"
 }
+case class DestructorCall(val expr: Expression) extends Instruction{
+    override def toString() = f"delete ${expr}"
+}
 trait ExecuteType
 case object AtType extends ExecuteType{
   override def toString() = f"at"

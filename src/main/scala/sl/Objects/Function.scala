@@ -57,6 +57,10 @@ abstract class Function(context: Context, val contextName: String, name: String,
         modifiers.isOverride && (overridedFunction != null && overridedFunction.hasVirtualOverride)
     }
 
+    def getTrueType(): Type = {
+        getType()
+    }
+
     if (modifiers.isVirtual){
 
     }
@@ -549,6 +553,12 @@ class OptionalFunction(context: Context, variable: Variable, name: String, lib: 
             function.call(ret, retSel, op)(ctx)
         }
     }
+
+    override def getTrueType(): Type = {
+        context.requestLibrary(lib)
+        val function = context.getFunction(fct, arguments.map(_.typ), List(), VoidType, false, false)
+        function.getType()
+    }
 }
 
 class ExtensionFunction(context: Context, variable: Variable, fct: Function) extends Function(context, fct.contextName, fct.name, fct.arguments, fct.getType(), fct.modifiers){
@@ -559,6 +569,10 @@ class ExtensionFunction(context: Context, variable: Variable, fct: Function) ext
 
     override def getContent(): List[IRTree] = List()
     override def getName(): String = fct.name
+
+    override def getTrueType(): Type = {
+        fct.getTrueType()
+    }
 
     def call(args2: List[Expression], ret: Variable = null, retSel: Selector = Selector.self, op: String = "=")(implicit ctx: Context): List[IRTree] = {
         val args = LinkedVariableValue(variable) :: args2

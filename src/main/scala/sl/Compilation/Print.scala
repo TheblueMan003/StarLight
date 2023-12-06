@@ -6,6 +6,7 @@ import sl.Utils
 import sl.*
 import objects.types.*
 import sl.IR.*
+import objects.Identifier
 
 private lazy val colorMap = Utils.getConfig("color.csv")
                             .map(l => l.split(";").toList)
@@ -129,6 +130,14 @@ object Print{
                         case StringType => (List(), List(PrintNBT(vari, col, mod)))
                         case JsonType => (List(), List(PrintNBT(vari, col, mod)))
                         case EntityType => (List(), List(PrintSelector(vari.getEntityVariableSelector(), col, mod)))
+                        case StructType(_, _) | ClassType(_, _) => {
+                            ctx.tryGetFunction(Identifier.fromString(vari.fullName+".toString"), List(), List(), StringType, false) match
+                                case None => (List(), List(PrintVariable(vari, sel, col, mod)))
+                                case Some((fct, args)) => {
+                                    val (p1, print) = toRawJson(FunctionCallValue(LinkedFunctionValue(fct), args, List(), sel))
+                                    (p1, print)
+                                }
+                        }
                         case other => (List(), List(PrintVariable(vari, sel, col, mod)))
                 }
             }

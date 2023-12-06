@@ -158,7 +158,12 @@ object Execute{
                             value.getAllPosition().flatMap(pos => makeExecute(x => PositionedIR(pos.getString(), x), block))
                         }
                         else{
-                            makeExecute(x => PositionedIR(value.getString(), x), Compiler.compile(exec.block))
+                            try{
+                                makeExecute(x => PositionedIR(value.getString(), x), Compiler.compile(exec.block))
+                            }
+                            catch {
+                                case Utils.ForceStringConversionException(_) => Compiler.compile(FunctionCall("__at__", value.getMacroArguments() ::: List(LinkedFunctionValue(context.getFreshBlock(Compiler.compile(exec.block)))), List()))
+                            }
                         }
                     case SelectorValue(value) => {
                         val (prefix, _, selector) = Utils.getSelector(exec.exprs.head)

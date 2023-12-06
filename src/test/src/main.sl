@@ -2,23 +2,23 @@ package main
 
 import standard::print
 
-class C{
-    C(){
-        print("C")
+struct C(int a){
+    string toString(){
+        return "hi"
     }
-    void test(){
+}
 
-    }
-    bool operator>=(C c){
-        return true
-    }
+class D{
+
 }
-def test(a: int){
-    C c = new C()
-    if (c >= c){
-        print("true")
+
+def test(){
+    var x = 1
+    var y = 2
+    var z = 3
+    at({~x, ~y, ~z}){
+        print(x)
+        print(y)
+        print(z)
     }
-    else{
-        print("false")
-    }
-}
+}   

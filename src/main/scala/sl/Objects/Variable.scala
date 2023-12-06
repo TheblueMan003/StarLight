@@ -729,7 +729,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			case FloatValue(value) => tupleVari.flatMap(_.assign(op, valueE))
 			case EnumIntValue(value) => tupleVari.flatMap(_.assign(op, valueE))
 			case DefaultValue => ???
-			case NullValue => ???
+			case NullValue => throw new Exception("Cannot assign null to range")
 			case VariableValue(name, sel) => tupleVari.flatMap(_.assign(op, valueE))
 			case LinkedVariableValue(vari, sel) => 
 				if (vari.getType().isInstanceOf[RangeType]) {

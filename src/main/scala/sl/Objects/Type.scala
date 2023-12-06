@@ -454,6 +454,7 @@ case class ClassType(clazz: Class, sub: List[Type]) extends Type {
       case AnyType                                                   => 10000
       case _ => outOfBound
   }
+  
   override def isSubtypeOf(other: Type)(implicit context: Context): Boolean = {
     other match
       case ClassType(clz, sub2) => clazz.hasParent(clz) && sub == sub2
@@ -466,6 +467,8 @@ case class ClassType(clazz: Class, sub: List[Type]) extends Type {
   override def isDirectEqualitable(): Boolean = true
   override def isComparaisonSupported(): Boolean = true
   override def isEqualitySupported(): Boolean = true
+
+  override def generateExtensionFunction(variable: Variable)(implicit context: Context): Unit = {}
 }
 case object TypeType extends Type {
   override def toString(): String = "type"

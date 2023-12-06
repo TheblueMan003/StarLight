@@ -203,6 +203,10 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
         varId += 1
         "lambda_"+varId.toString()
     }
+    def getFreshVariableName()= synchronized{
+        varId += 1
+        "_"+varId.toString()
+    }
     def getFreshVariable(typ: Type): Variable = {
         synchronized{
             varId += 1
@@ -519,8 +523,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
             }
         })
         array.appendAll(extensions.getOrElse(typ, List()))
-        if (parent != null && !set.contains(parent)){
-            set.add(parent)
+        if (parent != null){
             parent.getAllExtension(typ, set, array)
         }
     }

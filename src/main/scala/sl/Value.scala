@@ -472,12 +472,29 @@ case class PositionValue(
   override def hasIntValue(): Boolean = false
   override def hasFloatValue(): Boolean = false
   override def getFloatValue(): Double = ???
+
+  override def canEqual(that: Any): Boolean = ???
   override def getString()(implicit context: Context): String =
     val px = Utils.forceString(x)
     val py = Utils.forceString(y)
     val pz = Utils.forceString(z)
 
     f"${px} ${py} ${pz}"
+
+  def unpack(expr: Expression): (Expression, Expression) = {
+    expr match {
+      case BinaryOperation("+", StringValue("^"), right) => (StringValue("^"), right)
+      case BinaryOperation("+", StringValue("~"), right) => (StringValue("~"), right)
+      case other => (StringValue(""), other)
+    }
+  }
+
+  def getMacroArguments()(implicit context: Context): List[Expression] = {
+    val px = unpack(x)
+    val py = unpack(y)
+    val pz = unpack(z)
+    List(px._1, px._2, py._1, py._2, pz._1, pz._2)
+  }
   def isRanged(): Boolean = {
     List(x, y, z)
       .map(p => {

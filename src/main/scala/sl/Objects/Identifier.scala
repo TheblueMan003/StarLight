@@ -1,10 +1,12 @@
 package objects
 
+import scala.util.parsing.input.Positional
+
 object Identifier:
   given fromString: Conversion[String, Identifier] =
     (s => Identifier(s.split("\\.").toList))
 
-case class Identifier(values: List[String]) {
+case class Identifier(values: List[String]) extends Positional {
   def child(name: String): Identifier = {
     Identifier(values ::: List(name))
   }

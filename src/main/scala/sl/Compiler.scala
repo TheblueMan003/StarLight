@@ -10,6 +10,7 @@ import sl.IR.*
 import scala.collection.parallel.CollectionConverters._
 import scala.collection.mutable.ArrayBuffer
 import objects.MacroFunction
+import sl.Utils.simplifyToVariable
 
 object Compiler{
     def compile(context: Context):List[IRFile] = {
@@ -538,6 +539,10 @@ object Compiler{
                     val vari = context.getFreshVariable(Utils.typeof(call))
                     vari.assign("nullPointerAssign", call)
                 }
+                case DestructorCall(expr) => {
+                    val (tree, vari) = simplifyToVariable(expr)
+                    tree ::: Compiler.compile(FunctionCall(Identifier.fromString(vari.vari.fullName+"."+"__delete__"), List(), List())) ::: vari.vari.assign("=", NullValue)
+                }
                 case If(BinaryOperation("||", left, right), ifBlock, elseBlock) => {
                     compile(If(left, ifBlock, ElseIf(right, ifBlock) :: elseBlock), meta)
                 }
@@ -552,6 +557,15 @@ object Compiler{
                                         VariableAssigment(List((Right(vari), Selector.self)), "+=", jump)
                                     ))))
                         }
+                        case JsonValue(JsonArray(elements)) => {
+                            var id = context.getFreshVariableName()
+                            Compiler.compile(
+                                ForEach(id, provider, InstructionBlock(List(
+                                    VariableDecl(List(key), typ, Modifier.newPrivate(), "=", VariableValue(id)),
+                                    instr
+                                )))
+                            )
+                        }
                         case VariableValue(variName, selector) => {
                             val classOpt = context.tryGetClass(variName)
                             classOpt match{
@@ -562,7 +576,7 @@ object Compiler{
                                     )), EmptyInstruction))
                                 case other => {
                                     val (tree1,ite) = Utils.simplifyToLazyVariable(provider)
-                                    val (tree2,vari) = Utils.simplifyToLazyVariable(FunctionCallValue(VariableValue(ite.vari.fullName+".getIterator"), List(), List()))
+                                    val (tree2,vari) = Utils.simplifyToLazyVariable(FunctionCallValue(VariableValue(ite.vari.fullName+".iterator"), List(), List()))
                                     tree1 ::: tree2 ::: Execute.whileLoop(WhileLoop(FunctionCallValue(VariableValue(vari.vari.fullName+".hasNext"), List(), List()), InstructionList(List(
                                         VariableDecl(List(key), typ, Modifier.newPrivate(), "=", FunctionCallValue(VariableValue(vari.vari.fullName+".next"), List(), List())),
                                         instr
@@ -572,7 +586,7 @@ object Compiler{
                         }
                         case other => {
                             val (tree1,ite) = Utils.simplifyToLazyVariable(provider)
-                            val (tree2,vari) = Utils.simplifyToLazyVariable(FunctionCallValue(VariableValue(ite.vari.fullName+".getIterator"), List(), List()))
+                            val (tree2,vari) = Utils.simplifyToLazyVariable(FunctionCallValue(VariableValue(ite.vari.fullName+".iterator"), List(), List()))
                             tree1 ::: tree2 ::: Execute.whileLoop(WhileLoop(FunctionCallValue(VariableValue(vari.vari.fullName+".hasNext"), List(), List()), InstructionList(List(
                                 VariableDecl(List(key), typ, Modifier.newPrivate(), "=", FunctionCallValue(VariableValue(vari.vari.fullName+".next"), List(), List())),
                                 instr
