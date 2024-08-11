@@ -63,7 +63,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 	val tagName = modifiers.getAttributesString("tag", ()=>variName)(context)
 	var wasAssigned = false
 	lazy val scoreboard = if modifiers.isEntity then modifiers.getAttributesString("name", ()=>context.getScoreboardID(this))(context) else ""
-	lazy val variableScoreboard = modifiers.getAttributesString("scoreboard", ()=>Settings.variableScoreboard)(context)
+	lazy val variableScoreboard = modifiers.getAttributesString("score", ()=>Settings.variableScoreboard)(context)
 	lazy val inGameName = modifiers.getAttributesString("name", ()=>variName)(context)
 	lazy val criterion = modifiers.getAttributesString("criterion", ()=>"dummy")(context)
 	var lazyValue: Expression = DefaultValue

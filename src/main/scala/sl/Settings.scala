@@ -101,10 +101,10 @@ case object MCJava extends Target{
     def hasFeature(feature: String): Boolean = features.exists(x => x == feature)
 
     def getFunctionPath(path: String): String = {
-        "/data/" + path.replaceAll("([A-Z])","-$1").toLowerCase().replaceAllLiterally(".","/").replaceFirst("/", "/functions/")+ ".mcfunction"
+        "/data/" + path.replaceAll("([A-Z])","-$1").toLowerCase().replaceAllLiterally(".","/").replaceFirst("/", "/function/")+ ".mcfunction"
     }
     def getPredicatePath(path: String): String = {
-        "/data/" + path.replaceAll("([A-Z])","-$1").toLowerCase().replaceAllLiterally(".","/").replaceFirst("/", "/predicates/")+ ".json"
+        "/data/" + path.replaceAll("([A-Z])","-$1").toLowerCase().replaceAllLiterally(".","/").replaceFirst("/", "/predicate/")+ ".json"
     }
     def getFunctionName(path: String): String = {
         path.replaceAll("([A-Z])","-$1").toLowerCase().replaceAllLiterally(".","/").replaceFirst("/", ":")
@@ -146,9 +146,9 @@ case object MCJava extends Target{
         
 
         List(IRFile("pack.mcmeta", "pack.mcmeta", List(JsonIR(getPackMeta())), List(), true),
-            IRFile(f"data/${context.root.getPath()}/functions/__init__.mcfunction", "__init__", dfScore,List(), false, false),
-            IRFile("data/minecraft/tags/functions/tick.json", "data/minecraft/tags/functions/tick.json", List(JsonIR("{"+ f"\t\"values\":[$ticks]"+ "}")), List(),true),
-            IRFile("data/minecraft/tags/functions/load.json", "data/minecraft/tags/functions/load.json", List(JsonIR("{"+ f"\t\"values\":[$loads]"+ "}")), List(),true))
+            IRFile(f"data/${context.root.getPath()}/function/__init__.mcfunction", "__init__", dfScore,List(), false, false),
+            IRFile("data/minecraft/tags/function/tick.json", "data/minecraft/tags/function/tick.json", List(JsonIR("{"+ f"\t\"values\":[$ticks]"+ "}")), List(),true),
+            IRFile("data/minecraft/tags/function/load.json", "data/minecraft/tags/function/load.json", List(JsonIR("{"+ f"\t\"values\":[$loads]"+ "}")), List(),true))
     }
 
     def getPackMeta()=

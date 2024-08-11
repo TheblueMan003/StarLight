@@ -526,6 +526,10 @@ object Compiler{
                             val (prev, vari) = Utils.simplifyToLazyVariable(expr)
                             prev ::: compile(FunctionCall(Identifier.fromString(vari.vari.fullName+"."+name), args, typeargs))
                         }
+                        case ArrayGetValue(LinkedVariableValue(arr, sel), index) => {
+                            val (prev, vari) = Utils.simplifyToVariable(expr)
+                            prev ::: compile(FunctionCall(Identifier.fromString(vari.vari.fullName+"."+name), args, typeargs)) ::: compile(ArrayAssigment(Right(arr), index, "=", vari))
+                        }
                         case other => {
                             val (prev, vari) = Utils.simplifyToVariable(expr)
                             prev ::: compile(FunctionCall(Identifier.fromString(vari.vari.fullName+"."+name), args, typeargs))

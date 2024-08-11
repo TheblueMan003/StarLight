@@ -257,14 +257,14 @@ case class Namecolor(val color: String) extends PrintColor{
 case class TextModdifier(var bold: Boolean, var obfuscated: Boolean, var strikethrough: Boolean, var underlined: Boolean, var italic: Boolean, var link: String){
     def toJava()(implicit ctx: Context): String = {
         var ret = ""
-        ret += f"\"bold\":\"$bold\","
-        ret += f"\"obfuscated\":\"$obfuscated\","
-        ret += f"\"strikethrough\":\"$strikethrough\","
-        ret += f"\"underlined\":\"$underlined\","
+        ret += f"\"bold\":$bold,"
+        ret += f"\"obfuscated\":$obfuscated,"
+        ret += f"\"strikethrough\":$strikethrough,"
+        ret += f"\"underlined\":$underlined,"
         if (link != null && link != ""){
             ret += f"\"clickEvent\":{\"action\":\"open_url\",\"value\":\"$link\"},"
         }
-        ret += f"\"italic\":\"$italic\""
+        ret += f"\"italic\":$italic"
         ret
     }
     def toBedrock()(implicit ctx: Context): String = {

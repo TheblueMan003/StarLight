@@ -14,16 +14,16 @@ trait TagType {
 }
 case object BlockTag extends TagType {
   override def path(fullName: String): String =
-    fullName.replaceFirst("\\.", ".tags.blocks.")
+    fullName.replaceFirst("\\.", ".tags.block.")
 
 }
 case object ItemTag extends TagType {
   override def path(fullName: String): String =
-    fullName.replaceFirst("\\.", ".tags.items.")
+    fullName.replaceFirst("\\.", ".tags.item.")
 }
 case object EntityTag extends TagType {
   override def path(fullName: String): String =
-    fullName.replaceFirst("\\.", ".tags.entity_types.")
+    fullName.replaceFirst("\\.", ".tags.entity_type.")
 }
 class Tag(
     context: Context,
