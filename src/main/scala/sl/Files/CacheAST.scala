@@ -37,8 +37,8 @@ object CacheAST{
         }
     }
     def normalize(name: String):String={
-        if name.endsWith(".sl") then normalize(name.substring(0, name.size - 3))
-        else if name.startsWith("./") || name.startsWith(".\\") then normalize(name.substring(2))
+        if ((name.endsWith(".sl"))) normalize(name.substring(0, name.size - 3))
+        else if ((name.startsWith("./") || name.startsWith(".\\"))) normalize(name.substring(2))
         else name.replace(".", "/").replace("\\", "/")
     }
 }

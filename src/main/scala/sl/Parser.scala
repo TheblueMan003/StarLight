@@ -769,8 +769,8 @@ object Parser extends StandardTokenParsers {
           typeargs,
           block,
           mod.withDoc(doc),
-          if par.isDefined then Some(par.get._1) else None,
-          if par.isDefined then (par.get._2) else List(),
+          if (par.isDefined) Some(par.get._1) else None,
+          if (par.isDefined) (par.get._2) else List(),
           interface,
           entity.map { case e ~ _ ~ n => (n, e) }.toMap
         )
@@ -794,8 +794,8 @@ object Parser extends StandardTokenParsers {
           typeargs,
           block,
           mod.withDoc(doc),
-          if par.isDefined then Some(par.get._1) else None,
-          if par.isDefined then (par.get._2) else List(),
+          if (par.isDefined) Some(par.get._1) else None,
+          if (par.isDefined) (par.get._2) else List(),
           interface,
           Map()
         )
@@ -843,8 +843,8 @@ object Parser extends StandardTokenParsers {
           typeargs,
           InstructionList(fieldsDecl ::: List(constructor, block)),
           mod.withDoc(doc),
-          if par.isDefined then Some(par.get._1) else None,
-          if par.isDefined then (par.get._2) else List(),
+          if (par.isDefined) Some(par.get._1) else None,
+          if (par.isDefined) (par.get._2) else List(),
           interface,
           entity.map { case e ~ _ ~ n => (n, e) }.toMap
         )
@@ -1486,7 +1486,7 @@ object Parser extends StandardTokenParsers {
       opt("else" ~> instruction) ^^ { p =>
         {
           val elze =
-            p._1._2.map(k => ElseIf(k._1, k._2)) ::: (if p._2.isEmpty then Nil
+            p._1._2.map(k => ElseIf(k._1, k._2)) ::: (if (p._2.isEmpty) Nil
                                                       else
                                                         List(
                                                           ElseIf(
@@ -2348,28 +2348,28 @@ object Parser extends StandardTokenParsers {
     */
   def expr: Parser[Expression] = positioned(
     rep1sep(exprNoTuple, ",") ^^ (p =>
-      if p.length == 1 then p.head else TupleValue(p)
+      if (p.length == 1) p.head else TupleValue(p)
     )
   )
 
   def unpackCast(p: (Expression ~ List[Type])): Expression = {
-    if p._2.isEmpty then p._1 else CastValue(p._1, p._2.last)
+    if (p._2.isEmpty) p._1 else CastValue(p._1, p._2.last)
   }
 
   def unpackForSelect(
       p: (Expression ~ List[String ~ String ~ Expression])
   ): Expression = {
-    if p._2.isEmpty then p._1
+    if (p._2.isEmpty) p._1
     else p._2.foldLeft(p._1)((e, p) => ForSelect(e, p._1._1, p._2))
   }
 
   def unpack(op: String, p: (Expression ~ List[Expression])): Expression = {
-    if p._2.isEmpty then p._1
+    if (p._2.isEmpty) p._1
     else p._2.foldLeft(p._1)(BinaryOperation(op, _, _))
   }
 
   def unpack(p: (Expression ~ List[String ~ Expression])): Expression = {
-    if p._2.isEmpty then p._1
+    if (p._2.isEmpty) p._1
     else p._2.foldLeft(p._1)((e, p) => BinaryOperation(p._1, e, p._2))
   }
 
@@ -2394,7 +2394,7 @@ object Parser extends StandardTokenParsers {
     ident2 ~ typeVariablesForce ^^ { case n ~ t => IdentifierType(n, t) } |
       ident2 ^^ { identifierType(_) } |
       (("(" ~> types) ~ rep("," ~> types)) <~ ")" ^^ (p =>
-        if p._2.length > 0 then TupleType(p._1 :: p._2) else p._1
+        if (p._2.length > 0) TupleType(p._1 :: p._2) else p._1
       )
 
   def types: Parser[Type] =
@@ -2455,22 +2455,22 @@ object Parser extends StandardTokenParsers {
           case _                 => {}
         }
 
-        if subs.contains("virtual") || sel == "abstract_function" then {
+        if (subs.contains("virtual") || sel == "abstract_function") {
           mod.isVirtual = true
         }
-        if subs.contains("abstract") || sel == "abstract_function" then {
+        if (subs.contains("abstract") || sel == "abstract_function") {
           mod.isAbstract = true
         }
-        if subs.contains("override") then { mod.isOverride = true }
-        if subs.contains("lazy") then { mod.isLazy = true }
-        if subs.contains("macro") then { mod.isMacro = true }
-        if subs.contains("scoreboard") then { mod.isEntity = true }
-        if subs.contains("ticking") then { mod.isTicking = true }
-        if subs.contains("loading") then { mod.isLoading = true }
-        if subs.contains("helper") then { mod.isHelper = true }
-        if subs.contains("static") then { mod.isStatic = true }
-        if subs.contains("const") then { mod.isConst = true }
-        if subs.contains("async") then { mod.isAsync = true }
+        if (subs.contains("override")) { mod.isOverride = true }
+        if (subs.contains("lazy")) { mod.isLazy = true }
+        if (subs.contains("macro")) { mod.isMacro = true }
+        if (subs.contains("scoreboard")) { mod.isEntity = true }
+        if (subs.contains("ticking")) { mod.isTicking = true }
+        if (subs.contains("loading")) { mod.isLoading = true }
+        if (subs.contains("helper")) { mod.isHelper = true }
+        if (subs.contains("static")) { mod.isStatic = true }
+        if (subs.contains("const")) { mod.isConst = true }
+        if (subs.contains("async")) { mod.isAsync = true }
 
         mod
       }

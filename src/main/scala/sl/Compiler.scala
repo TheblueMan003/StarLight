@@ -73,8 +73,8 @@ object Compiler{
         try{
             instruction match{
                 case FunctionDecl(name3, block, typ2, args2, typevars, modifier) =>{
-                    val name2 = if (context.getCurrentClass() != null || context.getCurrentStructUse()!= null) && name3 == "this" then "__init__" else name3
-                    val name = if (name2 == "~") then context.getFreshLambdaName() else name2
+                    val name2 = if (((context.getCurrentClass() != null || context.getCurrentStructUse()!= null) && name3 == "this")) "__init__" else name3
+                    val name = if ((name2 == "~")) context.getFreshLambdaName() else name2
                     var fname = context.getFunctionWorkingName(name)
 
                     val args = if (modifier.isAsync) args2 ::: List(Argument("--await_callback--", FuncType(List(), VoidType), None)) else args2
@@ -82,7 +82,7 @@ object Compiler{
                     modifier.simplify()
                     if (typevars.length > 0){
                         val func = new GenericFunction(context, context.getPath()+"."+name, fname, args, typevars, typ2, modifier, block.unBlockify())
-                        func.overridedFunction = if modifier.isOverride then context.getFunction(Identifier.fromString(name), args.map(_.typ), List(), typ2, false, false) else null
+                        func.overridedFunction = if ((modifier.isOverride)) context.getFunction(Identifier.fromString(name), args.map(_.typ), List(), typ2, false, false) else null
                         context.addFunction(name, func)
                     }
                     else{
@@ -95,19 +95,19 @@ object Compiler{
 
                         if (modifier.isLazy){
                             val func = new LazyFunction(context, context.getPath()+"."+name, fname, args, context.getType(typ), modifier, Utils.fix(block)(context, args.map(a => Identifier.fromString(a.name)).toSet))
-                            func.overridedFunction = if modifier.isOverride then context.getFunction(Identifier.fromString(name), args.map(_.typ), List(), typ, false, false) else null
+                            func.overridedFunction = if ((modifier.isOverride)) context.getFunction(Identifier.fromString(name), args.map(_.typ), List(), typ, false, false) else null
                             context.addFunction(name, func)
                             func.generateArgument()(context)
                         }
                         else if (modifier.isMacro){
                             val func = new MacroFunction(context, context.getPath()+"."+name, fname, args, context.getType(typ), modifier, Utils.fix(block)(context, args.map(a => Identifier.fromString(a.name)).toSet))
-                            func.overridedFunction = if modifier.isOverride then context.getFunction(Identifier.fromString(name), args.map(_.typ), List(), typ, false, false) else null
+                            func.overridedFunction = if ((modifier.isOverride)) context.getFunction(Identifier.fromString(name), args.map(_.typ), List(), typ, false, false) else null
                             context.addFunction(name, func)
                             func.generateArgument()(context)
                         }
                         else{
                             val func = new ConcreteFunction(context, context.getPath()+"."+name, fname, args, context.getType(typ), modifier, block.unBlockify(), meta.firstPass)
-                            func.overridedFunction = if modifier.isOverride then context.getFunction(Identifier.fromString(name), args.map(_.typ), List(), typ, false, false) else null
+                            func.overridedFunction = if ((modifier.isOverride)) context.getFunction(Identifier.fromString(name), args.map(_.typ), List(), typ, false, false) else null
                             context.addFunction(name, func)
                             func.generateArgument()(context)
                         }
@@ -124,9 +124,10 @@ object Compiler{
                 case StructDecl(name, generics, block, modifier, parent) => {
                     modifier.simplify()
                     if (!meta.firstPass){
-                        val parentName = parent match
+                        val parentName = parent match{
                             case None => null
                             case Some(p) => Identifier.fromString(p)
+                        }
                         
                         context.addStruct(new Struct(context, name, generics, modifier, block.unBlockify(), parentName))
                     }
@@ -135,9 +136,10 @@ object Compiler{
                 case ClassDecl(name, generics, block, modifier, parent, parentGenerics, interfaces, entity) => {
                     modifier.simplify()
                     if (!meta.firstPass){
-                        val parentName = parent match
+                        val parentName = parent match{
                             case None => null
                             case Some(p) => Identifier.fromString(p)
+                        }
                         
                         val c = new Class(context, name, generics, modifier, block.unBlockify(), parentName, parentGenerics, interfaces.map(x => (Identifier.fromString(x._1), x._2)), entity)
                         context.addClass(c)
@@ -149,9 +151,10 @@ object Compiler{
                 case TemplateDecl(name, block, modifier, parent, generics, parentGenerics) => {
                     modifier.simplify()
                     if (!meta.firstPass){
-                        val parentName = parent match
+                        val parentName = parent match{
                             case None => null
                             case Some(p) => Identifier.fromString(p)
+                        }
                         
                         context.addTemplate(new Template(context, name, modifier, block.unBlockify(), parentName, generics, parentGenerics))
                     }
@@ -230,7 +233,7 @@ object Compiler{
                 }
                 case VariableDecl(names2, typ, modifier, op, expr) => {
                     modifier.simplify()
-                    val names = names2.map(n => if n == "@@@" then context.getFreshId() else n)
+                    val names = names2.map(n => if ((n == "@@@")) context.getFreshId() else n)
                     if (typ == IdentifierType("val", List()) || typ == IdentifierType("var", List())){
                         expr match{
                             case FunctionCallValue(VariableValue(name, sel), args, typeargs, selector) if (context.tryGetTemplate(name) != None) => {
@@ -246,7 +249,7 @@ object Compiler{
                             }
                             case other => {
                                 if (typ == IdentifierType("val", List())) modifier.isConst = true
-                                Utils.simplify(expr) match
+                                Utils.simplify(expr) match{
                                     case TupleValue(values) if values.size == names.size => {
                                         names.zip(values.map(Utils.typeof(_))).map((name, typ2) => {
                                             val vari = new Variable(context, name, context.getType(typ2), modifier)
@@ -269,6 +272,7 @@ object Compiler{
                                             vari.generate()
                                         })
                                     }
+                                }
                                 compile(VariableAssigment(names.map(f => (Left[Identifier, Variable](Identifier.fromString(f)), Selector.self)), op, expr))
                             }
                         }
@@ -288,9 +292,10 @@ object Compiler{
                     }
                 }
                 case sl.JSONFile(name, expr, mod) => {
-                    val json = Utils.simplify(expr) match
+                    val json = Utils.simplify(expr) match{
                         case JsonValue(json) => json
                         case other => throw new Exception(f"JSON file must be a JSON value. Found: $other")
+                    }
                     
                     context.addJsonFile(new objects.JSONFile(context, name, mod, Utils.compileJson(json)))
                     List()
@@ -307,14 +312,15 @@ object Compiler{
                         List()
                     }
                     if (value != null){
-                        context.addObjectFrom(value, Identifier.fromString(if alias == null then value else alias), context.root.push(lib))
+                        context.addObjectFrom(value, Identifier.fromString(if ((alias == null)) value else alias), context.root.push(lib))
                     }
                     else{
                         val last = Identifier.fromString(lib).values.last
-                        context.hasObject(lib+"."+last) match
-                            case true => context.addObjectFrom(last, if alias == null then last else alias, context.root.push(lib))
+                        context.hasObject(lib+"."+last) match{
+                            case true => context.addObjectFrom(last, if ((alias == null)) last else alias, context.root.push(lib))
                             case false if alias!=null => context.push(alias, context.getContext(lib))
                             case false => {}
+                        }
                     }
                     ret
                 }
@@ -351,7 +357,7 @@ object Compiler{
                     else{
                         val simplied = Utils.simplify(expr)
                         val varis = names.map((i,s) => (i.get(), s))
-                        simplied match
+                        simplied match{
                             case TupleValue(lst) => 
                                 val isSwap = varis.exists(x => lst.exists(y => x._1.isPresentIn(y)(context, x._2)))
                                 if (isSwap){
@@ -372,17 +378,19 @@ object Compiler{
                                 }
                             case VariableValue(name, sel) => {
                                 val vari = context.getVariable(name) 
-                                vari.getType() match
+                                vari.getType() match{
                                     case TupleType(sub) => varis.zip(vari.tupleVari).flatMap(p => p._1._1.assign(op, LinkedVariableValue(p._2, sel), !meta.isSource)(context, p._1._2))
                                     case _ => varis.flatMap(l => l._1.assign(op, simplied, !meta.isSource)(context, l._2))
+                                }
                             }
                             case LinkedVariableValue(vari, sel) => {
-                                vari.getType() match
+                                vari.getType() match{
                                     case TupleType(sub) => varis.zip(vari.tupleVari).flatMap(p => p._1._1.assign(op, LinkedVariableValue(p._2, sel), !meta.isSource)(context, p._1._2))
                                     case _ => varis.flatMap(l => l._1.assign(op, simplied, !meta.isSource)(context, l._2))
+                                }
                             }
                             case FunctionCallValue(name, args, typeargs, selector) => {
-                                Utils.typeof(simplied) match
+                                Utils.typeof(simplied) match{
                                     case TupleType(sub) if sub.size == varis.size => {
                                         val fake = context.getFreshVariable(TupleType(sub))
                                         if (varis.forall(x => x._2 == Selector.self)){
@@ -396,8 +404,10 @@ object Compiler{
                                     case other => {
                                         varis.flatMap(x => x._1.assign(op, simplied, !meta.isSource)(context, x._2))
                                     }
+                                }
                             }
                             case _ => varis.flatMap(l => l._1.assign(op, simplied, !meta.isSource)(context, l._2))
+                        }
                     }
                 }
                 case ArrayAssigment(name, index, op, value) => {
@@ -424,17 +434,19 @@ object Compiler{
                             List()
                         }
                         else if (typ == JsonType && !vari.modifiers.isEntity){
-                            Utils.simplify(index.head) match
+                            Utils.simplify(index.head) match{
                                 case IntValue(id) => vari.assignJson(op, value, vari.getSubKey(f"[$id]"))
                                 case other => vari.assignJson(op, value, vari.getSubKey(other.getString()))
+                            }
                         }
                         else{
-                            (typ, Utils.simplify(index.head)) match
+                            (typ, Utils.simplify(index.head)) match{
                                 case (ArrayType(sub, v), IntValue(index)) => indexed(index)
                                 case (ArrayType(sub, v), EnumIntValue(index)) => indexed(index)
                                 case _ =>{
                                     call()
                                 }
+                            }
                         }
                     }
                     else{
@@ -442,23 +454,25 @@ object Compiler{
                     }
                 }
                 case Return(value) => {
-                    context.getCurrentFunction() match
+                    context.getCurrentFunction() match{
                         case cf: ConcreteFunction => 
-                            if (cf.modifiers.hasAttributes("__returnCheck__")) then
+                            if ((cf.modifiers.hasAttributes("__returnCheck__")))
                                 Compiler.compile(VariableAssigment(List((Left(Identifier.fromString("__hasFunctionReturned__")), Selector.self)), "=", IntValue(1)), meta):::
                                 cf.returnVariable.assign("=", value)
                             else cf.returnVariable.assign("=", value)
                         case _ => throw new Exception(f"Unexpected return at ${instruction.pos}")
+                    }
                 }
                 case Throw(expr) => {
                     context.requestLibrary("standard.Exception")
-                    context.getCurrentFunction() match
+                    context.getCurrentFunction() match{
                         case cf: ConcreteFunction => 
-                            if (cf.modifiers.hasAttributes("__returnCheck__")) then
+                            if ((cf.modifiers.hasAttributes("__returnCheck__")))
                                 Compiler.compile(VariableAssigment(List((Left(Identifier.fromString("__exceptionThrown")), Selector.self)), "=", expr), meta):::
                                 Compiler.compile(VariableAssigment(List((Left(Identifier.fromString("__hasFunctionReturned__")), Selector.self)), "=", IntValue(2)), meta)
                             else Compiler.compile(VariableAssigment(List((Left(Identifier.fromString("__exceptionThrown")), Selector.self)), "=", expr), meta)
                         case _ => Compiler.compile(VariableAssigment(List((Left(Identifier.fromString("__exceptionThrown")), Selector.self)), "=", expr), meta)
+                    }
                 }
                 case Try(block, except, finallyBlock) => {
                     context.requestLibrary("standard.Exception")
@@ -468,7 +482,7 @@ object Compiler{
                 }
                 case CMD(value) => List(CommandIR(value.replaceAllLiterally("\\\"","\"")))
                 case Package(name, block) => {
-                    val sub = if (name == "_") then context.root else context.root.push(name)
+                    val sub = if ((name == "_")) context.root else context.root.push(name)
                     if (!meta.isLib){
                         compile(Settings.globalImport, meta)(sub)
                     }
@@ -492,7 +506,7 @@ object Compiler{
                     block.flatMap(inst => compile(inst, meta)(ctx))
                 }
                 case FunctionCall(name, args, typeargs) => {
-                    context.tryGetVariable(name) match
+                    context.tryGetVariable(name) match{
                         case Some(vari) if vari.getType().isInstanceOf[StructType] || vari.getType().isInstanceOf[ClassType] => {
                             Compiler.compile(FunctionCall(name.child("__apply__"), args, typeargs))
                         }
@@ -515,10 +529,11 @@ object Compiler{
                                 }
                                 (fct, cargs).call()
                             }
+                        }
                     }
                 }
                 case DotCall(expr, FunctionCall(name, args, typeargs)) => {
-                    Utils.simplify(expr) match
+                    Utils.simplify(expr) match{
                         case LinkedVariableValue(vari, sel) => {
                             compile(FunctionCall(Identifier.fromString(vari.fullName+"."+name), args, typeargs))
                         }
@@ -534,6 +549,7 @@ object Compiler{
                             val (prev, vari) = Utils.simplifyToVariable(expr)
                             prev ::: compile(FunctionCall(Identifier.fromString(vari.vari.fullName+"."+name), args, typeargs))
                         }
+                    }
                 }
                 case LinkedFunctionCall(name, args, ret) => {
                     val uargs = args.map(Utils.simplify)
@@ -551,7 +567,7 @@ object Compiler{
                     compile(If(left, ifBlock, ElseIf(right, ifBlock) :: elseBlock), meta)
                 }
                 case For(typ, key, provider, instr) => {
-                    provider match
+                    provider match{
                         case RangeValue(min, max, jump) => {
                             val vari = context.getFreshVariable(typ)
                             vari.assign("=", min)
@@ -596,6 +612,7 @@ object Compiler{
                                 instr
                             ))))
                         }
+                    }
                 }
                 case ifb: If => Execute.ifs(ifb)
                 case swit: Switch => Execute.switch(swit)
@@ -609,7 +626,7 @@ object Compiler{
                     (fct, cargs).call()
                 }
                 case Await(func, continuation) => {
-                    func match
+                    func match{
                         case FunctionCall(name, args, typeargs) => {
                             Compiler.compile(FunctionCall(name, args ::: List(LambdaValue(List(), continuation, context)), typeargs))
                         }
@@ -617,6 +634,7 @@ object Compiler{
                             Compiler.compile(LinkedFunctionCall(fun, args ::: List(LambdaValue(List(), continuation, context)), ret))
                         }
                         case other => throw new Exception(f"Unexpected await value: $other")
+                    }
                 }
                 case Assert(cond, continutation) => {
                     val simp = Utils.simplify(cond)
@@ -637,6 +655,7 @@ object Compiler{
         }
         catch{
             e => {
+                throw e
                 //if (instruction.pos.longString != "<undefined position>"){
                 Reporter.error(f"${e.getMessage()} at ${instruction.pos}\n${instruction.pos.longString}")
                 //}

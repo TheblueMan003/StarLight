@@ -35,7 +35,7 @@ class FoldReduce(var files: List[IRFile]){
         }
     }
     def fold(acc: List[IRTree], right: IRTree): List[IRTree] = {
-        if acc.isEmpty then return List(right)
+        if (acc.isEmpty) return List(right)
         val left = acc.last
         acc.dropRight(1):::(
             (left, right) match {

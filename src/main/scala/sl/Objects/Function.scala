@@ -42,7 +42,7 @@ abstract class Function(context: Context, val contextName: String, name: String,
     val parentClass = context.getCurrentClass()
     var age = 0
     val wasMovedToBlock = context.isInLazyCall() || parentFunction != null || parentVariable != null || modifiers.protection==Protection.Private || Settings.obfuscate
-    override lazy val fullName: String = if (wasMovedToBlock) then context.fctCtx.getFreshId() else context.getPath() + "." + name
+    override lazy val fullName: String = if ((wasMovedToBlock)) context.fctCtx.getFreshId() else context.getPath() + "." + name
     var minArgCount = getMinArgCount(arguments)
     var maxArgCount = getMaxArgCount(arguments)
     var argumentsVariables: List[Variable] = List()
@@ -71,11 +71,12 @@ abstract class Function(context: Context, val contextName: String, name: String,
         stringUsed = true
     }
     protected def getMaxArgCount(args: List[Argument]): Int = {
-        if args.length == 0 then 0 else
-        args.last.typ match
+        if (args.length == 0) 0 else
+        args.last.typ match{
             case ParamsType => Integer.MAX_VALUE
             case RawJsonType => Integer.MAX_VALUE
             case _ => args.length
+        }
     }
 
     def prototype() = {
@@ -87,16 +88,18 @@ abstract class Function(context: Context, val contextName: String, name: String,
     }
 
     def hasRawJsonArg(): Boolean = {
-        if arguments.length == 0 then false else
-        arguments.last.typ match
+        if (arguments.length == 0) false else
+        arguments.last.typ match{
             case RawJsonType => true
             case _ => false
+        }
     }
     def hasParamsArg(): Boolean = {
-        if arguments.length == 0 then false else
-        arguments.last.typ match
+        if (arguments.length == 0) false else
+        arguments.last.typ match{
             case ParamsType => true
             case _ => false
+        }
     }
 
     def canBeCallAtCompileTime = false
@@ -104,7 +107,7 @@ abstract class Function(context: Context, val contextName: String, name: String,
     protected def getMinArgCount(args: List[Argument], stopped: Boolean = false): Int = {
         args match{
             case head::tail => {
-                head.defValue match
+                head.defValue match{
                     case None => 
                         if (stopped){
                             throw new Exception(f"${head.name} must have a default value in ${fullName}")
@@ -115,6 +118,7 @@ abstract class Function(context: Context, val contextName: String, name: String,
                     case Some(value) => {
                         getMinArgCount(tail, true)
                     }
+                }
             }
             case Nil => 0
         }
@@ -133,21 +137,21 @@ abstract class Function(context: Context, val contextName: String, name: String,
         })
     }
     def argMap(args: List[Expression]) = {
-        if args.size > argumentsVariables.size then throw new Exception(f"Too much argument for $fullName got: $args expected: $arguments")
-        if args.length < minArgCount then throw new Exception(f"Too few argument for $fullName got: $args expected: $arguments")
+        if (args.size > argumentsVariables.size) throw new Exception(f"Too much argument for $fullName got: $args expected: $arguments")
+        if (args.length < minArgCount) throw new Exception(f"Too few argument for $fullName got: $args expected: $arguments")
 
         if (modifiers.isAsync){
             argumentsVariables.dropRight(1).filter(_.getType() != VoidType)
                     .zip(arguments.dropRight(1).map(_.defValue))
                     .zipAll(args.dropRight(1), null, null)
-                    .map(p => (p._1._1, if p._2 == null then p._1._2.get else p._2)) :::
+                    .map(p => (p._1._1, if (p._2 == null) p._1._2.get else p._2)) :::
             List((argumentsVariables.last, args.last))
         }
         else{
             argumentsVariables.filter(_.getType() != VoidType)
                     .zip(arguments.map(_.defValue))
                     .zipAll(args, null, null)
-                    .map(p => (p._1._1, if p._2 == null then p._1._2.get else p._2))
+                    .map(p => (p._1._1, if (p._2 == null) p._1._2.get else p._2))
         }
     }
     def exists(): Boolean
@@ -320,7 +324,7 @@ class LazyFunction(context: Context, _contextName: String, name: String, argumen
             vari.generate()(sub)
             vari.isFunctionArgument = true
             val instr = sub.addVariable(vari).assign("=", v)
-            block = if a.name.startsWith("$") then Utils.subst(block, a.name, Utils.simplify(v).getString()) else block
+            block = if (a.name.startsWith("$")) Utils.subst(block, a.name, Utils.simplify(v).getString()) else block
             instr
         })
 
@@ -328,16 +332,16 @@ class LazyFunction(context: Context, _contextName: String, name: String, argumen
         if (ret == null){
             val variret = sub.getFreshVariable(typ)
             block = Utils.substReturn(block, variret)(!modifiers.hasAttributes("__returnCheck__"), retSel)
-            pref:::sl.Compiler.compile(block.unBlockify())(if modifiers.hasAttributes("inline") then ctx else sub)
+            pref:::sl.Compiler.compile(block.unBlockify())(if (modifiers.hasAttributes("inline")) ctx else sub)
         }
         else if (op == "="){
             block = Utils.substReturn(block, ret)(!modifiers.hasAttributes("__returnCheck__"), retSel)
-            pref:::sl.Compiler.compile(block.unBlockify())(if modifiers.hasAttributes("inline") then ctx else sub)
+            pref:::sl.Compiler.compile(block.unBlockify())(if (modifiers.hasAttributes("inline")) ctx else sub)
         }
         else{
             val vari = ctx.getFreshVariable(getType())
             block = Utils.substReturn(block, vari)(!modifiers.hasAttributes("__returnCheck__"), retSel)
-            pref:::sl.Compiler.compile(block.unBlockify())(if modifiers.hasAttributes("inline") then ctx else sub) ::: (if ret == null then List() else ret.assign(op, LinkedVariableValue(vari)))
+            pref:::sl.Compiler.compile(block.unBlockify())(if modifiers.hasAttributes("inline") then ctx else sub) ::: (if (ret == null) List() else ret.assign(op, LinkedVariableValue(vari)))
         }
     }
     override def generateArgument()(implicit ctx: Context):Unit = {
@@ -385,10 +389,11 @@ class MacroFunction(context: Context, _contextName: String, name: String, argume
     }
 
     def isSimpleValue(expr: Expression) = {
-        expr match
+        expr match{
             case _: (IntValue | FloatValue | StringValue | BoolValue | JsonValue | PositionValue | SelectorValue | TagValue | LinkedTagValue | NamespacedName) => true
             case NullValue => true
             case _ => false
+        }
     }
 
     override def generateArgument()(implicit ctx: Context):Unit = {
@@ -416,7 +421,7 @@ class MultiplexFunction(context: Context, _contextName: String, name: String, ar
 
     override def compile(): Unit = {
         val cases = 
-            if typ == VoidType then
+            if (typ == VoidType)
                 functions.zipWithIndex.map((x, i) => SwitchCase(IntValue(x.getMuxID()), LinkedFunctionCall(x, argumentsVariables.tail.map(LinkedVariableValue(_))), BoolValue(true))).toList
             else
                 functions.zipWithIndex.map((x, i) => SwitchCase(IntValue(x.getMuxID()), LinkedFunctionCall(x, argumentsVariables.tail.map(LinkedVariableValue(_)), returnVariable), BoolValue(true))).toList
@@ -488,9 +493,10 @@ class ClassFunction(_contextName: String, variable: Variable, function: Function
         if (modifiers.isAbstract) throw new Exception(f"Cannot call abstract function $fullName")
         val selector = SelectorValue(JavaSelector("@e", List(("tag", SelectorIdentifier(clazz.getTag())))))
         def isScoreboard(expr: Expression) = {
-            expr match
+            expr match{
                 case LinkedVariableValue(vari, selector) => vari.modifiers.isEntity
                 case _ => false
+            }
         }
         def noScoreboardArg(expr: Expression): (List[IRTree], Expression) = {
             if (Utils.contains(expr, isScoreboard)){

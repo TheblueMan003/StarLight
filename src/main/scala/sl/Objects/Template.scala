@@ -23,7 +23,7 @@ class Template(
   ): Int = {
     args match {
       case head :: tail => {
-        head.defValue match
+        head.defValue match{
           case None =>
             if (stopped) {
               throw new Exception(
@@ -35,6 +35,7 @@ class Template(
           case Some(value) => {
             getMinArgCount(tail, true)
           }
+        }
       }
       case Nil => 0
     }
@@ -51,7 +52,7 @@ class Template(
         Utils.subst(
           b,
           v._1.name,
-          if (v._2 == null) then v._1.defValue.get else v._2
+          if ((v._2 == null)) v._1.defValue.get else v._2
         )
       )
   }
@@ -65,7 +66,7 @@ class Template(
             Utils.subst(
               b,
               v._1.name,
-              if (v._2 == null) then v._1.defValue.get else v._2
+              if ((v._2 == null)) v._1.defValue.get else v._2
             )
           )
       )

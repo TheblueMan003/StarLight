@@ -56,7 +56,7 @@ object DataPackBuilder{
         files.foreach { file =>
             val name = file.getPath()
             val content = file.getFinalContents()
-            zip.putNextEntry(new ZipEntry(if name.startsWith("/") then name.drop(1) else name))
+            zip.putNextEntry(new ZipEntry(if (name.startsWith("/")) name.drop(1) else name))
             content.foreach(x => writer.println(x.getString()))
             writer.flush()
             zip.closeEntry()
@@ -115,7 +115,7 @@ object DataPackBuilder{
         .foreach { file =>
             val content = file.getFinalContents()
             val name = file.getPath()
-            zip.putNextEntry(new ZipEntry(if name.startsWith("/") then name.drop(1) else name))
+            zip.putNextEntry(new ZipEntry(if (name.startsWith("/")) name.drop(1) else name))
             content.foreach(x => writer.println(x.getString()))
             writer.flush()
             zip.closeEntry()

@@ -285,8 +285,9 @@ class Class(context: Context, name: String, val generics: List[String], _modifie
         }
     }
     def isNotClassFunction(f: Function) = {
-        f match
+        f match{
             case a: ClassFunction => false
             case _ => true
+        }
     }
 }

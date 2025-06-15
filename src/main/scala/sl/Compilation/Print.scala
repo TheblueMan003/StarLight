@@ -43,7 +43,7 @@ object Print{
     def toRawJson(expr: Expression, top: Boolean = false)(implicit ctx: Context): (List[IRTree], List[Printable])= {
         var mod = TextModdifier(false, false, false, false, false, null)
         var col = Namecolor("white")
-        Utils.simplify(expr) match
+        Utils.simplify(expr) match{
             case DefaultValue => (List(), List(PrintString("default", col, mod)))
             case NullValue => (List(), List(PrintString("null", col, mod)))
             case IntValue(value) => (List(), List(PrintString(f"$value", col, mod)))
@@ -62,17 +62,18 @@ object Print{
                 else{
                     val reg = "[a-zA-Z0-9_]+(\\.[a-zA-Z0-9_]+)+".r
                     val matched = reg.findFirstMatchIn(value) 
-                    matched match
+                    matched match{
                         case Some(v) if v.matched == value => {
                             (List(), List(PrintTranslate(f"$value", RawJsonValue(List()), col, mod)))
                         }
                         case _ => 
                             val str = value.replace("\\","\\\\")
                             (List(), List(PrintString(f"$str", col, mod)))
+                    }
                 }
             case value: NamespacedName => (List(), List(PrintString(f"${value.getString()}", col, mod)))
             case VariableValue(name, sel) => {
-                ctx.tryGetVariable(name) match
+                ctx.tryGetVariable(name) match{
                     case Some(vari) => {
                         toRawJson(LinkedVariableValue(vari, sel))
                     }
@@ -82,6 +83,7 @@ object Print{
                         val (a,b) = toRawJson(LinkedVariableValue(vari))
                         (upCal:::a, b)
                     }
+                }
             }
             case ArrayGetValue(name, index) => {
                 val (p1, vari) = Utils.simplifyToVariable(expr)
@@ -94,7 +96,7 @@ object Print{
                 }
                 else{
                     ctx.addScoreboardUsedForce(vari.getIRSelector())
-                    vari.getType() match
+                    vari.getType() match{
                         case ArrayType(inner, size) => {
                             val (p1, print) = vari.tupleVari.map(v => toRawJson(LinkedVariableValue(v), false)(ctx))
                             .reduce((a,b) => 
@@ -131,14 +133,16 @@ object Print{
                         case JsonType => (List(), List(PrintNBT(vari, col, mod)))
                         case EntityType => (List(), List(PrintSelector(vari.getEntityVariableSelector(), col, mod)))
                         case StructType(_, _) | ClassType(_, _) => {
-                            ctx.tryGetFunction(Identifier.fromString(vari.fullName+".toString"), List(), List(), StringType, false) match
+                            ctx.tryGetFunction(Identifier.fromString(vari.fullName+".toString"), List(), List(), StringType, false) match{
                                 case None => (List(), List(PrintVariable(vari, sel, col, mod)))
                                 case Some((fct, args)) => {
                                     val (p1, print) = toRawJson(FunctionCallValue(LinkedFunctionValue(fct), args, List(), sel))
                                     (p1, print)
                                 }
+                            }
                         }
                         case other => (List(), List(PrintVariable(vari, sel, col, mod)))
+                    }
                 }
             }
             case dot: DotValue => {
@@ -186,14 +190,14 @@ object Print{
             case TupleValue(values) => {
                 if (top){
                     val (p2, print) = toRawJson(values(0))
-                    print match
+                    print match{
                         case PrintTranslate(k, rjv, c, m)::Nil => {
                             val (p3, rjv2) = toRawJson(values.drop(1))
                             (p2:::p3, List(PrintTranslate(k, rjv2, c, m)))
                         }
                         case _ =>{
                             def checkArg(value: Expression):Unit = {
-                                Utils.simplify(value) match
+                                Utils.simplify(value) match{
                                     case StringValue("strikethrough") => mod.strikethrough = true
                                     case StringValue("bold") => mod.bold = true
                                     case StringValue("italic") => mod.italic = true
@@ -202,9 +206,10 @@ object Print{
                                     case StringValue(color) if colorMap.contains(color) => col = Namecolor(color)
                                     case StringValue(link) if link.startsWith("http") => mod.link = link
                                     case other => throw new Exception(f"Arugment for rawJson not support: $other")
+                                }
                             }
                             def convert(print: Printable) = {
-                                print match
+                                print match{
                                     case PrintSelector(selector, color, modifier) => PrintSelector(selector, col, mod)
                                     case PrintString(text, color, modifier) => PrintString(text, col, mod)
                                     case PrintVariable(vari, sel, color, modifier) => {
@@ -213,18 +218,19 @@ object Print{
                                     }
                                     case PrintTranslate(key, rjv, color, modifier) => PrintTranslate(key, rjv, col, mod)
                                     case PrintNBT(vari, color, modifier) => PrintNBT(vari, col, mod)
+                                }
                             }
                             values.drop(1).foreach(checkArg(_));
 
                             (p2, print.map(convert(_)))
                         }
-                
+                    }
                 }
                 else{
                     values.map(toRawJson(_)).reduce((l,r) => (l._1 ::: r._1, l._2 ::: List(PrintString(f",", col, mod)) ::: r._2))
                 }
             }
-        
+        }
     }
 }
 
@@ -232,9 +238,10 @@ trait Printable{
     def toBedrock()(implicit ctx: Context): String
     def toJava()(implicit ctx: Context): String
     def getString()(implicit ctx: Context): String = {
-        Settings.target match
+        Settings.target match{
             case MCBedrock => toBedrock()
             case MCJava => toJava()
+        }
     }
     def getLength()(implicit ctx: Context): Int
     def sub(size: Int)(implicit ctx: Context): Printable
@@ -269,11 +276,11 @@ case class TextModdifier(var bold: Boolean, var obfuscated: Boolean, var striket
     }
     def toBedrock()(implicit ctx: Context): String = {
         var ret = ""
-        if bold then ret += "§l"
-        if obfuscated then ret += "§k"
-        if strikethrough then ret += "§m"
-        if underlined then ret += "§n"
-        if italic then ret += "§o"
+        if (bold) ret += "§l"
+        if (obfuscated) ret += "§k"
+        if (strikethrough) ret += "§m"
+        if (underlined) ret += "§n"
+        if (italic) ret += "§o"
         ret
     }
 }

@@ -26,9 +26,10 @@ object Variable {
 		def get()(implicit context: Context):Variable = {
 			value match{
 				case Left(value) => {
-					context.tryGetProperty(value) match
+					context.tryGetProperty(value) match{
 						case Some(Property(name, getter, setter, variable)) => PropertySetVariable(context, getter, setter, variable)
 						case None => context.getVariable(value)
+					}
 				}
 				case Right(value) => value
 			}
@@ -59,10 +60,10 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 	val parentFunction = context.getCurrentFunction()
 	var tupleVari: List[Variable] = List()
 	var indexedVari: List[(Variable, Expression)] = List()
-	val variName = if modifiers.hasAttributes("versionSpecific")(context) then fullName+"_"+Settings.version.mkString("_") else fullName
+	val variName = if (modifiers.hasAttributes("versionSpecific")(context)) fullName+"_"+Settings.version.mkString("_") else fullName
 	val tagName = modifiers.getAttributesString("tag", ()=>variName)(context)
 	var wasAssigned = false
-	lazy val scoreboard = if modifiers.isEntity then modifiers.getAttributesString("name", ()=>context.getScoreboardID(this))(context) else ""
+	lazy val scoreboard = if (modifiers.isEntity) modifiers.getAttributesString("name", ()=>context.getScoreboardID(this))(context) else ""
 	lazy val variableScoreboard = modifiers.getAttributesString("score", ()=>Settings.variableScoreboard)(context)
 	lazy val inGameName = modifiers.getAttributesString("name", ()=>variName)(context)
 	lazy val criterion = modifiers.getAttributesString("criterion", ()=>"dummy")(context)
@@ -72,7 +73,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 	var getter: Function = null
 	var setter: Function = null
 	var wasGenerated = false
-	var jsonArrayKey: String = if modifiers.isEntity then modifiers.getAttributesString("nbt", ()=>"json")(context) else modifiers.getAttributesString("path", ()=>"json")(context)
+	var jsonArrayKey: String = if (modifiers.isEntity) modifiers.getAttributesString("nbt", ()=>"json")(context) else modifiers.getAttributesString("path", ()=>"json")(context)
 	
 	def canBeReduceToLazyValue = modifiers.isLazy && !getType().isInstanceOf[StructType]
 
@@ -147,7 +148,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			context.push(name).addFunction(Identifier.fromString(f.name), ExtensionFunction(f.context, this, f))
 		})
 
-		typ match
+		typ match{
 			case StructType(struct, sub) => {
 				val ctx = context.push(name, this)
 				ctx.inherit(struct.context)
@@ -190,7 +191,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 				clazz.generateForVariable(this, sub)
 			}
 			case ArrayType(inner, size) => {
-				size match
+				size match{
 					case IntValue(size) => {
 						val ctx = context.push(name, this)
 						tupleVari = Range(0, size).map(i => ctx.addVariable(new Variable(ctx, f"$i", inner, _modifier))).toList
@@ -215,6 +216,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 						Array.generate(this, indexedVari, values.size)
 					}
 					case other => throw new Exception(f"Cannot have a array with size: $other")
+				}
 			}
 			case TupleType(sub) => {
 				val ctx = context.push(name, this)
@@ -233,6 +235,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			}
 			case _ => {
 			}
+		}
 	}
 
 
@@ -255,9 +258,9 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 					assignStruct(op, Utils.simplify(value))
 				}
 				case RawJsonType => {
-					Utils.typeof(value) match
+					Utils.typeof(value) match{
 						case TupleType(sub) => {
-							Utils.simplify(value) match
+							Utils.simplify(value) match{
 								case TupleValue(lst) =>
 									val value2 = Print.toRawJson(lst)
 									op match{
@@ -267,6 +270,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 									}
 									return value2._1
 								case other => throw new Exception(f"Unsupported operation: $fullName $op $value at \n${value.pos.longString}")
+							}
 						}
 						case RawJsonType => {
 							op match{
@@ -284,6 +288,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 							}
 							return value2._1
 						}
+					}
 				}
 				case other => {
 					Utils.simplify(value) match{
@@ -472,7 +477,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 								tmp.assign("=", value) ::: assign(op, LinkedVariableValue(tmp))
 							}
 							else{
-								getType() match
+								getType() match{
 									case IntType => assignInt(op, other)
 									case FloatType => assignFloat(op, other)
 									case BoolType => assignBool(op, other)
@@ -488,6 +493,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 									case RangeType(sub) => assignRange(op, other)
 									case VoidType if other == NullValue => List()
 									case other => throw new Exception(f"Cannot Assign to $fullName of type $other at \n${value.pos.longString}")
+								}
 							}
 						}
 					}
@@ -506,9 +512,10 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 	 * @return A List of instructions.
 	 */
 	def checkNull(tree: IRTree)(implicit selector: Selector = Selector.self) = 
-		getType() match
+		getType() match{
 			case EntityType => IfEntity(f"@e[tag=$tagName]", tree, true)
 			case _ => IfScoreboard(getIRSelector(), "=", getIRSelector(), tree, true)
+		}
 
 	/**
 	 * Generates a default assignment instruction for the Variable.
@@ -534,10 +541,11 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 				}
 			}
 			else if (Settings.target == MCJava){
-				getType() match
+				getType() match{
 					case TupleType(_) => Execute.makeExecute(checkNull, assign("=", expr) ::: assign("=", CastValue(IntValue(1), getType())))
 					case StructType(_, _) => Execute.makeExecute(checkNull, assign("=", expr) ::: assign("=", CastValue(IntValue(1), getType())))
 					case _ => Execute.makeExecute(checkNull, assign("=", expr))
+				}
 			}
 			else{
 				???
@@ -629,28 +637,32 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 		op match{
 			case "=" => assign("=", value.left) ::: assign(value.op+"=", value.right)
 			case "+=" => {
-				value.op match
+				value.op match{
 					case "+" => assign("+=", value.left) ::: assign("+=", value.right)
 					case "-" => assign("+=", value.left) ::: assign("-=", value.right)
 					case _ => assignTmp(op, value)
+				}
 			}
 			case "-=" => {
-				value.op match
+				value.op match{
 					case "+" => assign("-=", value.left) ::: assign("-=", value.right)
 					case "-" => assign("-=", value.left) ::: assign("+=", value.right)
 					case _ => assignTmp(op, value)
+				}
 			}
 			case "*=" => {
-				value.op match
+				value.op match{
 					case "*" => assign("*=", value.left) ::: assign("*=", value.right)
 					case "/" => assign("*=", value.left) ::: assign("/=", value.right)
 					case _ => assignTmp(op, value)
+				}
 			}
 			case "/=" => {
-				value.op match
+				value.op match{
 					case "*" => assign("/=", value.left) ::: assign("*=", value.right)
 					case "/" => assign("/=", value.left) ::: assign("*=", value.right)
 					case _ => assignTmp(op, value)
+				}
 			}
 			case other => assignTmp(op, value)
 		}
@@ -666,7 +678,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 	 * @return A list of IRTree objects representing the assignment operation.
 	 */
 	def assignInt(op: String, valueE: Expression)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
-		valueE match
+		valueE match{
 			case IntValue(value) => {
 				op match{
 					case "=" => List(ScoreboardSet(getIRSelector(), value))
@@ -694,7 +706,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			case EnumIntValue(value) => assignInt(op, IntValue(value))
 			case DefaultValue => List(ScoreboardSet(getIRSelector(), 0))
 			case NullValue => List(ScoreboardReset(getIRSelector()))
-			case BoolValue(value) => assignInt(op, IntValue(if value then 1 else 0))
+			case BoolValue(value) => assignInt(op, IntValue(if (value) 1 else 0))
 			case FloatValue(value) => assignInt(op, IntValue(value.toInt))
 			case VariableValue(name, sel) => assignInt(op, context.resolveVariable(valueE))
 			case LinkedVariableValue(vari, sel) => assignIntLinkedVariable(op, vari, sel)
@@ -705,6 +717,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			case seq: SequenceValue => assignSequence(op, seq)
 			case seq: SequencePostValue => assignSequencePost(op, seq)
 			case _ => throw new Exception(f"Unknown cast to int: $valueE at \n${valueE.pos.longString}")
+		}
 	}
 
 
@@ -718,11 +731,12 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 	 * @return A list of intermediate representation trees representing the assignment operation.
 	 */
 	def assignRange(op: String, valueE: Expression)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
-		valueE match
+		valueE match{
 			case RangeValue(min, max, IntValue(1)) => {
-				op match
+				op match{
 					case "=" => tupleVari(0).assign(op, min) ::: tupleVari(1).assign(op, max)
 					case _ => throw new Exception(f"Cannot assign use op: $op with ranges")
+				}
 			}
 			case IntValue(value) => tupleVari.flatMap(_.assign(op, valueE))
 			case BoolValue(value) => tupleVari.flatMap(_.assign(op, valueE))
@@ -745,6 +759,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			case seq: SequenceValue => assignSequence(op, seq)
 			case seq: SequencePostValue => assignSequencePost(op, seq)
 			case _ => throw new Exception(f"Unknown cast to int: $valueE at \n${valueE.pos.longString}")
+		}
 	}
 
 	
@@ -769,21 +784,24 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			Compiler.compile(With(SelectorValue(sel), BoolValue(true), BoolValue(true), VariableAssigment(List((Right(this),selector)), op, FunctionCallValue(name, args, List(), Selector.self)), null))
 		}
 		else{
-			name match
+			name match{
 				case VariableValue(iden, sel) => 
-					context.tryGetVariable(iden) match
+					context.tryGetVariable(iden) match{
 						case Some(vari) if vari.getType().isInstanceOf[StructType] => {
 							context.getFunction(iden.child("__apply__"), args, typeargs, getType()).call(this, selector, op)
 						}
 						case other => context.getFunction(iden, args, typeargs, getType()).call(this, selector, op)
+					}
 				case LinkedFunctionValue(fct) => (fct, args).call(this, selector, op)
 				case other =>{
 					val (t, v) = Utils.simplifyToVariable(other)
-					v.vari.getType() match
+					v.vari.getType() match{
 						case FuncType(sources, output) =>
 							t ::: (context.getFunctionMux(sources, output)(context), v::args).call(this, selector, op)
 						case other => throw new Exception(f"Cannot call $other at \n${name.pos.longString}")
+					}
 				}
+			}
 		}
 	}
 
@@ -830,12 +848,13 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 					}
 					case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 					case LinkedVariableValue(vari, selector) => {
-						vari.getType() match
+						vari.getType() match{
 							case StringType => List(StringCopy(getStorage(), vari.getStorage()(context, selector)))
 							case other => 
 								context.requestLibrary("standard.string")
 								handleFunctionCall("=", VariableValue("standard.string.cast"), List(LinkedVariableValue(vari, selector)), List(), Selector.self)
 							//case other => throw new Exception(f"Cannot assign $other to string at \n${valueE.pos.longString}")
+						}
 					}
 					case DefaultValue => List(StringSet(getStorage(), Utils.stringify("")))
 					case JsonValue(JsonString(value)) => List(StringSet(getStorage(), Utils.stringify(value)))
@@ -863,11 +882,11 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 				}
 			}
 			case "*=" => {
-				Utils.typeof(valueE) match
+				Utils.typeof(valueE) match{
 					case IntType => 
 						context.requestLibrary("standard.string")
 						handleFunctionCall("=", VariableValue("standard.string.multiply"), List(LinkedVariableValue(this), valueE), List(), Selector.self)
-				
+				}
 			}
 			case other => throw new Exception(f"Cannot assign use op: $other with int at \n${valueE.pos.longString}")
 		}
@@ -887,55 +906,60 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			assign(op, FunctionCallValue(VariableValue("__get__"), index, List()))
 		}
 		else{
-			name2 match
+			name2 match{
 				case pos: PositionValue => {
-					getType() match
+					getType() match{
 						case JsonType => {
-							index match
+							index match{
 								case List(StringValue(key2)) if  op == "=" => List(StorageSet(getStorage(jsonArrayKey), StorageBlock(pos.getString(), key2)))
 								case List(StringValue(key2)) if  op == "<:=" => List(StoragePrepend(getStorage(jsonArrayKey), StorageBlock(pos.getString(), key2)))
 								case List(StringValue(key2)) if  op == ":>=" => List(StorageAppend(getStorage(jsonArrayKey), StorageBlock(pos.getString(), key2)))
 								case List(StringValue(key2)) if  op == "::=" => List(StorageMerge(getStorage(jsonArrayKey), StorageBlock(pos.getString(), key2)))
 								case List(StringValue(key2)) if  op == "-:=" => List(StorageRemove(getStorage(jsonArrayKey), StorageBlock(pos.getString(), key2)))
 								case _ => throw new Exception(f"Cannot use $index as index for json")
+							}
 						}
 						case other => {
 							val vari = context.getFreshVariable(JsonType)
 							vari.handleArrayGetValue("=", name2, index) ::: assign(op, LinkedVariableValue(vari))
 						}
+					}
 				}
 				case pos: SelectorValue => {
-					getType() match
+					getType() match{
 						case JsonType => {
-							index match
+							index match{
 								case List(StringValue(key2)) if  op == "=" => List(StorageSet(getStorage(jsonArrayKey), StorageEntity(pos.getString(), key2)))
 								case List(StringValue(key2)) if  op == "<:=" => List(StoragePrepend(getStorage(jsonArrayKey), StorageEntity(pos.getString(), key2)))
 								case List(StringValue(key2)) if  op == ":>=" => List(StorageAppend(getStorage(jsonArrayKey), StorageEntity(pos.getString(), key2)))
 								case List(StringValue(key2)) if  op == "::=" => List(StorageMerge(getStorage(jsonArrayKey), StorageEntity(pos.getString(), key2)))
 								case List(StringValue(key2)) if  op == "-:=" => List(StorageRemove(getStorage(jsonArrayKey), StorageEntity(pos.getString(), key2)))
 								case _ => throw new Exception(f"Cannot use $index as index for json")
+							}
 						}
 						case other => {
 							val vari = context.getFreshVariable(JsonType)
 							vari.handleArrayGetValue("=", name2, index) ::: assign(op, LinkedVariableValue(vari))
 						}
+					}
 				}
 				case other => {
 					val (prev,name) = Utils.simplifyToVariable(name2)
 					prev ::: (
 					name match{
 						case LinkedVariableValue(vari, sel) => {
-							vari.getType() match
+							vari.getType() match{
 								case ArrayType(sub, IntValue(size)) => {
-									index.map(Utils.simplify(_)) match
+									index.map(Utils.simplify(_)) match{
 										case IntValue(i)::Nil => {
-											if (i >= size || i < 0) then throw new Exception(f"Index out of Bound for array $name: $i not in 0..$size at \n${name2.pos.longString}")
+											if ((i >= size || i < 0)) throw new Exception(f"Index out of Bound for array $name: $i not in 0..$size at \n${name2.pos.longString}")
 											assign(op, LinkedVariableValue(vari.tupleVari(i)))
 										}
 										case _ => assign(op, FunctionCallValue(VariableValue(vari.fullName+".get"), index, List()))
+									}
 								}
 								case ArrayType(sub, TupleValue(sizes)) => {
-									index.map(Utils.simplify(_)) match
+									index.map(Utils.simplify(_)) match{
 										case TupleValue(indexes)::Nil if indexes.forall(_.isInstanceOf[IntValue]) => {
 											vari.indexedVari.find(x => x._2 == TupleValue(indexes)) match{
 												case Some((vari, _)) => assign(op, LinkedVariableValue(vari))
@@ -946,11 +970,12 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 											assign(op, FunctionCallValue(VariableValue(vari.fullName+".get"), indexes, List()))
 										}
 										case _ => assign(op, FunctionCallValue(VariableValue(vari.fullName+".get"), index, List()))
+									}
 								}
 								case JsonType if op == "=" => {
 									index match{
 										case List(StringValue(str)) => 
-											getType() match
+											getType() match{
 												case IntType | EnumType(_) => List(StorageRead(getIRSelector(), vari.getStorage(vari.getSubKey(str)), 1))
 												case FloatType => List(StorageRead(getIRSelector(), vari.getStorage(vari.getSubKey(str)), Settings.floatPrec))
 												case BoolType => List(StorageRead(getIRSelector(), vari.getStorage(vari.getSubKey(str)), 1))
@@ -962,23 +987,27 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 													assignJson("=", LinkedVariableValue(vari.withKey(vari.getSubKey(str))))
 												}
 												case FuncType(sources, output) => List(StorageRead(getIRSelector(), vari.getStorage(vari.getSubKey(str)), 1))
+											}
 										case other => assign(op, FunctionCallValue(VariableValue(vari.fullName+".get"), index, List()))
 									}
 								}
 								case TupleType(sub) => {
-									index match
+									index match{
 										case List(IntValue(i)) => assign(op, LinkedVariableValue(vari.tupleVari(i)))
 										case index::Nil => 
 											val id=Identifier.fromString("key")
 											Compiler.compile(Switch(index, List(SwitchForEach(id, RangeValue(IntValue(0), IntValue(sub.size-1), IntValue(1)), SwitchCase(VariableValue(id), VariableAssigment(List((Right(this), sel)), op, ArrayGetValue(LinkedVariableValue(vari), List(VariableValue(id)))), BoolValue(true))))))
 										case other => throw new Exception(f"Cannot use $other as index for tuple")
+									}
 								}
 								case other => assign(op, FunctionCallValue(VariableValue(vari.fullName+".__get__"), index, List()))
+							}
 						}
 					}
 					)
 				}
 			}
+		}
 	}
 
 	/**
@@ -1093,7 +1122,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 	 * @return A list of IRTree nodes representing the assignment operation.
 	 */
 	def assignEnum(op: String, value: Expression)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
-		value match
+		value match{
 			case VariableValue(name, sel) => {
 				val a = getType().asInstanceOf[EnumType].enm.values.indexWhere(_.name == name.toString())
 				if (a >= 0 && sel == Selector.self){
@@ -1106,6 +1135,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			}
 			case EnumIntValue(value) => assignInt(op, IntValue(value))
 			case _ => assignInt(op, value)
+		}
 	}
 
 
@@ -1122,7 +1152,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 	 * @return A list of IRTree nodes representing the assignment operation.
 	 */
 	def assignFloat(op: String, valueE: Expression)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
-		valueE match
+		valueE match{
 			case FloatValue(value) => {
 				val fvalue = (value * Settings.floatPrec).toInt
 				op match{
@@ -1186,7 +1216,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 				}
 			}
 			case NullValue => List(ScoreboardReset(getIRSelector()))
-			case BoolValue(value) => assignFloat(op, IntValue(if value then 1 else 0))
+			case BoolValue(value) => assignFloat(op, IntValue(if (value) 1 else 0))
 			case VariableValue(name, sel) => assignFloat(op, context.resolveVariable(valueE))
 			case LinkedVariableValue(vari, sel) => assignFloatLinkedVariable(op, vari, sel)
 			case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
@@ -1196,6 +1226,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			case seq: SequenceValue => assignSequence(op, seq)
 			case seq: SequencePostValue => assignSequencePost(op, seq)
 			case _ => throw new Exception(f"Unknown cast to float for $fullName and value $valueE at \n${valueE.pos.longString}")
+		}
 	}
 
 	/**
@@ -1208,18 +1239,19 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 	 * @return A list of IRTree nodes representing the assignment operation.
 	 */
 	def assignBool(op: String, value: Expression)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
-		value match
+		value match{
 			case IntValue(0) => assignBool(op, BoolValue(false))
 			case IntValue(1) => assignBool(op, BoolValue(true))
-			case BoolValue(value) => 
+			case BoolValue(value) => {
 				op match{
-					case "=" => List(ScoreboardSet(getIRSelector(), if value then 1 else 0))
-					case "|=" => if value then List(ScoreboardSet(getIRSelector(), 1)) else List()
-					case "||=" => if value then List(ScoreboardSet(getIRSelector(), 1)) else List()
-					case "+=" => if value then List(ScoreboardSet(getIRSelector(), 1)) else List()
-					case "&=" => if value then List() else List(ScoreboardSet(getIRSelector(), 0))
-					case "&&=" => if value then List() else List(ScoreboardSet(getIRSelector(), 0))
+					case "=" => List(ScoreboardSet(getIRSelector(), if (value) 1 else 0))
+					case "|=" => if (value) List(ScoreboardSet(getIRSelector(), 1)) else List()
+					case "||=" => if (value) List(ScoreboardSet(getIRSelector(), 1)) else List()
+					case "+=" => if (value) List(ScoreboardSet(getIRSelector(), 1)) else List()
+					case "&=" => if (value) List() else List(ScoreboardSet(getIRSelector(), 0))
+					case "&&=" => if (value) List() else List(ScoreboardSet(getIRSelector(), 0))
 				}
+			}
 			case UnaryOperation("!", value) => {
 				op match{
 					case _ if isPresentIn(value)=> {
@@ -1235,10 +1267,10 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			case NullValue => List(ScoreboardReset(getIRSelector()))
 			case DefaultValue => List(ScoreboardSet(getIRSelector(), 0))
 			case VariableValue(name, sel) => assignBool(op, context.resolveVariable(value))
-			case LinkedVariableValue(vari, sel) => 
-				vari.getType() match
+			case LinkedVariableValue(vari, sel) => {
+				vari.getType() match{
 					case a if a.isSubtypeOf(BoolType) => {
-						op match
+						op match{
 							case "&=" => List(ScoreboardOperation(getIRSelector(), "*=", vari.getIRSelector()(sel)))
 							case "&&=" => List(ScoreboardOperation(getIRSelector(), "*=", vari.getIRSelector()(sel)))
 							case "|=" => List(ScoreboardOperation(getIRSelector(), "+=", vari.getIRSelector()(sel)))
@@ -1246,6 +1278,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 							case "+=" => List(ScoreboardOperation(getIRSelector(), "+=", vari.getIRSelector()(sel)))
 							case "=" => List(ScoreboardOperation(getIRSelector(), "=", vari.getIRSelector()(sel)))
 							case _ => List(ScoreboardOperation(getIRSelector(), "*=", vari.getIRSelector()(sel)))
+						}
 					}
 					case JsonType => {
 						op match{
@@ -1259,6 +1292,8 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 					}
 					case EntityType => ScoreboardSet(getIRSelector(), 0)::Compiler.compile(If(value, VariableAssigment(List((Right(this), selector)), "=", BoolValue(true)), List()))
 					case other => throw new Exception(f"Cannot assign $value of type $other to $fullName of type ${getType()} at \n${value.pos.longString}")
+				}
+			}
 			case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 			case ArrayGetValue(name, index) => handleArrayGetValue(op, name, index)
 			case BinaryOperation(op @ ("==" | "<=" | "<" | ">" | ">=" | "!=" | "||" | "&&" ), left, right) => {
@@ -1275,6 +1310,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 					VariableAssigment(List((Right(vari2), Selector.self)), "=", BoolValue(true)), 
 					List(ElseIf(BoolValue(true), VariableAssigment(List((Right(vari2), Selector.self)), "=", BoolValue(false)))))):::assignBool(op, LinkedVariableValue(vari2, Selector.self))
 			case _ => throw new Exception(f"Unknown cast to bool $value at \n${value.pos.longString}")
+		}
 	}
 
 	/**
@@ -1350,9 +1386,10 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 				}
 			}
 			case a if a.isSubtypeOf(getType()) => 
-				op match
+				op match{
 					case "=" | "+=" | "-=" | "*=" | "/=" | "%=" => List(ScoreboardOperation(getIRSelector(), op, vari.getIRSelector()(sel)))
 					case otherOp => throw new Exception(f"Cannot assign ${vari.fullName} of type ${vari.getType()} to $fullName of type ${getType()} with operator $otherOp")
+				}
 			case other => castVariable(op, vari, sel)
 		}
 	}
@@ -1368,7 +1405,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 	 */
 	def assignTuple(op: String, expr2: Expression)(implicit context: Context, selector: Selector = Selector.self)={
 		val expr = Utils.simplify(expr2)
-		expr match
+		expr match{
 			case TupleValue(value) => tupleVari.zip(value).flatMap((t, v) => t.assign(op, v))
 			case LinkedVariableValue(vari, sel) => {
 				if (vari.getType().isSubtypeOf(getType())){
@@ -1387,6 +1424,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			case FunctionCallValue(fct, args, typeargs, selector) => handleFunctionCall(op, fct, args, typeargs, selector)
 			case ArrayGetValue(name, index) => handleArrayGetValue(op, name, index)
 			case v => tupleVari.flatMap(t => t.assign(op, v))
+		}
 	}
 
 	/**
@@ -1401,15 +1439,16 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 	def assignArray(op: String, expr2: Expression)(implicit context: Context, selector: Selector = Selector.self)={
 		val ArrayType(sub, size) = getType().asInstanceOf[ArrayType]: @unchecked
 		val expr = Utils.simplify(expr2)
-		expr match
+		expr match{
 			case TupleValue(value) => {
-				size match
+				size match{
 					case IntValue(size) if size == value.size => tupleVari.zip(value).flatMap((t, v) => t.assign(op, v))
 					case _ if sub == Utils.typeof(expr) => tupleVari.flatMap(t => t.assign(op, expr))
 					case _ => throw new Exception(f"Cannot assign tuple of size ${value.size} to array of size $size at \n${expr2.pos.longString}")
+				}
 			}
 			case LinkedVariableValue(vari, sel) => {
-				vari.getType() match
+				vari.getType() match{
 					case JsonType => tupleVari.zipWithIndex.flatMap((t, i) => t.assign(op, LinkedVariableValue(vari.withKey(vari.getSubKey(f"[$i]")), sel)))
 					case other => {
 						if (vari.getType().isSubtypeOf(getType())){
@@ -1424,6 +1463,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 							}
 						}
 					}
+				}
 			}
 			case JsonValue(JsonArray(array)) => {
 				if (array.size != tupleVari.size) throw new Exception(f"Cannot assign array of size ${array.size} to array of size ${tupleVari.size} at \n${expr2.pos.longString}")
@@ -1450,6 +1490,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			}
 			case ArrayGetValue(name, index) => handleArrayGetValue(op, name, index)
 			case v => tupleVari.flatMap(t => t.assign(op, v))
+		}
 	}
 
 
@@ -1465,10 +1506,10 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 	def assignFunc(op: String, expr: Expression)(implicit context: Context, selector: Selector = Selector.self):List[IRTree]={
 		if (op != "=") throw new Exception(f"Illegal operation with ${name}: $op at \n${expr.pos.longString}")
 		
-		expr match
+		expr match{
 			case VariableValue(name, sel) => {
 				val vari = context.tryGetVariable(name)
-				vari match
+				vari match{
 					case Some(vari) => List(ScoreboardOperation(getIRSelector(), op, vari.getIRSelector()(sel)))
 					case None =>{
 						val typ = getType().asInstanceOf[FuncType]
@@ -1476,14 +1517,16 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 						fct.markAsUsed()
 						context.addFunctionToMux(typ.sources, typ.output, fct)
 						List(ScoreboardSet(getIRSelector(), fct.getMuxID()))
+					}
 				}
 			}
 			case LinkedVariableValue(vari, sel) => {
-				vari.getType() match
+				vari.getType() match{
 					case other if Utils.fix(other)(context, Set()).isSubtypeOf(Utils.fix(getType())(context, Set())) => List(ScoreboardOperation(getIRSelector(), op, vari.getIRSelector()(sel)))
 					case IntType => List(ScoreboardOperation(getIRSelector(), op, vari.getIRSelector()(sel)))
 					case JsonType => List(StorageRead(getIRSelector(), vari.getStorage()))
 					case other => castVariable(op, vari, sel)
+				}
 			}
 			case LambdaValue(args, instr, ctx) => {
 				val typ = getType().asInstanceOf[FuncType]
@@ -1503,6 +1546,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 				List(ScoreboardSet(getIRSelector(), fct.getMuxID()))
 			}
 			case _ => throw new Exception(f"Unsupported Operation at \n${expr.pos.longString}")
+		}
 	}
 
 	/**
@@ -1539,7 +1583,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			case _ => {}
 		}
 		if (modifiers.isEntity){
-			op match
+			op match{
 				case "=" => {
 					context.getFunction("__clearBindEntity__", List(VariableValue(Identifier.fromString(fullName+".binding"))), List(), VoidType, false).call():::
 					context.getFunction("__addBindEntity__", List(VariableValue(Identifier.fromString(fullName+".binding")), expr), List(), VoidType, false).call()
@@ -1548,17 +1592,18 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 					context.getFunction("__addBindEntity__", List(VariableValue(Identifier.fromString(fullName+".binding")), expr), List(), VoidType, false).call()
 				}
 				case _: String => throw new Exception(f"Unsupported operation $op on entity $fullName at \n${expr.pos.longString}")
+			}
 		}
 		else{
 			op match{
 				case "=" => {
-					expr match
+					expr match{
 						case VariableValue(name, sel) => {
 							val vari = context.getVariable(name)
 							assignEntity(op, LinkedVariableValue(vari, sel))
 						}
 						case LinkedVariableValue(vari, sel) => {
-							vari.getType() match
+							vari.getType() match{
 								case EntityType => {
 									// Remove tag to previous entities
 									removeEntityTag():::
@@ -1576,6 +1621,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 									Compiler.compile(With(LinkedVariableValue(vari, sel), BoolValue(false), BoolValue(true), VariableAssigment(List((Right(this), selector)), "=", SelectorValue(Selector.self)), EmptyInstruction))
 								}
 								case other => castVariable(op, vari, sel)
+							}
 						}
 						case NullValue => {
 							removeEntityTag()
@@ -1598,15 +1644,16 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 							tupleVari.zip(List(BoolValue(false))).flatMap((t, v) => t.assign(op, v)) ::: 
 							handleFunctionCall(op, name, args, typeargs, selector)
 						case _ => throw new Exception(f"No cast from ${expr} to entity at \n${expr.pos.longString}")
+					}
 				}
 				case "+=" | "&=" => {
-					expr match
+					expr match{
 						case VariableValue(name, sel) => {
 							val vari = context.getVariable(name)
 							assignEntity(op, LinkedVariableValue(vari, sel))
 						}
 						case LinkedVariableValue(vari, sel) => {
-							vari.getType() match
+							vari.getType() match{
 								case EntityType => {
 									// copy fields
 									tupleVari.zip(vari.tupleVari).flatMap((t, v) => t.assign(op, LinkedVariableValue(v, sel))) :::
@@ -1616,6 +1663,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 														List(ElseIf(BoolValue(true), CMD(f"tag @e[tag=${vari.tagName}] add $tagName")))))
 								}
 								case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()} at \n${expr.pos.longString}")
+							}
 						}
 						case IntValue(0) => List()
 						case IntValue(1) => tupleVari.flatMap(t => t.assign(op, BoolValue(false)))
@@ -1632,15 +1680,16 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 						case seq: SequencePostValue => assignSequencePost(op, seq)
 						case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 						case _ => throw new Exception(f"No cast from ${expr} to entity at \n${expr.pos.longString}")
+					}
 				}
 				case "-=" | "/=" => {
-					expr match
+					expr match{
 						case VariableValue(name, sel) => {
 							val vari = context.getVariable(name)
 							assignEntity(op, LinkedVariableValue(vari, sel))
 						}
 						case LinkedVariableValue(vari, sel) => {
-							vari.getType() match
+							vari.getType() match{
 								case EntityType => {
 									// Add tag to new entities
 									Compiler.compile(If(LinkedVariableValue(tupleVari(0), sel), 
@@ -1648,6 +1697,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 														List(ElseIf(BoolValue(true), CMD(f"tag @e[tag=${vari.tagName}] remove $tagName")))))
 								}
 								case other => throw new Exception(f"Cannot assign ${vari.fullName} of type $other to $fullName of type ${getType()} at \n${expr.pos.longString}")
+							}
 						}
 						case IntValue(0) => List()
 						case SelectorValue(value) => {
@@ -1661,6 +1711,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 						case seq: SequencePostValue => assignSequencePost(op, seq)
 						case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 						case _ => throw new Exception(f"No cast from ${expr} to entity at \n${expr.pos.longString}")
+					}
 				}
 				case _ => throw new Exception(f"Illegal operation with ${name}: $op at \n${expr.pos.longString}")
 			}
@@ -1675,7 +1726,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 	 * @return The storage object for the current variable.
 	 */
 	def getStorage(keya: String = "json")(implicit context: Context, selector: Selector = Selector.self) = {
-		val key = if keya == "json" then jsonArrayKey else keya
+		val key = if (keya == "json") jsonArrayKey else keya
 		if (modifiers.isEntity){
 			StorageEntity(getSelectorName().toString(), if (key.startsWith("json."))then key.substring(5) else key)
 		}
@@ -1694,7 +1745,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 	def getStorageValue(keya: String = "json")(implicit context: Context, selector: Selector = Selector.self) = {
 		getType() match{
 			case JsonType => {
-				val key = if keya == "json" then jsonArrayKey else keya
+				val key = if (keya == "json") jsonArrayKey else keya
 				if (modifiers.isEntity){
 					StorageEntity(getSelectorName().toString(), if (key.startsWith("json."))then key.substring(5) else key)
 				}
@@ -1715,7 +1766,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 	 * @return The storage path for the current variable.
 	 */
 	def getStoragePath(keya: String = "json")(implicit context: Context, selector: Selector = Selector.self) = {
-		val key = if keya == "json" then jsonArrayKey else keya
+		val key = if (keya == "json") jsonArrayKey else keya
 		if (modifiers.isEntity){
 			getSelectorName().toString()
 		}
@@ -1735,13 +1786,13 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 	 * @return A list of IRTree nodes representing the assignment operation.
 	 */
 	def assignJson(op: String, value: Expression, keya: String = "json")(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
-		val key = if jsonArrayKey != "json" then jsonArrayKey else keya
+		val key = if (jsonArrayKey != "json") jsonArrayKey else keya
 		if (Settings.target == MCBedrock){
 			throw new Exception(f"Dynamic Json Variable Not Supported in Bedrock ($fullName) at \n${value.pos.longString}")
 		}
 
 		//if (!key.startsWith("json") && !modifiers.isEntity)throw new Exception(f"Cannot assign to json key ${key} at \n${value.pos.longString}")
-		value match
+		value match{
 			case JsonValue(json) => 
 				op match{
 					case "=" => {
@@ -1937,6 +1988,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 					case other => jsonUnpackedOperation(op, value, key)
 				}
 			case _ => throw new Exception(f"Unknown cast to json $value at \n${value.pos.longString}")
+		}
 	}
 
 	/**
@@ -1949,7 +2001,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 	 * @return A list of IRTree objects representing the assignment.
 	 */
 	def assignBinaryOperatorJson(op: String, value: BinaryOperation)(implicit context: Context, selector: Selector = Selector.self):List[IRTree]={
-		value match
+		value match{
 			case BinaryOperation(op2 @ ("+" | "*"), left, right) if Utils.typeof(right) == JsonType && Utils.typeof(left) != JsonType => {
 				assignBinaryOperator(op, BinaryOperation(op2, right, left))
 			}
@@ -1960,6 +2012,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			case other => {
 				assignBinaryOperator(op, other)
 			}
+		}
 	}
 
 	/**
@@ -1973,7 +2026,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 	 * @return A list of IRTree objects representing the operation.
 	 */
 	def jsonUnpackedOperation(op: String, value: Expression, keya: String = "json")(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
-		value match
+		value match{
 			case BinaryOperation("+" | "*", left, right) if Utils.typeof(right) == JsonType && Utils.typeof(left) != JsonType && Utils.typeof(left) != StringType => {
 				jsonUnpackedOperation(op, BinaryOperation(op, right, left), keya)
 			}
@@ -1985,6 +2038,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 				val vari = context.getFreshVariable(Utils.typeof(value))
 				vari.assign("=", LinkedVariableValue(withKey(keya), selector)) ::: vari.assign(op, value) ::: assign("=", LinkedVariableValue(vari))
 			}
+		}
 	}
 
 	/**
@@ -1997,16 +2051,16 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 	 * @return A list of IRTree nodes representing the assignment operation.
 	 */
 	def assignStruct(op: String, value: Expression)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
-		if value == DefaultValue then return List()
-		op match
+		if (value == DefaultValue) return List()
+		op match{
 			case "=" => {
-				value match
+				value match{
 					case LinkedVariableValue(vari, sel) => {
 						if (vari.getType() == getType()){
 							tupleVari.zip(vari.tupleVari).flatMap((a,v) => a.assign(op, LinkedVariableValue(v, sel)))
 						}
 						else{
-							vari.getType() match
+							vari.getType() match{
 								case JsonType => {
 									tupleVari.flatMap(v => v.assign("=", LinkedVariableValue(vari.withKey(vari.getSubKey(v.name)), sel)))
 								}
@@ -2018,15 +2072,17 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 										case e: Exception => castVariable(op, vari, sel)
 									}
 								}
+							}
 						}
 					}
 					case VariableValue(name, sel) => {
 						assignStruct(op, context.resolveVariable(value))
 					}
-					case ConstructorCall(name2, args, typeArg) if name2.toString() == "@@@" => 
+					case ConstructorCall(name2, args, typeArg) if name2.toString() == "@@@" => {
 						context.getFunction(fullName + ".__init__", args, List(), getType(), false).call()
+					}
 					case ConstructorCall(name2, args, typevars) => {
-						context.getType(IdentifierType(name2.toString(), typevars)) match
+						context.getType(IdentifierType(name2.toString(), typevars)) match{
 							case ClassType(clazz, sub) => context.getFunction(fullName + ".__set__", List(value), List(), getType(), false).call()
 							case typ@StructType(struct, sub) => {
 								if (typ == getType()){
@@ -2039,6 +2095,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 								}
 							}
 							case other => throw new Exception(f"Cannot constructor call $other at \n${value.pos.longString}")
+						}
 					}
 					case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 					case bin: BinaryOperation => assignBinaryOperator("=", bin)
@@ -2052,15 +2109,19 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 						handleArrayGetValue(op, name, index)
 					}
 					case _ => context.getFunction(fullName + ".__set__", List(value), List(), getType(), false).call()
+				}
 			}
-			case op => 
-				value match
+			case op => {
+				value match{
 					case FunctionCallValue(name, args, typeargs, selector) => handleFunctionCall(op, name, args, typeargs, selector)
 					case bin: BinaryOperation => assignBinaryOperator(op, bin)
 					case ter: TernaryOperation => assignTernaryOperator(op, ter)
 					case seq: SequenceValue => assignSequence(op, seq)
 					case seq: SequencePostValue => assignSequencePost(op, seq)
 					case _ => context.getFunction(fullName + "." + Utils.getOpFunctionName(op),  List(value), List(), getType(), false).call()
+				}
+			}
+		}
 	}
 
 	/** 
@@ -2091,17 +2152,17 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 	 * @return A list of IRTree nodes representing the assignment operation.
 	 */
 	def assignClass(op: String, value: Expression)(implicit context: Context, selector: Selector = Selector.self): List[IRTree] = {
-		if value == DefaultValue then return List()
-		op match
+		if (value == DefaultValue) return List()
+		op match{
 			case "nullPointerAssign" => {
-				value match
+				value match{
 					case ConstructorCall(name2, args, typevars) => {
-						context.getType(IdentifierType(name2.toString(), typevars)) match
+						context.getType(IdentifierType(name2.toString(), typevars)) match{
 							case typ@ClassType(clazz2, sub) => {
 								val clazz = clazz2.get(sub)
 								try{
 									val entity = clazz.getEntity()
-									val initarg = List(StringValue(clazz.fullName))::: (if entity != null then List(entity) else List())
+									val initarg = List(StringValue(clazz.fullName))::: (if (entity != null) List(entity) else List())
 									
 									assign("=", FunctionCallValue(VariableValue("object.__initUnbounded"), initarg, List()))
 									::: context.getFunction(name + ".__init__", args, List(), getType(), false).call()
@@ -2117,10 +2178,12 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 								}
 							}
 							case other => throw new Exception(f"Cannot constructor call $other at \n${value.pos.longString}")
+						}
 					}
+				}
 			}
 			case "=" => {
-				value match
+				value match{
 					case LinkedVariableValue(vari, sel) if vari.getType().isSubtypeOf(getType()) || vari.getType() == getType()=> {
 						deref() ::: List(ScoreboardOperation(getIRSelector(), op, vari.getIRSelector()(sel))) ::: addref()
 					}
@@ -2140,7 +2203,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 						val ClassType(clazz, sub) = getType(): @unchecked
 						try{
 							val entity = clazz.getEntity()
-							val initarg = List(StringValue(clazz.fullName))::: (if entity != null then List(entity) else List())
+							val initarg = List(StringValue(clazz.fullName))::: (if (entity != null) List(entity) else List())
 							deref()
 							::: assign("=", FunctionCallValue(VariableValue("object.__initInstance"), initarg, List()))
 							::: context.getFunction(name + ".__init__", args, List(), getType(), false).call()
@@ -2157,14 +2220,14 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 						}
 					}
 					case ConstructorCall(name2, args, typevars) => {
-						context.getType(IdentifierType(name2.toString(), typevars)) match
+						context.getType(IdentifierType(name2.toString(), typevars)) match{
 							case StructType(struct, sub) => throw new Exception(f"Cannot call struct constructor for class at \n${value.pos.longString}")
 							case typ@ClassType(clazz2, sub) => {
 								val clazz = clazz2.get(sub)
 								if (typ == getType() && typevars.map(context.getType(_)) == sub && !isFunctionArgument){
 									try{
 										val entity = clazz.getEntity()
-										val initarg = List(StringValue(clazz.fullName))::: (if entity != null then List(entity) else List())
+										val initarg = List(StringValue(clazz.fullName))::: (if (entity != null) List(entity) else List())
 										deref()
 										::: assign("=", FunctionCallValue(VariableValue("object.__initInstance"), initarg, List()))
 										::: context.getFunction(name + ".__init__", args, List(), getType(), false).call()
@@ -2185,6 +2248,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 								}
 							}
 							case other => throw new Exception(f"Cannot constructor call $other at \n${value.pos.longString}")
+						}
 					}
 					case NullValue => deref() ::: List(ScoreboardSet(getIRSelector(), 0))
 					case DefaultValue => List(ScoreboardSet(getIRSelector(), 0))
@@ -2198,9 +2262,10 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 						map.flatMap(x => tupleVari.find(y => y.name == x._1).get.assign("=", Utils.jsonToExpr(x._2))).toList
 					}
 					case _ => context.getFunction(name + ".__set__", List(value), List(), getType(), false).call()
-						
+				}
 			}
 			case _ => assignStruct(op, value)
+		}
 	}
 
 
@@ -2213,7 +2278,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 	 * @return True if the variable is present in the expression, false otherwise.
 	 */
 	def isPresentIn(expr: Expression)(implicit context: Context, selector: Selector): Boolean = {
-		expr match
+		expr match{
 			case IntValue(value) => false
 			case FloatValue(value) => false
 			case BoolValue(value) => false
@@ -2248,6 +2313,7 @@ class Variable(context: Context, name: String, var typ: Type, _modifier: Modifie
 			case SequenceValue(left, right) => isPresentIn(right)
 			case SequencePostValue(left, right) => isPresentIn(left)
 		}
+	}
 
 
 	/**

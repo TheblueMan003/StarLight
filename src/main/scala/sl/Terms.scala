@@ -12,11 +12,11 @@ import objects.TagType
 
 
 case class Argument(val name: String, val typ: Type, val defValue: Option[Expression]){
-  override def toString() = if (defValue.isDefined) then f"$typ $name = ${defValue.get}" else f"$typ $name"
+  override def toString() = if ((defValue.isDefined)) f"$typ $name = ${defValue.get}" else f"$typ $name"
 }
 
 case class TemplateArgument(val name: String, val defValue: Option[Expression]){
-  override def toString() = if (defValue.isDefined) then f"$name = ${defValue.get}" else f"$name"
+  override def toString() = if ((defValue.isDefined)) f"$name = ${defValue.get}" else f"$name"
 }
 
 case class CPosition(_line: Int, _column: Int, _lineContents: String) extends Position{
@@ -28,6 +28,10 @@ case class CPosition(_line: Int, _column: Int, _lineContents: String) extends Po
 trait CPositionable extends Positional{
   override def setPos(newpos: Position): this.type = {
     super.setPos(CPosition(newpos.line, newpos.column, newpos.longString.split("\n")(0)))
+    this
+  }
+  def setPos(newpos: Int): this.type = {
+    super.setPos(CPosition(-1, newpos, ""))
     this
   }
 }
@@ -88,21 +92,25 @@ case class VariableDecl(val name: List[String], val _type: Type, val modifier: M
   override def toString() = f"${_type} ${name.mkString(", ")} $op $expr"
 }
 case class VariableAssigment(val name: List[(Either[Identifier, Variable], Selector)], val op: String, val expr: Expression) extends Instruction{
-  override def toString() = 
+  override def toString() = {
     val nameText = name.map(n => {
-      n match
-        case (Left(id), sel) => if (sel == Selector.self) then id.toString() else sel.toString() +"."+ id.toString()
-        case (Right(v), sel) => if (sel == Selector.self) then v.fullName else sel.toString() +"."+ v.fullName
+      n match{
+        case (Left(id), sel) => if ((sel == Selector.self)) id.toString() else sel.toString() +"."+ id.toString()
+        case (Right(v), sel) => if ((sel == Selector.self)) v.fullName else sel.toString() +"."+ v.fullName
+      }
     })
     f"${nameText.mkString(", ")} ${op} ${expr}"
+  }
 }
 case class ArrayAssigment(val name: Either[Identifier, Variable], val index: List[Expression], val op: String, val expr: Expression) extends Instruction{
-  override def toString() = 
-    val nameText = name match
+  override def toString() = {
+    val nameText = name match{
         case Left(id) => id.toString()
         case Right(v) => v.fullName
-    
+    }
+  
     f"${nameText}[$index] ${op} ${expr}"
+  }
 }
 
 case class CMD(val value: String) extends Instruction{
@@ -138,15 +146,15 @@ case class Import(val lib: String, val value: String, val alias: String) extends
 case class Switch(val value: Expression, val cases: List[SwitchElement], val copyVariable: Boolean = true) extends Instruction {
   override def toString() = f"switch($value){\n${cases.mkString("\n")}\n}"
 }
-trait SwitchElement{
+trait SwitchElement extends CPositionable{
 }
 case class SwitchCase(val expr: Expression, val instr: Instruction, val cond: Expression) extends SwitchElement{
   override def toString(): String = f"$expr -> $instr"
 }
-case class SwitchForGenerate(val key: String, val provider: Expression, val instr: SwitchCase) extends CPositionable with SwitchElement {
+case class SwitchForGenerate(val key: String, val provider: Expression, val instr: SwitchCase) extends SwitchElement {
   override def toString(): String = f"forgenerate($key, $provider)$instr"
 }
-case class SwitchForEach(val key: Identifier, val provider: Expression, val instr: SwitchCase) extends CPositionable with SwitchElement {
+case class SwitchForEach(val key: Identifier, val provider: Expression, val instr: SwitchCase) extends SwitchElement {
   override def toString(): String = f"foreach($key, $provider)$instr"
 }
 
@@ -195,7 +203,7 @@ case class Execute(val typ: ExecuteType, val exprs: List[Expression], val block:
 }
 case class With(val expr: Expression, val isat: Expression, val cond: Expression, val block: Instruction, val elze: Instruction) extends Instruction {
   override def toString() = 
-    if (elze == null) then f"with($expr, $isat, $cond) $block"
+    if ((elze == null)) f"with($expr, $isat, $cond) $block"
     else f"with($expr, $isat, $cond) $block else $elze"
 }
 case class Sleep(val time: Expression, val continuation: Instruction) extends Instruction {

@@ -1,15 +1,20 @@
-scalaVersion := "3.2.0"
+val scala3Version = "3.3.5"
 
-name              := "StarLight"
+lazy val root = project
+  .in(file("."))
+  .settings(
+    name              := "StarLight",
+    version           := "0.1.5-SNAPSHOT",
+    organization      := "com.github.theblueman003",
 
-version           := "0.1.5-SNAPSHOT"
+    scalaVersion := scala3Version,
 
-organization      := "com.github.theblueman003"
+    publishMavenStyle := true,
 
-publishMavenStyle := true
-
-libraryDependencies += "org.scala-lang.modules" %% "scala-parser-combinators" % "2.1.1"
-
-libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.11" % Test
-
-libraryDependencies += "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.4"
+    libraryDependencies += "org.scalameta" %% "munit" % "0.7.29" % Test,
+    libraryDependencies += "org.scala-lang.modules" %% "scala-parser-combinators" % "2.1.1",
+    libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.11" % Test,
+    libraryDependencies += "com.lihaoyi" %% "fastparse" % "3.1.1",
+    libraryDependencies += "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.4",
+)
+  

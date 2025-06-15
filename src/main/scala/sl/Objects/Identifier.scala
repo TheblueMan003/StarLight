@@ -40,43 +40,47 @@ case class Identifier(values: List[String]) extends Positional {
   }
   def isPrefixBy(other: Identifier): Boolean = {
     def rec(l1: List[String], l2: List[String]): Boolean = {
-      l1 match
+      l1 match{
         case head :: next => {
-          l2 match
+          l2 match{
             case h1 :: n2 => h1 == head && rec(next, n2)
             case Nil      => true
+          }
         }
         case Nil => {
-          l2 match
+          l2 match{
             case h1 :: n2 => false
             case Nil      => true
+          }
         }
-
+      }
     }
     rec(values, other.values)
   }
   def isSufixedBy(other: Identifier): Boolean = {
     def rec(l1: List[String], l2: List[String]): Boolean = {
-      l1 match
+      l1 match{
         case head :: next => {
-          l2 match
+          l2 match{
             case h1 :: n2 => h1 == head && rec(next, n2)
             case Nil      => true
+          }
         }
         case Nil => {
-          l2 match
+          l2 match{
             case h1 :: n2 => false
             case Nil      => true
+          }
         }
-
+      }
     }
     rec(values.reverse, other.values.reverse)
   }
   def getSufixOf(other: Identifier): List[String] = {
     def rec(l1: List[String], l2: List[String]): List[String] = {
-      l1 match
+      l1 match{
         case head :: next => {
-          l2 match
+          l2 match{
             case h1 :: n2 => {
               if (h1 == head) {
                 rec(next, n2)
@@ -85,13 +89,15 @@ case class Identifier(values: List[String]) extends Positional {
               }
             }
             case Nil => Nil
+          }
         }
         case Nil => {
-          l2 match
+          l2 match{
             case h1 :: n2 => l2
             case Nil      => Nil
+          }
         }
-
+      }
     }
     rec(values, other.values)
   }
@@ -117,9 +123,9 @@ case class Identifier(values: List[String]) extends Positional {
   }
   def distanceTo(other: Identifier): Int = {
     def rec(l1: List[String], l2: List[String]): Int = {
-      l1 match
+      l1 match{
         case head :: next => {
-          l2 match
+          l2 match{
             case h1 :: n2 => {
               if (h1 == head) {
                 rec(next, n2)
@@ -128,13 +134,15 @@ case class Identifier(values: List[String]) extends Positional {
               }
             }
             case Nil => l1.size
+          }
         }
         case Nil => {
-          l2 match
+          l2 match{
             case h1 :: n2 => l2.size
             case Nil      => 0
+          }
         }
-
+      }
     }
     rec(values, other.values)
   }

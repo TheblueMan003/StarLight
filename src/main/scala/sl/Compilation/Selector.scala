@@ -96,49 +96,57 @@ case class BedrockSelector(val prefix: String, val filters: List[(String, Select
         key match{
             case "c" => List(("limit", value), ("sort", SelectorIdentifier("nearest")))
             case "r" => {
-                lst.find(_._1 == "rm") match
+                lst.find(_._1 == "rm") match{
                     case None => List(("distance", makeLower(value)))
                     case Some(v2) => List(("distance", makeRange(value, v2._2)))
+                }
             }
             case "m" => {
                 List(("gamemode", value))
             }
             case "rx" => {
-                lst.find(_._1 == "rxm") match
+                lst.find(_._1 == "rxm") match{
                     case None => List(("x_rotation", makeLower(value)))
                     case Some(v2) => List(("x_rotation", makeRange(value, v2._2)))
+                }
             }
             case "ry" => {
-                lst.find(_._1 == "rym") match
+                lst.find(_._1 == "rym") match{
                     case None => List(("y_rotation", makeLower(value)))
                     case Some(v2) => List(("y_rotation", makeRange(value, v2._2)))
+                }
             }
             case "l" => {
-                lst.find(_._1 == "lm") match
+                lst.find(_._1 == "lm") match{
                     case None => List(("level", makeLower(value)))
                     case Some(v2) => List(("level", makeRange(value, v2._2)))
+                }
             }
 
 
             case "rm" => {
-                lst.find(_._1 == "r") match
+                lst.find(_._1 == "r") match{
                     case None => List(("distance", makeGreater(value)))
                     case Some(v2) => List()
+                }
             }
             case "rxm" => {
-                lst.find(_._1 == "rx") match
+                lst.find(_._1 == "rx") match{
                     case None => List(("x_rotation‌", makeGreater(value)))
                     case Some(v2) => List()
+                }
             }
             case "rym" => {
-                lst.find(_._1 == "ry") match
+                lst.find(_._1 == "ry") match{
                     case None => List(("y_rotation‌", makeGreater(value)))
                     case Some(v2) => List()
+                }
             }
            case "lm" => {
-                lst.find(_._1 == "l") match
+                lst.find(_._1 == "l") match{
                     case None => List(("level", makeGreater(value)))
                     case Some(v2) => List()
+                }
             }
             case "familly" => throw new Exception("familly not supported on java")
             case _ => List((key, value))
@@ -171,9 +179,10 @@ case class BedrockSelector(val prefix: String, val filters: List[(String, Select
         }
         else{
             val newFilter = filters.map{ case (s, v) => 
-                v match
+                v match{
                     case SelectorInvert(v2) => (s, v2)
                     case _ => (s, SelectorInvert(v))
+                }
             }
             BedrockSelector(prefix, newFilter)
         }
@@ -204,41 +213,46 @@ case class JavaSelector(val prefix: String, val filters: List[(String, SelectorF
     def filterToBedrock(key: String, value: SelectorFilterValue, lst: List[(String, SelectorFilterValue)]): List[(String, SelectorFilterValue)] = {
         key match{
             case "limit" => {
-                value match
+                value match{
                     case SelectorNumber(value) => List(("c", SelectorNumber(value)))
                     case SelectorIdentifier(value) => List(("c", SelectorIdentifier(value)))
+                }
             }
             case "distance" => {
-                value match
+                value match{
                     case SelectorNumber(value) => List(("r", SelectorNumber(value)), ("rm", SelectorNumber(value)))
                     case SelectorRange(v1, v2) => List(("r", v2), ("rm", v1))
                     case SelectorGreaterRange(value) => List(("rm", value))
                     case SelectorLowerRange(value) => List(("r", value))
                     case SelectorIdentifier(value) => List(("r", SelectorIdentifier(value)), ("rm", SelectorIdentifier(value)))
+                }
             }
             case "rotation_x" => {
-                value match
+                value match{
                     case SelectorNumber(value) => List(("rx", SelectorNumber(value)), ("rxm", SelectorNumber(value)))
                     case SelectorRange(v1, v2) => List(("rx", v2), ("rxm", v1))
                     case SelectorGreaterRange(value) => List(("rxm", value))
                     case SelectorLowerRange(value) => List(("rx", value))
                     case SelectorIdentifier(value) => List(("rx", SelectorIdentifier(value)), ("rxm", SelectorIdentifier(value)))
+                }
             }
             case "rotation_y" => {
-                value match
+                value match{
                     case SelectorNumber(value) => List(("ry", SelectorNumber(value)), ("rym", SelectorNumber(value)))
                     case SelectorRange(v1, v2) => List(("ry", v2), ("rym", v1))
                     case SelectorGreaterRange(value) => List(("rym", value))
                     case SelectorLowerRange(value) => List(("ry", value))
                     case SelectorIdentifier(value) => List(("ry", SelectorIdentifier(value)), ("rym", SelectorIdentifier(value)))
+                }
             }
             case "level" => {
-                value match
+                value match{
                     case SelectorNumber(value) => List(("l", SelectorNumber(value)), ("lm", SelectorNumber(value)))
                     case SelectorRange(v1, v2) => List(("l", v2), ("lm", v1))
                     case SelectorGreaterRange(value) => List(("lm", value))
                     case SelectorLowerRange(value) => List(("l", value))
                     case SelectorIdentifier(value) => List(("l", SelectorIdentifier(value)), ("lm", SelectorIdentifier(value)))
+                }
             }
             case "sort" if value == SelectorIdentifier("nearest") => List()
             case "predicate" | "advancements‌" | "sort" => {
@@ -276,9 +290,10 @@ case class JavaSelector(val prefix: String, val filters: List[(String, SelectorF
         }
         else{
             val newFilter = filters.map{ case (s, v) => 
-                v match
+                v match{
                     case SelectorInvert(v2) => (s, v2)
                     case _ => (s, SelectorInvert(v))
+                }
             }
             BedrockSelector(prefix, newFilter)
         }
@@ -308,9 +323,10 @@ case class SelectorGreaterRange(val min: SelectorFilterValue) extends SelectorFi
     override def subst(from: String, to: String): SelectorFilterValue = SelectorGreaterRange(min.subst(from, to))
 }
 case class SelectorNumber(val value: Double) extends SelectorFilterValue{
-    override def getString()(implicit context: Context): String = 
+    override def getString()(implicit context: Context): String = {
         val int = value.toInt
-        if int == value then f"$int" else f"$value"
+        if (int == value) f"$int" else f"$value"
+    }
     override def fix(implicit context: Context, ignore: Set[Identifier]): SelectorFilterValue = this
     override def subst(from: String, to: String): SelectorFilterValue = this
 }
@@ -321,30 +337,34 @@ case class SelectorString(val value: String) extends SelectorFilterValue{
 }
 case class SelectorIdentifier(val value: String) extends SelectorFilterValue{
     override def getString()(implicit context: Context): String = {
-        context.tryGetVariable(value) match
+        context.tryGetVariable(value) match{
             case Some(vari) if vari.modifiers.isLazy => {
-                vari.lazyValue match
+                vari.lazyValue match{
                     case IntValue(n) => SelectorNumber(n).getString()
                     case FloatValue(n) => SelectorNumber(n).getString()
                     case n: NamespacedName => n.getString()
                     case StringValue(value) => SelectorString(value).getString()
                     case JsonValue(value) => SelectorNbt(value).getString()
                     case _ => value
+                }
             }
             case _ => value
+        }
     }
     override def fix(implicit context: Context, ignore: Set[Identifier]): SelectorFilterValue = {
-        context.tryGetVariable(value) match
+        context.tryGetVariable(value) match{
             case Some(vari) if vari.modifiers.isLazy => {
-                vari.lazyValue match
+                vari.lazyValue match{
                     case IntValue(n) => SelectorNumber(n)
                     case FloatValue(n) => SelectorNumber(n)
                     case n: NamespacedName => SelectorString(n.getString())
                     case StringValue(value) => SelectorString(value)
                     case JsonValue(value) => SelectorNbt(value)
                     case other => throw new Exception(f"Lazy value not supported: $other")
+                }
             }
             case _ => this
+        }
     }
     override def subst(from: String, to: String): SelectorFilterValue = SelectorIdentifier(value.replaceAll(from, to))
 }

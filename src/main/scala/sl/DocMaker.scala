@@ -51,7 +51,7 @@ object DocMaker {
     * modifiers and comments
     */
   def make2(instr: Instruction)(implicit packag: String = ""): String = {
-    instr match
+    instr match{
       case i: InstructionBlock => i.list.map(make2).mkString("")
       case If(cond, ifBlock, elze) =>
         make2(ifBlock) + elze.flatMap(g => make2(g.ifBlock)).mkString("")
@@ -155,6 +155,7 @@ object DocMaker {
       case With(expr, isat, cond, block, elze) =>
         make2(block) + "\n\n" + make2(elze)
       case _ => ""
+    }
   }
 }
 

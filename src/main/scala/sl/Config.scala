@@ -26,18 +26,20 @@ object ConfigLoader{
         "resources"
     )
     def loadVersion(value: String): PackVersion = {
-        Parser.parseExpression(value, true) match
+        Parser.parseExpression(value, true) match{
             case IntValue(value) => SinglePackVersion(value)
             case RangeValue(IntValue(min), IntValue(max), IntValue(1)) => RangedPackVersion(min, max)
             case JsonValue(JsonArray(lst)) => {
                 ListPackVersion(lst.map{
-                    _ match
+                    _ match{
                         case JsonInt(value, typ) => value
                         case JsonExpression(IntValue(value), typ) => value
                         case other => throw new Exception(f"Illegal Version format: $other")
+                    }
                 })
             }
             case other => throw new Exception(f"Illegal Version format: $other")
+        }
         
     }
     def load(path: String)={

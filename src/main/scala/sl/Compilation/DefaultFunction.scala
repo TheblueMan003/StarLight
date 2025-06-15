@@ -707,9 +707,10 @@ object DefaultFunction{
                 args match{
                     case Nil => {
                         val clazz = ctx.getCurrentClass()
-                        clazz match
+                        clazz match{
                             case c => (List(), StringValue(c.fullName))
                             case null => throw new Exception("Not in a class")
+                        }
                     }
                     case other => throw new Exception(f"Illegal Arguments $other for getClassName")
                 }

@@ -16,13 +16,13 @@ enum ReturnState{
 }
 object ReturnState{
     def follow(a: ReturnState, b: ReturnState)={
-        if a == Full || b == Full then Full
-        else if a == Partial || b == Partial then Partial
+        if (a == Full || b == Full) Full
+        else if (a == Partial || b == Partial) Partial
         else None
     }
     def combine(a: ReturnState, b: ReturnState)={
-        if a == Full && b == Full then Full
-        else if a == None && b == None then None
+        if (a == Full && b == Full) Full
+        else if (a == None && b == None) None
         else Partial
     }
 }
@@ -37,7 +37,7 @@ object StaticAnalyser{
      * @return A new instruction.
      */
     def check(instruction: Instruction): Instruction = Utils.positioned(instruction, {
-        instruction match
+        instruction match{
             case Package(name, block) => Package(name, check(block))
             case InstructionBlock(instructions) => InstructionBlock(instructions.map(check))
             case InstructionList(instructions) => InstructionList(instructions.map(check))
@@ -51,20 +51,24 @@ object StaticAnalyser{
             case Execute(typ, exprs, block) => Execute(typ, exprs, check(block))
             case With(expr, isat, cond, block, elze) => With(expr, isat, cond, check(block), check(elze))
             case Try(block, except, finallyBlock) => Try(check(block), check(except), check(finallyBlock))
-            case FunctionDecl(name, block, typ, args, typeArgs, modifier) => 
+            case FunctionDecl(name, block, typ, args, typeArgs, modifier) => {
                 val newBlock = check(block)
                 val returnState = hasReturn(newBlock)
-                if returnState == ReturnState.None && typ != VoidType && !modifier.hasAttributes("noReturnCheck")(null) then
+                if (returnState == ReturnState.None && typ != VoidType && !modifier.hasAttributes("noReturnCheck")(null))
                     if (Settings.consoleWarningReturn){Reporter.warning(f"Function $name does not return")}
-                if returnState == ReturnState.Partial && typ != VoidType && !modifier.hasAttributes("noReturnCheck")(null) then
+                if (returnState == ReturnState.Partial && typ != VoidType && !modifier.hasAttributes("noReturnCheck")(null))
                     if (Settings.consoleWarningReturn){Reporter.warning(f"Function $name does not return in all cases")}
                 val finalBlock = returnOne(newBlock)
-                if (finalBlock != newBlock) then
+                if ((finalBlock != newBlock))
+                {
                     modifier.addAtrribute("__returnCheck__", BoolValue(true))
                     val block = InstructionList(List(getDeclaration("__hasFunctionReturned__", BoolValue(false)), finalBlock))
                     FunctionDecl(name, block, typ, args, typeArgs, modifier)
-                else
+                }
+                else{
                     FunctionDecl(name, finalBlock, typ, args, typeArgs, modifier)
+                }
+            }
             case ClassDecl(name, generics, block, modifier, parent, parentGenerics, interfaces, entity) => ClassDecl(name, generics, check(block), modifier, parent, parentGenerics, interfaces, entity)
             case StructDecl(name, generics, block, modifier, parent) => StructDecl(name, generics, check(block), modifier, parent)
             case ForEach(key, provider, instr) => ForEach(key, provider, check(instr))
@@ -72,6 +76,7 @@ object StaticAnalyser{
             case TemplateDecl(name, block, modifier, parent, generics, parentGenerics) => TemplateDecl(name, check(block), modifier, parent, generics, parentGenerics)
             case TemplateUse(template, name, block, values) => TemplateUse(template, name, check(block), values)
             case _ => instruction
+        }
     })
     /**
      * Determines if the given instruction has a return statement.
@@ -80,7 +85,7 @@ object StaticAnalyser{
      * @return a ReturnState indicating if the instruction has a return statement and if it is reachable
      */
     def hasReturn(instruction: Instruction): ReturnState = {
-        instruction match
+        instruction match{
             case InstructionBlock(instructions) => 
                 instructions.map(hasReturn).foldLeft(ReturnState.None)(ReturnState.follow)
             case InstructionList(instructions) => 
@@ -106,6 +111,7 @@ object StaticAnalyser{
             case ForEach(key, provider, instr) => hasReturn(instr)
             case ForGenerate(key, provider, instr) => hasReturn(instr)
             case _ => ReturnState.None
+        }
     }
     /**
      * Returns an instruction that return only once per path.
@@ -113,20 +119,22 @@ object StaticAnalyser{
      * @return an instruction that return only once per path.
      */
     def returnOne(instruction: Instruction): Instruction = Utils.positioned(instruction, {
-        instruction match
+        instruction match{
             case Package(name, block) => throw new Exception("Package cannot return")
             case InstructionBlock(instructions) => InstructionBlock(returnOnce(instructions))
             case InstructionList(instructions) =>  InstructionList(returnOnce(instructions))
             case If(cond, ifBlock, elseBlock) => If(cond, returnOne(ifBlock), elseBlock.map(e => ElseIf(e.cond, returnOne(e.ifBlock))))
             case WhileLoop(cond, block) => {
-                hasReturn(block) match
+                hasReturn(block) match{
                     case ReturnState.None => WhileLoop(cond, block)
                     case _ => WhileLoop(BinaryOperation("&&", cond, getComparaison("__hasFunctionReturned__", BoolValue(false))), returnOne(block))
+                }
             }
             case DoWhileLoop(cond, block) => {
-                hasReturn(block) match
+                hasReturn(block) match{
                     case ReturnState.None => DoWhileLoop(cond, block)
                     case _ => DoWhileLoop(BinaryOperation("&&", cond, getComparaison("__hasFunctionReturned__", IntValue(0))), returnOne(block))
+                }
             }
             case Switch(value, cases, default) => {
                 val newCases = cases.map{case x: SwitchCase => SwitchCase(x.expr, InstructionList(returnOnce(List(x.instr))), x.cond);
@@ -138,15 +146,18 @@ object StaticAnalyser{
             case Execute(typ, exprs, block) => Execute(typ, exprs, returnOne(block))
             case With(expr, isat, cond, block, elze) => With(expr, isat, cond, returnOne(block), returnOne(elze))
             case ForEach(key, provider, instr) => 
-                hasReturn(instr) match
+                hasReturn(instr) match{
                     case ReturnState.None => ForEach(key, provider, instr)
                     case _ => ForEach(key, provider, If(getComparaison("__hasFunctionReturned__", IntValue(0)), instr, List()))
+                }
             case ForGenerate(key, provider, instr) => 
-                hasReturn(instr) match
+                hasReturn(instr) match{
                     case ReturnState.None => ForGenerate(key, provider, instr)
                     case _ => ForGenerate(key, provider, If(getComparaison("__hasFunctionReturned__", IntValue(0)), instr, List()))
+                }
             case Return(_) => instruction
             case other => other
+        }
     })
     def returnOnce(instructions: List[Instruction])={
         var buffer = instructions
@@ -154,7 +165,7 @@ object StaticAnalyser{
         while(buffer.nonEmpty){
             val head = buffer.head
                 //__hasFunctionReturned__
-            hasReturn(head) match
+            hasReturn(head) match{
                 case ReturnState.Full => 
                     lst = returnOne(head) :: lst
                     buffer = List()
@@ -166,7 +177,8 @@ object StaticAnalyser{
                     lst = returnOne(head) :: lst
                     buffer = buffer.tail
             }
-            lst.reverse
+        }
+        lst.reverse
     }
     /**
      * Returns a variable declaration instruction with the given name, value, and type.
@@ -258,10 +270,11 @@ object StaticAnalyser{
      * @return True if the Instruction needs to be converted, false otherwise.
      */
     def needConversion(inst: Instruction): Boolean = {
-        Utils.contains(inst, x => x match
+        Utils.contains(inst, x => x match{
             case Await(_, _) => true
             case Sleep(_, _) => true
-            case _ => false)
+            case _ => false
+        })
     }
 
     /**
@@ -272,27 +285,27 @@ object StaticAnalyser{
      * @return A tuple containing the instruction and a boolean indicating whether the rest of the program was consumed.
      */
     def handleSleep(instruction: Instruction, rest: List[Instruction]): (Instruction, Boolean) = {
-        val ret = instruction match
+        val ret = instruction match{
             case Sleep(time, continuation) => 
                 val (newContinuation, changed) = handleSleep(continuation, rest)
-                if changed then
+                if (changed)
                     (Sleep(time, newContinuation), true)
                 else
                     (Sleep(time, InstructionList(newContinuation :: rest)), true)
             case Await(func, continuation) => 
                 val (newContinuation, changed) = handleSleep(continuation, rest)
-                if changed then
+                if (changed)
                     (Await(func, newContinuation), true)
                 else
                     (Await(func, InstructionList(newContinuation :: rest)), true)
             case Assert(func, continuation) => 
                 val (newContinuation, changed) = handleSleep(continuation, rest)
-                if changed then
+                if (changed)
                     (Assert(func, newContinuation), true)
                 else
                     (Assert(func, InstructionList(newContinuation :: rest)), true)
             case FunctionDecl(name, block, typ, args, typeArgs, modifier) => 
-                if (modifier.isAsync) then
+                if ((modifier.isAsync))
                     (FunctionDecl(name, handleSleep(InstructionList(List(block, FunctionCall(Identifier.fromString("--await_callback--"), List(), List())))), typ, args, typeArgs, modifier), false)
                 else
                     (FunctionDecl(name, handleSleep(block), typ, args, typeArgs, modifier), false)
@@ -308,8 +321,9 @@ object StaticAnalyser{
                 (Package(name, handleSleep(block)), false)
             case InstructionList(list) => {
                 list.foldRight((InstructionList(List()), false))((instr, acc) => {
-                    val (newInstr, changed) = handleSleep(instr, acc._1 match
-                        case InstructionList(list) => list ::: rest)
+                    val (newInstr, changed) = handleSleep(instr, acc._1 match{
+                        case InstructionList(list) => list ::: rest
+                    })
                     
                     if (changed){
                         (InstructionList(newInstr :: Nil), changed || acc._2)
@@ -321,8 +335,9 @@ object StaticAnalyser{
             }
             case InstructionBlock(list) => {
                 list.foldRight((InstructionBlock(List()), false))((instr, acc) => {
-                    val (newInstr, changed) = handleSleep(instr, acc._1 match
-                        case InstructionBlock(list) => list ::: rest)
+                    val (newInstr, changed) = handleSleep(instr, acc._1 match{
+                        case InstructionBlock(list) => list ::: rest
+                    })
                     
                     if (changed){
                         (InstructionBlock(newInstr :: Nil), changed || acc._2)
@@ -332,19 +347,21 @@ object StaticAnalyser{
                     }
                 })
             }
-            case loop@WhileLoop(cond, block) => 
-                if needConversion(block) then
+            case loop@WhileLoop(cond, block) => {
+                if (needConversion(block))
                     handleSleep(convertWhileToFunction(loop), rest)
                 else
                     (WhileLoop(cond, block), false)
-            case loop@DoWhileLoop(cond, block) => 
-                if needConversion(block) then
+            }
+            case loop@DoWhileLoop(cond, block) => {
+                if (needConversion(block))
                     handleSleep(convertDoWhileToFunction(loop), rest)
                 else
                     (DoWhileLoop(cond, block), false)
-            case If(cond, ifBlock, elseBlock) => 
+            }
+            case If(cond, ifBlock, elseBlock) => {
                 val needed = needConversion(ifBlock) || elseBlock.exists(e => needConversion(e.ifBlock))
-                if needed then
+                if (needed){
                     var (newIfBlock, ifChanged) = handleSleep(ifBlock, rest)
 
                     if (!ifChanged){
@@ -363,8 +380,11 @@ object StaticAnalyser{
 
 
                     (If(cond, newIfBlock, elze.map(_._1):::List(ElseIf(BoolValue(true), InstructionList(rest)))), true)
-                else
+                }
+                else{
                     (instruction, false)
+                }
+            }
             case Switch(value, cases, copyVariable) => {
                 val needed = cases.exists{
                     case x: SwitchCase => needConversion(x.instr)
@@ -443,6 +463,7 @@ object StaticAnalyser{
                 }
             
             case other => (other, false)
+        }
         (Utils.positioned(instruction, ret._1), ret._2)
     }
 }

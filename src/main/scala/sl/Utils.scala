@@ -28,9 +28,10 @@ object Utils{
         source.getLines.toList
     }
     def getLibPath(path: String)={
-        libaries.get(path.toLowerCase) match
+        libaries.get(path.toLowerCase) match{
             case Some(p) => p
             case None => path
+        }
     }
     def preloadAll():Unit={
         sl.files.FileUtils.getListOfFiles("libraries").filter(p => p.endsWith(".sl")).par.foreach(f => {
@@ -71,7 +72,7 @@ object Utils{
         newone
     }
     def substReturn(instr: Instruction, to: Variable)(implicit isFullReturn: Boolean, selector: Selector): Instruction = positioned(instr, {
-        instr match
+        instr match{
             case Package(name, block) => Package(name, substReturn(block, to))
             case StructDecl(name, generics, block, modifier, parent) => StructDecl(name, generics, substReturn(block, to), modifier, parent)
             case ClassDecl(name, generics, block, modifier, parent, parentGenerics, interfaces, entity) => ClassDecl(name, generics, substReturn(block, to), modifier, parent, parentGenerics, interfaces, entity)
@@ -134,11 +135,12 @@ object Utils{
                                                                     case x: SwitchForEach => SwitchForEach(x.key, x.provider, SwitchCase(x.instr.expr, substReturn(x.instr.instr, to), x.instr.cond));
                                                                     }, cv)
             case null => null
+        }
     })
 
 
     def subst(instr: Instruction, from: Identifier, to: Identifier): Instruction = positioned(instr,{
-        instr match
+        instr match{
             case Package(name, block) => Package(name, subst(block, from, to))
             case StructDecl(name, generics, block, modifier, parent) => StructDecl(name, generics, subst(block, from, to), modifier, parent)
             case ClassDecl(name, generics, block, modifier, parent, parentGenerics, interfaces, entity) => ClassDecl(name, generics, subst(block, from, to), modifier, parent, parentGenerics, interfaces, entity)
@@ -195,15 +197,17 @@ object Utils{
                                                                                     case x: SwitchForEach => SwitchForEach(x.key, subst(x.provider, from, to), SwitchCase(subst(x.instr.expr, from, to), subst(x.instr.instr, from, to), subst(x.instr.cond, from, to)));
                                                                                     }, cv)
             case null => null
+        }
     })
     def subst(vari: Either[Identifier, Variable], from: Identifier, to: Identifier): Either[Identifier, Variable] = {
-        vari match
+        vari match{
             case Left(value) => Left(value.replaceAllLiterally(from, to))
             case Right(value) => Right(value)
+        }
     }
 
     def subst(instr: Expression, from: Identifier, to: Identifier): Expression = positioned(instr,{
-        instr match
+        instr match{
             case IntValue(value) => instr
             case FloatValue(value) => instr
             case BoolValue(value) => instr
@@ -238,11 +242,12 @@ object Utils{
             case LambdaValue(args, instr, ctx) => LambdaValue(args, subst(instr, from, to), ctx)
             case ForSelect(expr, filter, selector) => ForSelect(subst(expr, from, to), filter, subst(selector, from, to))
             case lk: LinkedVariableValue => lk
+        }
     })
 
 
     def subst(instr: Instruction, from: String, to: String): Instruction = positioned(instr,{
-        instr match
+        instr match{
             case Package(name, block) => Package(name.replaceAllLiterally(from, to), subst(block, from, to))
             case StructDecl(name, generics, block, modifier, parent) => StructDecl(name.replaceAllLiterally(from, to), generics, subst(block, from, to), modifier, parent)
             case ClassDecl(name, generics, block, modifier, parent, parentGenerics, interfaces, entity) =>
@@ -320,15 +325,17 @@ object Utils{
                                                                                     case x: SwitchForEach => SwitchForEach(x.key, subst(x.provider, from, to), SwitchCase(subst(x.instr.expr, from, to), subst(x.instr.instr, from, to), subst(x.instr.cond, from, to)));
                                                                                     }, cv)
             case null => null
+        }
     })
     def subst(vari: Either[Identifier, Variable], from: String, to: String): Either[Identifier, Variable] = {
-        vari match
+        vari match{
             case Left(value) => Left(value.toString().replaceAllLiterally(from, to))
             case Right(value) => Right(value)
+        }
     }
 
     def subst(instr: Expression, from: String, to: String): Expression = positioned(instr, {
-        instr match
+        instr match{
             case IntValue(value) => instr
             case FloatValue(value) => instr
             case BoolValue(value) => instr
@@ -364,6 +371,7 @@ object Utils{
             case lk: LinkedVariableValue => lk
             case ForSelect(expr, filter, selector) => ForSelect(subst(expr, from, to), filter.replaceAllLiterally(from, to), subst(selector, from, to))
             case null => null
+        }
     })
 
     def subst(json: JSONElement, from: String, to: String): JSONElement = {
@@ -381,14 +389,15 @@ object Utils{
     }
 
     def subst(typ: Type, from: String, to: Expression): Type = {
-        typ match
+        typ match{
             case FuncType(args, ret) => FuncType(args.map(subst(_, from, to)), subst(ret, from, to))
             case TupleType(values) => TupleType(values.map(subst(_, from, to)))
             case ArrayType(value, size) => ArrayType(subst(value, from, to), subst(size, from, to))
             case other => other
+        }
     }
     def subst(instr: Instruction, from: String, to: Expression): Instruction = positioned(instr, {
-        instr match
+        instr match{
             case Package(name, block) => Package(name, subst(block, from, to))
             case StructDecl(name, generics, block, modifier, parent) => StructDecl(name, generics, subst(block, from, to), modifier, parent)
             case ClassDecl(name, generics, block, modifier, parent, parentGenerics, interfaces, entity) => ClassDecl(name, generics, subst(block, from, to), modifier, parent, parentGenerics, interfaces, entity)
@@ -457,15 +466,16 @@ object Utils{
                                                                                     case x: SwitchForEach => SwitchForEach(x.key, subst(x.provider, from, to), SwitchCase(subst(x.instr.expr, from, to), subst(x.instr.instr, from, to), x.instr.cond));
                                                                                     }, cv)
             case null => null
+        }
     })
 
     def rmFunctions(instr: Instruction)(implicit predicate: FunctionDecl=>Boolean = _ => true): Instruction = positioned(instr, {
-        instr match
+        instr match{
             case Package(name, block) => Package(name, rmFunctions(block))
             case StructDecl(name, generics, block, modifier, parent) => StructDecl(name, generics, rmFunctions(block), modifier, parent)
             case ClassDecl(name, generics, block, modifier, parent, parentGenerics, interfaces, entity) => ClassDecl(name, generics, rmFunctions(block), modifier, parent, parentGenerics, interfaces, entity)
             case ExtensionDecl(name, block, modifier) => ExtensionDecl(name, rmFunctions(block), modifier)
-            case fct: FunctionDecl => if predicate(fct) then InstructionList(List()) else instr
+            case fct: FunctionDecl => if (predicate(fct)) InstructionList(List()) else instr
             case OptionalFunctionDecl(name, source, library, typ, args, typeArgs, modifier) => instr
             case PredicateDecl(name, args, block, modifier) => instr
             case TagDecl(name, values, modifier, typ) => instr
@@ -514,29 +524,33 @@ object Utils{
                                                                     case x: SwitchForEach => SwitchForEach(x.key, x.provider, SwitchCase(x.instr.expr, rmFunctions(x.instr.instr), x.instr.cond));
                                                                     }, cv)
             case null => null
+        }
     })
 
     def fix(name: Either[Identifier, Variable])(implicit context: Context, ignore: Set[Identifier]) = {
-        name match
+        name match{
             case Left(iden) if ignore.contains(iden) => name
             case Left(iden) => {
-                context.tryGetVariable(iden) match
+                context.tryGetVariable(iden) match{
                     case None => name
                     case Some(value) => Right(value)
+                }
             }
             case Right(vari) => Right(vari)
+        }
     }
 
     def getFreeVar(instr: Instruction): Set[Identifier]= {
-        instr match
+        instr match{
             case VariableDecl(name, _type, modifier, op, expr) => name.map(Identifier.fromString(_)).toSet
             case InstructionList(list) => list.flatMap(getFreeVar(_)).toSet
             case InstructionBlock(list) => list.flatMap(getFreeVar(_)).toSet
             case _ => Set()
+        }
     }
 
     def fix(instr: Instruction)(implicit context: Context, ignore: Set[Identifier]): Instruction = positioned(instr, {
-        instr match
+        instr match{
             case Package(name, block) => Package(name, fix(block))
             case StructDecl(name, generics, block, modifier, parent) => StructDecl(name, generics, fix(block), modifier, parent)
             case ClassDecl(name, generics, block, modifier, parent, parentGenerics, interfaces, entity) => ClassDecl(name, generics, fix(block), modifier, parent, parentGenerics.map(fix), interfaces.map(x => (x._1, x._2.map(fix(_)))), entity)
@@ -567,7 +581,7 @@ object Utils{
             case ElseIf(cond, ifBlock) => ElseIf(fix(cond), fix(ifBlock))
             case If(cond, ifBlock, elseBlock) => If(fix(cond), fix(ifBlock), elseBlock.map(fix(_).asInstanceOf[ElseIf]))
             case CMD(value) => instr
-            case FunctionCall(name, args, typeargs) => if ignore.contains(name) || name.toString().startsWith("@") then FunctionCall(name, args.map(fix(_)), typeargs.map(fix(_))) else{ 
+            case FunctionCall(name, args, typeargs) => if (ignore.contains(name) || name.toString().startsWith("@")) FunctionCall(name, args.map(fix(_)), typeargs.map(fix(_))) else{ 
                 val argF = args.map(fix(_))
                 context.tryGetFunction(name, argF, typeargs, VoidType, false, true) match{
                     case Some((fct, vari)) => return LinkedFunctionCall(fct, vari)
@@ -601,9 +615,10 @@ object Utils{
                                                                         case x: SwitchForEach => SwitchForEach(x.key, fix(x.provider), SwitchCase(fix(x.instr.expr), fix(x.instr.instr), fix(x.instr.cond)));
                                                                         }, cv)
             case null => null
+        }
     })
     def fix(typ: Type)(implicit context: Context, ignore: Set[Identifier]): Type = {
-        typ match
+        typ match{
             case TupleType(sub) => TupleType(sub.map(fix(_)))
             case ArrayType(inner, size) => ArrayType(fix(inner), size)
             case RangeType(sub) => RangeType(fix(sub))
@@ -613,10 +628,11 @@ object Utils{
                 context.getType(typ)
             }
             case other => other
+        }
         
     }
     def fix(instr: Expression)(implicit context: Context, ignore: Set[Identifier]): Expression = positioned(instr, {
-        instr match
+        instr match{
             case IntValue(value) => instr
             case FloatValue(value) => instr
             case BoolValue(value) => instr
@@ -631,9 +647,10 @@ object Utils{
             case LinkedFunctionValue(fct) => instr
             case TagValue(value) => {
                 val vari = context.tryGetBlockTag(value)
-                vari match
+                vari match{
                     case None => instr
                     case Some(tag) => LinkedTagValue(tag)
+                }
             }
             case LinkedTagValue(tag) => instr
             case DefaultValue => DefaultValue
@@ -645,8 +662,8 @@ object Utils{
             case SequencePostValue(left, right) => SequencePostValue(fix(left), fix(right))
             case JsonValue(content) => JsonValue(fix(content))
             case ArrayGetValue(name, index) => ArrayGetValue(fix(name), index.map(fix(_)))
-            case VariableValue(name, sel) => if ignore.contains(name) then instr else
-                context.tryGetVariable(name) match
+            case VariableValue(name, sel) => if (ignore.contains(name)) instr else
+                context.tryGetVariable(name) match{
                     case Some(vari) => LinkedVariableValue(vari, sel)
                     case None => 
                         try{
@@ -655,6 +672,7 @@ object Utils{
                         catch{
                             case _ => VariableValue(name, sel)
                         }
+                }
             case BinaryOperation(op, left, right) => BinaryOperation(op, fix(left), fix(right))
             case TernaryOperation(left, middle, right) => TernaryOperation(fix(left), fix(middle), fix(right))
             case UnaryOperation(op, left) => UnaryOperation(op, fix(left))
@@ -662,11 +680,12 @@ object Utils{
             case FunctionCallValue(name, args, typeargs, sel) => FunctionCallValue(fix(name), args.map(fix(_)), typeargs.map(fix(_)), sel)
             case ConstructorCall(name, args, generics) => 
                 try{
-                if ignore.contains(name) then ConstructorCall(name, args.map(fix(_)), generics) else
-                context.getType(IdentifierType(name.toString(), generics)) match
-                    case StructType(struct, generics) => ConstructorCall(struct.fullName, args.map(fix(_)), generics.map(fix(_)))
-                    case ClassType(clazz, generics) => ConstructorCall(clazz.fullName, args.map(fix(_)), generics.map(fix(_)))
-                    case other => throw new Exception(f"Cannot constructor call $other")
+                    if (ignore.contains(name)) ConstructorCall(name, args.map(fix(_)), generics) else
+                    context.getType(IdentifierType(name.toString(), generics)) match{
+                        case StructType(struct, generics) => ConstructorCall(struct.fullName, args.map(fix(_)), generics.map(fix(_)))
+                        case ClassType(clazz, generics) => ConstructorCall(clazz.fullName, args.map(fix(_)), generics.map(fix(_)))
+                        case other => throw new Exception(f"Cannot constructor call $other")
+                    }
                 }
                 catch{
                     case e: Exception => ConstructorCall(name, args.map(fix(_)), generics)
@@ -676,6 +695,7 @@ object Utils{
             case lk: LinkedVariableValue => lk
             case ForSelect(expr, filter, selector) => ForSelect(fix(expr), filter, fix(selector))
             case null => null
+        }
     })
     def fix(json: JSONElement)(implicit context: Context, ignore: Set[Identifier]): JSONElement = {
         json match{
@@ -686,14 +706,14 @@ object Utils{
             case JsonInt(value, t) => JsonInt(value, t)
             case JsonFloat(value, t) => JsonFloat(value, t)
             case JsonIdentifier(value, t) => {
-                if ignore.contains(Identifier.fromString(value)) then JsonIdentifier(value, t) else
+                if (ignore.contains(Identifier.fromString(value))) JsonIdentifier(value, t) else
                 context.tryGetVariable(Identifier.fromString(value)) match{
                     case Some(vari) if vari.canBeReduceToLazyValue => toJson(vari.lazyValue, t)
                     case _ => JsonIdentifier(value, t)
                 }
             }
             case JsonExpression(VariableValue(value, sel), t) => {
-                if ignore.contains(value) then JsonIdentifier(value.toString(), t) else
+                if (ignore.contains(value)) JsonIdentifier(value.toString(), t) else
                 context.tryGetVariable(value) match{
                     case Some(vari) if vari.canBeReduceToLazyValue => toJson(vari.lazyValue, t)
                     case Some(vari) => JsonExpression(LinkedVariableValue(vari, sel), t)
@@ -706,7 +726,7 @@ object Utils{
     }
 
     def subst(instr: Expression, from: String, to: Expression): Expression = positioned(instr, {
-        instr match
+        instr match{
             case IntValue(value) => instr
             case FloatValue(value) => instr
             case BoolValue(value) => instr
@@ -728,7 +748,7 @@ object Utils{
             case DefaultValue => DefaultValue
             case NullValue => NullValue
             case DotValue(left, right) => DotValue(subst(left, from, to), subst(right, from, to))
-            case VariableValue(name, sel) => if name.toString() == from then to else instr
+            case VariableValue(name, sel) => if (name.toString() == from) to else instr
             case BinaryOperation(op, left, right) => BinaryOperation(op, subst(left, from, to), subst(right, from, to))
             case TernaryOperation(left, middle, right) => TernaryOperation(subst(left, from, to), subst(middle, from, to), subst(right, from, to))
             case UnaryOperation(op, left) => UnaryOperation(op, subst(left, from, to))
@@ -740,11 +760,12 @@ object Utils{
             case lk: LinkedVariableValue => lk
             case ForSelect(expr, filter, selector) => ForSelect(subst(expr, from, to), filter, subst(selector, from, to))
             case null => null
+        }
     })
 
 
     def unpackDotValue(dot: DotValue)(implicit context: Context): (List[IRTree], Expression) = {
-        dot match
+        dot match{
             case DotValue(left, VariableValue(v, sel)) => {
                 val (list, vari) = simplifyToVariable(left)
                 (list, VariableValue(vari.vari.fullName+"."+v.toString(), sel))
@@ -762,10 +783,11 @@ object Utils{
                 (list, ArrayGetValue(FunctionCallValue(VariableValue(vari.vari.fullName+"."+v.toString()), args, typeargs, sel), index))
             }
             case DotValue(left, right) => throw new Exception(f"Cannot unpack $dot")
-
+        }
     }
+
     def simplifyToVariable(expr: Expression)(implicit context: Context): (List[IRTree], LinkedVariableValue) = {
-        expr match
+        expr match{
             case VariableValue(name, sel) => simplifyToVariable(context.resolveVariable(expr))
             case LinkedVariableValue(name, sel) => (List(), LinkedVariableValue(name, sel))
             case instr @ VariableAssigment(name, op, expr) => {
@@ -783,6 +805,7 @@ object Utils{
                 val vari = context.getFreshVariable(typeof(other))
                 (vari.assign("=", other), LinkedVariableValue(vari))
             }
+        }
     }
     def simplifyToStorage(expr: Expression)(implicit context: Context): (List[IRTree], StorageValue) = {
         expr match{
@@ -794,7 +817,7 @@ object Utils{
     }
 
     def simplifyToLazyVariable(expr: Expression)(implicit context: Context): (List[IRTree], LinkedVariableValue) = {
-        expr match
+        expr match{
             case VariableValue(name, sel) => simplifyToLazyVariable(context.resolveVariable(expr))
             case LinkedVariableValue(name, sel) => (List(), LinkedVariableValue(name, sel))
             case FunctionCallValue(VariableValue(name, sel), args, typeargs, selector) => {
@@ -816,10 +839,11 @@ object Utils{
                 vari.modifiers.isLazy = true
                 (vari.assign("=", other), LinkedVariableValue(vari))
             }
+        }
     }
 
     def typeof(expr: Expression)(implicit context: Context, noError: Boolean = false): Type = {
-        expr match
+        expr match{
             case IntValue(value) => IntType
             case FloatValue(value) => FloatType
             case BoolValue(value) => BoolType
@@ -844,7 +868,7 @@ object Utils{
             case SequenceValue(left, right) => typeof(right)
             case SequencePostValue(left, right) => typeof(left)
             case ArrayGetValue(name, index) => {
-                typeof(name) match
+                typeof(name) match{
                     case ArrayType(inner, size) => inner
                     case MCObjectType => MCObjectType
                     case JsonType => JsonType
@@ -855,23 +879,25 @@ object Utils{
                             case other => throw new Exception(f"Cannot access tuple with $other")
                         }
                     case StructType(struct, sub) => {
-                        simplify(name) match
+                        simplify(name) match{
                             case LinkedVariableValue(vari, selector) => typeof(FunctionCallValue(VariableValue(vari.fullName+"."+"__get__"), index, List(), selector))
                             case other => throw new Exception(f"Cannot access struct with $other")
+                        }
                     }
                     case StringType => StringType
                         
                     case other => throw new Exception(f"Illegal array access of $name of type $other")
+                }
             }
             case LinkedFunctionValue(fct) => FuncType(fct.arguments.map(_.typ), fct.getTrueType())
             case DefaultValue => throw new Exception(f"default value has no type")
             case NullValue => AnyType
             case VariableValue(name, sel) => {
                 val vari = context.tryGetVariable(name)
-                vari match
+                vari match{
                     case None => {
                         val property = context.tryGetProperty(name)
-                        property match
+                        property match{
                             case None => {
                                 try{
                                     val fct = context.getFunction(name)
@@ -881,8 +907,10 @@ object Utils{
                                 }
                             }
                             case Some(v) => v.getter.getType()
+                        }
                     }
                     case Some(value) => value.getType()
+                }
             }
             case BinaryOperation(op, left, right) => 
                 try{
@@ -890,18 +918,20 @@ object Utils{
                 }
                 catch{
                     case e: Exception => 
-                        if noError then AnyType else throw new Exception(f"Cannot combine types ${typeof(left)} and ${typeof(right)} in $expr")
+                        if (noError) AnyType else throw new Exception(f"Cannot combine types ${typeof(left)} and ${typeof(right)} in $expr")
                 }
             case TernaryOperation(left, middle, right) => typeof(middle)
             case UnaryOperation(op, left) => BoolType
             case TupleValue(values) => TupleType(values.map(typeof(_)))
             case FunctionCallValue(name, args, typeargs, selector) => {
                 try{
-                    name match
+                    name match{
                         case VariableValue(name, sel) => context.getFunction(name, args, typeargs, AnyType)._1.getTrueType()
-                        case other => typeof(name) match
+                        case other => typeof(name) match{
                             case FuncType(sources, output) => output
                             case other => throw new Exception(f"Cannot call $other")
+                        }
+                    }
                 }catch{
                     _ => AnyType
                 }
@@ -914,10 +944,11 @@ object Utils{
             case ForSelect(expr, filter, selector) => BoolType
             case _ if noError => AnyType
             case other => throw new Exception(f"Cannot get type of $other")
+        }
     }
     case class ForceStringConversionException(expr: Expression) extends Exception(f"Cannot convert $expr to string")
     def forceString(expr: Expression)(implicit context: Context): String = {
-        expr match
+        expr match{
             case IntValue(value) => value.toString()
             case FloatValue(value) => value.toString()
             case StringValue(value) => value
@@ -928,6 +959,7 @@ object Utils{
             case BinaryOperation("+", left, right) => forceString(left) + forceString(right)
             case UnaryOperation("-", left) => "-"+forceString(left)
             case other => throw new ForceStringConversionException(other)
+        }
     }
 
     def combineType(op: String, t1: Type, t2: Type, expr: Expression): Type = {
@@ -939,7 +971,7 @@ object Utils{
             case "??" => t1
             case "::" if t1 == JsonType || t2 == JsonType => JsonType
             case "+" | "-" | "*" | "/" | "%" | "^" => {
-                (t1, t2) match
+                (t1, t2) match{
                     case (IntType, IntType) => IntType
                     case (IntType, FloatType) => FloatType
                     case (FloatType, IntType) => IntType
@@ -956,11 +988,13 @@ object Utils{
                     case (other, StructType(struct, generics)) => StructType(struct, generics)
                     case (ClassType(name, generics), other) => ClassType(name, generics)
                     case (other, ClassType(name, generics)) => ClassType(name, generics)
+                }
             }
             case "&&" | "||" => {
-                (t1, t2) match
+                (t1, t2) match{
                     case (BoolType | IntType | FloatType, BoolType | IntType | FloatType) => BoolType
                     case (a, b) => throw new Exception(f"Unexpect type in ${expr} found $a and $b, exptected: bool and bool") 
+                }
             }
             case _ => throw new Exception(f"Unexpect operator in ${expr} found $op")
         }
@@ -984,7 +1018,7 @@ object Utils{
     }
 
     def jsonToExpr(json: JSONElement)(implicit context: Context): Expression = {
-        json match
+        json match{
             case JsonInt(value, t) => IntValue(value)
             case JsonFloat(value, t) => FloatValue(value)
             case JsonBoolean(value) => BoolValue(value)
@@ -994,10 +1028,11 @@ object Utils{
             case JsonExpression(value, _) => value
             case JsonDictionary(values) => JsonValue(json)
             case JsonIdentifier(value, t) => VariableValue(value)
+        }
     }
 
     def simplifyJsonExpression(j: JsonExpression): JSONElement = {
-        j match
+        j match{
             case JsonExpression(JsonValue(value), t) => value
             case JsonExpression(StringValue(value), t) => JsonString(value)
             case JsonExpression(IntValue(value), t) => JsonInt(value, t)
@@ -1005,15 +1040,17 @@ object Utils{
             case JsonExpression(BoolValue(value), t) => JsonBoolean(value)
             case JsonExpression(NullValue, t) => JsonNull
             case other => other
+        }
     }
     def contains(instr: SwitchElement, predicate: Instruction=>Boolean): Boolean = { 
-        instr match
+        instr match{
             case SwitchCase(expr, instr, cond) => contains(instr, predicate) || predicate(instr)
             case SwitchForGenerate(key, provider, instr) => contains(instr, predicate) || predicate(instr.instr)
             case SwitchForEach(key, provider, instr) => contains(instr, predicate) || predicate(instr.instr)
+        }
     }
     def contains(instr: Instruction, predicate: Instruction=>Boolean): Boolean = {
-        instr match
+        instr match{
             case InstructionList(list) => list.exists(contains(_, predicate)) || predicate(instr)
             case InstructionBlock(list) => list.exists(contains(_, predicate)) || predicate(instr)
             case If(cond, ifBlock, elseBlock) => contains(ifBlock, predicate) || elseBlock.exists(contains(_, predicate)) || predicate(instr)
@@ -1037,10 +1074,11 @@ object Utils{
             case JSONFile(name, json, mod) => predicate(instr)
             case null => false
             case _ => predicate(instr)
+        }
     }
 
     def contains(expr: Expression, predicate: Expression=>Boolean): Boolean = {
-        expr match
+        expr match{
             case BinaryOperation(_, left, right) => contains(left, predicate) || contains(right, predicate) || predicate(expr)
             case TernaryOperation(left, middle, right) => contains(left, predicate) || contains(middle, predicate) || contains(right, predicate) || predicate(expr)
             case UnaryOperation(op, left) => contains(left, predicate) || predicate(expr)
@@ -1053,10 +1091,11 @@ object Utils{
             case IsType(expr, typ) => contains(expr, predicate) || predicate(expr)
             case CastValue(expr, typ) => contains(expr, predicate) || predicate(expr)
             case other => predicate(other)
+        }
     }
 
     def simplify(expr: Expression)(implicit context: Context): Expression = positioned(expr, {
-        expr match
+        expr match{
             case VariableValue(name, selector) if name == Identifier.fromString("this") => simplify(CastValue(VariableValue("__ref", selector), ClassType(context.getCurrentClass(), List())))
             case NamespacedName(value, json) => NamespacedName(value, simplify(json))
             case PositionValue(x, y, z) => PositionValue(simplify(x), simplify(y), simplify(z))
@@ -1071,12 +1110,13 @@ object Utils{
             case JsonValue(JsonNull) => NullValue
             case JsonValue(other) => JsonValue(fix(other)(context, Set()))
             case CastValue(value, typ) => {
-                simplify(value) match
+                simplify(value) match{
                     case CastValue(other, typ2) => CastValue(other, typ)
                     case other if typeof(other) == typ => other
                     case other => CastValue(other, typ)
+                }
             }
-            case LambdaValue(args, instr, ctx) => LambdaValue(args, instr, if ctx == null then context else ctx)
+            case LambdaValue(args, instr, ctx) => LambdaValue(args, instr, if (ctx == null) context else ctx)
             case SelectorValue(value) => Utils.fix(expr)(context, Set())
             case IsType(left, typ) => 
                 val simpl = simplify(left)
@@ -1085,10 +1125,11 @@ object Utils{
                 
                 typ1Con match{
                     case ClassType(clazz, args) => {
-                        typ2 match
-                            case ClassType(clazz2, args2) => if clazz2 == clazz && args == args2 then BoolValue(true) else IsType(simpl, ClassType(clazz, args))
+                        typ2 match{
+                            case ClassType(clazz2, args2) => if (clazz2 == clazz && args == args2) BoolValue(true) else IsType(simpl, ClassType(clazz, args))
                             case AnyType =>  IsType(simpl, ClassType(clazz, args))
                             case _ => BoolValue(false)
+                        }
                     }
                     case _ if typ2 != AnyType => BoolValue(typ1Con == typ2)
                     case _ => IsType(simpl, typ)
@@ -1099,7 +1140,7 @@ object Utils{
             case UnaryOperation(op, left) => {
                 val inner = Utils.simplify(left)
                 (op,inner) match {
-                    case ("!",StringValue(value)) => StringValue(value.map(c => if c.isUpper then c.toLower else c.toUpper))
+                    case ("!",StringValue(value)) => StringValue(value.map(c => if (c.isUpper) c.toLower else c.toUpper))
                     case ("!",IntValue(value)) => IntValue(~value)
                     case ("!",BoolValue(value)) => BoolValue(!value)
                     case (op, other) => UnaryOperation(op, other)
@@ -1109,24 +1150,26 @@ object Utils{
                 val nl = simplify(left)
                 val nm = simplify(middle)
                 val nr = simplify(right)
-                (nl, nm, nr) match
-                    case (BoolValue(a), b, c) => if a then b else c
+                (nl, nm, nr) match{
+                    case (BoolValue(a), b, c) => if (a) b else c
                     case (a, b, c) => TernaryOperation(a, b, c)
+                }
             }
             case BinaryOperation("??", left, right) => {
                 val nl = simplify(left)
                 val nr = simplify(right)
-                nl match
+                nl match{
                     case NullValue => nr
                     case v: LinkedVariableValue => BinaryOperation("??", v, nr)
                     case v: VariableValue => BinaryOperation("??", v, nr)
                     case other => nl
+                }
             }
             case BinaryOperation("<" | "<=" | "==" | "!=" | ">=" | ">", left, right) => {
                 val op = expr.asInstanceOf[BinaryOperation].op
                 val nl = simplify(left)
                 val nr = simplify(right)
-                (nl, nr) match
+                (nl, nr) match{
                     case (IntValue(a), IntValue(b)) => BoolValue(compare(op, a, b))
                     case (FloatValue(a), FloatValue(b)) => BoolValue(compare(op, a, b))
                     case (IntValue(a), FloatValue(b)) => BoolValue(compare(op, a, b))
@@ -1142,13 +1185,14 @@ object Utils{
                     case (JsonValue(a), JsonValue(b)) if op == "==" => BoolValue(a == b)
                     case (JsonValue(a), JsonValue(b)) if op == "!=" => BoolValue(a != b)
                     case _ => BinaryOperation(op, nl, nr)
+                }
             }
             case BinaryOperation("+", a: Expression, b: Expression) if a == b && typeof(a).allowAdditionSimplification() => BinaryOperation("*", a, IntValue(2))
             case BinaryOperation("+", RawJsonValue(a), RawJsonValue(b)) => RawJsonValue(a ::: b)
             case BinaryOperation(op, left, right) => {
                 val nl = simplify(left)
                 val nr = simplify(right)
-                (nl, nr) match
+                (nl, nr) match{
                     case (PositionValue(x1, y1, z1), PositionValue(x2, y2, z2)) if op == "+" => PositionValue(simplify(BinaryOperation("+", x1, x2)), simplify(BinaryOperation("+", y1, y2)), simplify(BinaryOperation("+", z1, z2)))
                     case (StringValue(a), JsonValue(JsonDictionary(dic))) if op == "in" => BoolValue(dic.contains(a))
                     case (StringValue(a), JsonValue(JsonArray(arr))) if op == "in" => BoolValue(arr.contains(StringValue(a)))
@@ -1183,6 +1227,7 @@ object Utils{
                     case (a, b) if a == b && op == "&" && !containsFunctionCall(a) => a
                     case (a, b) if a == b && op == "|" && !containsFunctionCall(a) => a
                     case _ => BinaryOperation(op, nl, nr)
+                }
             }
             case VariableValue(iden, sel) if iden.toString() == "Compiler.isJava" => {
                 BoolValue(Settings.target == MCJava)
@@ -1191,29 +1236,32 @@ object Utils{
                 BoolValue(Settings.target == MCBedrock)
             }
             case LinkedVariableValue(vari, sel) => {
-                if vari.canBeReduceToLazyValue then vari.lazyValue else expr
+                if (vari.canBeReduceToLazyValue) vari.lazyValue else expr
             }
             case VariableValue(iden, sel) => {
                 val vari = context.tryGetVariable(iden)
-                vari match
+                vari match{
                     case None => expr
-                    case Some(vari) => if vari.canBeReduceToLazyValue then vari.lazyValue else LinkedVariableValue(vari, sel)
+                    case Some(vari) => if (vari.canBeReduceToLazyValue) vari.lazyValue else LinkedVariableValue(vari, sel)
+                }
             }
             case TagValue(iden) => {
                 val vari = context.tryGetBlockTag(iden)
-                vari match
+                vari match{
                     case None => expr
                     case Some(tag) => LinkedTagValue(tag)
+                }
             }
             case ArrayGetValue(name, index) => {
                 val inner = Utils.simplify(name)
                 val index2 = index.map(Utils.simplify(_))
-                (inner, index2) match
+                (inner, index2) match{
                     case (TagValue(tag), List(IntValue(n))) => {
                         val blt = context.tryGetBlockTag(tag)
-                        blt match
+                        blt match{
                             case Some(value) => value.content(n)
                             case None => throw new Exception(s"Unknown block tag $tag")
+                        }
                     }
                     case (LinkedTagValue(tag), List(IntValue(n))) => {
                         tag.content(n)
@@ -1233,9 +1281,9 @@ object Utils{
                             StringValue(str(str.length + n).toString())
                         }
                     case (StringValue(str), List(RangeValue(IntValue(min), IntValue(max), IntValue(delta)))) => {
-                        var min2 = clamp(if min >= 0 then min else str.length + min, 0, str.length-1)
-                        var max2 = clamp(if max >= 0 then max else str.length + max, 0, str.length-1)
-                        val delta2 = if delta >= 0 then delta else -delta
+                        var min2 = clamp(if (min >= 0) min else str.length + min, 0, str.length-1)
+                        var max2 = clamp(if (max >= 0) max else str.length + max, 0, str.length-1)
+                        val delta2 = if (delta >= 0) delta else -delta
                         if (delta < 0){
                             val tmp = min2
                             min2 = max2
@@ -1250,6 +1298,7 @@ object Utils{
                         }
                     }
                     case (_, _) => ArrayGetValue(inner, index2)
+                }
             }
             case TupleValue(values) => TupleValue(values.map(Utils.simplify(_)))
             case RangeValue(min, max, delta) => RangeValue(simplify(min), simplify(max), simplify(delta))
@@ -1265,50 +1314,56 @@ object Utils{
             }
             case FunctionCallValue(VariableValue(name, sel), args, typs, sel2) => {
                 val sargs = args.map(Utils.simplify(_))
-                context.tryGetFunction(name, sargs, typs, VoidType) match
+                context.tryGetFunction(name, sargs, typs, VoidType) match{
                     case Some((fct: CompilerFunction, args2)) if fct.isValue => fct.body(args2, context)._2
                     case Some((other,args2)) => FunctionCallValue(LinkedFunctionValue(other), args2, typs, sel2)
                     case _ => FunctionCallValue(VariableValue(name, sel), sargs, typs, sel2)
+                }
             }
             case other => other
-            
+        }
     })
     def clamp(value: Int, min: Int, max: Int): Int = {
-        if value < min then min
-        else if value > max then max
+        if (value < min) min
+        else if (value > max) max
         else value
     }
     def combineJson(op: String, elm1: JSONElement, elm2: JSONElement): JSONElement = {
-        if elm1 == JsonNull then elm2
-        else if elm2 == JsonNull then elm1
+        if (elm1 == JsonNull) elm2
+        else if (elm2 == JsonNull) elm1
         else
-        elm1 match
+        elm1 match{
             case JsonArray(content1) => {
-                elm2 match
+                elm2 match{
                     case JsonArray(content2) => 
-                        op match
+                        op match{
                             case "=" => JsonArray(content2)
-                            case "::" | "::=" => JsonArray(content1.zipAll(content2, null, null).map((a, b) => if a == null then b else if b == null then a else combineJson(op, a, b)))
+                            case "::" | "::=" => JsonArray(content1.zipAll(content2, null, null).map((a, b) => if (a == null) b else if (b == null) a else combineJson(op, a, b)))
                             case "<:" | "<:=" => JsonArray(content2 ::: content1)
                             case ">:" | ">:=" | "+" | "+=" => JsonArray(content1 ::: content2)
                             case "-:" | "-:=" => JsonArray(content1.filterNot(content2.contains(_)))
+                        }
                     case other => JsonArray(content1 ::: List(other))
+                }
             }
             case JsonDictionary(content1) => {
-                elm2 match
+                elm2 match{
                     case JsonDictionary(content2) => 
-                        op match
-                            case "::" | "::=" | "=" => JsonDictionary((content1.toList ++ content2.toList).groupBy(_._1).map((k, value) => (k, if value.length == 1 then value.head._2 else combineJson(op, value(0)._2, value(1)._2))).toMap)
-                            case "<:" | "<:=" => JsonDictionary((content2.toList ++ content1.toList).groupBy(_._1).map((k, value) => (k, if value.length == 1 then value.head._2 else combineJson(op, value(0)._2, value(1)._2))).toMap)
-                            case ">:" | ">:=" | "+" | "+=" => JsonDictionary((content1.toList ++ content2.toList).groupBy(_._1).map((k, value) => (k, if value.length == 1 then value.head._2 else combineJson(op, value(0)._2, value(1)._2))).toMap)
+                        op match{
+                            case "::" | "::=" | "=" => JsonDictionary((content1.toList ++ content2.toList).groupBy(_._1).map((k, value) => (k, if (value.length == 1) value.head._2 else combineJson(op, value(0)._2, value(1)._2))).toMap)
+                            case "<:" | "<:=" => JsonDictionary((content2.toList ++ content1.toList).groupBy(_._1).map((k, value) => (k, if (value.length == 1) value.head._2 else combineJson(op, value(0)._2, value(1)._2))).toMap)
+                            case ">:" | ">:=" | "+" | "+=" => JsonDictionary((content1.toList ++ content2.toList).groupBy(_._1).map((k, value) => (k, if (value.length == 1) value.head._2 else combineJson(op, value(0)._2, value(1)._2))).toMap)
                             case "-:" | "-:=" => JsonDictionary(content1.filterNot(a => content2.contains(a._1)))
+                        }
                     case _ => throw new Exception(f"Json Element doesn't match ${elm1} vs ${elm2}")
+                }
             }
             case other => elm1
+        }
     }
 
     def toJson(expr: Expression, typ: String = null)(implicit context: Context): JSONElement = {
-        simplify(expr) match
+        simplify(expr) match{
             case JsonValue(content) => compileJson(content)
             case StringValue(value) => JsonString(value)
             case IntValue(value) => JsonInt(value, typ)
@@ -1394,19 +1449,21 @@ object Utils{
             case LinkedVariableValue(vari, selector) => JsonExpression(LinkedVariableValue(vari, selector), typ)
             
             case v => JsonExpression(fix(v)(context, Set()), typ)
+        }
     }
 
     def compileJson(elm: JSONElement)(implicit context: Context): JSONElement = {
-        elm match
+        elm match{
             case JsonArray(content) => JsonArray(content.map(compileJson(_)))
             case JsonDictionary(map) => JsonDictionary(map.map((k,v) => (k, compileJson(v))))
             case JsonExpression(FunctionCallValue(name, args, typeargs, sel), t) => {
-                val fct = simplify(name) match
+                val fct = simplify(name) match{
                     case LinkedFunctionValue(fct) => (fct, args)
                     case LinkedVariableValue(vari, sel) if vari.modifiers.isLazy => {
-                        vari.lazyValue match
+                        vari.lazyValue match{
                             case LinkedFunctionValue(fct) => (fct, args)
                             case other => throw new Exception(f"Lazy value do not contains a function")
+                        }
                     }
                     case VariableValue(name, sel) => context.getFunction(name, args, typeargs, VoidType)
                     case LambdaValue(largs, instr, ctx) => {
@@ -1414,8 +1471,9 @@ object Utils{
                         (block, args)
                     }
                     case other => throw new Exception(f"Not a function ${other}")
+                }
 
-                Settings.target match
+                Settings.target match{
                     case MCJava => {
                         if (fct._1.modifiers.isLazy){
                             var vari = context.getFreshVariable(fct._1.getType())
@@ -1459,10 +1517,11 @@ object Utils{
                             JsonArray(fct.call().map(v => JsonString("/"+v.getString())))
                         }
                     }
+                }
             }
             case JsonIdentifier(value, t) => {
                 val vari = context.tryGetVariable(value)
-                vari match
+                vari match{
                     case Some(value) => {
                         if (value.canBeReduceToLazyValue){
                             toJson(value.lazyValue, t)
@@ -1474,43 +1533,47 @@ object Utils{
                     case None => {
                         throw new Exception(f"No value for $value in ${context.fullPath}")
                     }
+                }
             }
             case JsonExpression(value, t) => toJson(Utils.simplify(value), t)
             case JsonFloat(value, t) => elm
             case JsonBoolean(value) => elm
             case JsonInt(value, t) => elm
             case JsonString(value) => elm
-        
+        }
     }
 
     def compare(op: String, a: String, b: String): Boolean = {
-        op match
+        op match{
             case "<"  => a < b
             case "<=" => a <= b
             case "==" => a == b
             case "!=" => a != b
             case ">=" => a >= b
             case ">"  => a > b
+        }
     }
 
     def compare(op: String, a: Double, b: Double): Boolean = {
-        op match
+        op match{
             case "<"  => a < b
             case "<=" => a <= b
             case "==" => a == b
             case "!=" => a != b
             case ">=" => a >= b
             case ">"  => a > b
+        }
     }
 
     def compare(op: String, a: Boolean, b: Boolean): Boolean = {
-        op match
+        op match{
             case "<"  => a < b
             case "<=" => a <= b
             case "==" => a == b
             case "!=" => a != b
             case ">=" => a >= b
             case ">"  => a > b
+        }
     }
 
     def combine(op: String, a: JSONElement, b: JSONElement): JSONElement = {
@@ -1518,51 +1581,55 @@ object Utils{
     }
 
     def combine(op: String, a: String, b: String): String = {
-        op match
+        op match{
             case "+" => a + b
             case "::" => a + b
+        }
     }
 
     def combine(op: String, a: Boolean, b: Boolean): Boolean = {
-        op match
+        op match{
             case "+" => a || b
             case "-" => a != b
             case "*" => a && b
             case "/" => !a && !b
             case "&&" => a && b
             case "||" => a || b
+        }
     }
 
     def combine(op: String, a: Int, b: Int): Int = {
-        op match
+        op match{
             case "+" => a + b
             case "-" => a - b
             case "*" => a * b
             case "/" => a / b
             case "%" => a % b
-            case "&&" => if a != 0 && b != 0 then 1 else 0
-            case "||" => if a != 0 || b != 0 then 1 else 0
+            case "&&" => if (a != 0 && b != 0) 1 else 0
+            case "||" => if (a != 0 || b != 0) 1 else 0
             case "<<" => a << b
             case ">>" => a >> b
             case "&" => a & b
             case "|" => a | b
             case "^" => math.pow(a, b).toInt
+        }
     }
 
     def combine(op: String, a: Double, b: Double): Double = {
-        op match
+        op match{
             case "+" => a + b
             case "-" => a - b
             case "*" => a * b
             case "/" => a / b
             case "%" => a % b
-            case "&&" => if a != 0 && b != 0 then 1 else 0
-            case "||" => if a != 0 || b != 0 then 1 else 0
+            case "&&" => if (a != 0 && b != 0) 1 else 0
+            case "||" => if (a != 0 || b != 0) 1 else 0
             case "^" => math.pow(a, b)
+        }
     }
 
     def getForgenerateCases(key: String, provider: Expression)(implicit context: Context): IterableOnce[List[(String, String)]] = {
-        simplify(provider) match
+        simplify(provider) match{
             case RangeValue(IntValue(min), IntValue(max), IntValue(delta)) => Range(min, max+1, delta).map(elm => List((key, elm.toString())))
             case RangeValue(FloatValue(min), FloatValue(max), FloatValue(delta)) => (BigDecimal(min) to BigDecimal(max) by BigDecimal(delta)).map(elm => List((key, elm.toString())))
             case TupleValue(lst) => lst.map(elm => List((key, elm.toString())))
@@ -1572,9 +1639,10 @@ object Utils{
             }
             case TagValue(iden) => {
                 val blt = context.tryGetBlockTag(iden)
-                blt match
+                blt match{
                     case Some(value) => return value.content.par.map(v => List((key, v.toString()))).toList
                     case None => {}
+                }
                 throw new Exception(f"Unknown Generator: $iden")
             }
             case LinkedTagValue(value) => {
@@ -1582,19 +1650,22 @@ object Utils{
             }
             case VariableValue(iden, sel) => {
                 val enm = context.tryGetEnum(iden)
-                enm match
+                enm match{
                     case Some(value) => return value.values.par.map(v => (key, v.name) :: v.fields.zip(value.fields).map((p, f) => (key+"."+f.name, p.getString()))).toList
                     case None => {}
+                }
 
                 val blt = context.tryGetBlockTag(iden)
-                blt match
+                blt match{
                     case Some(value) => return value.content.par.map(v => List((key, v.toString()))).toList
                     case None => {}
+                }
 
                 val vari = context.tryGetVariable(iden)
-                vari match
+                vari match{
                     case Some(vri) if vri.canBeReduceToLazyValue => getForgenerateCases(key, vri.lazyValue)
                     case _ => {}
+                }
 
                 throw new Exception(f"Unknown Generator: $iden")
             }
@@ -1606,7 +1677,7 @@ object Utils{
                 }
             }
             case FunctionCallValue(iden, args, typeargs, selector) =>{
-                (iden, args.map(Utils.simplify(_))) match
+                (iden, args.map(Utils.simplify(_))) match{
                     case (VariableValue(Identifier(List("Compiler","csv")), _), List(StringValue(filePath))) => {
                         val file = new File(filePath)
                         if(file.exists()){
@@ -1658,12 +1729,13 @@ object Utils{
                         (0 to rjson.length()).map(i => List((key, rjson.substring(i).getString()))).toList
                     }
                     case _ => throw new Exception(f"Unknown generator: $provider")
-                
+                }
             }
             case _ => throw new Exception(f"Unknown generator: $provider")
+        }
     }
     def getForeachCases(key: String, provider: Expression)(implicit context: Context): IterableOnce[List[(String, Expression)]] = {
-        Utils.simplify(provider) match
+        Utils.simplify(provider) match{
             case RangeValue(IntValue(min), IntValue(max), IntValue(delta)) => Range(min, max+1, delta).map(elm => List((key,IntValue(elm))))
             case RangeValue(FloatValue(min), FloatValue(max), FloatValue(delta)) => (BigDecimal(min) to BigDecimal(max) by BigDecimal(delta)).map(elm => List((key, FloatValue(elm.toDouble))))
             case TupleValue(lst) if lst.forall(x => x.isInstanceOf[RangeValue]) => {
@@ -1685,32 +1757,37 @@ object Utils{
             }
             case TagValue(iden) => {
                 val blt = context.tryGetBlockTag(iden)
-                blt match
+                blt match{
                     case Some(value) => return value.content.par.map(v => List((key, v))).toList
                     case None => {}
+                }
                 throw new Exception(f"Unknown Generator: $iden")
             }
             case LinkedTagValue(value) => value.content.par.map(v => List((key, v))).toList
             case LinkedVariableValue(vari, sel) if vari.canBeReduceToLazyValue => getForeachCases(key, vari.lazyValue)
             case LinkedVariableValue(vari, sel) =>
-                vari.getType() match
+                vari.getType() match{
                     case ArrayType(inner, sub) => vari.tupleVari.map(elm => List((key, LinkedVariableValue(elm))))
                     case TupleType(inners) => vari.tupleVari.map(elm => List((key, LinkedVariableValue(elm))))
                     case _ => throw new Exception(f"Unknown Generator: $vari")
+                }
             case VariableValue(iden, sel) => {
                 val enm = context.tryGetEnum(iden)
-                enm match
+                enm match{
                     case Some(value) => return value.values.par.map(v => (key, VariableValue(value.fullName+"."+ v.name)) :: v.fields.zip(value.fields).map((p, f) => (key+"."+f.name, p))).toList
                     case None => {}
+                }
                 val blt = context.tryGetBlockTag(iden)
-                blt match
+                blt match{
                     case Some(value) => return value.content.par.map(v => List((key, v))).toList
                     case None => {}
+                }
 
                 val vari = context.tryGetVariable(iden)
-                vari match
+                vari match{
                     case Some(vri) if vri.canBeReduceToLazyValue => return getForeachCases(key, vri.lazyValue)
                     case _ => {}
+                }
 
                 throw new Exception(f"Unknown Generator: $iden")
             }
@@ -1725,7 +1802,7 @@ object Utils{
                 List(List((key, name)))
             }
             case FunctionCallValue(name, args, typeargs, selector) => {
-                (name, args.map(Utils.simplify(_))) match
+                (name, args.map(Utils.simplify(_))) match{
                     case (VariableValue(Identifier(List("Compiler","csv")), _), List(StringValue(filePath))) => {
                         val file = new File(filePath)
                         if(file.exists()){
@@ -1777,8 +1854,10 @@ object Utils{
                         (0 to rjson.length()).map(i => List((key, rjson.substring(i)))).toList
                     }
                     case (vari, args) => throw new Exception(f"Unknown generator: $provider $args")
+                }
             }
             case _ => throw new Exception(f"Unknown generator: $provider")
+        }
     }
     def getSelector(expr: Expression, noSimplification: Boolean = false)(implicit context: Context): (List[IRTree], Context, Selector) = {
         def apply(selector: Expression): (List[IRTree], Context, Selector) = {
@@ -1787,7 +1866,7 @@ object Utils{
             (sl.Compilation.Execute.withInstr(With(selector, BoolValue(false), BoolValue(true), 
                 VariableAssigment(List((Right(vari), Selector.self)), "=", SelectorValue(Selector.self)), null)):::prefix, ctx, sel)
         }
-        (if noSimplification then expr else Utils.simplify(expr)) match
+        (if (noSimplification) expr else Utils.simplify(expr)) match{
             case VariableValue(Identifier(List("@attacker")), selector) if Settings.target.hasFeature("execute on") => apply(expr)
             case VariableValue(Identifier(List("@controller")), selector) if Settings.target.hasFeature("execute on") => apply(expr)
             case VariableValue(Identifier(List("@leasher")), selector) if Settings.target.hasFeature("execute on") => apply(expr)
@@ -1800,7 +1879,7 @@ object Utils{
                 getSelector(context.resolveVariable(VariableValue(name, sel)))
             }
             case LinkedVariableValue(vari, sel) => 
-                vari.getType() match
+                vari.getType() match{
                     case EntityType if !vari.modifiers.isEntity => (List(), null, JavaSelector("@e", List(("tag", SelectorIdentifier(vari.tagName)))))
                     case EntityType if vari.modifiers.isEntity => {
                         val e = context.getFreshVariable(EntityType)
@@ -1842,6 +1921,7 @@ object Utils{
                         }
                     }
                     case _ => throw new Exception(f"Not a selector: $expr")
+                }
             case TupleValue(values) => ???
             case SelectorValue(value) => (List(), null, value)
             case ClassValue(value) => 
@@ -1883,7 +1963,8 @@ object Utils{
                 val (p2, ctx, s) = getSelector(vari)
                 (prefix ::: p2, ctx, s)
             }
-            case other => throw new Exception(f"Unexpected value in as $other")
+            case other => throw new Exception(f"Unexpected value in as $other: ${other.getClass().getName()}")
+        }
     }
     def getOpFunctionName(op: String)={
         op match{
@@ -1926,10 +2007,10 @@ object Utils{
         }
     }
     def resolveGenerics(names: List[String], args: List[(Argument, Type)])(implicit context: Context): List[Type] = {
-        names.map(name => args.map(a => a._1.typ match
+        names.map(name => args.map(a => a._1.typ match{
             case IdentifierType(name2, gen) if name == name => a._2
             case _ => null
-        )
+        })
         .filter(_!=null)
         .reduce((a,b) => combineType(a, b))
         )

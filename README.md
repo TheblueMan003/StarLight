@@ -883,7 +883,7 @@ int a = function(0)
 where T is the type parameters.
 
 ### "Lazy IF"
-When a if statement is compiled, the expression inside it is simplified. If the result value is always true then the condition will disapear from the output code and all the else statement with it. 
+When a if (statement is compiled, the expression inside it is simplified. If the result value is always true) the condition will disapear from the output code and all the else statement with it. 
 ```
 if (true){
     //do stuff
