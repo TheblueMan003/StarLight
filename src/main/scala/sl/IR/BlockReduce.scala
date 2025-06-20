@@ -71,9 +71,10 @@ class BlockReduce(var files: List[IRFile]){
         def apply(instr: IRTree)(implicit file: IRFile): IRTree = {
             instr match {
                 case e: IRExecute => {
-                    apply(e.getStatements) match
+                    apply(e.getStatements) match{
                         case EmptyIR => {changed = true;EmptyIR}
                         case instr => e.withStatements(instr)
+                    }
                 }
                 case _ => instr
             }
@@ -139,9 +140,10 @@ class BlockReduce(var files: List[IRFile]){
                     }
                 }
                 case e: IRExecute => {
-                    apply(e.getStatements) match
+                    apply(e.getStatements) match{
                         case EmptyIR => EmptyIR
                         case instr => e.withStatements(instr)
+                    }
                 }
                 case _ => instr
             }
@@ -153,10 +155,10 @@ class BlockReduce(var files: List[IRFile]){
             }).filterNot(_ == EmptyIR))
         })
         
-        files.filter(_.getContents().length == 0).map(f=>
+        files.filter(_.getContents().length == 0).map(f=>{
             if (debug){println("delete " + f.getName() + " because it is empty")}
             f.delete()
-            )
+        })
     }
 
     def reduceDupplicate() = if (Settings.optimizeDeduplication){

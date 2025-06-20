@@ -45,17 +45,19 @@ object ContextBuilder{
         inst match{
             case StructDecl(name, generics, block, modifier, parent) => {
                 modifier.simplify()
-                val parentName = parent match
+                val parentName = parent match{
                     case None => null
                     case Some(p) => Identifier.fromString(p)
+                }
                 
                 context.addStruct(new Struct(context, name, generics, modifier, block.unBlockify(), parentName))
             }
             case ClassDecl(name, generics, block, modifier, parent, parentGenerics, interfaces, entity) => {
                 modifier.simplify()
-                val parentName = parent match
+                val parentName = parent match{
                     case None => null
                     case Some(p) => Identifier.fromString(p)
+                }
                 
                 val c = new Class(context, name, generics, modifier, block.unBlockify(), parentName, parentGenerics, interfaces.map(x => (Identifier.fromString(x._1), x._2)), entity)
                 context.addClass(c)
@@ -68,9 +70,10 @@ object ContextBuilder{
             }
             case TemplateDecl(name, block, modifier, parent, generics, parentGenerics) => {
                 modifier.simplify()
-                val parentName = parent match
+                val parentName = parent match{
                     case None => null
                     case Some(p) => Identifier.fromString(p)
+                }
                 
                 context.addTemplate(new Template(context, name, modifier, block.unBlockify(), parentName, generics, parentGenerics))
             }
@@ -136,15 +139,16 @@ object ContextBuilder{
 
                     if (value != null){
                         try{
-                            context.addObjectFrom(value, Identifier.fromString(if alias == null then value else alias), context.root.push(lib))
+                            context.addObjectFrom(value, Identifier.fromString(if (alias == null) value else alias), context.root.push(lib))
                         }catch{case _ =>{}}
                     }
                     else{
                             val last = Identifier.fromString(lib).values.last
-                            context.hasObject(lib+"."+last) match
-                                case true => context.addObjectFrom(last, if alias == null then last else alias, context.root.push(lib))
+                            context.hasObject(lib+"."+last) match{
+                                case true => context.addObjectFrom(last, if (alias == null) last else alias, context.root.push(lib))
                                 case false if alias!=null => context.push(alias, context.getContext(lib))
                                 case false => {}
+                            }
                         }
                 }
             }

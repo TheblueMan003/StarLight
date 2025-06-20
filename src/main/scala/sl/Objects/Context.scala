@@ -230,7 +230,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
         val mod = Modifier.newPrivate()
         mod.isLazy = isLazy
         mod.addAtrribute("compileAtCall", BoolValue(true))
-        val fct = if isLazy then LazyFunction(this, getPath()+"."+name, name, args, output, mod, instr) else ConcreteFunction(this, getPath()+"."+name, name, args, output, mod, instr, true)
+        val fct = if (isLazy) LazyFunction(this, getPath()+"."+name, name, args, output, mod, instr) else ConcreteFunction(this, getPath()+"."+name, name, args, output, mod, instr, true)
         fct.generateArgument()(this)
         addFunction(name, fct)
         fct
@@ -399,33 +399,33 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
 
 
     def getCurrentFunction(): Function = {
-        if variable != null || clazz != null then return null
-        if function == null && parent != null then parent.getCurrentFunction() else function
+        if (variable != null || clazz != null) return null
+        if (function == null && parent != null) parent.getCurrentFunction() else function
     }
     def getCurrentVariable(): Variable = {
-        if function != null || clazz != null then return null
-        if variable == null && parent != null then parent.getCurrentVariable() else variable
+        if (function != null || clazz != null) return null
+        if (variable == null && parent != null) parent.getCurrentVariable() else variable
     }
     def getCurrentClass(): Class = {
-        if clazz == null && parent != null then parent.getCurrentClass() else clazz
+        if (clazz == null && parent != null) parent.getCurrentClass() else clazz
     }
     def getCurrentTemplateUse():String={
-        if templateUse == null && parent != null then parent.getCurrentTemplateUse() else templateUse
+        if (templateUse == null && parent != null) parent.getCurrentTemplateUse() else templateUse
     }
     def getCurrentParentTemplateUse()(implicit count: Int):String={
-        if count == 0 then getCurrentTemplateUse() else {
-            if templateUse != null && parent != null then parent.getCurrentParentTemplateUse()(count-1) else
-            if parent != null then parent.getCurrentParentTemplateUse() else
+        if (count == 0) getCurrentTemplateUse() else {
+            if (templateUse != null && parent != null) parent.getCurrentParentTemplateUse()(count-1) else
+            if (parent != null) parent.getCurrentParentTemplateUse() else
             null
         }
     }
     def getCurrentStructUse():String={
-        if structUse == null && parent != null then parent.getCurrentStructUse() else structUse
+        if (structUse == null && parent != null) parent.getCurrentStructUse() else structUse
     }
     def getCurrentParentStructUse()(implicit count: Int):String={
-        if count == 0 then getCurrentStructUse() else {
-            if structUse != null && parent != null then parent.getCurrentParentStructUse()(count-1) else
-            if parent != null then parent.getCurrentParentStructUse() else
+        if (count == 0) getCurrentStructUse() else {
+            if (structUse != null && parent != null) parent.getCurrentParentStructUse()(count-1) else
+            if (parent != null) parent.getCurrentParentStructUse() else
             null
         }
     }
@@ -433,7 +433,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
         inLazyCall = true
     }
     def isInLazyCall(): Boolean = {
-        if inLazyCall then true else if parent != null then parent.isInLazyCall() else false
+        if (inLazyCall) true else if (parent != null) parent.isInLazyCall() else false
     }
 
 
@@ -493,7 +493,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
         }
     }
     def getAllVariable(set: mutable.Set[Context], array: ArrayBuffer[Variable], strict: Boolean): Unit = {
-        if set.contains(this) then return
+        if (set.contains(this)) return
         set.add(this)
         if (!strict){
             inheritted.foreach(x => {
@@ -520,7 +520,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
         extensions(name) = function ::: extensions(name)
     }
     def getAllExtension(typ: Type, set: mutable.Set[Context], array: ArrayBuffer[(String, Function)]): Unit = {
-        if set.contains(this) then return
+        if (set.contains(this)) return
         set.add(this)
         inheritted.foreach(x => {
             if (x != null && !set.contains(x)){
@@ -580,10 +580,15 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
 
 
     def getFunction(identifier: Identifier, args: List[Expression], typeargs: List[Type], output: Type, concrete: Boolean = false, silent: Boolean = false): (Function, List[Expression]) = {
-        tryGetFunction(identifier, args, typeargs, output, concrete, silent) match{
+        val ret = tryGetFunction(identifier, args, typeargs, output, concrete, silent) match{
             case Some(value) => value
             case None => throw new FunctionNotFoundException(f"Unknown function: $identifier in context: $path")
         }
+        ret match {
+            case (c: ConcreteFunction, _) => c.markAsUsed()
+            case _ => { }
+        }
+        ret
     }
     def tryGetFunction(identifier: Identifier, args: List[Expression], typeargs: List[Type], output: Type, concrete: Boolean = false, silent: Boolean = false): Option[(Function, List[Expression])] = {
         if (identifier.toString().startsWith("@")){
@@ -591,10 +596,10 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
         }
         else{
             val vari = tryGetVariable(identifier)
-            vari match
+            vari match{
                 case Some(vari) if vari.getType().isInstanceOf[FuncType] => {
                     if (vari.modifiers.isLazy){
-                        vari.lazyValue match
+                        vari.lazyValue match{
                             case LambdaValue(args2, instr, context) => {
                                 Some((context.getFreshLambda(args2, args.map(Utils.typeof(_)(this, true)), output, instr, false), args))
                             }
@@ -606,6 +611,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
                             case NullValue => Some((null, args))
                             case LinkedFunctionValue(fct) => Some((fct, args))
                             case other => throw new Exception(f"Illegal call of ${other} with $args")
+                        }
                     }
                     else{
                         val typ = vari.getType().asInstanceOf[FuncType]
@@ -622,6 +628,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
                     catch{
                         case e => None
                     }
+            }
         }
     }
     def isOverridenBy(g: Function, f: Function): Boolean = {
@@ -663,7 +670,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
             if (filtered.size == 0) return None
             val ret = handleOverride(filtered.filterNot(x => x.modifiers.isAbstract).map(f => 
                 (f.arguments.zip(args).map((a, v)=> v.getDistance(a.typ)(this)).reduceOption(_ + _).getOrElse(0)
-                 + (if output != VoidType then f.getType().getDistance(output)(this) else 0), f))
+                 + (if (output != VoidType) f.getType().getDistance(output)(this) else 0), f))
                         .groupBy(_._1)
                         .toList
                         .sortBy(_._1)
@@ -685,7 +692,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
             Some(ret.sortBy(f => -f.contextName.length).head)
         }
         val ret = inner()
-        ret match
+        ret match{
             case Some(g: GenericFunction) => 
                 if (typeargs.size != g.generics.size){
                     Some(g.get(Utils.resolveGenerics(g.generics, g.arguments.zip(args))(this)))
@@ -694,6 +701,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
                     Some(g.get(typeargs))
                 }
             case other => other
+        }
     }
     def getFunction(identifier: Identifier): Function = {
         if (identifier.toString().startsWith("@")) return getFunctionTags(identifier)
@@ -739,9 +747,10 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
         }
     }
     def addFunctionToTags(function: Function) = synchronized{
-        function match
+        function match{
             case f: ConcreteFunction => f.markAsUsed()
             case _ => {}
+        }
         function.modifiers.tags.foreach(tagStr =>
             val tag = Identifier.fromString(tagStr)
             val fct = getFunctionTags(function.context.mapFunctionTag(tag), function.arguments)
@@ -772,10 +781,11 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
         function.age = functionCount
         functions(name) = function :: functions(name)
         if (function.modifiers.tags.length > 0){
-            function match
+            function match{
                 case cf: ConcreteFunction => tagCtx.addFunctionToTags(cf)
                 case cf: ClassFunction => {}
                 case other => tagCtx.addFunctionToTags(other)
+            }
         }
         function
     }
@@ -837,7 +847,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
         }
     }
     def getAllFunction(set: mutable.Set[Context], array: ArrayBuffer[(String, Function)]): Unit = {
-        if set.contains(this) then return
+        if (set.contains(this)) return
         set.add(this)
         inheritted.foreach(x => {
             if (x != null && !set.contains(x)) {
@@ -858,10 +868,11 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
     def getStruct(identifier: Identifier): Struct = {
         tryGetTypeDef(identifier) match{
             case Some(value) => {
-                value match
+                value match{
                     case StructType(clazz, args) => clazz
                     case IdentifierType(name, sub) => getStruct(name)
                     case other => throw new Exception(f"$identifier is not a struct")
+                }
             }
             case None => {
                 tryGetElement(_.structs)(identifier) match{
@@ -884,10 +895,11 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
     def getClass(identifier: Identifier): Class = {
         tryGetTypeDef(identifier) match{
             case Some(value) => {
-                value match
+                value match{
                     case ClassType(clazz, args) => clazz
                     case IdentifierType(name, sub) => getClass(name)
                     case other => throw new Exception(f"$identifier is not a class")
+                }
             }
             case None => {
                 tryGetElement(_.classes)(identifier) match{
@@ -986,7 +998,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
     }
 
     def getType(typ: Type, constructorArgs: List[Expression] = null): Type = {
-        typ match
+        typ match{
             case ArrayType(inner, null) => {
                 requestLibrary("standard.array")
                 getType(IdentifierType("standard.array.Array", List(inner)))
@@ -1023,6 +1035,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
                 throw new Exception(f"Unknown type: $identifier in context: $path")
             }
             case _ => typ
+        }
     }
 
     def asPrettyString(shift: String):String = {
@@ -1143,7 +1156,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
 
 
     def isChildOf(other: Context): Boolean={
-        if (other == this || (other.child.contains(name) && other.child(name) == this)) then{ 
+        if ((other == this || (other.child.contains(name) && other.child(name) == this))){ 
             true
         }
         else if (parent != null){
@@ -1158,10 +1171,10 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
 
     private def tryGetElement[T](mapGetter: (Context)=>mutable.Map[String, T])(identifier: Identifier, down: Boolean = false): Option[T] = {
         val value = tryGetElementNoCheck(mapGetter)(identifier, down)(0)
-        value match
+        value match{
             case None => None
             case Some(value) => {
-                if (value.isInstanceOf[CObject]) then{
+                if ((value.isInstanceOf[CObject])){
                     val obj = value.asInstanceOf[CObject]
                     /*if (obj.modifiers.protection == Protection.Private && !isChildOf(value.asInstanceOf[CObject].context)){
                         throw new Exception(f"Cannot access private object: $identifier")
@@ -1170,13 +1183,15 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
                 }
                 Some(value)
             }
+        }
     }
     protected def tryGetElementNoCheck[T](mapGetter: (Context)=>mutable.Map[String, T])(identifier: Identifier, down: Boolean = false, up: Boolean = false)(depth: Int = 0): Option[T] = {
         if (depth > 200)return None
         val value = tryGetElementInner(mapGetter)(identifier, down, up)(depth + 1)
-        value match
+        value match{
             case None => inheritted.map(_.tryGetElementNoCheck(mapGetter)(identifier, down, up)(depth + 1)).filter(x => x != None).headOption.getOrElse(None)
             case Some(_) => value
+        }
     }
 
     private def tryGetElementInner[T](mapGetter: (Context)=>mutable.Map[String, T])(identifier: Identifier, down: Boolean = false, up: Boolean = false)(depth: Int = 0): Option[T] = {

@@ -11,9 +11,33 @@ import java.nio.file.Paths
 import sl.IR.*
 import scala.io.Source
 import Selector._
+import sl.MappingTool.FromTileMap
 
 object DefaultFunction{
     def get()(implicit context: Context) = {
+        val ctx1 = context.root.push("Tileset")
+
+        ctx1.addFunction("to_blocks", CompilerFunction(ctx1, "to_blocks", 
+                    List(
+                        Argument("path", StringType, None),
+                        Argument("tileset", StringType, None),
+                        Argument("splitter", StringType, None),
+                        Argument("axis", StringType, None)),
+                    VoidType,
+                    Modifier.newPublic(),
+                    (args: List[Expression],ctx: Context) => {
+                        (FromTileMap.call(
+                            args(0).asInstanceOf[StringValue].value, 
+                            args(1).asInstanceOf[StringValue].value,
+                            args(2).asInstanceOf[StringValue].value,
+                            args(3).asInstanceOf[StringValue].value).map(
+                                cmd => CommandIR(cmd)
+                            ),
+                            NullValue
+                        )
+                    }
+                ))
+
         val ctx = context.root.push("Compiler")
 
         ctx.addFunction("readJson", CompilerFunction(ctx, "readJson", 
@@ -707,9 +731,10 @@ object DefaultFunction{
                 args match{
                     case Nil => {
                         val clazz = ctx.getCurrentClass()
-                        clazz match
+                        clazz match{
                             case c => (List(), StringValue(c.fullName))
                             case null => throw new Exception("Not in a class")
+                        }
                     }
                     case other => throw new Exception(f"Illegal Arguments $other for getClassName")
                 }

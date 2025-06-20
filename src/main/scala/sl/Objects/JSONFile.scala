@@ -15,7 +15,7 @@ class JSONFile(
 
   def exists(): Boolean = true
   def getContent(): List[JsonIR] = List(JsonIR(json.getString()(Context.getNew(""))))
-  def getName(): String = if isDatapack() then Settings.target.getJsonPath(name)
+  def getName(): String = if (isDatapack()) Settings.target.getJsonPath(name)
                           else Settings.target.getRPJsonPath(name)
 
   def isDatapack(): Boolean = 

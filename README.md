@@ -595,6 +595,37 @@ void bar(){
 ```
 will result as `hello hello world world`
 
+## Timeline
+Timelines allow you to schedule multiple events, that should be run on after then other.
+Timelines also support looping schedule. Timelines will create a function with there name which can be used to start the timeline.
+```
+timeline test{
+    after( 1s ){
+        // wait for once second then run the code below
+        ./say hi
+    }
+    until (i == 10) {
+        // repeat until i == 10
+        i++
+        ./say hi again
+    }
+    while (i > 0) {
+        // repeat while i > 0
+        i--
+        ./say hi again
+    }
+    for (5s){
+        // repeat this every tick for 5 seconds
+        ./say waiting...
+    }
+    event (i == 0){
+        // wait until i = 0, then run the code below
+        ./say i is zero
+    }
+}
+test()
+```
+
 ## Predicate (JAVA Only)
 Predicate can be defined like function but with a json body.
 ```
@@ -883,7 +914,7 @@ int a = function(0)
 where T is the type parameters.
 
 ### "Lazy IF"
-When a if statement is compiled, the expression inside it is simplified. If the result value is always true then the condition will disapear from the output code and all the else statement with it. 
+When a if (statement is compiled, the expression inside it is simplified. If the result value is always true) the condition will disapear from the output code and all the else statement with it. 
 ```
 if (true){
     //do stuff

@@ -195,7 +195,7 @@ class ScoreboardReduce(files: List[IRFile], access: mutable.Set[SBLink]){
                     if (s == EmptyIR) EmptyIR
                     else IfScoreboardMatch(left, min, max, s, invert)
                 }
-                state.possibleValue match
+                state.possibleValue match{
                     case DirectValue(value) => {
                         if ((value >= min && value <= max && !invert)) reduce(statement)
                         else if ((value < min || value > max) && invert) reduce(statement)
@@ -210,6 +210,7 @@ class ScoreboardReduce(files: List[IRFile], access: mutable.Set[SBLink]){
                         else ntree
                     }
                     case _ => ntree
+                }
             }
             case IfScoreboard(left, op, right, statement, invert) => {
                 if (left == right) {
@@ -319,37 +320,42 @@ class ScoreboardReduce(files: List[IRFile], access: mutable.Set[SBLink]){
             val ret = tree match{
                 case ScoreboardSet(target, value) => {
                     val state = lgetOrAdd(target)
-                    state.possibleValue match
+                    state.possibleValue match{
                         case DirectValue(v) => state.possibleValue = if(inIf){SetValue(Set(v, value))}else{DirectValue(value)}
                         case SetValue(v) => state.possibleValue = if(inIf){SetValue(v + value)}else{DirectValue(value)}
                         case _ => state.possibleValue = if(inIf){AnyValue}else{DirectValue(value)}
+                    }
                     tree
                 }
                 case ScoreboardAdd(target, value) => {
                     val state = lgetOrAdd(target)
-                    state.possibleValue match
+                    state.possibleValue match{
                         case DirectValue(v) => state.possibleValue = if(inIf){SetValue(Set(v, v+value))}else{DirectValue(v + value)}
                         case SetValue(v) => state.possibleValue = if(inIf){SetValue(v.map(_ + value) ++ v)}else{SetValue(v.map(_ + value))}
                         case _ => state.possibleValue = AnyValue
+                    }
                     
-                    (state.possibleValue) match
+                    (state.possibleValue) match{
                         case DirectValue(v)=> ScoreboardSet(target, v)
                         case other => tree
+                    }
                 }
                 case ScoreboardRemove(target, value) => {
                     val state = lgetOrAdd(target)
-                    state.possibleValue match
+                    state.possibleValue match{
                         case DirectValue(v) => state.possibleValue = if(inIf){SetValue(Set(v, v-value))}else{DirectValue(v - value)}
                         case SetValue(v) => state.possibleValue = if(inIf){SetValue(v.map(_ - value) ++ v)}else{SetValue(v.map(_ - value))}
                         case _ => state.possibleValue = AnyValue
+                    }
                     
-                    (state.possibleValue) match
+                    (state.possibleValue) match{
                         case DirectValue(v)=> ScoreboardSet(target, v)
                         case other => tree
+                    }
                 }
                 case IfScoreboardMatch(left, min, max, statement, invert) => {
                     val state = lgetOrAdd(left)
-                    state.possibleValue match
+                    state.possibleValue match{
                         case DirectValue(v) => {
                             if (v >= min && v <= max && !invert) reduceOne(statement)
                             else if ((v < min || v > max) && !invert) EmptyIR
@@ -370,6 +376,7 @@ class ScoreboardReduce(files: List[IRFile], access: mutable.Set[SBLink]){
                         case _ => {
                             IfScoreboardMatch(left, min, max, reduceOne(statement)(true), invert)
                         }
+                    }
                 }
                 case IfScoreboard(left, op, right, statement, invert) => {
                     if (left == right){
@@ -593,14 +600,15 @@ class ScoreboardReduce(files: List[IRFile], access: mutable.Set[SBLink]){
                     catch{
                         case e: ArithmeticException => lstate.possibleValue = AnyValue
                     }
-                    (lstate.possibleValue, operation, rstate.possibleValue) match
+                    (lstate.possibleValue, operation, rstate.possibleValue) match{
                         case (DirectValue(v), "=", _)=> ScoreboardSet(target, v)
                         case (_, "+=", DirectValue(v))=> ScoreboardAdd(target, v)
                         case (_, "-=", DirectValue(v))=> ScoreboardRemove(target, v)
                         case other => tree
+                    }
                 }
                 case BlockCall(function, fullName, args) => {
-                    map.get(fullName) match
+                    map.get(fullName) match{
                         case Some(block) => {
                             block.scoreboardModified.foreach(name => {
                                 val state = lgetOrAdd(name)
@@ -613,6 +621,7 @@ class ScoreboardReduce(files: List[IRFile], access: mutable.Set[SBLink]){
                             tree
                         }
                         case None => tree
+                    }
                 }
                 case e: ExecuteIR => {
                     e.withStatements(reduceOne(e.getStatements)(true))
@@ -639,7 +648,7 @@ class ScoreboardReduce(files: List[IRFile], access: mutable.Set[SBLink]){
 class ScoreboardState(sblink: SBLink,forced: Boolean = false){
     var accessed = mutable.Set[IRFile]()
     var modified = mutable.Set[IRFile]()
-    var possibleValue: ScoreboardValue = if forced then AnyValue else UnknownValue
+    var possibleValue: ScoreboardValue = if (forced) AnyValue else UnknownValue
     var accessedValue = mutable.Set[ScoreboardValue]()
     var operation = mutable.Set[SBOperation]()
 
@@ -674,12 +683,13 @@ class ScoreboardState(sblink: SBLink,forced: Boolean = false){
     }
     def setValue(value: Int): Unit ={
         possibleValue = (
-            possibleValue match
+            possibleValue match{
                 case UnknownValue => DirectValue(value)
                 case DirectValue(v) if v == value => DirectValue(v)
                 case DirectValue(v) => SetValue(Set(v, value))
                 case SetValue(set) => SetValue(set + value)
                 case _ => AnyValue
+            }
         )
     }
     def addOperation(operation: SBOperation): Unit ={
@@ -689,8 +699,8 @@ class ScoreboardState(sblink: SBLink,forced: Boolean = false){
         possibleValue
     }
 
-    def accessCount = if forced then 1 else accessed.size
-    def modifyCount = if forced then 1 else modified.size
+    def accessCount = if (forced) 1 else accessed.size
+    def modifyCount = if (forced) 1 else modified.size
 
     override def toString(): String = {
         s"ScoreboardState($accessCount, $modifyCount, $possibleValue, $operation)"

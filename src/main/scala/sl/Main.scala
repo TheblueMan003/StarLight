@@ -15,6 +15,7 @@ import sys.process._
 import java.util.Locale
 import scala.collection.mutable
 import java.awt.RenderingHints.Key
+import sl.MappingTool.FromTileMap
 
 object Main {
   var version = List(0, 12, 1)
@@ -56,18 +57,18 @@ object Main {
     while (!ended) {
       Reporter.input()
       val args =
-        if argsOri != null then argsOri
+        if (argsOri != null) argsOri
         else scala.io.StdIn.readLine().split(" ")
       try {
-        args(0) match
+        args(0) match{
           case "" => {}
           case "clear" => {
             print("\n" * 100)
           }
           case "doc" => {
-            if (args.length < 2 && lastBuild == null) then {
+            if ((args.length < 2 && lastBuild == null)) {
               Reporter.error(f"Expected 1 argument got: ${args.length - 1}")
-            } else if (args.length == 2) then {
+            } else if ((args.length == 2)) {
               val path = args(1)
               val libraries: List[String] = FileUtils
                 .getListOfFiles(path)
@@ -95,9 +96,9 @@ object Main {
             }
           }
           case "build" => {
-            if (args.length < 1 && lastBuild == null) then {
+            if ((args.length < 1 && lastBuild == null)) {
               Reporter.error(f"Expected 1 argument got: ${args.length - 1}")
-            } else if (args.length < 1 && lastBuild != null) then {
+            } else if ((args.length < 1 && lastBuild != null)) {
               build(lastBuild)
               Reporter.ok("Build Completed!")
             } else {
@@ -107,7 +108,7 @@ object Main {
             }
           }
           case "test" => {
-            if (args.length < 1) then {
+            if ((args.length < 1)) {
               Reporter.error(f"Expected 1 argument got: ${args.length - 1}")
             } else {
               lastBuild = args(1) + ".slconf"
@@ -117,7 +118,7 @@ object Main {
             }
           }
           case "testScala" => {
-            if (args.length < 1) then {
+            if ((args.length < 1)) {
               Reporter.error(f"Expected 1 argument got: ${args.length - 1}")
             } else {
               compile(args.drop(1))
@@ -126,7 +127,7 @@ object Main {
             }
           }
           case "run" => {
-            if (args.length < 1) then {
+            if ((args.length < 1)) {
               Reporter.error(f"Expected 1 argument got: ${args.length - 1}")
             } else {
               run(args(1))
@@ -134,7 +135,7 @@ object Main {
             }
           }
           case "debug" => {
-            if (args.length < 1) then {
+            if ((args.length < 1)) {
               Reporter.error(f"Expected 1 argument got: ${args.length - 1}")
             } else {
               debug(args(1))
@@ -159,7 +160,7 @@ object Main {
             }
           }
           case "update" => {
-            if (args.length != 2) then {
+            if ((args.length != 2)) {
               Reporter.error(f"Expected 1 argument got: ${args.length - 1}")
             } else {
               Library.Downloader.updateLib(args(1))
@@ -172,10 +173,11 @@ object Main {
             DataPackBuilder.clearCache()
             ResourcePackBuilder.clearCache()
             Downloader.clearCache()
+            FromTileMap.clear_cache()
             Reporter.ok("Cache cleared!")
           }
           case "updateconfig" => {
-            if (args.length != 2) then {
+            if ((args.length != 2)) {
               Reporter.error(f"Expected 1 argument got: ${args.length - 1}")
             } else {
               val lastBuild = args(1) + ".slconf"
@@ -197,9 +199,9 @@ object Main {
             while (!ended) {
               try{
                 if (CacheAST.hasChanged()) {
-                  if (args.length < 1 && lastBuild == null) then {
+                  if ((args.length < 1 && lastBuild == null)) {
                     Reporter.error(f"Expected 1 argument got: ${args.length - 1}")
-                  } else if (args.length < 1 && lastBuild != null) then {
+                  } else if ((args.length < 1 && lastBuild != null)) {
                     build(lastBuild)
                     Reporter.ok("Build Completed!")
                   } else {
@@ -218,7 +220,7 @@ object Main {
             }
           }
           case ">" | "show" => {
-            if (args.length != 2) then {
+            if ((args.length != 2)) {
               Reporter.error(f"Expected 1 argument got: ${args.length - 1}")
             } else {
               lazy val name = args(1).replaceAll("/", ".").replaceAll(":", ".")
@@ -229,7 +231,7 @@ object Main {
                   )
                   .foreach { f => f.print() }
               } else {
-                lastIR.filter(f => f.name == name).headOption match
+                lastIR.filter(f => f.name == name).headOption match{
                   case Some(value) => {
                     value.print()
                   }
@@ -238,11 +240,12 @@ object Main {
                       f.print()
                     }
                   }
+                }
               }
             }
           }
           case "?" => {
-            if (args.length != 2) then {
+            if ((args.length != 2)) {
               Reporter.error(f"Expected 1 argument got: ${args.length - 1}")
             } else {
               lazy val name = args(1).replaceAll("/", ".").replaceAll(":", ".")
@@ -254,7 +257,7 @@ object Main {
                   )
                   .foreach { f => println(f.fullName) }
               } else {
-                varis.filter(f => f.fullName == name).headOption match
+                varis.filter(f => f.fullName == name).headOption match{
                   case Some(value) => {
                     println(value.fullName)
                   }
@@ -263,6 +266,7 @@ object Main {
                       println(f.fullName)
                     }
                   }
+                }
               }
             }
           }
@@ -313,8 +317,10 @@ object Main {
           case other => {
             Reporter.error(f"Unknown command: $other")
           }
+        }
       } catch {
         case e => {
+          throw e
           Reporter.error(e.getMessage())
           lastExecption = e
         }
@@ -353,7 +359,7 @@ object Main {
     println("Author: ")
     val author = scala.io.StdIn.readLine()
     val p = getArg(args, "-p")
-    val directory = if p == "default" then "." else p
+    val directory = if (p == "default") "." else p
 
     ConfigLoader.newProjectPath.map(name =>
       FileUtils.createDirectory(directory + "/" + name)
@@ -483,7 +489,7 @@ object Main {
 
     Reporter.phase(f"===========[Parsing]==========")
     var tokenized =
-      files.par.map(f => Parser.parseFromFile(f, () => Utils.getFile(f))).toList
+      files.par.map(f => FastParser.parseFromFile(f, () => Utils.getFile(f))).toList
 
     Reporter.phase(f"===========[Context Building]==========")
     if (tokenized.contains(None)) throw new Exception("Failled to Parse")
@@ -504,7 +510,7 @@ object Main {
     val exportStart = LocalDateTime.now()
     val outputPath = outputs
       .map(path =>
-        if (!path.endsWith("/") && !path.endsWith("\\")) then path + "/"
+        if ((!path.endsWith("/") && !path.endsWith("\\"))) path + "/"
         else path
       )
       .toList
@@ -564,7 +570,7 @@ object Main {
     if (Settings.target == MCJava) {
       Settings.java_resourcepack_output
         .map(path =>
-          if (!path.endsWith("/") && !path.endsWith("\\")) then path + "/"
+          if ((!path.endsWith("/") && !path.endsWith("\\"))) path + "/"
           else path
         )
         .foreach(f =>
@@ -581,7 +587,7 @@ object Main {
     if (Settings.target == MCBedrock) {
       Settings.bedrock_resourcepack_output
         .map(path =>
-          if (!path.endsWith("/") && !path.endsWith("\\")) then path + "/"
+          if ((!path.endsWith("/") && !path.endsWith("\\"))) path + "/"
           else path
         )
         .foreach(f =>
@@ -653,7 +659,7 @@ object Main {
   def makeDocumentation(name: String, inputs: List[String]) = {
     var files = FileUtils.getFiles(inputs)
 
-    var tokenized = files.par.map(f => Parser.parse(f, Utils.getFile(f))).toList
+    var tokenized = files.par.map(f => FastParser.parse(f, Utils.getFile(f))).toList
 
     if (tokenized.contains(None)) throw new Exception("Failled to Parse")
 

@@ -30,7 +30,7 @@ class Predicate(
   ): Int = {
     args match {
       case head :: tail => {
-        head.defValue match
+        head.defValue match{
           case None =>
             if (stopped) {
               throw new Exception(
@@ -42,6 +42,7 @@ class Predicate(
           case Some(value) => {
             getMinArgCount(tail, true)
           }
+        }
       }
       case Nil => 0
     }
@@ -51,13 +52,13 @@ class Predicate(
       .filter(_.getType() != VoidType)
       .zip(arguments.map(_.defValue))
       .zipAll(args, null, null)
-      .map(p => (p._1._1, if p._2 == null then p._1._2.get else p._2))
+      .map(p => (p._1._1, if (p._2 == null) p._1._2.get else p._2))
   }
   def argMap2(args: List[Expression]) = {
     arguments
       .map(_.defValue)
       .zipAll(args, null, null)
-      .map(p => (if p._2 == null then p._1.get else p._2))
+      .map(p => (if (p._2 == null) p._1.get else p._2))
   }
   def generateArgument()(implicit ctx: Context): Unit = {
     val ctx2 = ctx.push(name)

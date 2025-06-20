@@ -78,7 +78,7 @@ case class BoolValue(val value: Boolean)
     with SmallValue
     with Stringifyable {
   override def toString(): String = value.toString()
-  override def getIntValue(): Int = if value then 1 else 0
+  override def getIntValue(): Int = if (value) 1 else 0
   override def hasIntValue(): Boolean = true
   override def hasFloatValue(): Boolean = false
   override def getFloatValue(): Double = ???
@@ -114,13 +114,13 @@ object InterpolatedString {
     var ended = false
     var values = List[Expression]()
     while (!ended) {
-      patern.findFirstMatchIn(text) match
+      patern.findFirstMatchIn(text) match{
         case None => ended = true
         case Some(value) => {
           value.matched
           val expr = value.group(1)
           val befor = value.before.toString()
-          values = values ::: (if (befor.size > 0) then
+          values = values ::: (if ((befor.size > 0))
                                  List(
                                    StringValue(befor),
                                    Parser.parseExpression(expr, true)
@@ -128,6 +128,7 @@ object InterpolatedString {
                                else List(Parser.parseExpression(expr, true)))
           text = value.after.toString()
         }
+      }
     }
     values match {
       case List(StringValue(s)) => StringValue(s)
@@ -146,9 +147,10 @@ case class RawJsonValue(val value: List[Printable])
   override def getFloatValue(): Double = ???
   override def getString()(implicit context: Context): String = {
     val json1 = value.map(_.getString()).reduce(_ + "," + _)
-    Settings.target match
+    Settings.target match{
       case MCBedrock => f"{\"rawtext\" : [$json1]}"
       case MCJava    => f"[$json1]"
+    }
   }
   def length()(implicit ctx: Context): Int = {
     value.map(v => v.getLength()).sum
@@ -165,7 +167,7 @@ case class RawJsonValue(val value: List[Printable])
   }
   def padLeft(finalSize: Int)(implicit ctx: Context): RawJsonValue = {
     val length = this.length()
-    if length >= finalSize then this
+    if (length >= finalSize) this
     else
       RawJsonValue(
         value ::: List(
@@ -179,7 +181,7 @@ case class RawJsonValue(val value: List[Printable])
   }
   def padRight(finalSize: Int)(implicit ctx: Context): RawJsonValue = {
     val length = this.length()
-    if length >= finalSize then this
+    if (length >= finalSize) this
     else
       RawJsonValue(
         List(
@@ -193,7 +195,7 @@ case class RawJsonValue(val value: List[Printable])
   }
   def padCenter(finalSize: Int)(implicit ctx: Context): RawJsonValue = {
     val length = this.length()
-    if length >= finalSize then this
+    if (length >= finalSize) this
     else {
       val left = (finalSize - length) / 2
       val right = finalSize - length - left
@@ -227,11 +229,12 @@ case class NamespacedName(
   override def hasFloatValue(): Boolean = false
   override def getFloatValue(): Double = ???
   override def getString()(implicit context: Context): String = {
-    json match
+    json match{
       case JsonValue(JsonNull)          => value
       case JsonExpression(NullValue, _) => value
       case NullValue                    => value
       case _                            => value + json.getString()
+    }
   }
 }
 case class TagValue(val value: String) extends Expression with SmallValue {
@@ -263,7 +266,7 @@ case class VariableValue(
   override def getFloatValue(): Double = ???
   override def getString()(implicit context: Context): String = {
     val vari = context.tryGetVariable(name)
-    vari match
+    vari match{
       case None => {
         try {
           val fct = context.getFunction(name)
@@ -279,6 +282,7 @@ case class VariableValue(
           throw new Exception(f"Variable $name cannot be transformed to string")
         }
       }
+    }
   }
 }
 case class ArrayGetValue(val name: Expression, val index: List[Expression])
@@ -474,12 +478,13 @@ case class PositionValue(
   override def getFloatValue(): Double = ???
 
   override def canEqual(that: Any): Boolean = ???
-  override def getString()(implicit context: Context): String =
+  override def getString()(implicit context: Context): String ={
     val px = Utils.forceString(x)
     val py = Utils.forceString(y)
     val pz = Utils.forceString(z)
 
     f"${px} ${py} ${pz}"
+  }
 
   def unpack(expr: Expression): (Expression, Expression) = {
     expr match {
@@ -615,9 +620,10 @@ case class JsonValue(val content: JSONElement)
   override def hasFloatValue(): Boolean = false
   override def getFloatValue(): Double = ???
   override def getString()(implicit context: Context): String =
-    content match
+    content match{
       case JsonString(s) => s
       case _             => content.getString()
+    }
 }
 trait JSONElement {
   def getString()(implicit context: Context): String
@@ -781,7 +787,7 @@ case class JsonBoolean(val value: Boolean) extends JSONElement {
     value.toString()
   }
   def getNbt(): String = {
-    if value then "1b" else "0b"
+    if (value) "1b" else "0b"
   }
   def forceNBT()(implicit
       vari: Variable,

@@ -25,7 +25,7 @@ object Preparser {
       var ended = false
       var text2 = name
       while (!ended) {
-        namespacedName.findFirstMatchIn(text2) match
+        namespacedName.findFirstMatchIn(text2) match{
           case None => ended = true
           case Some(value) => {
             value.matched
@@ -34,6 +34,7 @@ object Preparser {
                 2
               ) + value.after.toString()
           }
+        }
       }
 
       text2
@@ -41,7 +42,7 @@ object Preparser {
 
     var ended = false
     /*while(!ended){
-            namespacedName.findFirstMatchIn(text2)match
+            namespacedName.findFirstMatchIn(text2)match{
                 case None => ended = true
                 case Some(value) => {
                     value.matched
@@ -49,11 +50,12 @@ object Preparser {
                     "§§§"+ Utils.stringify(value.group(1)+"@"+value.group(2))+ "§§§" +
                     value.after.toString()
                 }
+            }
         }*/
 
     ended = false
     while (!ended) {
-      cmd.findFirstMatchIn(text2) match
+      cmd.findFirstMatchIn(text2) match{
         case None => ended = true
         case Some(value) => {
           value.matched
@@ -63,10 +65,11 @@ object Preparser {
             ) + "%%%" +
             value.after.toString()
         }
+      }
     }
     ended = false
     while (!ended) {
-      cmd2.findFirstMatchIn(text2) match
+      cmd2.findFirstMatchIn(text2) match{
         case None => ended = true
         case Some(value) => {
           value.matched
@@ -76,11 +79,12 @@ object Preparser {
             ) + "%%%" +
             value.after.toString()
         }
+      }
     }
 
     ended = false
     while (!ended) {
-      doc.findFirstMatchIn(text2) match
+      doc.findFirstMatchIn(text2) match{
         case None => ended = true
         case Some(value) => {
           value.matched
@@ -92,6 +96,7 @@ object Preparser {
             ) + "???" +
             value.after.toString()
         }
+      }
     }
 
     paternsToReplace.foreach(p => text2 = text2.replaceAllLiterally(p._1, p._2))

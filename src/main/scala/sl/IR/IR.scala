@@ -25,7 +25,7 @@ case class SBLink(entity: String, objective: String) extends IRTree{
     override def toString(): String = getString()
 
     def getKey()(implicit context: IRContext) = {
-        if entity.startsWith("@") then ???
+        if (entity.startsWith("@")) ???
         else entity+" "+objective
     }
 
@@ -49,21 +49,23 @@ case class CommandInsertIR(link: SBLink, vari: String, statement: String) extend
 }*/
 case class IfScoreboard(left: SBLink, op: String, right: SBLink, statement: IRTree, invert: Boolean = false) extends IRTree with IRExecute{
     def condition={
-        if invert then 
+        if (invert) 
             "unless score "+left.getString() + " " + op + " " + right.getString()
         else
             "if score "+left.getString() + " " + op + " " + right.getString()
     }
     def getString(): String = {
-        "execute "+condition + (statement match
+        "execute "+condition + (statement match{
             case a: IRExecute => " "+a.getExecuteString()
             case _ => " run "+statement.getString()
+        }
         )
     }
     def getExecuteString(): String = {
-        condition + (statement match
+        condition + (statement match{
             case a: IRExecute => " "+a.getExecuteString()
             case _ => " run "+statement.getString()
+        }
         )
     }
     def getStatements = statement
@@ -71,28 +73,31 @@ case class IfScoreboard(left: SBLink, op: String, right: SBLink, statement: IRTr
 }
 case class IfScoreboardMatch(left: SBLink, min: Int, max: Int, statement: IRTree, invert: Boolean = false) extends IRTree with IRExecute{
     def getBound = {
-        (min, max) match
+        (min, max) match{
             case (Int.MinValue, v) => ".." + v
             case (v, Int.MaxValue) => v + ".."
             case (v1, v2) if v1 == v2 => v1.toString
             case (v1, v2) => v1 + ".." + v2
+        }
     }
     def condition={
-        if invert then 
+        if (invert) 
             "unless score "+left.getString() + " matches " + getBound
         else
             "if score "+left.getString() + " matches " + getBound
     }
     def getString(): String = {
-        "execute "+condition + (statement match
+        "execute "+condition + (statement match{
             case a: IRExecute => " "+a.getExecuteString()
             case _ => " run "+statement.getString()
+        }
         )
     }
     def getExecuteString(): String = {
-        condition + (statement match
+        condition + (statement match{
             case a: IRExecute => " "+a.getExecuteString()
             case _ => " run "+statement.getString()
+        }
         )
     }
     def getStatements = statement
@@ -100,21 +105,23 @@ case class IfScoreboardMatch(left: SBLink, min: Int, max: Int, statement: IRTree
 }
 case class IfStorage(target: String, path: String, statement: IRTree, invert: Boolean = false) extends IRTree with IRExecute{
     def condition={
-        if invert then 
+        if (invert) 
             f"unless data storage $target $path"
         else
             f"if data storage $target $path"
     }
     def getString(): String = {
-        "execute "+condition + (statement match
+        "execute "+condition + (statement match{
             case a: IRExecute => " "+a.getExecuteString()
             case _ => " run "+statement.getString()
+        }
         )
     }
     def getExecuteString(): String = {
-        condition + (statement match
+        condition + (statement match{
             case a: IRExecute => " "+a.getExecuteString()
             case _ => " run "+statement.getString()
+        }
         )
     }
     def getStatements = statement
@@ -122,21 +129,23 @@ case class IfStorage(target: String, path: String, statement: IRTree, invert: Bo
 }
 case class IfEntity(selector: String, statement: IRTree, invert: Boolean = false) extends IRTree with IRExecute{
     def condition={
-        if invert then 
+        if (invert) 
             "unless entity "+selector
         else
             "if entity "+selector
     }
     def getString(): String = {
-        "execute "+condition + (statement match
+        "execute "+condition + (statement match{
             case a: IRExecute => " "+a.getExecuteString()
             case _ => " run "+statement.getString()
+        }
         )
     }
     def getExecuteString(): String = {
-        condition + (statement match
+        condition + (statement match{
             case a: IRExecute => " "+a.getExecuteString()
             case _ => " run "+statement.getString()
+        }
         )
     }
     def getStatements = statement
@@ -145,21 +154,23 @@ case class IfEntity(selector: String, statement: IRTree, invert: Boolean = false
 
 case class IfBlock(value: String, statement: IRTree, invert: Boolean = false) extends IRTree with IRExecute{
     def condition={
-        if invert then 
+        if (invert) 
             "unless block "+value
         else
             "if block "+value
     }
     def getString(): String = {
-        "execute "+condition + (statement match
+        "execute "+condition + (statement match{
             case a: IRExecute => " "+a.getExecuteString()
             case _ => " run "+statement.getString()
+        }
         )
     }
     def getExecuteString(): String = {
-        condition + (statement match
+        condition + (statement match{
             case a: IRExecute => " "+a.getExecuteString()
             case _ => " run "+statement.getString()
+        }
         )
     }
     def getStatements = statement
@@ -168,21 +179,23 @@ case class IfBlock(value: String, statement: IRTree, invert: Boolean = false) ex
 
 case class IfBlocks(value: String, statement: IRTree, invert: Boolean = false) extends IRTree with IRExecute{
     def condition={
-        if invert then 
+        if (invert)
             "unless blocks "+value
         else
             "if blocks "+value
     }
     def getString(): String = {
-        "execute "+condition + (statement match
+        "execute "+condition + (statement match{
             case a: IRExecute => " "+a.getExecuteString()
             case _ => " run "+statement.getString()
+        }
         )
     }
     def getExecuteString(): String = {
-        condition + (statement match
+        condition + (statement match{
             case a: IRExecute => " "+a.getExecuteString()
             case _ => " run "+statement.getString()
+        }
         )
     }
     def getStatements = statement
@@ -191,21 +204,25 @@ case class IfBlocks(value: String, statement: IRTree, invert: Boolean = false) e
 
 case class IfPredicate(value: String, statement: IRTree, invert: Boolean = false) extends IRTree with IRExecute{
     def condition={
-        if invert then 
+        if (invert){ 
             "unless predicate "+value
-        else
+        }
+        else{
             "if predicate "+value
+        }
     }
     def getString(): String = {
-        "execute "+condition + (statement match
+        "execute "+condition + (statement match{
             case a: IRExecute => " "+a.getExecuteString()
             case _ => " run "+statement.getString()
+        }
         )
     }
     def getExecuteString(): String = {
-        condition + (statement match
+        condition + (statement match{
             case a: IRExecute => " "+a.getExecuteString()
             case _ => " run "+statement.getString()
+        }
         )
     }
     def getStatements = statement
@@ -214,21 +231,23 @@ case class IfPredicate(value: String, statement: IRTree, invert: Boolean = false
 
 case class IfLoaded(value: String, statement: IRTree, invert: Boolean = false) extends IRTree with IRExecute{
     def condition={
-        if invert then 
+        if (invert) 
             "unless loaded "+value
         else
             "if loaded "+value
     }
     def getString(): String = {
-        "execute "+condition + (statement match
+        "execute "+condition + (statement match{
             case a: IRExecute => " "+a.getExecuteString()
             case _ => " run "+statement.getString()
+        }
         )
     }
     def getExecuteString(): String = {
-        condition + (statement match
+        condition + (statement match{
             case a: IRExecute => " "+a.getExecuteString()
             case _ => " run "+statement.getString()
+        }
         )
     }
     def getStatements = statement
@@ -237,15 +256,17 @@ case class IfLoaded(value: String, statement: IRTree, invert: Boolean = false) e
 
 case class ExecuteIR(block: String, statement: IRTree) extends IRTree with IRExecute{
     def getString(): String = {
-        "execute "+block + (statement match
+        "execute "+block + (statement match{
             case a: IRExecute => " "+a.getExecuteString()
             case _ => " run "+statement.getString()
+        }
         )
     }
     def getExecuteString(): String = {
-        block + (statement match
+        block + (statement match{
             case a: IRExecute => " "+a.getExecuteString()
             case _ => " run "+statement.getString()
+        }
         )
     }
     def getStatements = statement
@@ -263,9 +284,10 @@ def FacingEntityIR(ent: String, height: String, statement: IRTree) = ExecuteIR(f
 def AlignIR(value: String, statement: IRTree) = ExecuteIR(f"align ${value}", statement)
 
 case class ScoreboardOperation(target: SBLink, operation: String, source: SBLink) extends IRTree{
-    operation match
+    operation match{
         case "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "<" | ">" | "><" | "><=" | ">=" | "=<" | "<=" => ()
         case _ => throw new Exception("Invalid operation: " + operation)
+    }
     
     def getString(): String = s"scoreboard players operation $target $operation $source"
 }
@@ -377,18 +399,20 @@ case class StorageRemove(target: StorageVariable, value: StorageValue) extends I
         }
 }
 case class StorageRead(score: SBLink, target: StorageVariable, scale: Double = 1) extends IRTree{
-    def getString(): String = 
-        target match
+    def getString(): String = {
+        target match{
             case StorageStorage(_, _) => f"execute store result score $score run data get $target $scale%.5f"
             case StorageBlock(_, _) => f"execute store result score $score run data get $target $scale%.5f"
             case StorageEntity(_, _) => f"execute store result score $score run data get $target $scale%.5f"
             case StorageScoreboard(key, typ, scale) => throw new Exception("Cannot read scoreboard value")
+        }
+    }
 }
 
 
 case class BlockCall(function: String, fullName: String, arg: String) extends IRTree{
     def getString(): String = 
-        if arg == "" || arg == null then s"function $function"
+        if (arg == "" || arg == null) s"function $function"
         else s"function $function $arg"
 }
 case class ScheduleCall(function: String, fullName: String, time: Int) extends IRTree{

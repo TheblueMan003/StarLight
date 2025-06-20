@@ -85,7 +85,7 @@ object ResourcePackBuilder{
         .toList
         .map((k,v) => v.sortBy(_.getContents().length).head)
         .map(f => (f.getPath(), f.getContents())).foreach { (name, content) =>
-            zip.putNextEntry(new ZipEntry(if name.startsWith("/") then name.drop(1) else name))
+            zip.putNextEntry(new ZipEntry(if (name.startsWith("/")) name.drop(1) else name))
             content.foreach(x => writer.println(x.getString()))
             writer.flush()
             zip.closeEntry()

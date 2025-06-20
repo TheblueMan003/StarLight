@@ -81,26 +81,29 @@ class Modifier() extends Serializable {
   def getAttributesString(key: String, default: () => String)(implicit
       context: Context
   ): String = {
-    attributes.getOrElse(key, null) match
+    attributes.getOrElse(key, null) match{
       case null               => default()
       case StringValue(value) => value
       case other              => Utils.simplify(other)(context).toString()
+    }
   }
 
   def getAttributesFloat(key: String, default: () => Double)(implicit
       context: Context
   ): Double = {
-    attributes.getOrElse(key, null) match
+    attributes.getOrElse(key, null) match{
       case null              => default()
       case FloatValue(value) => value
       case IntValue(value)   => value.toDouble
       case other             => ???
+    }
   }
 
   def hasAttributes(key: String)(implicit context: Context): Boolean = {
-    attributes.getOrElse(key, BoolValue(false)) match
+    attributes.getOrElse(key, BoolValue(false)) match{
       case BoolValue(value) => value
       case other            => Utils.simplify(other)(context) == BoolValue(true)
+    }
   }
 
   def addAtrribute(key: String, value: Expression) = {
@@ -109,31 +112,33 @@ class Modifier() extends Serializable {
   }
 
   def withDoc(text: Option[String]) = {
-    text match
+    text match{
       case None        => {}
       case Some(value) => doc += value
+    }
 
     this
   }
 
   def schema() = {
-    var ret = protection match
+    var ret = protection match{
       case Protection.Public    => "public"
       case Protection.Protected => ""
       case Protection.Private   => "private"
-    if isAbstract then ret += " abstract"
-    if isVirtual then ret += " virtual"
-    if isOverride then ret += " override"
-    if isLazy then ret += " lazy"
-    if isEntity then ret += " entity"
-    if isConst then ret += " const"
-    if isTicking then ret += " ticking"
-    if isLoading then ret += " loading"
-    if isStatic then ret += " static"
-    if isHelper then ret += " helper"
-    if isAsync then ret += " async"
-    if tags.length > 0 then ret += " " + tags.mkString(" ")
-    if attributes.size > 0 then
+    }
+    if (isAbstract) ret += " abstract"
+    if (isVirtual) ret += " virtual"
+    if (isOverride) ret += " override"
+    if (isLazy) ret += " lazy"
+    if (isEntity) ret += " entity"
+    if (isConst) ret += " const"
+    if (isTicking) ret += " ticking"
+    if (isLoading) ret += " loading"
+    if (isStatic) ret += " static"
+    if (isHelper) ret += " helper"
+    if (isAsync) ret += " async"
+    if (tags.length > 0) ret += " " + tags.mkString(" ")
+    if (attributes.size > 0)
       ret += " [" + attributes.map(a => s"${a._1}=${a._2}").mkString(",") + "]"
     ret
   }
