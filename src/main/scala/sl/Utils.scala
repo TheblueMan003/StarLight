@@ -36,14 +36,14 @@ object Utils{
     def preloadAll():Unit={
         sl.files.FileUtils.getListOfFiles("libraries").filter(p => p.endsWith(".sl")).par.foreach(f => {
             val path = f.replace("/","/").replace("\\","/").dropRight(3)
-            Parser.parseFromFile(path, ()=> Utils.getFile(f.replace("/","/").replace("\\","/")))
+            FastParser.parseFromFile(path, ()=> Utils.getFile(f.replace("/","/").replace("\\","/")))
         })
     }
     def getLib(path: String): Option[Instruction] = {
         val cpath = path.replace(".","/")
         val ipath = path.replace("/",".").replace("\\",".")
         
-        Some(Parser.parseFromFile("libraries/"+path, ()=>(
+        Some(FastParser.parseFromFile("libraries/"+path, ()=>(
             if (path == "__init__"){
                 (Source.fromResource("libraries/"+getLibPath(cpath+".sl"))).getLines.reduce((x,y) => x + "\n" +y)
             }
@@ -1745,7 +1745,7 @@ object Utils{
                     case (VariableValue(Identifier(List("Compiler", "json")), _), List(StringValue(filePath))) => {
                         val file = new File(filePath)
                         if(file.exists()){
-                            val json = Parser.parseJson(Source.fromFile(file).mkString)
+                            val json = FastParser.parseJson(Source.fromFile(file).mkString)
                             json match{
                                 case JsonArray(content) => content.map(v => List((key, JsonValue(v).getString())))
                                 case JsonDictionary(map) => map.map(v => List((key+"."+v._1, JsonValue(v._2).getString())))
@@ -1861,7 +1861,7 @@ object Utils{
                         if(file.exists()){
                             val lines = Source.fromFile(file).getLines()
                             val header = lines.next().split(",").toList
-                            lines.map(line => line.split(",").toList.zip(header).map((v, h) => (key+"."+h, Parser.parseExpression(v)))).toList
+                            lines.map(line => line.split(",").toList.zip(header).map((v, h) => (key+"."+h, FastParser.parseExpression(v)))).toList
                         }
                         else{
                             throw new Exception(f"File $filePath does not exist")
@@ -1870,7 +1870,7 @@ object Utils{
                     case (VariableValue(Identifier(List("Compiler", "json")), _), List(StringValue(filePath))) => {
                         val file = new File(filePath)
                         if(file.exists()){
-                            val json = Parser.parseJson(Source.fromFile(file).mkString)
+                            val json = FastParser.parseJson(Source.fromFile(file).mkString)
                             json match{
                                 case JsonArray(content) => content.map(v => List((key, JsonValue(v))))
                                 case JsonDictionary(map) => map.map(v => List((key+"."+v._1, JsonValue(v._2))))
@@ -1886,7 +1886,7 @@ object Utils{
                         if(file.exists()){
                             // Get lines from file
                             val lines = Source.fromFile(file).getLines()
-                            lines.map(line => line.split("=").toList.map(_.trim)).map(lst => List((key, Parser.parseExpression(lst.last)))).toList
+                            lines.map(line => line.split("=").toList.map(_.trim)).map(lst => List((key, FastParser.parseExpression(lst.last)))).toList
                         }
                         else{
                             throw new Exception(f"File $filePath does not exist")
@@ -1897,7 +1897,7 @@ object Utils{
                         if(file.exists()){
                             // run the script and get the output
                             val output = Process(filePath).!!
-                            output.split("\n").map(line => line.trim).map(lst => List((key, Parser.parseExpression(lst)))).toList
+                            output.split("\n").map(line => line.trim).map(lst => List((key, FastParser.parseExpression(lst)))).toList
                         }
                         else{
                             throw new Exception(f"File $filePath does not exist")

@@ -244,7 +244,7 @@ class ConcreteFunction(context: Context, _contextName: String, name: String, arg
 
     def compile():Unit={
         if (!wasCompiled){
-            val suf = sl.Compiler.compile(body.unBlockify(), Meta(false, false, true))(context.push(name, this))
+            val suf = sl.Compiler.compile(body.unBlockify(), Meta(false, !topLevel, true))(context.push(name, this))
             content = content ::: suf/* ::: clearObject()(context.push(name, this))*/
             wasCompiled = true
         }
@@ -265,7 +265,6 @@ class ConcreteFunction(context: Context, _contextName: String, name: String, arg
         _needCompiling && !wasCompiled
     }
     def markAsUsed():Unit = {
-        println(f"Marking function $fullName as used: $topLevel")
         _needCompiling = true
         if (needCompiling()) {
             context.addFunctionToCompile(this)

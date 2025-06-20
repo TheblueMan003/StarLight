@@ -272,7 +272,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
         val r = root
         r.synchronized{
             if (importFile(lib)){
-                Compiler.compile(Utils.getLib(lib).get, sl.Meta(false, false))(root)
+                Compiler.compile(Utils.getLib(lib).get, sl.Meta(false, true))(root)
             }
         }
     }

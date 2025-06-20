@@ -181,12 +181,6 @@ class object{
         }
     }
 
-    if (Compiler.isJava()){
-        virtual string toString(){
-            return "object@" + __ref
-        }
-    }
-
     static lazy object __initInstance(mcobject clazz, mcobject entity = minecraft:marker){
         __totalRefCount++
         if (Compiler.isJava()){

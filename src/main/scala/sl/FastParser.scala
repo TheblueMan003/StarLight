@@ -128,7 +128,7 @@ object FastParser {
     def identLazy2[$: P]: P[String] = P(identLazy.rep(1, sep = ".").map(_.mkString(".")))
 
     def identLazyCMD[$: P]: P[String] = P(subident.rep(1, sep = ".").map(_.mkString(".")))
-    def identTag[$: P]: P[String] = P("@".! ~~ identLazy2).map {
+    def identTag[$: P]: P[String] = P("@".! ~~ identLazy2).filter(_._2.size >= 2).map {
         case (tag, ident) => tag + ident
     }
 
@@ -136,13 +136,13 @@ object FastParser {
 
     def floatValue[$: P]: P[Double] = P(CharIn("0-9").rep(1) ~ "." ~ CharIn("0-9").rep(1)).!.map(_.toDouble)
     
-    def block[$: P]: P[Instruction] = P(Index ~ "{" ~/ instruction.rep(sep=";".?) ~ "}").map {
+    def block[$: P]: P[Instruction] = P(Index ~ "{" ~ instruction.rep ~ "}").map {
         case (index, instructions) => InstructionBlock(instructions.toList).setPos(index)
     }
-    def classBlock[$: P]: P[Instruction] = P(Index ~ "{" ~/ classInstruction.rep(sep=";".?) ~ "}").map {
+    def classBlock[$: P]: P[Instruction] = P(Index ~ "{" ~ classInstruction.rep ~ "}").map {
         case (index, instructions) => InstructionBlock(instructions.toList).setPos(index)
     }
-    def blockExtension[$: P]: P[Instruction] = P(Index ~ "{" ~/ (functionDecl | optFunctionDecl).rep(sep=";".?) ~ "}").map {
+    def blockExtension[$: P]: P[Instruction] = P(Index ~ "{" ~ (functionDecl | optFunctionDecl).rep ~ "}").map {
         case (index, instructions) => InstructionBlock(instructions.toList).setPos(index)
     }
     def keyword_or_subident[$: P]: P[String] = P(
@@ -214,7 +214,7 @@ object FastParser {
         case None           =>  List()
         case Some(value)    =>  value.toList
     }
-    def instruction[$: P]: P[Instruction] = P(positioned
+    def instruction2[$: P]: P[Instruction] = P(positioned
      (timeline
       | functionDecl
       | functionCall
@@ -268,6 +268,7 @@ object FastParser {
       | constructorCall.map { case c => FreeConstructorCall(c) }
       | destructorCall)
     )
+    def instruction[$: P]: P[Instruction] = instruction2 ~ ";".?
 
     def classInstruction[$: P]: P[Instruction] = P(positioned((functionDecl 
         | constructorDecl
@@ -454,7 +455,7 @@ object FastParser {
         }
     }
     def continuation[$: P]: P[Instruction] = P(
-        (";".? ~ instruction.rep(sep = ";".?)).map {
+        (";".? ~ instruction.rep).map {
             case instrs => InstructionList(instrs.toList)
         }
     )
@@ -787,7 +788,7 @@ object FastParser {
         )
     )
     def forLoop[$: P]: P[Instruction] = positioned(
-        (keywordD("for") ~ "(" ~ instruction ~ ";" ~ exprNoTuple ~ ";" ~ instruction ~ ")" ~ instruction).map
+        (keywordD("for") ~ "(" ~ instruction2 ~ ";" ~ exprNoTuple ~ ";" ~ instruction2 ~ ")" ~ instruction).map
         (p =>
             InstructionBlock(
             List(
@@ -896,7 +897,7 @@ object FastParser {
     def blocktag[$: P]: P[Instruction] = {
         positioned(
         (doc ~ modifier("blocktag") ~ keywordD("blocktag") ~ identLazy2 ~ "{" ~ tagentry.rep(sep = ",")  ~ ",".? ~ "}") .map { 
-            case (d, m, n, c) =>{
+            case (d, m, n, c) => {
                 TagDecl(n, c.toList, m.withDoc(d), objects.BlockTag)
             }
         }
@@ -936,7 +937,7 @@ object FastParser {
       EnumValue(p._1, p._2.getOrElse(Seq()).toList)
     )
     def varAssignment[$: P]: P[Instruction] = positioned(
-        (((selector ~ ".").? ~ identLazy2).rep(1, sep=",") ~ assignmentOp ~/ expr).map {
+        (((selector ~ ".").? ~ identLazy2).rep(1, sep=",") ~ assignmentOp ~ expr).map {
         case (id, op, expr) => {
             val identifiers = id.map(p => {
                 (Identifier.fromString(p._2), p._1.getOrElse(Selector.self))
@@ -1010,7 +1011,7 @@ object FastParser {
 
     def varDeclaration[$: P]: P[VariableDecl] = positioned(
         (doc ~ modifier("variable") ~ types ~ identLazy.rep(1, sep= ",") ~ (
-        assignmentOp ~/ expr
+        assignmentOp ~ expr
         ).?).map {
         case (doc, mod1, typ, names, expr) => {
             val mod = mod1.withDoc(doc)
@@ -1144,9 +1145,9 @@ object FastParser {
          | selectorFilterInnerValue
     def selectorFilter[$: P]: P[(String, SelectorFilterValue)] =
         (identLazy ~ "=" ~ selectorFilterValue).map { p => (p._1, p._2) }
-    def selector[$: P]: P[Selector] = ("@".! ~ (keywordD("a") | keywordD("s") | keywordD("e") | keywordD("p") | keywordD("r")).! ~ (
-        "[" ~ selectorFilter.rep(sep=",") ~ "]"
-    ).?).map { p => Selector.parse(p._1 + p._2, p._3.getOrElse(Seq()).toList) }
+    def selector[$: P]: P[Selector] = ("@".! ~ (keywordD("a") | keywordD("s") | keywordD("e") | keywordD("p") | keywordD("r")).! ~ 
+    ("[" ~ selectorFilter.rep(sep=",") ~ "]").?)
+        .map { p => Selector.parse(p._1 + p._2, p._3.getOrElse(Seq()).toList) }
     def selectorStr[$: P]: P[String] = (selector.map(_.toString()))
     def stringLit2[$: P]: P[String] = stringLit.map { p => p.replaceAllLiterally("◘", "\\\"") }
     def anyWord[$: P]: P[String] = ident
@@ -1250,7 +1251,7 @@ object FastParser {
         | keywordD("true")  .map(_ => BoolValue(true))
         | keywordD("false") .map(_ => BoolValue(false))
         | keywordD("null")  .map(_ => NullValue)
-        | selector.map (SelectorValue(_))
+        | selector.map(SelectorValue(_))
         | singleVarAssignment .map { p =>
             SequenceValue(p, VariableValue(p.name.head._1.left.get, p.name.head._2))
         }
@@ -1532,7 +1533,7 @@ object FastParser {
     }
     def doc[$: P]: P[Option[String]] = ("???" ~ stringLit ~ "???").?
     def program[$: P]: P[Instruction] = positioned(
-        instruction.rep(sep = ";".?).map(i => InstructionList(i.toList))
+        instruction.rep.map(i => InstructionList(i.toList))
     )
   
 
