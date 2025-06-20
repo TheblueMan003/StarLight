@@ -21,7 +21,8 @@ object Compiler{
 
         val buffer = new ArrayBuffer[IRFile]()
 
-        context.getAllFunction().map(_._2).filter(_.exists()).foreach(fct => buffer += fct.getIRFile())
+        var changed = true
+        context.getAllFunction().map(_._2).filter(_.exists()).foreach(fct => buffer ++= fct.getIRFile())
         context.getAllJsonFiles().filter(f => f.exists() && f.isDatapack()).foreach(fct => buffer += fct.getIRFile())
         context.getAllBlockTag().filter(_.exists()).foreach(fct => buffer += fct.getIRFile())
         context.getAllPredicates().flatMap(_.getIRFiles()).foreach(fct => buffer += fct)
@@ -106,13 +107,48 @@ object Compiler{
                             func.generateArgument()(context)
                         }
                         else{
-                            val func = new ConcreteFunction(context, context.getPath()+"."+name, fname, args, context.getType(typ), modifier, block.unBlockify(), meta.firstPass)
+                            val func = new ConcreteFunction(context, context.getPath()+"."+name, fname, args, context.getType(typ), modifier, block.unBlockify(), !meta.isLib)
                             func.overridedFunction = if ((modifier.isOverride)) context.getFunction(Identifier.fromString(name), args.map(_.typ), List(), typ, false, false) else null
                             context.addFunction(name, func)
                             func.generateArgument()(context)
                         }
                     }
                     List()
+                }
+                case Timeline(name, elments) => {
+                    val func = new ConcreteFunction(context, context.getPath()+"."+name, name, List(), VoidType, Modifier.newPublic(), TimelineInner(elments), meta.firstPass)
+                    context.addFunction(name, func)
+                    func.generateArgument()(context)
+                    List()
+                }
+                case TimelineInner(elments) => {
+                    if (elments.isEmpty) return List()
+                    val head = elments.head
+                    head match{
+                        case DelayTimelineElement(time, instr) => {
+                            val uargs = List(time, LambdaValue(List(), InstructionList(List(instr, TimelineInner(elments.tail))), context))
+                            val (fct,cargs) = context.getFunction(Identifier.fromString("__sleep__"), uargs, List(), VoidType)
+                            (fct, cargs).call()
+                        }
+                        case EventTimelineElement(time, instr) => {
+                            val uargs = List(time, LambdaValue(List(), InstructionList(List(instr, TimelineInner(elments.tail))), context))
+                            val (fct,cargs) = context.getFunction(Identifier.fromString("__wait_for__"), uargs, List(), VoidType)
+                            (fct, cargs).call()
+                        }
+                        case UntilTimelineElement(time, instr) => {
+                            val uargs = List(time, LambdaValue(List(), instr, context), LambdaValue(List(), TimelineInner(elments.tail), context))
+                            val (fct,cargs) = context.getFunction(Identifier.fromString("__until__"), uargs, List(), VoidType)
+                            (fct, cargs).call()
+                        }
+                        case ForLengthTimelineElement(time, instr) => {
+                            val uargs = List(time, LambdaValue(List(), instr,context), LambdaValue(List(), TimelineInner(elments.tail), context))
+                            val (fct,cargs) = context.getFunction(Identifier.fromString("__async_repeat__"), uargs, List(), VoidType)
+                            (fct, cargs).call()
+                        }
+                        case DirectTimelineElement(instruction) => {
+                            compile(InstructionList(List(instruction, TimelineInner(elments.tail))), meta)
+                        }
+                    }
                 }
                 case OptionalFunctionDecl(name, source, library, typ, args, typeArgs, modifier) => {
                     context.addFunction(

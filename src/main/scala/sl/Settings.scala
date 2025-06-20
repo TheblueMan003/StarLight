@@ -47,7 +47,7 @@ class SettingsContext(){
     var target: Target = MCJava
     var obfuscate = false
     var debug = false
-    var allFunction = true
+    var allFunction = false
     var lazyTypeChecking = false
     var macroConvertToLazy = true
 

@@ -22,17 +22,9 @@ private lazy val colorCodeMap = Utils.getConfig("color.csv")
 
 object Print{
     def convertMinecraftColorCodes(input: String): List[TupleValue] = {
-        val pattern = "§[0-9a-f]".r
-        val parts = pattern.split(input)
-        
-        val colorCodes = pattern.findAllIn(input).toList
-
-        val tuples = for ((text, code) <- parts.zipAll(colorCodes, "", "")) yield {
-        val colorName = colorCodeMap.getOrElse(code.substring(1), "reset")
-        (text, colorName)
+        FastParser.parse_string_color_formated(input).map{
+            case TupleValue(List(StringValue(color), StringValue(text))) => TupleValue(List(StringValue(text), StringValue(colorCodeMap.getOrElse(color, "reset"))))
         }
-
-        tuples.toList.map{case (a,b) => TupleValue(List(StringValue(a), StringValue(b)))}
     }
     def toRawJson(expr: List[Expression])(implicit ctx: Context): (List[IRTree], RawJsonValue) = {
         val res = expr.map(toRawJson(_, true))
@@ -55,7 +47,7 @@ object Print{
             case TagValue(value) => (List(), List(PrintString(f"#$value", col, mod)))
             case LinkedTagValue(value) => (List(), List(PrintString(f"#$value", col, mod)))
             case StringValue(value) => 
-                if (value.contains("§")){
+                if (value.contains("§") && Settings.target == MCJava){
                     val tuples = TupleValue(convertMinecraftColorCodes(value))
                     toRawJson(tuples)
                 }

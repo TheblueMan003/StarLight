@@ -225,6 +225,35 @@ case class DotCall(val left: Expression, val right: FunctionCall) extends Instru
   override def toString(): String = f"$left.$right"
 }
 
+trait TimelineElement extends CPositionable {
+  def instruction: Instruction
+}
+case class DelayTimelineElement(val time: Expression, val instruction: Instruction) extends TimelineElement {
+  override def toString(): String = f"delay($time)$instruction"
+}
+case class ForLengthTimelineElement(val time: Expression, val instruction: Instruction) extends TimelineElement {
+  override def toString(): String = f"for($time)$instruction"
+}
+case class UntilTimelineElement(val time: Expression, val instruction: Instruction) extends TimelineElement {
+  override def toString(): String = f"until($time)$instruction"
+}
+case class WhileTimelineElement(val time: Expression, val instruction: Instruction) extends TimelineElement {
+  override def toString(): String = f"while($time)$instruction"
+}
+case class EventTimelineElement(val event: Expression, val instruction: Instruction) extends TimelineElement {
+  override def toString(): String = f"event($event)$instruction"
+}
+case class DirectTimelineElement(val instruction: Instruction) extends TimelineElement {
+  override def toString(): String = f"$instruction"
+}
+case class Timeline(val name: String, val elments: List[TimelineElement]) extends Instruction{
+  override def toString(): String = f"timeline {\n${elments.mkString("\n")}\n}"
+}
+case class TimelineInner(val elments: List[TimelineElement]) extends Instruction{
+  override def toString(): String = f"timeline {\n${elments.mkString("\n")}\n}"
+}
+
+
 case class JSONFile(val name: String, val json: Expression, val modifier: Modifier) extends Instruction {
   override def toString() = f"jsonfile $name"
 }

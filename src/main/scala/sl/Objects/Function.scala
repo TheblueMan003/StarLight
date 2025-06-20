@@ -158,15 +158,19 @@ abstract class Function(context: Context, val contextName: String, name: String,
     def getName(): String
     def getContent(): List[IRTree]
     def getFunctionType() = FuncType(arguments.map(a => a.typ), typ)
-    def getIRFile(): IRFile ={
-        IRFile(getName(), fullName, getContent(), getExtraContextPathComments() ::: modifiers.getDocAsIR() ::: getExtraComments(), false, 
-        !(modifiers.isTicking ||
-          modifiers.isLoading || 
-          modifiers.protection == Protection.Public || 
-          stringUsed || 
-          (!Settings.optimizeAllowRemoveProtected && modifiers.protection == Protection.Protected && !wasMovedToBlock))
-        , modifiers.isMacro
-          )
+    def getIRFile(): Option[IRFile] = {
+        val content = getContent()
+        if (content.isEmpty) None
+        else {   
+            Some(IRFile(getName(), fullName, getContent(), getExtraContextPathComments() ::: modifiers.getDocAsIR() ::: getExtraComments(), false, 
+                !(modifiers.isTicking ||
+                modifiers.isLoading || 
+                modifiers.protection == Protection.Public || 
+                stringUsed || 
+                (!Settings.optimizeAllowRemoveProtected && modifiers.protection == Protection.Protected && !wasMovedToBlock))
+                , modifiers.isMacro
+            ))
+        }
     }
     def getExtraContextPathComments(): List[IRTree] = {
         if (Settings.exportContextPath){
@@ -261,6 +265,7 @@ class ConcreteFunction(context: Context, _contextName: String, name: String, arg
         _needCompiling && !wasCompiled
     }
     def markAsUsed():Unit = {
+        println(f"Marking function $fullName as used: $topLevel")
         _needCompiling = true
         if (needCompiling()) {
             context.addFunctionToCompile(this)

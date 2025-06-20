@@ -63,6 +63,58 @@ def lazy __sleep__(int time, void=>void action){
     import cmd.schedule as schedule
     schedule.add(time, action)
 }
+def lazy __async_repeat__(int time, void=>void action, void=>void next){
+    var counter = 0
+    def loop(){
+        counter++
+        if (counter < time){
+            action()
+            __sleep__(1, loop)
+        }
+        else{
+            next()
+        }
+    }
+    loop()
+}
+def lazy __until__(bool cond, void=>void action, void=>void next){
+    import cmd.schedule as schedule
+    def loop(){
+        action()
+        if (cond){
+            next()
+        }
+        else{
+            schedule.add(1, loop)
+        }
+    }
+    loop()
+}
+def lazy __while__(bool cond, void=>void action, void=>void next){
+    import cmd.schedule as schedule
+    def loop(){
+        action()
+        if (cond){
+            schedule.add(1, loop)
+        }
+        else{
+            next()
+        }
+    }
+    loop()
+}
+def lazy __wait_for__(bool cond, void=>void action){
+    import cmd.schedule as schedule
+    def loop(){
+        if (cond){
+            action()
+        }
+        else{
+            schedule.add(1, loop)
+        }
+    }
+    loop()
+}
 
 def lazy aligned(void=>void fct){
     align("xyz")at(~0.5 ~ ~0.5)fct()

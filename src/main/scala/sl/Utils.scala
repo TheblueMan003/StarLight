@@ -88,6 +88,8 @@ object Utils{
             case JSONFile(name, json, mod) => instr
             case Import(lib, value, alias) => instr
             case Throw(expr) => instr
+            case Timeline(name, elments) => instr
+            case TimelineInner(elments) => instr
             case Try(block, catchBlock, finallyBlock) => Try(substReturn(block, to), substReturn(catchBlock, to), substReturn(finallyBlock, to))
             
             case InstructionList(list) => InstructionList(list.map(substReturn(_, to)))
@@ -139,6 +141,16 @@ object Utils{
     })
 
 
+    def subst(elm: TimelineElement, from: Identifier, to: Identifier): TimelineElement = positioned(elm, {
+        elm match {
+            case EventTimelineElement(time, instruction)        => EventTimelineElement(subst(time, from, to), subst(instruction, from, to))
+            case DelayTimelineElement(time, instruction)        => DelayTimelineElement(subst(time, from, to), subst(instruction, from, to))  
+            case ForLengthTimelineElement(time, instruction)    => ForLengthTimelineElement(subst(time, from, to), subst(instruction, from, to))
+            case UntilTimelineElement(time, instruction)        => UntilTimelineElement(subst(time, from, to), subst(instruction, from, to))
+            case WhileTimelineElement(time, instruction)        => WhileTimelineElement(subst(time, from, to), subst(instruction, from, to))
+            case DirectTimelineElement(instruction)             => DirectTimelineElement(subst(instruction, from, to))
+        }
+    }) 
     def subst(instr: Instruction, from: Identifier, to: Identifier): Instruction = positioned(instr,{
         instr match{
             case Package(name, block) => Package(name, subst(block, from, to))
@@ -157,6 +169,8 @@ object Utils{
             case Try(block, catchBlock, finallyBlock) => Try(subst(block, from, to), subst(catchBlock, from, to), subst(finallyBlock, from, to))
             case JSONFile(name, json, mod) => instr
             case Import(lib, value, alias) => instr
+            case Timeline(name, elments) => Timeline(name, elments.map(subst(_, from, to)))
+            case TimelineInner(elments) => TimelineInner(elments.map(subst(_, from, to)))
             
             case InstructionList(list) => InstructionList(list.map(subst(_, from, to)))
             case InstructionBlock(list) => InstructionBlock(list.map(subst(_, from, to)))
@@ -246,6 +260,16 @@ object Utils{
     })
 
 
+    def subst(elm: TimelineElement, from: String, to: String): TimelineElement = positioned(elm, {
+        elm match {
+            case EventTimelineElement(time, instruction)        => EventTimelineElement(subst(time, from, to), subst(instruction, from, to))
+            case DelayTimelineElement(time, instruction)        => DelayTimelineElement(subst(time, from, to), subst(instruction, from, to))  
+            case ForLengthTimelineElement(time, instruction)    => ForLengthTimelineElement(subst(time, from, to), subst(instruction, from, to))
+            case UntilTimelineElement(time, instruction)        => UntilTimelineElement(subst(time, from, to), subst(instruction, from, to))
+            case WhileTimelineElement(time, instruction)        => WhileTimelineElement(subst(time, from, to), subst(instruction, from, to))
+            case DirectTimelineElement(instruction)             => DirectTimelineElement(subst(instruction, from, to))
+        }
+    }) 
     def subst(instr: Instruction, from: String, to: String): Instruction = positioned(instr,{
         instr match{
             case Package(name, block) => Package(name.replaceAllLiterally(from, to), subst(block, from, to))
@@ -284,6 +308,8 @@ object Utils{
             case EnumDecl(name, fields, values, modifier) => EnumDecl(name.replaceAllLiterally(from, to), fields, values.map(v => EnumValue(v.name.replaceAllLiterally(from, to), v.fields.map(subst(_, from, to)))), modifier)
             case VariableDecl(name, _type, modifier, op, expr) => VariableDecl(name.map(_.replaceAllLiterally(from, to)), _type, modifier, op, subst(expr, from, to))
             case JSONFile(name, json, mod) => JSONFile(name.replaceAllLiterally(from, to), subst(json, from, to), mod)
+            case Timeline(name, elments) => Timeline(name.replaceAllLiterally(from, to), elments.map(subst(_, from, to)))
+            case TimelineInner(elments) => TimelineInner(elments.map(subst(_, from, to)))
 
             case Throw(expr) => Throw(subst(expr, from, to))
             case Try(instr, catchBlock, finallyBlock) => Try(subst(instr, from, to), subst(catchBlock, from, to), subst(finallyBlock, from, to))
@@ -396,6 +422,16 @@ object Utils{
             case other => other
         }
     }
+    def subst(elm: TimelineElement, from: String, to: Expression): TimelineElement = positioned(elm, {
+        elm match {
+            case EventTimelineElement(time, instruction)        => EventTimelineElement(subst(time, from, to), subst(instruction, from, to))
+            case DelayTimelineElement(time, instruction)        => DelayTimelineElement(subst(time, from, to), subst(instruction, from, to))  
+            case ForLengthTimelineElement(time, instruction)    => ForLengthTimelineElement(subst(time, from, to), subst(instruction, from, to))
+            case UntilTimelineElement(time, instruction)        => UntilTimelineElement(subst(time, from, to), subst(instruction, from, to))
+            case WhileTimelineElement(time, instruction)        => WhileTimelineElement(subst(time, from, to), subst(instruction, from, to))
+            case DirectTimelineElement(instruction)             => DirectTimelineElement(subst(instruction, from, to))
+        }
+    }) 
     def subst(instr: Instruction, from: String, to: Expression): Instruction = positioned(instr, {
         instr match{
             case Package(name, block) => Package(name, subst(block, from, to))
@@ -427,6 +463,9 @@ object Utils{
             case VariableDecl(name, _type, modifier, op, expr) => VariableDecl(name, subst(_type, from, to), modifier, op, subst(expr, from, to))
             case Throw(expr) => Throw(subst(expr, from, to))
             case Try(instr, catchBlock, finallyBlock) => Try(subst(instr, from, to), subst(catchBlock, from, to), subst(finallyBlock, from, to))
+            case Timeline(name, elments) => Timeline(name, elments.map(subst(_, from, to)))
+            case TimelineInner(elments) => TimelineInner(elments.map(subst(_, from, to)))
+
 
             case InstructionList(list) => InstructionList(list.map(subst(_, from, to)))
             case InstructionBlock(list) => InstructionBlock(list.map(subst(_, from, to)))
@@ -484,6 +523,8 @@ object Utils{
             case ForGenerate(key, provider, instr) => ForGenerate(key, provider, rmFunctions(instr))
             case ForEach(key, provider, instr) => ForEach(key, provider, rmFunctions(instr))
             case Import(lib, value, alias) => instr
+            case Timeline(name, elments) => instr
+            case TimelineInner(elments) => instr
 
             case InstructionList(list) => InstructionList(list.map(rmFunctions(_)))
             case InstructionBlock(list) => InstructionBlock(list.map(rmFunctions(_)))
@@ -549,6 +590,16 @@ object Utils{
         }
     }
 
+    def fix(elm: TimelineElement)(implicit context: Context, ignore: Set[Identifier]): TimelineElement = {
+        elm match {
+            case EventTimelineElement(event, instruction)       => EventTimelineElement(event, fix(instruction))
+            case DelayTimelineElement(time, instruction)        => DelayTimelineElement(time, fix(instruction))  
+            case ForLengthTimelineElement(time, instruction)    => ForLengthTimelineElement(time, fix(instruction))
+            case UntilTimelineElement(time, instruction)        => UntilTimelineElement(time, fix(instruction))
+            case WhileTimelineElement(time, instruction)        => WhileTimelineElement(time, fix(instruction))
+            case DirectTimelineElement(instruction)             => DirectTimelineElement(fix(instruction))
+        }
+    }
     def fix(instr: Instruction)(implicit context: Context, ignore: Set[Identifier]): Instruction = positioned(instr, {
         instr match{
             case Package(name, block) => Package(name, fix(block))
@@ -563,6 +614,8 @@ object Utils{
             case TagDecl(name, values, modifier, typ) => TagDecl(name, values.map(fix(_)), modifier, typ)
             case ForGenerate(key, provider, instr) => ForGenerate(key, fix(provider), fix(instr))
             case ForEach(key, provider, instr) => ForEach(key, fix(provider), fix(instr))
+            case Timeline(name, elments) => Timeline(name, elments.map(fix))
+            case TimelineInner(elments) => TimelineInner(elments.map(fix))
             case Import(lib, value, alias) => instr
 
             case InstructionList(list) => {

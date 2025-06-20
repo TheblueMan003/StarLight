@@ -15,6 +15,7 @@ import sys.process._
 import java.util.Locale
 import scala.collection.mutable
 import java.awt.RenderingHints.Key
+import sl.MappingTool.FromTileMap
 
 object Main {
   var version = List(0, 12, 1)
@@ -172,6 +173,7 @@ object Main {
             DataPackBuilder.clearCache()
             ResourcePackBuilder.clearCache()
             Downloader.clearCache()
+            FromTileMap.clear_cache()
             Reporter.ok("Cache cleared!")
           }
           case "updateconfig" => {

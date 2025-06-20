@@ -575,10 +575,15 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
 
 
     def getFunction(identifier: Identifier, args: List[Expression], typeargs: List[Type], output: Type, concrete: Boolean = false, silent: Boolean = false): (Function, List[Expression]) = {
-        tryGetFunction(identifier, args, typeargs, output, concrete, silent) match{
+        val ret = tryGetFunction(identifier, args, typeargs, output, concrete, silent) match{
             case Some(value) => value
             case None => throw new FunctionNotFoundException(f"Unknown function: $identifier in context: $path")
         }
+        ret match {
+            case (c: ConcreteFunction, _) => c.markAsUsed()
+            case _ => { }
+        }
+        ret
     }
     def tryGetFunction(identifier: Identifier, args: List[Expression], typeargs: List[Type], output: Type, concrete: Boolean = false, silent: Boolean = false): Option[(Function, List[Expression])] = {
         if (identifier.toString().startsWith("@")){

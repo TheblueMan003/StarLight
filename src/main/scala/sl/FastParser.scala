@@ -78,7 +78,8 @@ object FastParser {
         "assert",
         "operator",
         "break",
-        "delete"
+        "delete",
+        "timeline"
     )
 
     def keywordD[$: P](name: String): P[Unit] = P(CharIn("a-z", "A-Z", "_") ~~ CharIn("a-z", "A-Z", "0-9", "_").repX ~~ !CharIn("a-z", "A-Z", "0-9", "_")).!.filter(name == _).map(_ => ())
@@ -127,7 +128,7 @@ object FastParser {
     def identLazy2[$: P]: P[String] = P(identLazy.rep(1, sep = ".").map(_.mkString(".")))
 
     def identLazyCMD[$: P]: P[String] = P(subident.rep(1, sep = ".").map(_.mkString(".")))
-    def identTag[$: P]: P[String] = P(("@" | "@e" | "@a" | "@s" | "@r" | "@p").! ~~ identLazy2).map {
+    def identTag[$: P]: P[String] = P("@".! ~~ identLazy2).map {
         case (tag, ident) => tag + ident
     }
 
@@ -135,13 +136,13 @@ object FastParser {
 
     def floatValue[$: P]: P[Double] = P(CharIn("0-9").rep(1) ~ "." ~ CharIn("0-9").rep(1)).!.map(_.toDouble)
     
-    def block[$: P]: P[Instruction] = P(Index ~ "{" ~ instruction.rep ~ "}").map {
+    def block[$: P]: P[Instruction] = P(Index ~ "{" ~/ instruction.rep(sep=";".?) ~ "}").map {
         case (index, instructions) => InstructionBlock(instructions.toList).setPos(index)
     }
-    def classBlock[$: P]: P[Instruction] = P(Index ~ "{" ~ classInstruction.rep ~ "}").map {
+    def classBlock[$: P]: P[Instruction] = P(Index ~ "{" ~/ classInstruction.rep(sep=";".?) ~ "}").map {
         case (index, instructions) => InstructionBlock(instructions.toList).setPos(index)
     }
-    def blockExtension[$: P]: P[Instruction] = P(Index ~ "{" ~ (functionDecl | optFunctionDecl).rep ~ "}").map {
+    def blockExtension[$: P]: P[Instruction] = P(Index ~ "{" ~/ (functionDecl | optFunctionDecl).rep(sep=";".?) ~ "}").map {
         case (index, instructions) => InstructionBlock(instructions.toList).setPos(index)
     }
     def keyword_or_subident[$: P]: P[String] = P(
@@ -214,7 +215,8 @@ object FastParser {
         case Some(value)    =>  value.toList
     }
     def instruction[$: P]: P[Instruction] = P(positioned
-     (functionDecl
+     (timeline
+      | functionDecl
       | functionCall
       | dotFunctionCall
       | selectorFunctionCall
@@ -292,6 +294,62 @@ object FastParser {
         | predicate
         | blocktag)
         )
+    )
+
+    def timeline_time[$: P]: P[Expression] = positioned(
+        ((exprNoTuple ~ (keywordD("hours") | keywordD("h"))).? ~
+        (exprNoTuple ~ (keywordD("minutes") | keywordD("m"))).? ~ 
+        (exprNoTuple ~ (keywordD("seconds") | keywordD("s"))).? ~
+        (exprNoTuple ~ (keywordD("ticks") | keywordD("t")).?).?).map{
+            case (hours, minutes, seconds, ticks) => {
+                val time = List(
+                    hours  .map(BinaryOperation("*", _, IntValue(20*60*60))), 
+                    minutes.map(BinaryOperation("*", _, IntValue(20*60))), 
+                    seconds.map(BinaryOperation("*", _, IntValue(20))), 
+                    ticks).flatten
+
+                if (time.isEmpty) IntValue(0)
+                else time.reduceLeft((a, b) => BinaryOperation("+", a, b))
+            }
+        }
+    )
+    def timeline_event[$: P]: P[TimelineElement] = positioned(
+        (keywordD("event") ~ "(" ~ expr ~ ")" ~ instruction).map {
+            case (expr, instr) => EventTimelineElement(expr, instr)
+        }
+    )
+    def timeline_for[$: P]: P[TimelineElement] = positioned(
+        (keywordD("for") ~ "(" ~ timeline_time ~ ")" ~ instruction).map {
+            case (expr, instr) => ForLengthTimelineElement(expr, instr)
+        }
+    )
+    def timeline_after[$: P]: P[TimelineElement] = positioned(
+        (keywordD("after") ~ "(" ~ timeline_time ~ ")" ~ instruction).map {
+            case (expr, instr) => DelayTimelineElement(expr, instr)
+        }
+    )
+    def timeline_until[$: P]: P[TimelineElement] = positioned(
+        (keywordD("until") ~ "(" ~ expr ~ ")" ~ instruction).map {
+            case (expr, instr) => UntilTimelineElement(expr, instr)
+        }
+    )
+    def timeline_while[$: P]: P[TimelineElement] = positioned(
+        (keywordD("while") ~ "(" ~ expr ~ ")" ~ instruction).map {
+            case (expr, instr) => WhileTimelineElement(expr, instr)
+        }
+    )
+    def timeline_direct[$: P]: P[TimelineElement] = positioned(
+        (instruction).map {
+            case (instr) => DirectTimelineElement(instr)
+        }
+    )
+    def timeline_elements[$: P]: P[TimelineElement] = positioned(
+        (timeline_event | timeline_for | timeline_after | timeline_until | timeline_while | timeline_direct)
+    )
+    def timeline[$: P]: P[Instruction] = positioned(
+        (keywordD("timeline") ~ identLazy ~ "{" ~ timeline_elements.rep ~ "}").map {
+            case (name, elements) => Timeline(name, elements.toList)
+        }
     )
     def functionDecl[$: P]: P[FunctionDecl] = {
         (doc ~ keywordD("def") ~ modifier("function_short") ~ arguments ~ instruction).map { 
@@ -878,7 +936,7 @@ object FastParser {
       EnumValue(p._1, p._2.getOrElse(Seq()).toList)
     )
     def varAssignment[$: P]: P[Instruction] = positioned(
-        (((selector ~ ".").? ~ identLazy2).rep(1, sep=",") ~ assignmentOp ~ expr).map {
+        (((selector ~ ".").? ~ identLazy2).rep(1, sep=",") ~ assignmentOp ~/ expr).map {
         case (id, op, expr) => {
             val identifiers = id.map(p => {
                 (Identifier.fromString(p._2), p._1.getOrElse(Selector.self))
@@ -952,7 +1010,7 @@ object FastParser {
 
     def varDeclaration[$: P]: P[VariableDecl] = positioned(
         (doc ~ modifier("variable") ~ types ~ identLazy.rep(1, sep= ",") ~ (
-        assignmentOp ~ expr
+        assignmentOp ~/ expr
         ).?).map {
         case (doc, mod1, typ, names, expr) => {
             val mod = mod1.withDoc(doc)
@@ -1054,7 +1112,7 @@ object FastParser {
             LambdaValue(List(a), i, null).setPos(index)
     ))
     def lambda2[$: P]: P[Expression] = P((Index ~ 
-        "(" ~ identLazy2.rep(1, sep=",") ~")" ~ "=>" ~ instruction).map((index,a,i) =>
+        "(" ~ identLazy2.rep(sep=",") ~")" ~ "=>" ~ instruction).map((index,a,i) =>
             LambdaValue(a.toList, i, null).setPos(index)
     ))
     def sfField[$: P]: P[(String, SelectorFilterValue)] = P((ident ~ "=" ~ selectorFilterInnerValue).map(x => (x._1, x._2)))
@@ -1086,9 +1144,9 @@ object FastParser {
          | selectorFilterInnerValue
     def selectorFilter[$: P]: P[(String, SelectorFilterValue)] =
         (identLazy ~ "=" ~ selectorFilterValue).map { p => (p._1, p._2) }
-    def selector[$: P]: P[Selector] = (("@a" | "@s" | "@e" | "@p" | "@r").! ~ (
-        "[" ~ selectorFilter.rep(1, sep=",") ~ "]"
-    ).?).map { p => Selector.parse(p._1, p._2.getOrElse(Seq()).toList) }
+    def selector[$: P]: P[Selector] = ("@".! ~ (keywordD("a") | keywordD("s") | keywordD("e") | keywordD("p") | keywordD("r")).! ~ (
+        "[" ~ selectorFilter.rep(sep=",") ~ "]"
+    ).?).map { p => Selector.parse(p._1 + p._2, p._3.getOrElse(Seq()).toList) }
     def selectorStr[$: P]: P[String] = (selector.map(_.toString()))
     def stringLit2[$: P]: P[String] = stringLit.map { p => p.replaceAllLiterally("◘", "\\\"") }
     def anyWord[$: P]: P[String] = ident
@@ -1121,7 +1179,7 @@ object FastParser {
         BinaryOperation("+", StringValue("-"), VariableValue(s))
       }
     )
-    def relCoordinate[$: P]: P[Expression] = P("~" ~~ validCordNumber1.?).map {
+    def relCoordinate[$: P]: P[Expression] = P("~" ~~ validCordNumber2.?).map {
         case Some(num) => BinaryOperation("+", StringValue("~"), num)
         case None => StringValue("~")
     } | validCordNumber2
@@ -1192,6 +1250,7 @@ object FastParser {
         | keywordD("true")  .map(_ => BoolValue(true))
         | keywordD("false") .map(_ => BoolValue(false))
         | keywordD("null")  .map(_ => NullValue)
+        | selector.map (SelectorValue(_))
         | singleVarAssignment .map { p =>
             SequenceValue(p, VariableValue(p.name.head._1.left.get, p.name.head._2))
         }
@@ -1206,7 +1265,6 @@ object FastParser {
             BinaryOperation("in", SelectorValue(sel), VariableValue(id))
         }
         | constructorCall
-        | selector.map (SelectorValue(_))
         | exprArray
         | identifierExpr
         | "(" ~ expr ~ ")"
@@ -1511,6 +1569,29 @@ object FastParser {
     }
     def globalProgramParse[$: P]: P[Instruction] = {
         globalParse(program)
+    }
+
+    def string_color_formated[$: P]: P[TupleValue] = {
+        ("§" ~ AnyChar.! ~ CharsWhile(c => c != '§').rep(0).!).map { case (c, s) => TupleValue(List(StringValue(c), StringValue(s))) }
+    }
+    def multi_string_color_formated[$: P]: P[List[TupleValue]] = {
+        (Start ~ CharsWhile(c => c != '§', min = 0).! ~ string_color_formated.rep() ~ End).map{ case (h, t) =>
+            (if (h.size==0) Nil else List(TupleValue(List(StringValue("reset"), StringValue(h))))) ::: t.toList
+        }
+    }
+
+    def parse_string_color_formated(file: String): List[TupleValue] = {
+        val result = fastparse.parse(file, multi_string_color_formated(using _), true)
+        result match {
+            case Parsed.Success(value, _) => value
+            case f :Parsed.Failure => {
+                Reporter.error(
+                    s"Error parsing string color format: $file" + " "+ 
+                    f.trace().longAggregateMsg,
+                )
+                Nil
+            }
+        }
     }
 
     def parseFromFile(f: String, get: () => String): Instruction = {

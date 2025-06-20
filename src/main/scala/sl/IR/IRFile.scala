@@ -92,7 +92,7 @@ class IRFile(val path: String, val name: String, val contents: List[IRTree], val
         }
     }
     def canBeDeleted(): Boolean = {
-        canDelete
+        canDelete || contents.forall(x => x == EmptyIR || x.isInstanceOf[CommentsIR])
     }
 
     def hasSelfCall(): Boolean = {

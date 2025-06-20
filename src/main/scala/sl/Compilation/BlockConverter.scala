@@ -1,6 +1,8 @@
 package sl.Compilation
 
 import sl.Utils
+import sl.Settings
+import sl.MCBedrock
 
 object BlockConverter{
     lazy val blockMap = loadBlockMap()
@@ -12,6 +14,14 @@ object BlockConverter{
     }
     def getItemID(name: String)={
         blockMap.getOrElse(name, (name, "0"))._2
+    }
+    def get_platform_block_name(name: String) = {
+        if (Settings.target == MCBedrock){
+            blockMap.getOrElse(name, (name, "-1"))._1
+        }
+        else{
+            name
+        }
     }
     def loadBlockMap()={
         val line = Utils.getConfig("blockmap.csv")
