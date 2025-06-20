@@ -160,8 +160,8 @@ abstract class Function(context: Context, val contextName: String, name: String,
     def getFunctionType() = FuncType(arguments.map(a => a.typ), typ)
     def getIRFile(): Option[IRFile] = {
         val content = getContent()
-        if (content.isEmpty) None
-        else {   
+        /*  if (content.isEmpty) None
+        else {  */ 
             Some(IRFile(getName(), fullName, getContent(), getExtraContextPathComments() ::: modifiers.getDocAsIR() ::: getExtraComments(), false, 
                 !(modifiers.isTicking ||
                 modifiers.isLoading || 
@@ -170,7 +170,7 @@ abstract class Function(context: Context, val contextName: String, name: String,
                 (!Settings.optimizeAllowRemoveProtected && modifiers.protection == Protection.Protected && !wasMovedToBlock))
                 , modifiers.isMacro
             ))
-        }
+        //}
     }
     def getExtraContextPathComments(): List[IRTree] = {
         if (Settings.exportContextPath){
