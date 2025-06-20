@@ -134,7 +134,12 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
                 }
             }
         }
-        ret
+        if (ret == null || ret.isUseAllowed){
+            ret
+        }
+        else{
+            getFunctionToCompile()
+        }
     }
     def getFunctionToCompile(level: Int):List[ConcreteFunction] = {
         val r = root
@@ -156,7 +161,7 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
                 }
             }
         }
-        ret
+        ret.filter(f => f.isUseAllowed)
     }
     def getMuxes():List[MultiplexFunction] = {
         val r = muxCtx
@@ -1215,12 +1220,12 @@ class Context(val name: String, val parent: Context = null, _root: Context = nul
         }
     }
 
-    private def getElementList[T](mapGetter: (Context)=>mutable.Map[String, List[T]])(identifier: Identifier, down: Boolean = false, up: Boolean = false): List[T] = {
+    private def getElementList[T <: CObject](mapGetter: (Context)=>mutable.Map[String, List[T]])(identifier: Identifier, down: Boolean = false, up: Boolean = false): List[T] = {
         val value = getElementListInner(mapGetter)(identifier, down, up)
-        (inheritted.flatMap(_.getElementList(mapGetter)(identifier, down, up)) ::: value).distinct
+        (inheritted.flatMap(_.getElementList(mapGetter)(identifier, down, up)) ::: value).distinct.filter(x => x != null && x.isUseAllowed)
     }
 
-    private def getElementListInner[T](mapGetter: (Context)=>mutable.Map[String, List[T]])(identifier: Identifier, down: Boolean = false, up: Boolean = false): List[T] = {
+    private def getElementListInner[T <: CObject](mapGetter: (Context)=>mutable.Map[String, List[T]])(identifier: Identifier, down: Boolean = false, up: Boolean = false): List[T] = {
         val map = mapGetter(this)
         // Check if single word
         if (identifier.isSingleton()){

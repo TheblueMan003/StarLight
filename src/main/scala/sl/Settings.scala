@@ -73,6 +73,8 @@ class SettingsContext(){
     var exportSource = false
     var exportContextPath = true
 
+    var addDefaultFunctionTag = true
+
     var optimizeMaxInlining = 10
 
     var globalImport: Instruction = InstructionList(List())
@@ -145,10 +147,16 @@ case object MCJava extends Target{
 
         
 
-        List(IRFile("pack.mcmeta", "pack.mcmeta", List(JsonIR(getPackMeta())), List(), true),
-            IRFile(f"data/${context.root.getPath()}/function/__init__.mcfunction", "__init__", dfScore,List(), false, false),
-            IRFile("data/minecraft/tags/function/tick.json", "data/minecraft/tags/function/tick.json", List(JsonIR("{"+ f"\t\"values\":[$ticks]"+ "}")), List(),true),
-            IRFile("data/minecraft/tags/function/load.json", "data/minecraft/tags/function/load.json", List(JsonIR("{"+ f"\t\"values\":[$loads]"+ "}")), List(),true))
+        if (Settings.addDefaultFunctionTag){
+            List(IRFile("pack.mcmeta", "pack.mcmeta", List(JsonIR(getPackMeta())), List(), true),
+                IRFile(f"data/${context.root.getPath()}/function/__init__.mcfunction", "__init__", dfScore,List(), false, false),
+                IRFile("data/minecraft/tags/function/tick.json", "data/minecraft/tags/function/tick.json", List(JsonIR("{"+ f"\t\"values\":[$ticks]"+ "}")), List(),true),
+                IRFile("data/minecraft/tags/function/load.json", "data/minecraft/tags/function/load.json", List(JsonIR("{"+ f"\t\"values\":[$loads]"+ "}")), List(),true))
+        }
+        else{
+            List(IRFile("pack.mcmeta", "pack.mcmeta", List(JsonIR(getPackMeta())), List(), true),
+                IRFile(f"data/${context.root.getPath()}/function/__init__.mcfunction", "__init__", dfScore,List(), false, false))
+        }
     }
 
     def getPackMeta()=

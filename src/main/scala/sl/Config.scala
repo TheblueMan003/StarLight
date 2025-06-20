@@ -97,6 +97,7 @@ object ConfigLoader{
                     case ("export.doc", value) => Settings.exportDoc = value == "true"
                     case ("export.source", value) => Settings.exportSource = value == "true"
                     case ("export.contextPath", value) => Settings.exportContextPath = value == "true"
+                    case ("export.functionTag", value) => Settings.addDefaultFunctionTag = value == "true"
 
                     case ("console.info.parsed", value) => Settings.consoleInfoParsed = value == "true"
                     case ("console.info.preparsed", value) => Settings.consoleInfoPreParsed = value == "true"
@@ -196,6 +197,7 @@ object ConfigLoader{
             f"export.doc=${Settings.exportDoc}",
             f"export.source=${Settings.exportSource}",
             f"export.contextPath=${Settings.exportContextPath}",
+            f"export.functionTag=${Settings.addDefaultFunctionTag}",
 
             f"experimental.multi_thread=${Settings.experimentalMultithread}",
             

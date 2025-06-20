@@ -21,7 +21,7 @@ object Compiler{
 
         val buffer = new ArrayBuffer[IRFile]()
 
-        context.getAllFunction().map(_._2).filter(_.exists()).foreach(fct => buffer += fct.getIRFile())
+        context.getAllFunction().map(_._2).filter(x => x.exists() && x.isUseAllowed).foreach(fct => buffer += fct.getIRFile())
         context.getAllJsonFiles().filter(f => f.exists() && f.isDatapack()).foreach(fct => buffer += fct.getIRFile())
         context.getAllBlockTag().filter(_.exists()).foreach(fct => buffer += fct.getIRFile())
         context.getAllPredicates().flatMap(_.getIRFiles()).foreach(fct => buffer += fct)
