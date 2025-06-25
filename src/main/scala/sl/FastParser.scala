@@ -320,8 +320,8 @@ object FastParser {
         }
     )
     def timeline_for[$: P]: P[TimelineElement] = positioned(
-        (keywordD("for") ~ "(" ~ timeline_time ~ ")" ~ instruction).map {
-            case (expr, instr) => ForLengthTimelineElement(expr, instr)
+        (keywordD("for") ~ "(" ~ timeline_time ~ ((keywordD("by") | "~") ~ expr).? ~ ")" ~ instruction).map {
+            case (expr, step, instr) => ForLengthTimelineElement(expr, step.getOrElse(IntValue(1)), instr)
         }
     )
     def timeline_after[$: P]: P[TimelineElement] = positioned(
@@ -330,13 +330,13 @@ object FastParser {
         }
     )
     def timeline_until[$: P]: P[TimelineElement] = positioned(
-        (keywordD("until") ~ "(" ~ expr ~ ")" ~ instruction).map {
-            case (expr, instr) => UntilTimelineElement(expr, instr)
+        (keywordD("until") ~ "(" ~ expr ~ ((keywordD("by") | "~") ~ expr).? ~ ")" ~ instruction).map {
+            case (expr, step, instr) => UntilTimelineElement(expr, step.getOrElse(IntValue(1)), instr)
         }
     )
     def timeline_while[$: P]: P[TimelineElement] = positioned(
-        (keywordD("while") ~ "(" ~ expr ~ ")" ~ instruction).map {
-            case (expr, instr) => WhileTimelineElement(expr, instr)
+        (keywordD("while") ~ "(" ~ expr ~ ((keywordD("by") | "~") ~ expr).? ~ ")" ~ instruction).map {
+            case (expr, step, instr) => WhileTimelineElement(expr, step.getOrElse(IntValue(1)), instr)
         }
     )
     def timeline_direct[$: P]: P[TimelineElement] = positioned(
@@ -375,7 +375,7 @@ object FastParser {
                 FunctionDecl(n, InstructionList(List()), t, a, at, mod.withDoc(doc))
             }
         }
-        | (doc ~ keywordD("def").? ~ modifier("function") ~ identLazy ~ typeArgument ~ arguments ~ functionInstruction).map {
+        | (doc ~ keywordD("def") ~ modifier("function") ~ identLazy ~ typeArgument ~ arguments ~ functionInstruction).map {
             case (doc, mod, n, at, a, i) => {
                 FunctionDecl(n, i, VoidType, a, at, mod.withDoc(doc))
             }

@@ -77,7 +77,7 @@ def lazy __async_repeat__(int time, void=>void action, void=>void next){
     }
     loop()
 }
-def lazy __until__(bool cond, void=>void action, void=>void next){
+def lazy __until__(bool cond, int step, void=>void action, void=>void next){
     import cmd.schedule as schedule
     def loop(){
         action()
@@ -85,17 +85,17 @@ def lazy __until__(bool cond, void=>void action, void=>void next){
             next()
         }
         else{
-            schedule.add(1, loop)
+            schedule.add(step, loop)
         }
     }
     loop()
 }
-def lazy __while__(bool cond, void=>void action, void=>void next){
+def lazy __while__(bool cond, int step, void=>void action, void=>void next){
     import cmd.schedule as schedule
     def loop(){
         action()
         if (cond){
-            schedule.add(1, loop)
+            schedule.add(step, loop)
         }
         else{
             next()

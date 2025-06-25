@@ -145,9 +145,9 @@ object Utils{
         elm match {
             case EventTimelineElement(time, instruction)        => EventTimelineElement(subst(time, from, to), subst(instruction, from, to))
             case DelayTimelineElement(time, instruction)        => DelayTimelineElement(subst(time, from, to), subst(instruction, from, to))  
-            case ForLengthTimelineElement(time, instruction)    => ForLengthTimelineElement(subst(time, from, to), subst(instruction, from, to))
-            case UntilTimelineElement(time, instruction)        => UntilTimelineElement(subst(time, from, to), subst(instruction, from, to))
-            case WhileTimelineElement(time, instruction)        => WhileTimelineElement(subst(time, from, to), subst(instruction, from, to))
+            case ForLengthTimelineElement(time, step, instruction)    => ForLengthTimelineElement(subst(time, from, to), subst(step, from, to), subst(instruction, from, to))
+            case UntilTimelineElement(time, step, instruction)        => UntilTimelineElement(subst(time, from, to), subst(step, from, to), subst(instruction, from, to))
+            case WhileTimelineElement(time, step, instruction)        => WhileTimelineElement(subst(time, from, to), subst(step, from, to), subst(instruction, from, to))
             case DirectTimelineElement(instruction)             => DirectTimelineElement(subst(instruction, from, to))
         }
     }) 
@@ -264,9 +264,9 @@ object Utils{
         elm match {
             case EventTimelineElement(time, instruction)        => EventTimelineElement(subst(time, from, to), subst(instruction, from, to))
             case DelayTimelineElement(time, instruction)        => DelayTimelineElement(subst(time, from, to), subst(instruction, from, to))  
-            case ForLengthTimelineElement(time, instruction)    => ForLengthTimelineElement(subst(time, from, to), subst(instruction, from, to))
-            case UntilTimelineElement(time, instruction)        => UntilTimelineElement(subst(time, from, to), subst(instruction, from, to))
-            case WhileTimelineElement(time, instruction)        => WhileTimelineElement(subst(time, from, to), subst(instruction, from, to))
+            case ForLengthTimelineElement(time, step, instruction)    => ForLengthTimelineElement(subst(time, from, to), subst(step, from, to), subst(instruction, from, to))
+            case UntilTimelineElement(time, step, instruction)        => UntilTimelineElement(subst(time, from, to), subst(step, from, to), subst(instruction, from, to))
+            case WhileTimelineElement(time, step, instruction)        => WhileTimelineElement(subst(time, from, to), subst(step, from, to), subst(instruction, from, to))
             case DirectTimelineElement(instruction)             => DirectTimelineElement(subst(instruction, from, to))
         }
     }) 
@@ -426,9 +426,9 @@ object Utils{
         elm match {
             case EventTimelineElement(time, instruction)        => EventTimelineElement(subst(time, from, to), subst(instruction, from, to))
             case DelayTimelineElement(time, instruction)        => DelayTimelineElement(subst(time, from, to), subst(instruction, from, to))  
-            case ForLengthTimelineElement(time, instruction)    => ForLengthTimelineElement(subst(time, from, to), subst(instruction, from, to))
-            case UntilTimelineElement(time, instruction)        => UntilTimelineElement(subst(time, from, to), subst(instruction, from, to))
-            case WhileTimelineElement(time, instruction)        => WhileTimelineElement(subst(time, from, to), subst(instruction, from, to))
+            case ForLengthTimelineElement(time, step, instruction)    => ForLengthTimelineElement(subst(time, from, to), subst(step, from, to), subst(instruction, from, to))
+            case UntilTimelineElement(time, step, instruction)        => UntilTimelineElement(subst(time, from, to), subst(step, from, to), subst(instruction, from, to))
+            case WhileTimelineElement(time, step, instruction)        => WhileTimelineElement(subst(time, from, to), subst(step, from, to), subst(instruction, from, to))
             case DirectTimelineElement(instruction)             => DirectTimelineElement(subst(instruction, from, to))
         }
     }) 
@@ -594,9 +594,9 @@ object Utils{
         elm match {
             case EventTimelineElement(event, instruction)       => EventTimelineElement(event, fix(instruction))
             case DelayTimelineElement(time, instruction)        => DelayTimelineElement(time, fix(instruction))  
-            case ForLengthTimelineElement(time, instruction)    => ForLengthTimelineElement(time, fix(instruction))
-            case UntilTimelineElement(time, instruction)        => UntilTimelineElement(time, fix(instruction))
-            case WhileTimelineElement(time, instruction)        => WhileTimelineElement(time, fix(instruction))
+            case ForLengthTimelineElement(time, step, instruction)    => ForLengthTimelineElement(time, step, fix(instruction))
+            case UntilTimelineElement(time, step, instruction)        => UntilTimelineElement(time, step, fix(instruction))
+            case WhileTimelineElement(time, step, instruction)        => WhileTimelineElement(time, step, fix(instruction))
             case DirectTimelineElement(instruction)             => DirectTimelineElement(fix(instruction))
         }
     }

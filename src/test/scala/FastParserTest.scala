@@ -9,7 +9,7 @@ class FastParserTest extends munit.FunSuite {
 
     test("Function Declaration") {
         val input = "def f(){var x = 10}"
-        val expected = "def f() {\nvar? x = 10\n}"
+        val expected = "def f(): void {\nvar? x = 10\n}"
         assertEquals(sl.FastParser.parse(input).toString, expected)
     }
 
@@ -133,6 +133,13 @@ class FastParserTest extends munit.FunSuite {
         val input = "facing(@p)./say hi"
 
         val expected = "facing(List(@p)) /say hi"
+        assertEquals(sl.FastParser.parse(input).toString, expected)
+    }
+
+    test("fct call") {
+        val input = "test()test()"
+
+        val expected = "test<>()\ntest<>()"
         assertEquals(sl.FastParser.parse(input).toString, expected)
     }
 }

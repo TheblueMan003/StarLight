@@ -959,6 +959,48 @@ object DefaultFunction{
                 },
                 false
             ))
+        ctx.addFunction("schedule", CompilerFunction(ctx, "schedule", 
+            List(Argument("fct", MCObjectType, None), Argument("time", IntType, None)),
+            VoidType,
+            Modifier.newPublic(),
+            (args: List[Expression],ctx: Context) => {
+                args match{
+                    case LinkedFunctionValue(vari)::IntValue(time)::Nil => {
+                        (List(ScheduleCall(Settings.target.getFunctionName(vari.fullName),vari.fullName, time)), NullValue)
+                    }
+                    case VariableValue(fct, sel)::IntValue(time)::Nil => {
+                        val vari = ctx.getFunction(fct)
+                        (List(ScheduleCall(Settings.target.getFunctionName(vari.fullName),vari.fullName, time)), NullValue)
+                    }
+                    case LambdaValue(args, instr, ctx2)::IntValue(time)::Nil => {
+                        val block = ctx2.getFreshLambda(args, List(), VoidType, instr, false)
+                        block.markAsStringUsed()
+                        (List(ScheduleCall(Settings.target.getFunctionName(block.fullName), block.fullName, time)), NullValue)
+                    }
+                    case other => throw new Exception(f"Illegal Arguments $other for schedule")
+                }
+            },
+            false
+        ))
+        ctx.addFunction("scheduleClear", CompilerFunction(ctx, "scheduleClear", 
+            List(Argument("fct", MCObjectType, None)),
+            VoidType,
+            Modifier.newPublic(),
+            (args: List[Expression],ctx: Context) => {
+                args match{
+                    case LinkedFunctionValue(vari)::Nil => {
+                        (List(ScheduleClear(Settings.target.getFunctionName(vari.fullName),vari.fullName)), NullValue)
+                    }
+                    case VariableValue(fct, sel)::Nil => {
+                        val vari = ctx.getFunction(fct)
+                        (List(ScheduleClear(Settings.target.getFunctionName(vari.fullName),vari.fullName)), NullValue)
+                    }
+                    case other => throw new Exception(f"Illegal Arguments $other for scheduleClear")
+                }
+            },
+            false
+        ))
+        
         if (Settings.target == MCJava){
             ctx.addFunction("blockbenchSummon", CompilerFunction(ctx, "blockbenchSummon", 
                 List(Argument("name", MCObjectType, None)),
@@ -1045,47 +1087,6 @@ object DefaultFunction{
                     },
                 false
                 ))
-            ctx.addFunction("schedule", CompilerFunction(ctx, "schedule", 
-                List(Argument("fct", MCObjectType, None), Argument("time", IntType, None)),
-                VoidType,
-                Modifier.newPublic(),
-                (args: List[Expression],ctx: Context) => {
-                    args match{
-                        case LinkedFunctionValue(vari)::IntValue(time)::Nil => {
-                            (List(ScheduleCall(Settings.target.getFunctionName(vari.fullName),vari.fullName, time)), NullValue)
-                        }
-                        case VariableValue(fct, sel)::IntValue(time)::Nil => {
-                            val vari = ctx.getFunction(fct)
-                            (List(ScheduleCall(Settings.target.getFunctionName(vari.fullName),vari.fullName, time)), NullValue)
-                        }
-                        case LambdaValue(args, instr, ctx2)::IntValue(time)::Nil => {
-                            val block = ctx2.getFreshLambda(args, List(), VoidType, instr, false)
-                            block.markAsStringUsed()
-                            (List(ScheduleCall(Settings.target.getFunctionName(block.fullName), block.fullName, time)), NullValue)
-                        }
-                        case other => throw new Exception(f"Illegal Arguments $other for schedule")
-                    }
-                },
-                false
-            ))
-            ctx.addFunction("scheduleClear", CompilerFunction(ctx, "scheduleClear", 
-                List(Argument("fct", MCObjectType, None)),
-                VoidType,
-                Modifier.newPublic(),
-                (args: List[Expression],ctx: Context) => {
-                    args match{
-                        case LinkedFunctionValue(vari)::Nil => {
-                            (List(ScheduleClear(Settings.target.getFunctionName(vari.fullName),vari.fullName)), NullValue)
-                        }
-                        case VariableValue(fct, sel)::Nil => {
-                            val vari = ctx.getFunction(fct)
-                            (List(ScheduleClear(Settings.target.getFunctionName(vari.fullName),vari.fullName)), NullValue)
-                        }
-                        case other => throw new Exception(f"Illegal Arguments $other for scheduleClear")
-                    }
-                },
-                false
-            ))
         }
         if (Settings.target == MCBedrock){
             ctx.addFunction("random", CompilerFunction(ctx, "random", 

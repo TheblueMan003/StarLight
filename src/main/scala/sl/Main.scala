@@ -96,15 +96,23 @@ object Main {
             }
           }
           case "build" => {
-            if ((args.length < 1 && lastBuild == null)) {
-              Reporter.error(f"Expected 1 argument got: ${args.length - 1}")
-            } else if ((args.length < 1 && lastBuild != null)) {
-              build(lastBuild)
-              Reporter.ok("Build Completed!")
-            } else {
-              lastBuild = args(1) + ".slconf"
-              build(args(1) + ".slconf")
-              Reporter.ok("Build Completed!")
+            try{
+              if ((args.length < 1 && lastBuild == null)) {
+                Reporter.error(f"Expected 1 argument got: ${args.length - 1}")
+              } else if ((args.length < 1 && lastBuild != null)) {
+                build(lastBuild)
+                Reporter.ok("Build Completed!")
+              } else {
+                lastBuild = args(1) + ".slconf"
+                build(args(1) + ".slconf")
+                Reporter.ok("Build Completed!")
+              }
+            }
+            catch {
+              case e: Throwable => {
+                Reporter.error(e.getMessage())
+                lastExecption = e
+              }
             }
           }
           case "test" => {

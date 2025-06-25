@@ -134,14 +134,19 @@ object Compiler{
                             val (fct,cargs) = context.getFunction(Identifier.fromString("__wait_for__"), uargs, List(), VoidType)
                             (fct, cargs).call()
                         }
-                        case UntilTimelineElement(time, instr) => {
-                            val uargs = List(time, LambdaValue(List(), instr, context), LambdaValue(List(), TimelineInner(elments.tail), context))
+                        case UntilTimelineElement(time, step, instr) => {
+                            val uargs = List(time, step, LambdaValue(List(), instr, context), LambdaValue(List(), TimelineInner(elments.tail), context))
                             val (fct,cargs) = context.getFunction(Identifier.fromString("__until__"), uargs, List(), VoidType)
                             (fct, cargs).call()
                         }
-                        case ForLengthTimelineElement(time, instr) => {
-                            val uargs = List(time, LambdaValue(List(), instr,context), LambdaValue(List(), TimelineInner(elments.tail), context))
+                        case ForLengthTimelineElement(time, step, instr) => {
+                            val uargs = List(time, step, LambdaValue(List(), instr, context), LambdaValue(List(), TimelineInner(elments.tail), context))
                             val (fct,cargs) = context.getFunction(Identifier.fromString("__async_repeat__"), uargs, List(), VoidType)
+                            (fct, cargs).call()
+                        }
+                        case WhileTimelineElement(time, step, instr) => {
+                            val uargs = List(time, step, LambdaValue(List(), instr, context), LambdaValue(List(), TimelineInner(elments.tail), context))
+                            val (fct,cargs) = context.getFunction(Identifier.fromString("__while__"), uargs, List(), VoidType)
                             (fct, cargs).call()
                         }
                         case DirectTimelineElement(instruction) => {

@@ -1,6 +1,9 @@
 package sl.IR
 
 import objects.Variable
+import sl.Settings
+import sl.MCJava
+import sl.MCBedrock
 
 trait IRTree{
     var canBeDeleted = false
@@ -416,10 +419,30 @@ case class BlockCall(function: String, fullName: String, arg: String) extends IR
         else s"function $function $arg"
 }
 case class ScheduleCall(function: String, fullName: String, time: Int) extends IRTree{
-    def getString(): String = s"schedule function $function $time append"
+    def getString(): String = {
+        if (Settings.target == MCJava){
+            s"schedule function $function $time append"
+        }
+        else if (Settings.target == MCBedrock){
+            s"schedule delay add $function $time append"
+        }
+        else{
+            throw new Exception("Unknown target: " + Settings.target)
+        }
+    }
 }
 case class ScheduleClear(function: String, fullName: String) extends IRTree{
-    def getString(): String = s"schedule clear $function"
+    def getString(): String = {
+        if (Settings.target == MCJava){
+            s"schedule clear $function"
+        }
+        else if (Settings.target == MCBedrock){
+            s"schedule delay clear $function"
+        }
+        else{
+            throw new Exception("Unknown target: " + Settings.target)
+        }
+    }
 }
 case class InterpreterException(message: String) extends IRTree{
     def getString(): String = s""

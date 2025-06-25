@@ -61,7 +61,7 @@ case class ExtensionDecl(val name: Type, val block: Instruction, val modifier: M
 }
 
 case class FunctionDecl(val name: String, val block: Instruction, val typ: Type, val args: List[Argument], val typeArgs: List[String], val modifier: Modifier) extends Instruction {
-  override def toString() = f"def ${name}(${args.mkString(", ")}) ${block}"
+  override def toString() = f"def ${name}(${args.mkString(", ")}): $typ ${block}"
 }
 case class OptionalFunctionDecl(val name: Identifier, val source: Identifier, val library: Identifier, val typ: Type, val args: List[Argument], val typeArgs: List[String], val modifier: Modifier) extends Instruction {
   override def toString() = f"def ${name}(${args.mkString(", ")})"
@@ -231,13 +231,13 @@ trait TimelineElement extends CPositionable {
 case class DelayTimelineElement(val time: Expression, val instruction: Instruction) extends TimelineElement {
   override def toString(): String = f"delay($time)$instruction"
 }
-case class ForLengthTimelineElement(val time: Expression, val instruction: Instruction) extends TimelineElement {
+case class ForLengthTimelineElement(val time: Expression, val delay: Expression, val instruction: Instruction) extends TimelineElement {
   override def toString(): String = f"for($time)$instruction"
 }
-case class UntilTimelineElement(val time: Expression, val instruction: Instruction) extends TimelineElement {
+case class UntilTimelineElement(val time: Expression, val delay: Expression, val instruction: Instruction) extends TimelineElement {
   override def toString(): String = f"until($time)$instruction"
 }
-case class WhileTimelineElement(val time: Expression, val instruction: Instruction) extends TimelineElement {
+case class WhileTimelineElement(val time: Expression, val delay: Expression, val instruction: Instruction) extends TimelineElement {
   override def toString(): String = f"while($time)$instruction"
 }
 case class EventTimelineElement(val event: Expression, val instruction: Instruction) extends TimelineElement {
